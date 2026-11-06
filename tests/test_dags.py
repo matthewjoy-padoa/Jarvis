@@ -45,8 +45,8 @@ def test_dags_for_a_card_resource_first_then_groups(catalogue):
 def app(catalogue, monkeypatch):
     d = Deployment(slug="acme", client="Acme", software="Uegar", orchestrator=["acme-uegar"],
                    actions=[Action(title="Injection des firms", injection=True, injection_status="A faire", resources=["firm"])])
-    monkeypatch.setattr(main.vault, "get_deployment", lambda slug: d if slug == "acme" else None)
-    monkeypatch.setattr(main.vault, "list_deployments", lambda: [d])
+    monkeypatch.setattr(main.fiches, "get_deployment", lambda slug: d if slug == "acme" else None)
+    monkeypatch.setattr(main.fiches, "list_deployments", lambda: [d])
     monkeypatch.setattr(main, "airflow", AirflowSource(""))
     return TestClient(main.app)
 
@@ -126,7 +126,7 @@ def test_ced_cards_rule(title, injection, expected):
 
 
 def test_ced_view_and_launch(app, monkeypatch):
-    d = main.vault.get_deployment("acme")
+    d = main.fiches.get_deployment("acme")
     d.orchestrator = ["acme-pulse"]
     d.actions.append(Action(title="[INTE] [PULSE] Injecter les fichiers"))
     html = app.get("/deploiements/acme/injections?vue=ced").text

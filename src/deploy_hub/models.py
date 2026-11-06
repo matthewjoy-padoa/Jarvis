@@ -202,7 +202,7 @@ class Link:
 
 @dataclass
 class Stack:
-    """Une stack Padoa du client (prod, recette, formation…), saisie dans sync/clients/<slug>.yaml."""
+    """Une stack Padoa du client (prod, recette, formation…), saisie dans la configuration du client (config/clients/<slug>.yaml)."""
     label: str
     url: str
     env: str = ""
@@ -235,7 +235,7 @@ class Deployment:
     client: str
     software: str
     status: str = "en cours"
-    orchestrator: list[str] = field(default_factory=list)  # clés client de l'orchestrator (sync/clients/<slug>.yaml)
+    orchestrator: list[str] = field(default_factory=list)  # clés client de l'orchestrator (configuration du client)
     notion_url: str = ""
     synced_at: str = ""
     injection_counts: dict[str, int] = field(default_factory=dict)  # synchro Notion : nb de cartes par statut

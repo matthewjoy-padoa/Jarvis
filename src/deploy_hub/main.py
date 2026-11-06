@@ -8,7 +8,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from deploy_hub.config import PROJECT_ROOT, load_settings
+from deploy_hub import client_config
+from deploy_hub.config import PROJECT_ROOT, clients_dir, load_settings
 from deploy_hub.models import DONE, INJECTION_STATUSES, MILESTONE_LABELS, Deployment, status_group
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
@@ -19,13 +20,13 @@ from deploy_hub.sources.external import external_statuses
 from deploy_hub.sources.journal import changes_since
 from deploy_hub.sources import watchers
 from deploy_hub.sources.notifications import NotificationStore
-from deploy_hub.sources.vault import VaultSource
+from deploy_hub.sources.fiches import FicheSource
 
 HERE = Path(__file__).parent
 
 settings = load_settings()
 live = settings.mode == "live"
-vault = VaultSource(settings.deployments_dir, PROJECT_ROOT / "sync" / "clients")
+fiches = FicheSource(settings.deployments_dir, clients_dir())
 airflow = AirflowSource.from_env()
 notifications = NotificationStore(Path(os.getenv("DEPLOY_HUB_NOTIFICATIONS") or settings.deployments_dir.parent / "notifications.json"))
 claude = ClaudeRunner(settings.orchestrator_dir, live=live, notifications=notifications)
@@ -59,6 +60,13 @@ DEPLOYMENT_TABS = [
 ]
 
 
+def _deployments(request: Request) -> list[Deployment]:
+    """Toutes les fiches, lues une seule fois par requête (menu et contenu de la page partagent la même liste)."""
+    if not hasattr(request.state, "deployments"):
+        request.state.deployments = fiches.list_deployments()
+    return request.state.deployments
+
+
 def _render(request: Request, template: str, active: str, **context) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
@@ -66,7 +74,7 @@ def _render(request: Request, template: str, active: str, **context) -> HTMLResp
         {
             "pages": PAGES,
             "cross_pages": CROSS_PAGES,
-            "clients": vault.list_deployments(),
+            "clients": _deployments(request),
             "active": active,
             "mode": settings.mode,
             "airflow": airflow,
@@ -81,7 +89,7 @@ def _render(request: Request, template: str, active: str, **context) -> HTMLResp
 
 
 def _get(slug: str) -> Deployment:
-    deployment = vault.get_deployment(slug)
+    deployment = fiches.get_deployment(slug)
     if deployment is None:
         raise HTTPException(404, f"Déploiement inconnu : {slug}")
     return deployment
@@ -107,7 +115,7 @@ def _result(request: Request, result: ActionResult) -> HTMLResponse:
 @app.get("/", response_class=HTMLResponse)
 def today_page(request: Request):
     """Ce qui demande de l'attention aujourd'hui, tous clients : retards, échéances, KO, jalons, et « Quoi de neuf »."""
-    deployments = vault.list_deployments()
+    deployments = _deployments(request)
     today = date.today()
     items = [i for i in _deadlines(deployments) if i["kind"] != "Jalon"]
     return _render(
@@ -132,38 +140,86 @@ def whats_new(request: Request, depuis: str = "", client: str = ""):
     except ValueError:
         since = None
     since = since or datetime.now() - timedelta(days=1)
-    deployments = [_get(client)] if client else vault.list_deployments()
+    deployments = [_get(client)] if client else _deployments(request)
     changes = sorted((c for d in deployments for c in changes_since(d, settings.deployments_dir, since)), key=lambda c: c.when, reverse=True)
     return templates.TemplateResponse(request, "_whats_new.html", {"changes": changes, "since": since, "show_client": not client})
 
 
 @app.get("/clients", response_class=HTMLResponse)
-def index(request: Request):
-    return _render(request, "index.html", "/clients", deployments=vault.list_deployments())
+def index(request: Request, enregistre: str = "", retire: str = ""):
+    deployments = _deployments(request)
+    synced = {d.slug for d in deployments}
+    pending = [c for slug in client_config.slugs() if slug not in synced and (c := client_config.load(slug))]
+    return _render(request, "index.html", "/clients", deployments=deployments, pending=pending, saved=enregistre, retired=retire)
+
+
+def _client_form(request: Request, cfg, error: str = "", new: bool = True, form: dict | None = None) -> HTMLResponse:
+    suggestions = sorted(dag_catalogue.catalogue()["clients"])
+    return _render(request, "client_form.html", "/clients", cfg=cfg, error=error, new=new, form=form or {}, suggestions=suggestions)
+
+
+@app.get("/clients/nouveau", response_class=HTMLResponse)
+def client_new(request: Request):
+    return _client_form(request, None)
+
+
+def _config_or_fiche(slug: str):
+    """Configuration du client, ou, pour une fiche qui n'en a pas encore, une configuration de départ tirée de la fiche."""
+    cfg = client_config.load(slug)
+    if cfg is not None:
+        return cfg, ""
+    return client_config.ClientConfig.from_deployment(_get(slug)), "Ce client n'a pas encore de configuration : renseigne au moins sa fiche Notion."
+
+
+@app.get("/clients/{slug}/configuration", response_class=HTMLResponse)
+def client_edit(request: Request, slug: str):
+    cfg, notice = _config_or_fiche(slug)
+    return _client_form(request, cfg, notice, new=False)
+
+
+@app.post("/clients/enregistrer", response_class=HTMLResponse)
+async def client_save(request: Request):
+    form = dict(await request.form())
+    existing = (form.get("existing_slug") or "").strip() or None
+    try:
+        cfg = client_config.from_form(form, existing)
+        client_config.save(cfg, new=existing is None)
+    except client_config.ConfigError as e:
+        return _client_form(request, _config_or_fiche(existing)[0] if existing else None, str(e), new=existing is None, form=form)
+    return RedirectResponse(f"/clients?enregistre={cfg.slug}", status_code=303)
+
+
+@app.post("/clients/{slug}/retirer")
+def client_retire(slug: str):
+    try:
+        client_config.retire(slug)
+    except client_config.ConfigError as e:
+        raise HTTPException(404, str(e))
+    return RedirectResponse(f"/clients?retire={slug}", status_code=303)
 
 
 @app.get("/injections", response_class=HTMLResponse)
 def injections(request: Request, vue: str = "ressources"):
-    return _render(request, "list.html", "/injections", title="Injections", part="injections", deployments=vault.list_deployments(), vue=vue)
+    return _render(request, "list.html", "/injections", title="Injections", part="injections", deployments=_deployments(request), vue=vue)
 
 
 @app.get("/actions", response_class=HTMLResponse)
 def actions(request: Request, tous: bool = False):
     return _render(
-        request, "list.html", "/actions", title="Actions", part="actions", deployments=vault.list_deployments(), show_all=tous
+        request, "list.html", "/actions", title="Actions", part="actions", deployments=_deployments(request), show_all=tous
     )
 
 
 @app.get("/recette", response_class=HTMLResponse)
 def recette(request: Request, tous: bool = False):
     return _render(
-        request, "list.html", "/recette", title="Retours de recette", part="recette", deployments=vault.list_deployments(), show_all=tous
+        request, "list.html", "/recette", title="Retours de recette", part="recette", deployments=_deployments(request), show_all=tous
     )
 
 
 @app.get("/deadlines", response_class=HTMLResponse)
 def deadlines(request: Request):
-    return _render(request, "deadlines.html", "/deadlines", items=_deadlines(vault.list_deployments()))
+    return _render(request, "deadlines.html", "/deadlines", items=_deadlines(_deployments(request)))
 
 
 @app.get("/agents", response_class=HTMLResponse)
@@ -294,7 +350,7 @@ def refresh_one(request: Request, slug: str):
 def _deadline_notes() -> None:
     """Veilles (sources/watchers.py) : échéance du jour, synchro en retard, santé qui se dégrade, jalon proche."""
     now = datetime.now()
-    deployments = vault.list_deployments()
+    deployments = fiches.list_deployments()
     state = notifications.load_state()
     health, seen = watchers.health_notes(deployments, state.get("sante", {}), now)
     notifications.add_many(

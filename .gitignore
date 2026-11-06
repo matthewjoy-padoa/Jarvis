@@ -2,6 +2,8 @@
 .venv/
 .venv.*/
 .env
+# Configuration de l'utilisateur (ses clients) : modèle dans config.example/.
+config/
 # Données locales : fiches et caches synchronisés depuis Notion, contenu des retours, journal, notifications.
 # Elles restent sur la machine ; le dépôt ne contient que le code, les requêtes, les tests et la démo.
 data/

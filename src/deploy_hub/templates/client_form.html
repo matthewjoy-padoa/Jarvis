@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ "Ajouter un client" if new else "Configurer " ~ cfg.client }} · Jarvis{% endblock %}
+{% block content %}
+{# cfg : ClientConfig existante (modification) ou None ; form : valeurs saisies à réafficher après une erreur. #}
+{% set v = form if form else {} %}
+{% macro val(name, default="") -%}{{ v.get(name) if v.get(name) is not none and form else default }}{%- endmacro %}
+<div class="page-head">
+  <h1>{{ "Ajouter un client" if new else "Configurer " ~ cfg.client }}</h1>
+  <a href="/clients" class="btn-link">← Clients</a>
+</div>
+<p class="muted">La configuration est enregistrée sur ta machine (<code>config/clients/</code>, hors git) : chacun suit ses propres clients. Après l'enregistrement, lance la synchro (routine ou « Rafraîchir depuis Notion ») pour charger ses données.</p>
+{% if error %}<p class="result ko">{{ error }}</p>{% endif %}
+
+<form class="panel client-form" method="post" action="/clients/enregistrer">
+  {% if not new %}<input type="hidden" name="existing_slug" value="{{ cfg.slug }}">{% endif %}
+  <h2>Le client</h2>
+  <div class="field-row">
+    <label class="field">Nom <span class="req">obligatoire</span>
+      <input name="client" required value="{{ val('client', cfg.client if cfg else '') }}" placeholder="ex. Acme Santé au travail"></label>
+    <label class="field">Identifiant
+      <input name="slug" value="{{ val('slug', cfg.slug if cfg else '') }}" {% if not new %}readonly{% endif %} pattern="[a-z0-9][a-z0-9-]*" placeholder="déduit du nom : acme-sante-au-travail">
+      <small class="muted">Sert dans les adresses de l'app. Non modifiable ensuite.</small></label>
+  </div>
+  <div class="field-row">
+    <label class="field">Logiciel(s) d'origine
+      <input name="software" value="{{ val('software', cfg.software if cfg else '') }}" placeholder="ex. Preventiel, Pulse + Uegar"></label>
+    <label class="field">Statut
+      <input name="status" value="{{ val('status', cfg.status if cfg else 'en cours') }}"></label>
+  </div>
+
+  <h2>Notion</h2>
+  <label class="field">Fiche du client dans « Clients en déploiement » <span class="req">obligatoire</span>
+    <input name="page_id" required value="{{ val('page_id', cfg.page_id if cfg else '') }}" placeholder="adresse de la page ou son id (32 caractères)">
+    <small class="muted">Ouvre la fiche du client dans la base « Clients en déploiement », puis copie son lien (••• → Copier le lien). C'est elle qui relie les actions, la recette et les règles du client.</small></label>
+  <label class="field">Dashboard intégration du client
+    <input name="notion_url" type="url" value="{{ val('notion_url', cfg.notion_url if cfg else '') }}" placeholder="https://app.notion.com/p/…"></label>
+  <label class="field">Valeurs « Client » supplémentaires de la recette
+    <input name="recette_clients" value="{{ val('recette_clients', cfg.recette_clients | join(', ') if cfg else '') }}" placeholder="facultatif, ex. acme_pulse, acme-uegar">
+    <small class="muted">Retours de recette à inclure par leur champ « Client », en plus de ceux liés à la fiche.</small></label>
+
+  <h2>Orchestrator et stacks</h2>
+  <label class="field">Clés client de l'orchestrator
+    <input name="orchestrator" list="orchestrator-keys" value="{{ val('orchestrator', cfg.orchestrator | join(', ') if cfg else '') }}" placeholder="facultatif, ex. acme-uegar, acme-pulse">
+    <datalist id="orchestrator-keys">{% for k in suggestions %}<option value="{{ k }}">{% endfor %}</datalist>
+    <small class="muted">Clés de <code>dags/config_deployment.py</code> : elles servent à proposer les DAGs de chaque carte d'injection.</small></label>
+  <label class="field">Stacks Padoa
+    <textarea name="stacks" rows="3" placeholder="une par ligne : env | libellé | adresse&#10;prod | Production | https://…">{{ val('stacks', cfg.stacks_text if cfg else '') }}</textarea></label>
+
+  <div class="form-actions">
+    <button type="submit">{{ "Ajouter le client" if new else "Enregistrer" }}</button>
+    <a href="/clients" class="btn-link">Annuler</a>
+  </div>
+</form>
+
+{% if not new %}
+<form class="panel danger-zone" method="post" action="/clients/{{ cfg.slug }}/retirer" onsubmit="return confirm({{ ('Retirer ' ~ cfg.client ~ ' du suivi ? Sa configuration et sa fiche sont mises de côté (retires/), ses données sont conservées.') | tojson | forceescape }})">
+  <h2>Retirer ce client</h2>
+  <p class="muted">Jarvis ne le suivra plus. Rien n'est supprimé : la configuration va dans <code>config/clients/retires/</code> et les données restent dans <code>data/</code>.</p>
+  <button type="submit" class="secondary">Retirer du suivi</button>
+</form>
+{% endif %}
+{% endblock %}

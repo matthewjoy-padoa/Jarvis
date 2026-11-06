@@ -75,7 +75,7 @@ def app(store, monkeypatch):
     today = date.today()
     d = Deployment(slug="acme", client="Acme", software="Uegar", milestones={"freeze": today},
                    actions=[Action(title="Envoyer le planning", due=today), Action(title="Plus tard", due=today + timedelta(days=3))])
-    monkeypatch.setattr(main.vault, "list_deployments", lambda: [d])
+    monkeypatch.setattr(main.fiches, "list_deployments", lambda: [d])
     monkeypatch.setattr(main, "notifications", store)
     return TestClient(main.app)
 

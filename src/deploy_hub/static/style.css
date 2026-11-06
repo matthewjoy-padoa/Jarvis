@@ -441,3 +441,21 @@ button .ic { margin-right: 2px; }
 }
 .tabs.is-stuck { border-bottom-color: transparent; box-shadow: 0 0 0 100vmax var(--bg), 0 6px 12px -10px rgba(0, 18, 53, .35); clip-path: inset(0 -100vmax -14px); }
 @media (max-width: 900px) { .tabs { position: static; box-shadow: none; clip-path: none; } }
+
+/* Configuration des clients */
+.btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.btn-primary:hover { filter: brightness(1.08); }
+.card-config { position: relative; z-index: 1; display: inline-block; margin-top: 6px; font-size: 13px; font-weight: 600; }
+.pending-card { border-style: dashed; }
+.empty-state { text-align: center; padding: 28px 16px; }
+.client-form { display: grid; gap: 12px; max-width: 860px; }
+.client-form h2 { margin: 10px 0 0; }
+.field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 5px; font-weight: 600; font-size: 14px; }
+.field input, .field textarea { font: inherit; font-weight: 400; font-size: 14px; padding: 8px 12px; border: 2px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); }
+.field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
+.field input[readonly] { background: var(--bg); color: var(--muted); }
+.field small { font-weight: 400; }
+.req { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--bg); border-radius: 999px; padding: 1px 7px; margin-left: 4px; }
+.form-actions { display: flex; gap: 10px; align-items: center; margin-top: 6px; }
+.danger-zone { max-width: 860px; border-color: var(--pa-ko); }

@@ -1,3 +1,4 @@
+import os
 from datetime import date, timedelta
 
 import pytest
@@ -7,17 +8,17 @@ from deploy_hub.config import PROJECT_ROOT
 from deploy_hub.main import app, claude
 from deploy_hub.models import Deployment, ResourceInjection
 from deploy_hub.sources.claude_runner import retour_prompt
-from deploy_hub.sources.vault import VaultSource
+from deploy_hub.sources.fiches import FicheSource
 
 client = TestClient(app)
 DEMO_DIR = PROJECT_ROOT / "demo" / "deploiements"
 
 
 def demo() -> Deployment:
-    return VaultSource(DEMO_DIR).get_deployment("client-demo")
+    return FicheSource(DEMO_DIR).get_deployment("client-demo")
 
 
-def test_vault_parses_demo_deployment():
+def test_fiches_parse_demo_deployment():
     d = demo()
     assert d.client == "Client Démo"
     assert d.go_live == date(2026, 12, 7)
@@ -27,7 +28,7 @@ def test_vault_parses_demo_deployment():
 
 
 def test_unknown_dir_returns_no_deployment(tmp_path):
-    assert VaultSource(tmp_path / "absent").list_deployments() == []
+    assert FicheSource(tmp_path / "absent").list_deployments() == []
 
 
 def _deployment(done: int, total: int, days_since_reception: int, days_to_freeze: int) -> Deployment:
@@ -214,7 +215,7 @@ def test_stacks_fall_back_on_the_client_yaml(tmp_path):
     (tmp_path / "clients" / "acme.yaml").write_text(
         'stacks:\n  - {env: prod, label: Prod, url: "https://example.com/acme"}\n  - {label: Vide, url: ""}\n'
     )
-    d = VaultSource(tmp_path / "fiches", tmp_path / "clients").get_deployment("acme")
+    d = FicheSource(tmp_path / "fiches", tmp_path / "clients").get_deployment("acme")
     assert [(s.env, s.label, s.url) for s in d.stacks] == [("prod", "Prod", "https://example.com/acme")]
 
 
@@ -261,7 +262,7 @@ def test_recette_content_is_read_from_the_local_file(tmp_path):
         '---\nclient: Acme\nretours:\n  - {id: ABC123, status: À faire, notion_url: "https://app.notion.com/abc"}\n---\n')
     (tmp_path / "notion" / "acme").mkdir(parents=True)
     (tmp_path / "notion" / "acme" / "contenu-recette.json").write_text('{"https://app.notion.com/abc": {"analyse": "Une analyse"}}')
-    d = VaultSource(tmp_path / "deploiements").get_deployment("acme")
+    d = FicheSource(tmp_path / "deploiements").get_deployment("acme")
     assert d.retours[0].content == [("Analyse padoa", "Une analyse")]
 
 
@@ -285,9 +286,9 @@ def test_agent_brief_without_content_must_be_completed():
 
 
 @pytest.mark.parametrize(("stored", "shown"), [
-    ("https://app.notion.com/3284976cdfac81cc906cf93e77145e1a", "https://app.notion.com/p/3284976cdfac81cc906cf93e77145e1a"),
-    ("https://www.notion.so/3284976c-dfac-81cc-906c-f93e77145e1a", "https://app.notion.com/p/3284976cdfac81cc906cf93e77145e1a"),
-    ("https://app.notion.com/p/padoa/Dashboard-Presoa-32d4976cdfac80cab1e5d0b46ecbc937", "https://app.notion.com/p/padoa/Dashboard-Presoa-32d4976cdfac80cab1e5d0b46ecbc937"),
+    ("https://app.notion.com/fedcba9876543210fedcba9876543210", "https://app.notion.com/p/fedcba9876543210fedcba9876543210"),
+    ("https://www.notion.so/fedcba98-7654-3210-fedc-ba9876543210", "https://app.notion.com/p/fedcba9876543210fedcba9876543210"),
+    ("https://app.notion.com/p/padoa/Dashboard-Acme-abcdefabcdefabcdefabcdefabcdef12", "https://app.notion.com/p/padoa/Dashboard-Acme-abcdefabcdefabcdefabcdefabcdef12"),
     ("https://example.com/prod", "https://example.com/prod"),
 ])
 def test_notion_links_are_openable(stored, shown):
@@ -300,6 +301,28 @@ def test_fiche_links_get_the_p_segment(tmp_path):
     (tmp_path / "d" / "acme.md").write_text(
         '---\nclient: Acme\nactions:\n  - {title: Carte, notion_url: "https://app.notion.com/' + "a" * 32 + '"}\n'
         'retours:\n  - {id: ABC123, status: À faire, notion_url: "https://app.notion.com/' + "b" * 32 + '"}\n---\n')
-    d = VaultSource(tmp_path / "d").get_deployment("acme")
+    d = FicheSource(tmp_path / "d").get_deployment("acme")
     assert d.actions[0].notion_url == "https://app.notion.com/p/" + "a" * 32
     assert d.retours[0].notion_url == "https://app.notion.com/p/" + "b" * 32
+
+
+def test_fiches_are_cached_until_the_file_changes(tmp_path):
+    (tmp_path / "d").mkdir()
+    fiche = tmp_path / "d" / "acme.md"
+    fiche.write_text("---\nclient: Acme\n---\n")
+    source = FicheSource(tmp_path / "d")
+    first = source.get_deployment("acme")
+    assert source.get_deployment("acme") is first  # pas de nouvelle analyse
+    import os, time
+    fiche.write_text("---\nclient: Acme SST\n---\n")
+    os.utime(fiche, ns=(time.time_ns() + 10**9, time.time_ns() + 10**9))
+    assert source.get_deployment("acme").client == "Acme SST"
+
+
+def test_env_file_settings_are_read(tmp_path, monkeypatch):
+    from deploy_hub.config import load_env_file
+    monkeypatch.delenv("JARVIS_DATA_DIR", raising=False)
+    (tmp_path / ".env").write_text("JARVIS_DATA_DIR=/tmp/ailleurs  # commentaire\n")
+    load_env_file(tmp_path / ".env")
+    assert os.environ["JARVIS_DATA_DIR"] == "/tmp/ailleurs"
+    monkeypatch.delenv("JARVIS_DATA_DIR")
