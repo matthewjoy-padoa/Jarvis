@@ -500,3 +500,24 @@ a.wn-title:hover { color: var(--accent); }
 .wn-minus { color: var(--st-ko); }
 .link-btn { background: none; border: 0; padding: 0; color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; }
 .link-btn:hover { text-decoration: underline; }
+
+/* Nom de l'app : dégradé aux couleurs de la charte, graisse forte, reflet discret qui passe */
+.brand-name {
+  font-size: 21px; font-weight: 800; letter-spacing: -.02em; line-height: 1;
+  background: linear-gradient(100deg, #3333eb 0%, #8767f9 38%, #e25ac5 70%, #3333eb 100%);
+  background-size: 220% 100%; background-position: 0% 50%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.brand-dot { width: 7px; height: 7px; border-radius: 50%; background: #5ccb4d; margin-left: 1px; align-self: flex-end; margin-bottom: 5px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #5ccb4d 25%, transparent); }
+:root[data-theme="dark"] .brand-name { background-image: linear-gradient(100deg, #9b9bff 0%, #b8a6ff 38%, #f08ad8 70%, #9b9bff 100%); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .brand-name { background-image: linear-gradient(100deg, #9b9bff 0%, #b8a6ff 38%, #f08ad8 70%, #9b9bff 100%); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .brand-name { animation: jarvis-sheen 9s ease-in-out infinite; }
+  .brand:hover .brand-name { animation-duration: 2.5s; }
+  @keyframes jarvis-sheen { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+  .brand-dot { animation: jarvis-online 2.8s ease-in-out infinite; }
+  @keyframes jarvis-online { 0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, #5ccb4d 25%, transparent); } 50% { box-shadow: 0 0 0 5px color-mix(in srgb, #5ccb4d 0%, transparent); } }
+}
