@@ -489,3 +489,18 @@ a.wn-title:hover { color: var(--accent); }
 .wn-list > li, .wn-head, .wn-changes { min-width: 0; }  /* titres longs : coupés avec « … » au lieu de déborder */
 .wn-list { grid-template-columns: minmax(0, 1fr); }
 .wn-change .badge { white-space: normal; }
+
+/* Diff des textes, façon git : ajouts en vert, retraits masqués (affichables), contexte en gris */
+.wn-diff { flex-basis: 100%; border-left: 3px solid var(--pa-done); padding: 2px 0 2px 10px; }
+.wn-diff-label { font-size: 12px; font-weight: 600; color: var(--muted); }
+.wn-diff-text { margin: 2px 0 0; font-size: 13px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.wn-diff.expanded .wn-diff-text { display: block; }
+.d-eq { color: var(--muted); }
+.d-add { text-decoration: none; background: var(--pa-done); color: var(--text); border-radius: 3px; padding: 0 2px; }
+.d-del { display: none; text-decoration: line-through; background: var(--pa-ko); color: var(--text); border-radius: 3px; padding: 0 2px; }
+.wn-diff.show-del .d-del { display: inline; }
+.wn-diff.show-del { border-left-color: var(--pa-ko); }
+.wn-diff-actions { display: flex; gap: 12px; }
+.link-btn { background: none; border: 0; padding: 0; color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }

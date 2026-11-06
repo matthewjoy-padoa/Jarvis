@@ -1,7 +1,9 @@
 """« Quoi de neuf » : événements du journal des changements (data/notion/<client>/journal.json, écrit à chaque synchro
 par sync_notion.publish), rattachés aux retours et aux cartes de la fiche."""
 
+import difflib
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -35,6 +37,16 @@ class Change:
     field: str = ""
     before: object = None
     after: object = None
+
+    @property
+    def diff(self) -> list[tuple[str, str]]:
+        """Diff mot à mot d'un texte modifié, façon git : [(« = » | « + » | « - », texte)].
+        Le contexte inchangé est raccourci autour des modifications ; un texte ajouté de zéro est tout en « + »."""
+        return word_diff(str(self.before or ""), str(self.after or ""))
+
+    @property
+    def removed_words(self) -> int:
+        return sum(len(t.split()) for op, t in self.diff if op == "-")
 
     @property
     def is_status(self) -> bool:
@@ -150,3 +162,34 @@ def _day_label(when: datetime) -> str:
     if delta == 1:
         return "Hier"
     return f"{DAYS[when.weekday()]} {when.day} {MONTHS[when.month - 1]}"
+
+
+CONTEXT_WORDS = 8  # mots inchangés gardés de part et d'autre d'une modification
+TOKEN = re.compile(r"\s+|[^\s]+")
+
+
+def _shorten(text: str, keep_start: bool, keep_end: bool) -> str:
+    """Contexte inchangé : seulement quelques mots au bord des modifications, « … » au milieu."""
+    words = text.split(" ")
+    if len(words) <= 2 * CONTEXT_WORDS + 1:
+        return text
+    head = " ".join(words[:CONTEXT_WORDS]) if keep_start else ""
+    tail = " ".join(words[-CONTEXT_WORDS:]) if keep_end else ""
+    return " … ".join(p for p in (head, tail) if p) if head and tail else (f"{head} …" if head else f"… {tail}")
+
+
+def word_diff(before: str, after: str) -> list[tuple[str, str]]:
+    a, b = TOKEN.findall(before), TOKEN.findall(after)
+    out: list[tuple[str, str]] = []
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(a=a, b=b, autojunk=False).get_opcodes():
+        if op in ("delete", "replace"):
+            out.append(("-", "".join(a[i1:i2])))
+        if op in ("insert", "replace"):
+            out.append(("+", "".join(b[j1:j2])))
+        if op == "equal":
+            out.append(("=", "".join(a[i1:i2])))
+    # contexte raccourci : au début, on garde la fin ; à la fin, le début ; au milieu, les deux bords
+    for k, (op, text) in enumerate(out):
+        if op == "=":
+            out[k] = ("=", _shorten(text, keep_start=k > 0, keep_end=k < len(out) - 1))
+    return [(op, t) for op, t in out if t.strip() or op == "="]

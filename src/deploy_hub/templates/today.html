@@ -95,6 +95,25 @@
       try { localStorage.setItem(KEY, new Date().toISOString()); } catch (e) {}
       load();
     });
+    // Diff des textes : « Afficher le texte retiré » et « Tout afficher » (texte coupé à 3 lignes).
+    document.getElementById("whats-new").addEventListener("click", (e) => {
+      const del = e.target.closest("[data-toggle-del]"), more = e.target.closest("[data-expand]");
+      if (!del && !more) return;
+      const box = e.target.closest(".wn-diff");
+      if (del) {
+        const on = box.classList.toggle("show-del");
+        del.textContent = on ? "Masquer le texte retiré" : del.dataset.label || del.textContent;
+        if (on) del.dataset.label = del.dataset.label || del.textContent;
+        box.classList.add("expanded");
+      }
+      if (more) { box.classList.toggle("expanded"); more.textContent = box.classList.contains("expanded") ? "Réduire" : "Tout afficher"; }
+    });
+    // « Tout afficher » seulement pour les textes réellement coupés.
+    document.body.addEventListener("htmx:afterSwap", (e) => {
+      e.target.querySelectorAll && e.target.querySelectorAll(".wn-diff-text").forEach((p) => {
+        if (p.scrollHeight > p.clientHeight + 2) p.closest(".wn-diff").querySelector("[data-expand]").hidden = false;
+      });
+    });
     // Filtre du bloc : tout, éléments dont le statut a changé, retours de recette, cartes.
     document.getElementById("whats-new").addEventListener("click", (e) => {
       const btn = e.target.closest("[data-wn-filter]");

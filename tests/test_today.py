@@ -96,8 +96,11 @@ def test_whats_new_fragment(app):
     since = (datetime.now() - timedelta(days=1)).isoformat()
     html = app.get(f"/quoi-de-neuf?depuis={since}").text
     assert "<strong>1</strong> élément(s) modifié(s)" in html  # le retour : statut et commentaire sur une seule ligne
-    assert html.count('class="wn-item"') == 1 and "Non vérifié" in html and "Nouveau texte" in html
-    assert 'class="badge g-todo">À faire' in html and "Commentaire client modifié" in html
+    assert html.count('class="wn-item"') == 1 and "Non vérifié" in html
+    assert 'class="badge g-todo">À faire' in html and "Commentaire client" in html
+    # diff façon git : « Ancien » retiré (masqué par défaut), « Nouveau » ajouté, « texte » inchangé
+    assert '<del class="d-del">Ancien</del><ins class="d-add">Nouveau</ins><span class="d-eq"> texte</span>' in html
+    assert "Afficher le texte retiré (1 mot)" in html
     week = app.get(f"/quoi-de-neuf?depuis={(datetime.now() - timedelta(days=7)).isoformat()}").text
     assert "<strong>2</strong> élément(s) modifié(s)" in week and week.count('class="wn-day"') == 2
 
@@ -143,3 +146,15 @@ def test_same_field_changed_twice_keeps_start_and_end(acme):
     second = Change(t - timedelta(hours=1), d, "retour", "Retour X", "", "u", "modifie", "statut", "INTE - En cours", "Validé")
     item = group_changes([second, first])[0][1][0]
     assert [(c.before, c.after) for c in item.changes] == [("À faire", "Validé")]
+
+
+
+def test_word_diff_like_git():
+    from deploy_hub.sources.journal import word_diff
+    before = "Le client voit des visites en double sur la fiche du salarié depuis la reprise de juin, il faut corriger le filtre du transform."
+    after = before.replace("le filtre du transform.", "le filtre de date du transform et relancer le DAG.")
+    diff = word_diff(before, after)
+    assert ("+", "de date ") in diff and ("-", "transform.") in diff and ("+", "transform et relancer le DAG.") in diff
+    assert diff[0] == ("=", "… de juin, il faut corriger le filtre ")  # contexte raccourci avant la modification
+    assert word_diff("", "Nouvelle analyse.") == [("+", "Nouvelle analyse.")]
+    assert word_diff("Texte retiré.", "") == [("-", "Texte retiré.")]
