@@ -459,3 +459,33 @@ button .ic { margin-right: 2px; }
 .req { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--bg); border-radius: 999px; padding: 1px 7px; margin-left: 4px; }
 .form-actions { display: flex; gap: 10px; align-items: center; margin-top: 6px; }
 .danger-zone { max-width: 860px; border-color: var(--pa-ko); }
+
+/* Quoi de neuf : une ligne par retour ou carte, regroupées par jour */
+.wn-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin: 4px 0 6px; }
+.wn-summary { margin: 0; }
+.wn-day { font-size: 13px; margin: 16px 0 6px; text-transform: none; }
+.wn-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.wn-item { padding: 10px 12px; border: 2px solid var(--border); border-radius: 12px; background: var(--surface); }
+.wn-item:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+.wn-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.wn-kind { flex: none; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--bg); color: var(--muted); }
+.wn-kind-retour { background: var(--pa-ko); color: var(--text); }
+.wn-kind-carte { background: var(--pa-progress); color: var(--text); }
+.wn-title { font-weight: 600; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+a.wn-title:hover { color: var(--accent); }
+.wn-client { flex: none; font-size: 12px; color: var(--muted); }
+.wn-time { flex: none; margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.wn-notion { flex: none; font-size: 12px; font-weight: 600; }
+.wn-changes { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-top: 6px; padding-left: 2px; font-size: 13px; }
+.wn-change { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.wn-before { opacity: .75; }
+.wn-arrow { color: var(--muted); }
+.wn-pill { font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 999px; background: var(--bg); }
+.wn-new { background: var(--pa-done); }
+.wn-text { flex-basis: 100%; }
+.wn-text summary { margin: 0; color: var(--accent); font-size: 13px; width: max-content; }
+.wn-empty { margin: 8px 0; }
+@media (max-width: 700px) { .wn-head { flex-wrap: wrap; } .wn-title { white-space: normal; } .wn-time { margin-left: 0; } }
+.wn-list > li, .wn-head, .wn-changes { min-width: 0; }  /* titres longs : coupés avec « … » au lieu de déborder */
+.wn-list { grid-template-columns: minmax(0, 1fr); }
+.wn-change .badge { white-space: normal; }

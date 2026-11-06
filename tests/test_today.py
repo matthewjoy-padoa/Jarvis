@@ -95,8 +95,11 @@ def test_today_page(app):
 def test_whats_new_fragment(app):
     since = (datetime.now() - timedelta(days=1)).isoformat()
     html = app.get(f"/quoi-de-neuf?depuis={since}").text
-    assert "2 changement(s)" in html and "Non vérifié" in html and "voir avant / après" in html and "Nouveau texte" in html
-    assert "3 changement(s)" in app.get(f"/quoi-de-neuf?depuis={(datetime.now() - timedelta(days=7)).isoformat()}").text
+    assert "<strong>1</strong> élément(s) modifié(s)" in html  # le retour : statut et commentaire sur une seule ligne
+    assert html.count('class="wn-item"') == 1 and "Non vérifié" in html and "Nouveau texte" in html
+    assert 'class="badge g-todo">À faire' in html and "Commentaire client modifié" in html
+    week = app.get(f"/quoi-de-neuf?depuis={(datetime.now() - timedelta(days=7)).isoformat()}").text
+    assert "<strong>2</strong> élément(s) modifié(s)" in week and week.count('class="wn-day"') == 2
 
 
 def test_injections_grouped_by_resource(acme):
@@ -119,3 +122,24 @@ def test_actions_tab_has_a_multi_team_filter(app, acme):
     assert '<th data-filter="equipe" data-multi>Équipe</th>' in html
     assert 'data-values="INTE|OPS"' in html and '<span class="team team-ops">OPS</span>' in html
     assert 'data-values="Sans équipe"' in html
+
+
+
+def test_changes_are_grouped_by_item_and_day(acme):
+    from deploy_hub.sources.journal import group_changes
+    d, deployments_dir = acme
+    days = group_changes(changes_since(d, deployments_dir, datetime.now() - timedelta(days=7)))
+    assert days[0][0] == "Aujourd'hui" and len(days) == 2
+    retour = days[0][1][0]
+    assert retour.label == "Retour 0001AB · Adhérents" and len(retour.changes) == 2
+    assert [c.field for c in retour.status_changes] == ["statut"] and [c.field for c in retour.other_changes] == ["commentaire_client"]
+
+
+def test_same_field_changed_twice_keeps_start_and_end(acme):
+    from deploy_hub.sources.journal import Change, group_changes
+    d, _ = acme
+    t = datetime.now()
+    first = Change(t - timedelta(hours=2), d, "retour", "Retour X", "", "u", "modifie", "statut", "À faire", "INTE - En cours")
+    second = Change(t - timedelta(hours=1), d, "retour", "Retour X", "", "u", "modifie", "statut", "INTE - En cours", "Validé")
+    item = group_changes([second, first])[0][1][0]
+    assert [(c.before, c.after) for c in item.changes] == [("À faire", "Validé")]

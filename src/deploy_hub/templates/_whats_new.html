@@ -1,25 +1,61 @@
-{# Attend : changes (sources/journal.Change), since, show_client. #}
-<p class="muted">Depuis le {{ since.strftime("%d/%m à %H:%M") }} · {{ changes | length }} changement(s) noté(s) par la synchro.</p>
-{% if changes %}
-<ul class="changes" data-limit="10">
-  {% for c in changes %}
-  <li class="change" data-client="{{ c.deployment.client }}" data-kind="{{ c.kind }}">
-    <span class="date" title="{{ c.when.strftime('%d/%m/%Y %H:%M') }}">{{ c.when.strftime("%d/%m %H:%M") }}</span>
-    <span class="badge">{{ c.kind }}</span>
-    {% if c.link %}<a href="{{ c.link }}">{{ c.label }}</a>{% else %}{{ c.label }}{% endif %}
-    {% if show_client %}<span class="muted">· {{ c.deployment.client }}</span>{% endif %}
-    <span class="what">
-      {% if c.type == "modifie" and not c.is_text %}
-        {{ c.field_label }} : <s class="muted">{{ c.before if c.before is not none else "vide" }}</s> → <strong>{{ c.after if c.after is not none else "vide" }}</strong>
-      {% else %}<strong>{{ c.verb }}</strong>{% endif %}
-    </span>
-    {% if c.type == "modifie" and c.is_text %}
-    <details class="diff"><summary>voir avant / après</summary>
-      <div class="diff-cols"><div><span class="muted">Avant</span><p>{{ c.before or "—" }}</p></div><div><span class="muted">Après</span><p>{{ c.after or "—" }}</p></div></div>
-    </details>
-    {% endif %}
-    {% if c.notion_url %}<a class="btn-link" href="{{ c.notion_url }}" target="_blank" rel="noopener">Notion ↗</a>{% endif %}
+{# « Quoi de neuf » : un élément (retour ou carte) par ligne, regroupés par jour ; ses changements résumés sous son titre.
+   Attend : days (journal.group_changes), changes, since, show_client. #}
+{% set items = days | map(attribute=1) | sum(start=[]) %}
+{% set n_retours = items | selectattr("kind", "equalto", "retour") | list | length %}
+{% set n_status = items | selectattr("status_changes") | list | length %}
+{% macro short(c, value) -%}
+  {%- if value is none or value == "" -%}vide
+  {%- elif c.field == "deadline" -%}{{ value[8:10] }}/{{ value[5:7] }}
+  {%- elif c.field == "vigilance" -%}{{ "oui" if value else "non" }}
+  {%- else -%}{{ value }}{%- endif -%}
+{%- endmacro %}
+
+{% if items %}
+<div class="wn-bar">
+  <p class="wn-summary"><strong>{{ items | length }}</strong> élément(s) modifié(s) depuis le {{ since.strftime("%d/%m à %H:%M") }}
+    <span class="muted">· {{ n_retours }} retour(s) de recette, {{ items | length - n_retours }} carte(s)</span></p>
+  <div class="segmented" role="group" aria-label="Filtrer « Quoi de neuf »">
+    <a href="#" data-wn-filter="" class="active">Tout</a><a href="#" data-wn-filter="status">Statuts changés · {{ n_status }}</a><a href="#" data-wn-filter="retour">Recette</a><a href="#" data-wn-filter="carte">Cartes</a>
+  </div>
+</div>
+
+{% for day, day_items in days %}
+<h3 class="wn-day">{{ day }} <span class="muted">· {{ day_items | length }}</span></h3>
+<ul class="wn-list" data-limit="8">
+  {% for it in day_items %}
+  <li class="wn-item" data-kind="{{ it.kind }}" data-status="{{ 'yes' if it.status_changes else 'no' }}">
+    <div class="wn-head">
+      <span class="wn-kind wn-kind-{{ it.kind }}">{{ "Recette" if it.kind == "retour" else "Carte" }}</span>
+      {% if it.link %}<a class="wn-title" href="{{ it.link }}">{{ it.label }}</a>{% else %}<span class="wn-title">{{ it.label }}</span>{% endif %}
+      {% if show_client %}<span class="wn-client">{{ it.deployment.client }}</span>{% endif %}
+      <span class="wn-time" title="{{ it.when.strftime('%d/%m/%Y %H:%M') }}">{{ it.when.strftime("%H:%M") }}</span>
+      {% if it.notion_url %}<a class="wn-notion" href="{{ it.notion_url }}" target="_blank" rel="noopener" title="Ouvrir dans Notion">Notion ↗</a>{% endif %}
+    </div>
+    <div class="wn-changes">
+      {% for c in it.status_changes %}
+      <span class="wn-change">
+        {% if c.field != "statut" %}<span class="muted">{{ c.field_label }}</span>{% endif %}
+        <span class="badge {{ 'g-' ~ c.group_of(c.before) if c.before }} wn-before">{{ short(c, c.before) }}</span>
+        <span class="wn-arrow" aria-label="devient">→</span>
+        <span class="badge {{ 'g-' ~ c.group_of(c.after) if c.after }}">{{ short(c, c.after) }}</span>
+      </span>
+      {% endfor %}
+      {% for c in it.other_changes %}
+        {% if c.type == "nouveau" %}<span class="wn-pill wn-new">Nouveau</span>
+        {% elif c.type == "supprime" %}<span class="wn-pill">Supprimé de Notion</span>
+        {% elif c.is_text %}
+        <details class="wn-text">
+          <summary>{{ c.verb | capitalize }}</summary>
+          <div class="diff-cols"><div><span class="muted">Avant</span><p>{{ c.before or "—" }}</p></div><div><span class="muted">Après</span><p>{{ c.after or "—" }}</p></div></div>
+        </details>
+        {% else %}<span class="wn-change"><span class="muted">{{ c.field_label | capitalize }}</span> {{ short(c, c.before) }} <span class="wn-arrow">→</span> <strong>{{ short(c, c.after) }}</strong></span>
+        {% endif %}
+      {% endfor %}
+    </div>
   </li>
   {% endfor %}
 </ul>
-{% else %}<p class="muted">Rien à signaler sur cette période. (Le journal de Jarvis démarre à la première synchro qui suit sa mise en place.)</p>{% endif %}
+{% endfor %}
+{% else %}
+<p class="muted wn-empty">Rien à signaler depuis le {{ since.strftime("%d/%m à %H:%M") }}. (Le journal de Jarvis démarre à la première synchro qui suit sa mise en place.)</p>
+{% endif %}

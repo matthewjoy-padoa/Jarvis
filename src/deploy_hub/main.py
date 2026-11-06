@@ -17,7 +17,7 @@ from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
 from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, retour_prompt
 from deploy_hub.sources import notion_api
 from deploy_hub.sources.external import external_statuses
-from deploy_hub.sources.journal import changes_since
+from deploy_hub.sources.journal import changes_since, group_changes
 from deploy_hub.sources import watchers
 from deploy_hub.sources.notifications import NotificationStore
 from deploy_hub.sources.fiches import FicheSource
@@ -142,7 +142,8 @@ def whats_new(request: Request, depuis: str = "", client: str = ""):
     since = since or datetime.now() - timedelta(days=1)
     deployments = [_get(client)] if client else _deployments(request)
     changes = sorted((c for d in deployments for c in changes_since(d, settings.deployments_dir, since)), key=lambda c: c.when, reverse=True)
-    return templates.TemplateResponse(request, "_whats_new.html", {"changes": changes, "since": since, "show_client": not client})
+    return templates.TemplateResponse(request, "_whats_new.html", {"changes": changes, "days": group_changes(changes), "since": since,
+                                                                    "show_client": not client})
 
 
 @app.get("/clients", response_class=HTMLResponse)

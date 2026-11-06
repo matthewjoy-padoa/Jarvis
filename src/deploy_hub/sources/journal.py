@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from deploy_hub.models import Deployment, notion_link
+from deploy_hub.models import ACTION_STATUSES, INJECTION_STATUSES, RETOUR_STATUSES, Deployment, notion_link, status_group
 
 FIELD_LABELS = {
     "statut": "statut",
@@ -35,6 +35,17 @@ class Change:
     field: str = ""
     before: object = None
     after: object = None
+
+    @property
+    def is_status(self) -> bool:
+        return self.field in ("statut", "statut_injection")
+
+    def group_of(self, value) -> str:
+        """Groupe de statut (todo, in_progress, ko, done) d'une valeur avant/après, pour colorer son étiquette."""
+        if not self.is_status or not value:
+            return ""
+        table = RETOUR_STATUSES if self.kind == "retour" else INJECTION_STATUSES if self.field == "statut_injection" else ACTION_STATUSES
+        return status_group(str(value), table)
 
     @property
     def field_label(self) -> str:
@@ -83,3 +94,59 @@ def changes_since(d: Deployment, deployments_dir: Path, since: datetime) -> list
             kind = "carte"
         out.append(Change(when, d, kind, label, link, url, e["type"], e.get("champ", ""), e.get("avant"), e.get("apres")))
     return sorted(out, key=lambda c: c.when, reverse=True)
+
+
+@dataclass
+class ChangedItem:
+    """Un retour ou une carte et tous ses changements de la période : une ligne dans « Quoi de neuf »."""
+    kind: str
+    label: str
+    link: str
+    notion_url: str
+    deployment: Deployment
+    changes: list[Change]
+
+    @property
+    def when(self) -> datetime:
+        return max(c.when for c in self.changes)
+
+    @property
+    def status_changes(self) -> list[Change]:
+        return [c for c in self.changes if c.type == "modifie" and c.is_status]
+
+    @property
+    def other_changes(self) -> list[Change]:
+        return [c for c in self.changes if not (c.type == "modifie" and c.is_status)]
+
+
+def group_changes(changes: list[Change]) -> list[tuple[str, list[ChangedItem]]]:
+    """Changements regroupés par élément (un retour ou une carte = une ligne), puis par jour du dernier changement.
+    Renvoie [(« Aujourd'hui » | « Hier » | « lundi 3 novembre », [éléments du plus récent au plus ancien]), …]."""
+    items: dict[tuple, ChangedItem] = {}
+    for c in sorted(changes, key=lambda c: c.when):
+        key = (c.deployment.slug, c.notion_url or c.label)
+        if key not in items:
+            items[key] = ChangedItem(c.kind, c.label, c.link, c.notion_url, c.deployment, [])
+        # un même champ modifié plusieurs fois : garder l'état de départ et l'état d'arrivée
+        same = next((x for x in items[key].changes if x.type == c.type == "modifie" and x.field == c.field), None)
+        if same:
+            same.after, same.when = c.after, c.when
+        else:
+            items[key].changes.append(Change(c.when, c.deployment, c.kind, c.label, c.link, c.notion_url, c.type, c.field, c.before, c.after))
+    days: dict[str, list[ChangedItem]] = {}
+    for item in sorted(items.values(), key=lambda i: i.when, reverse=True):
+        days.setdefault(_day_label(item.when), []).append(item)
+    return list(days.items())
+
+
+DAYS = ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
+MONTHS = ("janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre")
+
+
+def _day_label(when: datetime) -> str:
+    delta = (datetime.now().date() - when.date()).days
+    if delta == 0:
+        return "Aujourd'hui"
+    if delta == 1:
+        return "Hier"
+    return f"{DAYS[when.weekday()]} {when.day} {MONTHS[when.month - 1]}"
