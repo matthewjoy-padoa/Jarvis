@@ -98,9 +98,8 @@ def test_whats_new_fragment(app):
     assert "<strong>1</strong> élément(s) modifié(s)" in html  # le retour : statut et commentaire sur une seule ligne
     assert html.count('class="wn-item"') == 1 and "Non vérifié" in html
     assert 'class="badge g-todo">À faire' in html and "Commentaire client" in html
-    # diff façon git : « Ancien » retiré (masqué par défaut), « Nouveau » ajouté, « texte » inchangé
-    assert '<del class="d-del">Ancien</del><ins class="d-add">Nouveau</ins><span class="d-eq"> texte</span>' in html
-    assert "Afficher le texte retiré (1 mot)" in html
+    # seulement ce qui a été ajouté, précédé d'un « + » vert ; ni le texte retiré ni le contexte
+    assert '<span class="wn-plus" aria-label="ajouté">+</span>Nouveau</p>' in html and "Ancien" not in html
     week = app.get(f"/quoi-de-neuf?depuis={(datetime.now() - timedelta(days=7)).isoformat()}").text
     assert "<strong>2</strong> élément(s) modifié(s)" in week and week.count('class="wn-day"') == 2
 

@@ -45,10 +45,6 @@ class Change:
         return word_diff(str(self.before or ""), str(self.after or ""))
 
     @property
-    def removed_words(self) -> int:
-        return sum(len(t.split()) for op, t in self.diff if op == "-")
-
-    @property
     def is_status(self) -> bool:
         return self.field in ("statut", "statut_injection")
 

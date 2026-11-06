@@ -44,14 +44,12 @@
         {% if c.type == "nouveau" %}<span class="wn-pill wn-new">Nouveau</span>
         {% elif c.type == "supprime" %}<span class="wn-pill">Supprimé de Notion</span>
         {% elif c.is_text %}
-        {# Diff façon git : ajouts surlignés en vert ; le texte retiré est masqué, affichable à la demande. #}
+        {# Textes modifiés : seulement ce qui a été ajouté, précédé d'un « + » vert, comme une ligne ajoutée dans git. #}
         <div class="wn-diff">
-          <span class="wn-diff-label">{{ c.field_label | capitalize }}{% if c.after is none %} <span class="muted">· vidé</span>{% elif c.before is none %} <span class="muted">· nouveau</span>{% endif %}</span>
-          <p class="wn-diff-text">{% for op, t in c.diff %}{% if op == "=" %}<span class="d-eq">{{ t }}</span>{% elif op == "+" %}<ins class="d-add">{{ t }}</ins>{% else %}<del class="d-del">{{ t }}</del>{% endif %}{% endfor %}</p>
-          <div class="wn-diff-actions">
-            <button type="button" class="link-btn" data-expand hidden>Tout afficher</button>
-            {% if c.removed_words %}<button type="button" class="link-btn" data-toggle-del>Afficher le texte retiré ({{ c.removed_words }} mot{{ "s" if c.removed_words > 1 }})</button>{% endif %}
-          </div>
+          <span class="wn-diff-label">{{ c.field_label | capitalize }}</span>
+          {% for op, t in c.diff if op == "+" and t.strip() %}<p class="wn-add"><span class="wn-plus" aria-label="ajouté">+</span>{{ t.strip() }}</p>
+          {% else %}<p class="wn-add muted"><span class="wn-minus" aria-label="retiré">−</span>Texte retiré</p>{% endfor %}
+        </div>
         </div>
         {% else %}<span class="wn-change"><span class="muted">{{ c.field_label | capitalize }}</span> {{ short(c, c.before) }} <span class="wn-arrow">→</span> <strong>{{ short(c, c.after) }}</strong></span>
         {% endif %}
