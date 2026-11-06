@@ -15,6 +15,6 @@ SELECT
   "Discussion INTE/OPS" AS discussion,
   "Échanges / Suivi Déploiement-Inté" AS echanges
 FROM "collection://9e3440bc-941b-4c76-8b65-6fc15bbb02a7"
-WHERE ("🏕️ Clients en déploiement" LIKE '%3ec4976cdfac8113b6fbf0d50dcf0035%')
+WHERE ("🏕️ Clients en déploiement" LIKE '%{{page_id}}%'{{ou_clients_recette}})
   AND "Last edited time" >= ?
 ORDER BY createdTime

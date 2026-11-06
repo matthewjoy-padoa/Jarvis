@@ -1,10 +1,12 @@
 {% extends "base.html" %}
+{% block title %}Clients · Jarvis{% endblock %}
 {% import "_icons.html" as ic %}
 {% block content %}
 {% import "_charts.html" as charts with context %}
 
 <div class="page-head">
   <h1>Clients</h1>
+  <a class="btn-primary" href="/clients/nouveau">+ Ajouter un client</a>
 <div class="refresh">
   <button type="button" class="secondary" hx-post="/actions/rafraichir" hx-target="next .refresh-out" hx-indicator="closest .refresh" hx-disabled-elt="this"{% if not notion_ready %} disabled title="Jeton Notion absent : voir README"{% endif %}>{{ ic.icon("sync") }} Tout rafraîchir</button>
   <span class="refresh-wait muted">Jarvis interroge Notion…</span>
@@ -12,7 +14,15 @@
 </div>
   <div class="segmented" aria-label="Vues tous clients"><span class="muted">Tous les clients :</span>{% for path, label in cross_pages %}<a href="{{ path }}">{{ label }}</a>{% endfor %}</div>
 </div>
-{% if not deployments %}<p class="muted">Aucune fiche de déploiement trouvée.</p>{% endif %}
+{% if saved %}<p class="result ok">Client « {{ saved }} » enregistré. Lance la synchro (routine ou « Rafraîchir depuis Notion ») pour charger ou mettre à jour ses données.</p>{% endif %}
+{% if retired %}<p class="result ok">Client « {{ retired }} » retiré du suivi. Sa configuration est dans config/clients/retires/.</p>{% endif %}
+{% if not deployments and not pending %}
+<section class="panel empty-state">
+  <h2>Aucun client suivi pour l'instant</h2>
+  <p>Ajoute ton premier client : il suffit de son nom et du lien de sa fiche dans la base Notion « Clients en déploiement ».</p>
+  <a class="btn-primary" href="/clients/nouveau">+ Ajouter un client</a>
+</section>
+{% endif %}
 <div class="grid">
   {% for d in deployments %}
   <div class="card card-linked">
@@ -24,8 +34,21 @@
       <p>Déploiement {{ d.go_live.strftime("%d/%m/%Y") }}
         <span class="badge {{ 'g-ko' if d.days_left < 14 }}">J{{ '%+d' % (-d.days_left) }}</span></p>
     {% endif %}
+    <a class="card-config" href="/clients/{{ d.slug }}/configuration" title="Configurer {{ d.client }}">Configurer</a>
     {% if d.stacks %}<div class="stacks card-stacks">{% for st in d.stacks %}<a href="{{ st.url }}" target="_blank" rel="noopener" title="{{ st.url }}">{% if st.env %}<span class="env">{{ st.env }}</span>{% endif %}{{ st.label }} ↗</a>{% endfor %}</div>{% endif %}
   </div>
   {% endfor %}
 </div>
+{% if pending %}
+<h2>En attente de première synchro</h2>
+<div class="grid">
+  {% for c in pending %}
+  <div class="card pending-card">
+    <div class="card-head"><strong>{{ c.client }}</strong>{% if c.software %}<span class="badge">{{ c.software }}</span>{% endif %}</div>
+    <p class="muted">Configuré, pas encore synchronisé : ses données arriveront au prochain passage de la routine, ou avec « Rafraîchir depuis Notion ».</p>
+    <a class="card-config" href="/clients/{{ c.slug }}/configuration">Configurer</a>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
 {% endblock %}

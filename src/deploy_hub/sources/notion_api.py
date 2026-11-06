@@ -17,7 +17,7 @@ from pathlib import Path
 
 import httpx
 
-from deploy_hub.config import PROJECT_ROOT
+from deploy_hub.config import PROJECT_ROOT, data_dir
 from deploy_hub.sync_notion import RECETTE_COLUMNS, RECETTE_CONTENT, SyncError, load_config, publish, summary
 
 API = "https://api.notion.com/v1"
@@ -274,12 +274,12 @@ def refresh(slug: str, notion: NotionClient, root: Path = PROJECT_ROOT) -> dict:
     """Synchro complète d'un client depuis Notion ; la fiche n'est réécrite que si toutes les lectures ont réussi."""
     config = load_config(slug, root)
     if not config.get("page_id"):
-        raise SyncError(f"{slug} : page_id absent de sync/clients/{slug}.yaml")
+        raise SyncError(f"{slug} : page_id absent de la configuration du client")
     started = time.monotonic()
     data = fetch(config, notion)
     caches = {base: {r["url"]: r for r in data[base]} for base in ("actions", "recette")}
     out = publish(slug, root, config, data["client"], data["regles"], caches)
-    state_path = root / "data" / "notion" / slug / "etat-synchro.json"
+    state_path = data_dir(root) / "notion" / slug / "etat-synchro.json"
     state_path.write_text(json.dumps({"complet_le": date.today().isoformat(), "source": "api"}), encoding="utf-8")
     result = summary(out["deployment"], out["blocked"], "api", out["changes"])
     result["secondes"] = round(time.monotonic() - started, 1)
@@ -287,11 +287,12 @@ def refresh(slug: str, notion: NotionClient, root: Path = PROJECT_ROOT) -> dict:
 
 
 def clients(root: Path = PROJECT_ROOT) -> list[str]:
-    return sorted(p.stem for p in (root / "sync" / "clients").glob("*.yaml"))
+    from deploy_hub.client_config import slugs
+    return slugs(root)
 
 
 if __name__ == "__main__":
-    # uv run python -m deploy_hub.sources.notion_api [slug…]   (sans slug : tous les clients de sync/clients/)
+    # uv run python -m deploy_hub.sources.notion_api [slug…]   (sans slug : tous les clients configurés)
     token = load_token()
     if not token:
         print("ÉCHEC : NOTION_TOKEN absent (environnement ou .env de l'app).", file=sys.stderr)

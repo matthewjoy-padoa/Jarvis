@@ -5,8 +5,8 @@ et dépose chaque résultat brut dans data/notion/<slug>/. Ce module tient un ca
 (cache-actions.json, cache-recette.json), en fait la fiche data/deploiements/<slug>.md lue par l'app,
 et met à jour la liste des pages de recette bloquées par le hook.
 
-    uv run python -m deploy_hub.sync_notion verifier medetram   # {"mode": "inchangé" | "delta" | "complet", ...}
-    uv run python -m deploy_hub.sync_notion medetram            # fusionne les résultats, écrit la fiche
+    uv run python -m deploy_hub.sync_notion verifier <slug>   # {"mode": "inchangé" | "delta" | "complet", ...}
+    uv run python -m deploy_hub.sync_notion <slug>            # fusionne les résultats, écrit la fiche
 
 Mode, à partir des empreintes (nombre de lignes, dernière modification) des bases Actions et Recette :
 - inchangé : empreintes identiques à la dernière synchro ;
@@ -16,6 +16,7 @@ Mode, à partir des empreintes (nombre de lignes, dernière modification) des ba
 """
 
 import json
+from dataclasses import asdict
 import re
 import sys
 from datetime import date, datetime, timedelta
@@ -23,7 +24,8 @@ from pathlib import Path
 
 import yaml
 
-from deploy_hub.config import PROJECT_ROOT
+from deploy_hub.config import PROJECT_ROOT, data_dir
+from deploy_hub.queries import ConfigError, page_id_of
 from deploy_hub.models import ACTION_STATUSES, DONE, INJECTION_STATUSES, KO, RETOUR_STATUSES, status_group
 from deploy_hub.sources.notifications import NotificationStore
 
@@ -69,8 +71,12 @@ def _date(value) -> date | None:
 
 
 def _page_id(url: str) -> str:
-    match = re.search(r"([0-9a-f]{32})", url.replace("-", ""))
-    return match.group(1) if match else ""
+    """Id de 32 caractères d'une adresse Notion, ou "" (même analyse que la configuration des clients)."""
+    try:
+        return page_id_of(url)
+    except ConfigError:
+        return ""
+
 
 
 def _yes(value) -> bool:
@@ -210,7 +216,7 @@ def write_fiche(deployment: dict, out: Path) -> None:
 def update_blocklist(retours: list[dict], blocklist: Path) -> int:
     """Ajoute les pages de recette au fichier lu par le hook ; ne retire jamais une page."""
     known = set(blocklist.read_text().split()) if blocklist.is_file() else set()
-    known |= {_page_id(r["notion_url"]) for r in retours if _page_id(r["notion_url"])}
+    known |= {pid for r in retours if (pid := _page_id(r["notion_url"]))}
     blocklist.write_text("\n".join(sorted(known)) + "\n")
     return len(known)
 
@@ -229,7 +235,7 @@ def fingerprint(raw: Path) -> dict | None:
 
 def plan(slug: str, root: Path = PROJECT_ROOT) -> dict:
     """Ce que la routine doit faire pour ce client : inchangé, delta (avec la date de départ par base) ou complet."""
-    raw = root / "data" / "notion" / slug
+    raw = data_dir(root) / "notion" / slug
     current = fingerprint(raw)
     state = _load_json(raw / "etat-synchro.json", None)
     caches_ok = all((raw / f"cache-{b}.json").is_file() for b in BASES)
@@ -256,7 +262,12 @@ def _consume(raw: Path) -> None:
 
 
 def load_config(slug: str, root: Path = PROJECT_ROOT) -> dict:
-    return yaml.safe_load((root / "sync" / "clients" / f"{slug}.yaml").read_text(encoding="utf-8"))
+    """Configuration du client, lue et normalisée par client_config (même lecture que l'app)."""
+    from deploy_hub import client_config  # client_config → queries ; import ici pour garder sync_notion léger
+    cfg = client_config.load(slug, root)
+    if cfg is None:
+        raise SyncError(f"Client inconnu : {slug} (pas de configuration dans config/clients/)")
+    return asdict(cfg)
 
 
 # Champs suivis par le journal des changements (« Quoi de neuf »), par base.
@@ -348,17 +359,17 @@ def sync_notes(slug: str, client: str, events: list[dict], caches: dict[str, dic
 def publish(slug: str, root: Path, config: dict, client: dict, regles_rows: list[dict], caches: dict[str, dict]) -> dict:
     """Écrit la fiche, les caches, le journal des changements et la liste des pages bloquées ;
     commun à la routine et à la synchro directe."""
-    raw = root / "data" / "notion" / slug
+    raw = data_dir(root) / "notion" / slug
     raw.mkdir(parents=True, exist_ok=True)
     _check_recette(list(caches["recette"].values()))
     when = datetime.now().isoformat(timespec="seconds")
     events = [e for base in BASES for e in diff_caches(_load_cache(raw, base), caches[base], base, when)]
     deployment = build_deployment(config, client, regles_rows, caches)
-    blocked = update_blocklist(deployment["retours"], root / "data" / "recette-pages.txt")
-    write_fiche(deployment, root / "data" / "deploiements" / f"{slug}.md")
+    blocked = update_blocklist(deployment["retours"], data_dir(root) / "recette-pages.txt")
+    write_fiche(deployment, data_dir(root) / "deploiements" / f"{slug}.md")
     write_caches(raw, caches)
     append_journal(raw, events)
-    NotificationStore(root / "data" / "notifications.json").add_many(sync_notes(slug, config["client"], events, caches, when))
+    NotificationStore(data_dir(root) / "notifications.json").add_many(sync_notes(slug, config["client"], events, caches, when))
     return {"deployment": deployment, "blocked": blocked, "changes": len(events)}
 
 
@@ -378,7 +389,7 @@ def summary(deployment: dict, blocked: int, mode, changes: int = 0) -> dict:
 def sync(slug: str, root: Path = PROJECT_ROOT) -> dict:
     """Passage de la routine : fusionne les résultats SQL déposés dans data/notion/<slug>/."""
     config = load_config(slug, root)
-    raw = root / "data" / "notion" / slug
+    raw = data_dir(root) / "notion" / slug
     merged = {base: merge_base(raw, base) for base in BASES}
     caches = {base: cache for base, (cache, _) in merged.items()}
     client = _rows(raw / "client.json")
@@ -398,11 +409,20 @@ def sync(slug: str, root: Path = PROJECT_ROOT) -> dict:
 
 
 if __name__ == "__main__":
+    # uv run python -m deploy_hub.sync_notion clients            → slugs des clients configurés
+    # uv run python -m deploy_hub.sync_notion requetes <slug>    → écrit ses requêtes SQL, affiche leur dossier
+    # uv run python -m deploy_hub.sync_notion verifier <slug>    → {"mode": "inchangé" | "delta" | "complet", ...}
+    # uv run python -m deploy_hub.sync_notion <slug>             → fusionne les résultats déposés, écrit la fiche
+    from deploy_hub import client_config, queries
     try:
-        if sys.argv[1] == "verifier":
+        if sys.argv[1] == "clients":
+            print("\n".join(client_config.slugs()))
+        elif sys.argv[1] == "requetes":
+            print(queries.write(sys.argv[2], load_config(sys.argv[2])))
+        elif sys.argv[1] == "verifier":
             print(json.dumps(plan(sys.argv[2]), ensure_ascii=False))
         else:
             print(json.dumps(sync(sys.argv[1]), ensure_ascii=False))
-    except (SyncError, OSError, KeyError, ValueError, IndexError) as e:
+    except (SyncError, ConfigError, OSError, KeyError, ValueError, IndexError) as e:
         print(f"ÉCHEC synchro : {e}", file=sys.stderr)
         sys.exit(1)

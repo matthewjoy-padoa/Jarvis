@@ -1,0 +1,17 @@
+# Un fichier par client suivi, dans config/clients/<slug>.yaml (hors git : chacun configure ses clients).
+# Le plus simple : passer par la page « Clients → Ajouter un client » de l'app, qui écrit ce fichier.
+client: Exemple                 # nom affiché
+software: Preventiel            # logiciel(s) d'origine, affiché
+status: en cours
+# Fiche du client dans la base Notion « Clients en déploiement » : son id (32 caractères) ou son adresse.
+page_id: 0123456789abcdef0123456789abcdef
+# Page « Dashboard intégration » du client (lien affiché dans l'app).
+notion_url: https://app.notion.com/p/...
+# Facultatif : valeurs du champ « Client » de la base Retours Recette à inclure en plus des retours liés à la fiche.
+recette_clients: []
+# Facultatif : clés client de l'orchestrator (dags/config_deployment.py), pour proposer les DAGs dans l'onglet Injections.
+orchestrator: []
+# Facultatif : liens rapides vers les stacks Padoa du client.
+stacks: []
+#  - {env: prod, label: Production, url: "https://…"}
+#  - {env: recette, label: Snap recette, url: "https://…"}

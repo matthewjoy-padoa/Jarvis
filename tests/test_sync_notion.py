@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 import deploy_hub.sync_notion as module
-from deploy_hub.sources.vault import parse_deployment
+from deploy_hub.sources.fiches import parse_deployment
 from deploy_hub.sync_notion import SyncError, plan, sync
 
 FIXTURES = Path(__file__).parent / "fixtures" / "notion" / "demo"
@@ -14,8 +14,8 @@ FIXTURES = Path(__file__).parent / "fixtures" / "notion" / "demo"
 
 @pytest.fixture
 def root(tmp_path: Path) -> Path:
-    (tmp_path / "sync" / "clients").mkdir(parents=True)
-    (tmp_path / "sync" / "clients" / "demo.yaml").write_text("slug: demo\nclient: Démo\nsoftware: Pulse\n")
+    (tmp_path / "config" / "clients").mkdir(parents=True)
+    (tmp_path / "config" / "clients" / "demo.yaml").write_text("slug: demo\nclient: Démo\nsoftware: Pulse\n")
     shutil.copytree(FIXTURES, tmp_path / "data" / "notion" / "demo")
     return tmp_path
 

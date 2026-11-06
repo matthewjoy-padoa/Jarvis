@@ -9,11 +9,11 @@ import pytest
 
 from deploy_hub.sources import notion_api
 from deploy_hub.sources.notion_api import NotionClient, refresh
-from deploy_hub.sources.vault import parse_deployment
+from deploy_hub.sources.fiches import parse_deployment
 from deploy_hub.sync_notion import SyncError, plan
 
 ROOT = Path(__file__).resolve().parents[1]
-PAGE = "3284976cdfac8157b91dcabc83e80b1c"
+PAGE = "0123456789abcdef0123456789abcdef"
 
 
 def prop(pid, kind, v):
@@ -88,7 +88,7 @@ class FakeNotion:
             return httpx.Response(200, json={"properties": props})
         if path.startswith("/pages/"):
             return httpx.Response(200, json={"id": PAGE, "properties": {
-                "Nom": prop("t", "title", [{"plain_text": "Presoa"}]), "Date de Kick-off": prop("k", "date", {"start": "2026-04-16"}),
+                "Nom": prop("t", "title", [{"plain_text": "Acme"}]), "Date de Kick-off": prop("k", "date", {"start": "2026-04-16"}),
                 "Date déploiement": prop("d", "date", {"start": "2026-11-17"}), "Date du Freeze": prop("f", "date", None)}})
         if m := re.fullmatch(r"/data_sources/([0-9a-f-]+)/query", path):
             ds, body = m.group(1), json.loads(request.content)
@@ -104,9 +104,9 @@ class FakeNotion:
 
 @pytest.fixture
 def root(tmp_path):
-    (tmp_path / "sync" / "clients").mkdir(parents=True)
-    (tmp_path / "sync" / "clients" / "presoa.yaml").write_text(
-        f"slug: presoa\nclient: Presoa\nsoftware: Pulse\npage_id: {PAGE}\nrecette_clients: [presoa_pulse, presoa-uegar]\n")
+    (tmp_path / "config" / "clients").mkdir(parents=True)
+    (tmp_path / "config" / "clients" / "acme.yaml").write_text(
+        f"slug: acme\nclient: Acme\nsoftware: Pulse\npage_id: {PAGE}\nrecette_clients: [acme_pulse, acme-uegar]\n")
     return tmp_path
 
 
@@ -116,9 +116,9 @@ def client_for(fake):
 
 def test_refresh_writes_the_fiche_from_notion(root):
     fake = FakeNotion()
-    result = refresh("presoa", client_for(fake), root)
+    result = refresh("acme", client_for(fake), root)
     assert result["cartes"] == 150 and result["retours"] == 2 and result["mode"] == "api"  # 2 pages d'actions lues
-    d = parse_deployment(root / "data" / "deploiements" / "presoa.md")
+    d = parse_deployment(root / "data" / "deploiements" / "acme.md")
     assert sum(a.injection for a in d.actions) == 100  # i % 3 in (0, 1) sur 150 cartes
     assert d.injection_counts == {"KO": 1, "A faire": 99}
     assert {a.title: a.resources for a in d.actions}["Carte 0"] == ["firm"] and {a.title: a.resources for a in d.actions}["Carte 1"] == ["visit_histo"]
@@ -127,23 +127,23 @@ def test_refresh_writes_the_fiche_from_notion(root):
 
 def test_recette_asks_only_the_listed_properties(root):
     fake = FakeNotion()
-    refresh("presoa", client_for(fake), root)
+    refresh("acme", client_for(fake), root)
     recette_queries = [r for r in fake.requests if r.url.path.endswith(f"{notion_api.RECETTE_DS}/query")]
     asked = set(recette_queries[0].url.params.get_list("filter_properties[]"))
     assert asked == {"rs", "rt", "rl", "rd", "rtitle", "tr", "cc", "ex", "an", "so", "di", "ec"}  # ni responsable, ni raison d'abandon
     assert not any("/blocks" in r.url.path for r in fake.requests)  # corps des pages jamais lu
     body = json.loads(recette_queries[0].content)
-    assert {"property": "Client", "select": {"equals": "presoa-uegar"}} in body["filter"]["or"]
+    assert {"property": "Client", "select": {"equals": "acme-uegar"}} in body["filter"]["or"]
 
 
 def test_recette_content_goes_to_the_local_file_only(root):
-    refresh("presoa", client_for(FakeNotion()), root)
-    raw_dir = root / "data" / "notion" / "presoa"
+    refresh("acme", client_for(FakeNotion()), root)
+    raw_dir = root / "data" / "notion" / "acme"
     assert json.loads((raw_dir / "contenu-recette.json").read_text())["https://app.notion.com/" + "a" * 32] == {"commentaire_client": "Le commentaire du client"}
     versioned = "".join(p.read_text() for p in root.rglob("*") if p.is_file() and p.name != "contenu-recette.json")
     assert "Le commentaire du client" not in versioned and "colonne non demandée" not in versioned
     assert "donnee-de-sante" not in versioned and "🩺" not in versioned
-    cache = json.loads((root / "data" / "notion" / "presoa" / "cache-recette.json").read_text())
+    cache = json.loads((root / "data" / "notion" / "acme" / "cache-recette.json").read_text())
     rows = sorted(cache.values(), key=lambda r: r["cree_le"])
     assert rows[0]["url"] == "https://app.notion.com/" + "a" * 32  # adresse reconstruite sans le titre
     assert rows[1]["statut"] == "Autre" and rows[1]["type_donnees"] == "Autre"
@@ -152,23 +152,23 @@ def test_recette_content_goes_to_the_local_file_only(root):
 
 
 def test_routine_after_a_direct_refresh_does_a_full_pass(root):
-    refresh("presoa", client_for(FakeNotion()), root)
-    raw = root / "data" / "notion" / "presoa"
+    refresh("acme", client_for(FakeNotion()), root)
+    raw = root / "data" / "notion" / "acme"
     for base in ("actions", "recette"):
         (raw / f"empreinte_{base}.json").write_text(json.dumps({"results": [{"n": 1, "modifie": "x"}]}))
-    assert plan("presoa", root)["mode"] == "complet"
+    assert plan("acme", root)["mode"] == "complet"
 
 
 def test_missing_property_or_access_stops_before_writing(root):
     def no_access(request):
         return httpx.Response(404, json={}) if "/query" in request.url.path else FakeNotion()(request)
     with pytest.raises(SyncError, match="partagée avec l'intégration"):
-        refresh("presoa", client_for(no_access), root)
-    assert not (root / "data" / "deploiements" / "presoa.md").exists()
+        refresh("acme", client_for(no_access), root)
+    assert not (root / "data" / "deploiements" / "acme.md").exists()
 
 
 def test_recette_statuses_match_the_sql_allowlist():
-    sql = (ROOT / "sync" / "requetes" / "recette-presoa.sql").read_text()
+    sql = (ROOT / "sync" / "requetes" / "recette.sql").read_text()
     listed = re.search(r'"Statut" IN \((.*?)\) THEN', sql, re.S).group(1)
     statuts = tuple(v.replace("''", "'") for v in re.findall(r"'((?:[^']|'')*)'", listed))
     assert statuts == notion_api.RECETTE_STATUTS

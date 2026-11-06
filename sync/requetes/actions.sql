@@ -25,5 +25,5 @@ SELECT
        COALESCE((SELECT group_concat(b."Actions à mener", ' ') FROM json_each(a."Carte Bible déploiement") jt
                  JOIN "collection://0cdf1861-fb15-4fee-b792-e8dfd7f0491f" b ON b.url = jt.value), '')) AS types_action
 FROM "collection://5055cf48-4d55-4606-8c83-92ae3dfaa8a2" a
-WHERE "Client" LIKE '%3284976cdfac8157b91dcabc83e80b1c%'
+WHERE "Client" LIKE '%{{page_id}}%'
 ORDER BY url

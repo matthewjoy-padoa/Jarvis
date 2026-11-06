@@ -58,7 +58,7 @@ def store(tmp_path):
 
 def test_watchers_run_with_the_bell_and_keep_health_state(store, monkeypatch):
     d = dep(synced_at="01/01/2020 08:00")
-    monkeypatch.setattr(main.vault, "list_deployments", lambda: [d])
+    monkeypatch.setattr(main.fiches, "list_deployments", lambda: [d])
     monkeypatch.setattr(main, "notifications", store)
     TestClient(main.app).get("/notifications/compte")
     assert store.load_state() == {"sante": {"acme": d.health}}

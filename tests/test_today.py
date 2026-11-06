@@ -78,8 +78,8 @@ def test_changes_since_are_linked_to_retours_and_cards(acme):
 @pytest.fixture
 def app(acme, monkeypatch):
     d, deployments_dir = acme
-    monkeypatch.setattr(main.vault, "get_deployment", lambda slug: d if slug == "acme" else None)
-    monkeypatch.setattr(main.vault, "list_deployments", lambda: [d])
+    monkeypatch.setattr(main.fiches, "get_deployment", lambda slug: d if slug == "acme" else None)
+    monkeypatch.setattr(main.fiches, "list_deployments", lambda: [d])
     monkeypatch.setattr(main, "settings", type(main.settings)(**{**main.settings.__dict__, "deployments_dir": deployments_dir}))
     return TestClient(main.app)
 
