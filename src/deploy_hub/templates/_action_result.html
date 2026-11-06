@@ -1,0 +1,2 @@
+{% import "_icons.html" as ic %}
+<p class="result {{ 'ok' if result.ok else 'ko' }}">{% if result.simulated %}{{ ic.icon("flask", "Simulation", "ic-muted") }} {% endif %}{{ result.message }}</p>

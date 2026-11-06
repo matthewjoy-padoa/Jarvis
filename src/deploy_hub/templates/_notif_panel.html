@@ -1,0 +1,22 @@
+{% import "_icons.html" as ic %}
+{# Panneau des notifications (cloche de la barre du haut). Attend : notes, unread, urgent. #}
+<div class="notif-head">
+  <strong>Jarvis vous signale</strong>
+  {% if unread %}<button type="button" class="secondary" hx-post="/notifications/lu" hx-target="#notif-panel">Tout marquer comme lu</button>{% endif %}
+</div>
+<ul class="notif-list">
+  {% for n in notes %}
+  <li class="notif {{ 'unread' if not n.read }} level-{{ n.level }}">
+    <span class="notif-icon notif-{{ n.kind }}">{{ ic.icon(n.icon) }}</span>
+    <div class="notif-body">
+      <a href="{{ n.link or '/notifications' }}" data-read-id="{{ n.id }}"{% if n.link and n.link.startswith('http') %} target="_blank" rel="noopener"{% endif %}>{{ n.title }}</a>
+      {% if n.detail %}<span class="muted">{{ n.detail }}</span>{% endif %}
+      <span class="muted notif-when">{{ n.when.strftime("%d/%m %H:%M") }}{% if n.level == "urgent" %} · <strong class="urgent-tag">urgent</strong>{% endif %}</span>
+    </div>
+  </li>
+  {% else %}<li class="muted">Rien à signaler. Jarvis reste en veille.</li>{% endfor %}
+</ul>
+<div class="notif-foot">
+  <a href="/notifications">Toutes les notifications</a>
+  <button type="button" class="secondary" data-enable-browser-notifs hidden>Activer les notifications du Mac</button>
+</div>

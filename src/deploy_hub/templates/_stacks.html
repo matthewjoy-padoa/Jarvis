@@ -1,0 +1,10 @@
+{# Liens rapides du client, en haut à droite de la fiche sur chaque onglet : Notion, puis stacks Padoa (sync/clients/<slug>.yaml, clé stacks). #}
+<div class="stacks" aria-label="Liens rapides">
+  {% if d.notion_url %}<a href="{{ d.notion_url }}" target="_blank" rel="noopener" title="Dashboard intégration dans Notion"><span class="env">Notion</span>Dashboard ↗</a>{% endif %}
+  {% for s in d.stacks %}
+  <a href="{{ s.url }}" target="_blank" rel="noopener" title="{{ s.url }}">{% if s.env %}<span class="env">{{ s.env }}</span>{% endif %}{{ s.label }} ↗</a>
+  {% else %}
+  <span class="muted" title="Ajoute-les dans sync/clients/{{ d.slug }}.yaml (clé stacks)">Stacks à renseigner</span>
+  {% endfor %}
+  {% for l in d.links %}<a href="{{ l.url }}" target="_blank" rel="noopener">{{ l.label }} ↗</a>{% endfor %}
+</div>

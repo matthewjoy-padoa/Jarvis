@@ -1,0 +1,11 @@
+{
+  "_doc": "Bases, vues et pages Notion de la base « Retours Recette » (données de santé). Lu par .claude/hooks/notion-recette-guard.sh.",
+  "ids": [
+    "9e3440bc-941b-4c76-8b65-6fc15bbb02a7",
+    "3d04976cdfac836fab5481e67cabe933",
+    "3804976cdfac823c851b883ea947ad2d",
+    "f454976cdfac828fa29f88128ca4c09d",
+    "4054976cdfac80009dc6dddc17292ae1"
+  ],
+  "mots_cles_athena": ["retours recette", "cahier de recette", "retour recette"]
+}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% import "_icons.html" as ic %}
+{% block title %}{{ d.client }} · Jarvis{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ ic.health(d, "lg") }} {{ d.client }} <span class="badge">{{ d.software }}</span></h1>
+    <p class="muted">
+      {% if d.go_live %}Déploiement le <strong class="text">{{ d.go_live.strftime("%d/%m/%Y") }}</strong> <span class="badge {{ 'g-ko' if 0 <= d.days_left < 14 }}">J{{ '%+d' % (-d.days_left) }}</span> · {% endif %}{{ d.progress }} % intégré{% if d.synced_at %} · <span title="Dernière synchro Notion">{{ ic.icon("sync", "", "ic-muted") }} {{ d.synced_at }}</span>{% endif %}
+    </p>
+  </div>
+  <div class="head-side">
+    {% include "_stacks.html" %}
+    <div class="refresh">
+  <button type="button" class="secondary" hx-post="/actions/rafraichir/{{ d.slug }}" hx-target="next .refresh-out" hx-indicator="closest .refresh" hx-disabled-elt="this"{% if not notion_ready %} disabled title="Jeton Notion absent : voir README"{% endif %}>{{ ic.icon("sync") }} Rafraîchir depuis Notion</button>
+  <span class="refresh-wait muted">Jarvis interroge Notion…</span>
+  <div class="refresh-out"></div>
+</div>
+  </div>
+</div>
+<nav class="tabs" aria-label="Onglets">
+  {% for key, label in tabs %}<a href="/deploiements/{{ d.slug }}/{{ key }}" class="{{ 'active' if key == tab }}">{{ label }}{% if key == 'recette' and d.open_retours %} <span class="count" title="Retours ouverts">{{ d.open_retours | length }}</span>{% endif %}</a>{% endfor %}
+</nav>
+{% with show_client = false %}{% include "_" ~ tab ~ ".html" %}{% endwith %}
+{% endblock %}

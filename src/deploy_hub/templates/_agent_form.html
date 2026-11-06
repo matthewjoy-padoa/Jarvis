@@ -1,0 +1,13 @@
+{% import "_icons.html" as ic %}
+{# Formulaire de l'agent sur un retour : brief pré-rempli par retour_prompt (sources/claude_runner.py), modifiable avant envoi. #}
+{% set out = "agent-" ~ d.slug ~ "-" ~ r.id %}
+<form class="agent-form" hx-post="/actions/agent-retour/{{ d.slug }}/{{ r.id }}" hx-target="#{{ out }}" hx-confirm="Lancer un agent sur le retour {{ r.id }} ?">
+  <label for="brief-{{ out }}">Brief de l'agent : relis-le, complète si besoin la partie <code>&lt;precisions&gt;</code>{% if to_fill in brief %}, et remplace <strong>{{ to_fill }}</strong>{% endif %}.</label>
+  <textarea id="brief-{{ out }}" name="prompt" rows="18" spellcheck="false">{{ brief }}</textarea>
+  <div class="agent-actions">
+    <button type="submit">{{ ic.icon("bot") }} Lancer l'agent</button>
+    <button type="button" class="secondary" onclick="navigator.clipboard.writeText(this.form.prompt.value).then(() => { this.textContent = 'Copié ✓'; })">Copier le brief</button>
+    <span class="muted">Branche <code>fix-{{ d.slug }}-{{ r.id | lower }}</code></span>
+  </div>
+</form>
+<div id="{{ out }}"></div>

@@ -1,0 +1,55 @@
+{# Attend : deployments, show_client. CED = DAG {client}-ced de l'orchestrator (dags/dag_ced.py) : extraction et injection
+   des fichiers, une série de requêtes par ressource (catalogue sync/dags/catalogue.json), plus les cartes Notion sur les fichiers. #}
+{% import "_charts.html" as charts with context %}
+{% for d in deployments %}
+{% set ceds = ced_for(d.orchestrator) %}
+{% if show_client %}<h2>{{ d.client }}</h2>{% endif %}
+{% for c in ceds %}
+{% set n = c.ressources.values() | map("length") | sum %}
+<section class="panel ced">
+  <div class="ced-head">
+    <h2><code>{{ c.dag_id }}</code> <span class="muted">· {{ n }} requête(s) de fichiers sur {{ c.ressources | length }} ressource(s)</span></h2>
+    <form class="dag-form" hx-post="/actions/injection/{{ d.slug }}" hx-target="next .dag-out" data-dag-form>
+      <input type="hidden" name="dag_id" value="{{ c.dag_id }}">
+      <input type="hidden" name="card" value="CED {{ c.customer }}">
+      <select name="padoa_env" aria-label="Stack cible">{% for e in padoa_envs %}<option value="{{ e }}">{{ e }}</option>{% endfor %}</select>
+      <button type="submit">Lancer le CED</button>
+    </form>
+  </div>
+  <div class="dag-out"></div>
+  <div class="chart-row">
+    {% set counts = [] %}{% for r, qs in c.ressources | dictsort %}{% set _ = counts.append((r, qs | length)) %}{% endfor %}
+    {{ charts.hbars("Requêtes de fichiers par ressource", counts | sort(attribute="1", reverse=true), 8) }}
+  </div>
+  <table data-filterable>
+    <thead><tr><th data-filter>Ressource</th><th data-nosort>Requêtes (types de fichiers)</th></tr></thead>
+    <tbody>
+    {% for r, qs in c.ressources | dictsort %}
+      <tr><td><code class="res">{{ r }}</code></td>
+        <td>{% for q in qs %}<code class="req {{ 'req-client' if q.niveau == 'client' }}" title="Requête {{ q.niveau }}">{{ q.requete | replace("query_file_type_", "type ") }}</code> {% endfor %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted">Requêtes en gras : propres au client (<code>src/extract/customers/…</code>) ; les autres viennent du logiciel. Catalogue généré depuis l'orchestrator, voir le README.</p>
+</section>
+{% else %}
+<p class="muted">Aucun DAG CED pour {{ d.client }}{% if not d.orchestrator %} : le client n'est pas encore dans l'orchestrator{% else %} : CED désactivé ou sans requête dans <code>dags/config_deployment.py</code>{% endif %}.</p>
+{% endfor %}
+
+<section class="panel">
+  <h2>Cartes Notion sur les fichiers</h2>
+  {% if d.ced_cards %}
+  <table>
+    <thead><tr><th>Carte</th><th>Statut</th><th>Statut injection</th><th>Deadline</th></tr></thead>
+    <tbody>
+    {% for a in d.ced_cards %}
+      <tr><td>{% if a.notion_url %}<a href="{{ a.notion_url }}" target="_blank" rel="noopener">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}</td>
+        <td><span class="badge g-{{ a.group }}">{{ a.status }}</span></td>
+        <td><span class="badge g-{{ a.injection_group }}">{{ a.injection_status }}</span></td>
+        <td class="muted">{{ a.due.strftime("%d/%m/%Y") if a.due else "—" }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">Aucune carte d'intégration ne parle de fichiers (CED, GED, fichiers) pour {{ d.client }}.</p>{% endif %}
+</section>
+{% endfor %}

@@ -1,0 +1,62 @@
+{# Attend : deployments, show_client, vue (ressources | ced). Notion : « Statut intégration - Injections » des cartes du client. #}
+{% set base = request.url.path %}
+<div class="segmented" role="group" aria-label="Vue des injections">
+  <a href="{{ base }}" class="{{ 'active' if vue not in ('liste', 'ced') }}">Par ressource</a><a href="{{ base }}?vue=liste" class="{{ 'active' if vue == 'liste' }}">Liste</a><a href="{{ base }}?vue=ced" class="{{ 'active' if vue == 'ced' }}">CED (fichiers)</a>
+</div>
+{% if vue == 'ced' %}{% include "_ced.html" %}{% else %}
+{% set grouped = vue != 'liste' %}
+{% import "_charts.html" as charts with context %}
+{% for d in deployments if d.injection_counts or d.resources %}
+<section class="chart-row">
+  {% set scope = {"client": d.client} if show_client else {} %}
+  {{ charts.segbar((d.client ~ " · ") if show_client else "Répartition des injections", d.injection_groups, "cartes", filter_key="groupe", scope=scope, href=(base ~ "?vue=liste") if grouped else None) }}
+  {% if d.injection_counts %}{{ charts.hbars("Par statut d'injection", d.injection_counts | dictsort(by="value", reverse=true), 5, filter_key="injection", scope=scope, href=(base ~ "?vue=liste") if grouped else None) }}{% endif %}
+</section>
+{% endfor %}
+{% if grouped %}{% include "_injections_blocks.html" %}{% else %}
+<table data-filterable>
+  <thead><tr>{% if show_client %}<th data-filter="client">Client</th>{% endif %}<th>Carte</th><th data-filter="injection">Statut injection</th><th>Ressources</th><th data-nosort>Lancer un DAG</th></tr></thead>
+  <tbody>
+  {% for d in deployments %}
+  {% for a in d.injection_cards %}
+    {% set choices = dags_for(d.orchestrator, a.resources) %}
+    <tr data-group="{{ a.injection_group }}">
+      {% if show_client %}<td><a href="/deploiements/{{ d.slug }}/injections">{{ d.client }}</a></td>{% endif %}
+      <td>{% if a.notion_url %}<a href="{{ a.notion_url }}" target="_blank" rel="noopener">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}</td>
+      <td><span class="badge g-{{ a.injection_group }}">{{ a.injection_status }}</span></td>
+      <td>{% for r in a.resources %}<code class="res">{{ r }}</code> {% else %}<span class="muted" title="Lier la ressource à la carte (ou à sa carte Bible) dans Notion">aucune</span>{% endfor %}</td>
+      <td class="actions">
+        {% if choices %}
+        <form class="dag-form" hx-post="/actions/injection/{{ d.slug }}" hx-target="next .dag-out" data-dag-form>
+          <input type="hidden" name="card" value="{{ a.title }}">
+          <select name="dag_id" aria-label="DAG">{% for c in choices %}<option value="{{ c.dag_id }}" title="{{ c.dag_id }}">{{ c.label }}</option>{% endfor %}</select>
+          <select name="padoa_env" aria-label="Stack cible">{% for e in padoa_envs %}<option value="{{ e }}">{{ e }}</option>{% endfor %}</select>
+          <button type="submit">Lancer</button>
+        </form>
+        <div class="dag-out"></div>
+        {% elif a.resources %}<span class="muted" title="Aucun DAG de {{ d.orchestrator | join(', ') or d.client }} ne traite ces ressources dans dags/config_deployment.py">aucun DAG{% if not d.orchestrator %} (client absent de l'orchestrator){% endif %}</span>
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  {% for r in d.resources %}
+    <tr data-group="{{ r.group }}">
+      {% if show_client %}<td><a href="/deploiements/{{ d.slug }}/injections">{{ d.client }}</a></td>{% endif %}
+      <td><strong>{{ r.name }}</strong>{% if r.note %}<br><span class="muted">{{ r.note }}</span>{% endif %}</td>
+      <td><span class="badge g-{{ r.group }}">{{ r.status }}</span></td>
+      <td><code class="res">{{ r.name }}</code></td>
+      <td class="actions">
+        {% set out = "out-" ~ d.slug ~ "-" ~ r.name %}
+        {% if r.dag_id %}
+        <button hx-post="/actions/dag/{{ r.dag_id }}" hx-target="#{{ out }}" hx-confirm="Déclencher {{ r.dag_id }} ?">Lancer le DAG</button>
+        {% endif %}
+        <button class="secondary" hx-post="/actions/claude/{{ d.slug }}/{{ r.name }}" hx-target="#{{ out }}" hx-confirm="Lancer Claude sur {{ r.name }} ?">Lancer Claude</button>
+        <div id="{{ out }}"></div>
+      </td>
+    </tr>
+  {% endfor %}
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endif %}

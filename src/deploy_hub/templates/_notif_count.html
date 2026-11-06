@@ -1,0 +1,1 @@
+{% if unread %}<span class="bell-count {{ 'urgent' if urgent }}" title="{{ unread | length }} non lue(s){% if urgent %}, dont {{ urgent | length }} urgente(s){% endif %}">{{ unread | length if unread | length < 100 else "99+" }}</span>{% endif %}

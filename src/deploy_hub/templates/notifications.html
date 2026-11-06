@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% import "_icons.html" as ic %}
+{% block title %}Notifications · Jarvis{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Notifications <span class="muted">· {{ unread | length }} non lue(s)</span></h1>
+  {% if unread %}<button type="button" class="secondary" hx-post="/notifications/lu" hx-swap="none" hx-on::after-request="location.reload()">Tout marquer comme lu</button>{% endif %}
+</div>
+<p class="muted">Agent terminé, changements urgents après une synchro (nouveau retour, retour ou injection en KO, point de vigilance, deadline rapprochée), échéances du jour. Les 500 dernières sont gardées.</p>
+<div class="panel">
+<ul class="notif-list" data-filterable data-items="li.notif" data-filters="Type:kind,Niveau:level,Client:client">
+  {% for n in notes %}
+  <li class="notif {{ 'unread' if not n.read }} level-{{ n.level }}" data-kind="{{ n.kind }}" data-level="{{ n.level }}" data-client="{{ n.client }}">
+    <span class="notif-icon notif-{{ n.kind }}">{{ ic.icon(n.icon) }}</span>
+    <div class="notif-body">
+      <a href="{{ n.link or '#' }}" data-read-id="{{ n.id }}"{% if n.link and n.link.startswith('http') %} target="_blank" rel="noopener"{% endif %}>{{ n.title }}</a>
+      {% if n.detail %}<span class="muted">{{ n.detail }}</span>{% endif %}
+      <span class="muted notif-when">{{ n.when.strftime("%d/%m/%Y %H:%M") }}{% if n.level == "urgent" %} · <strong class="urgent-tag">urgent</strong>{% endif %}</span>
+    </div>
+  </li>
+  {% else %}<li class="muted">Aucune notification.</li>{% endfor %}
+</ul>
+</div>
+{% endblock %}

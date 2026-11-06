@@ -1,0 +1,12 @@
+# Environnement et secrets
+.venv/
+.venv.*/
+.env
+# Données locales : fiches et caches synchronisés depuis Notion, contenu des retours, journal, notifications.
+# Elles restent sur la machine ; le dépôt ne contient que le code, les requêtes, les tests et la démo.
+data/
+# Caches Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store

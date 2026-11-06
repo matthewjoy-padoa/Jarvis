@@ -1,0 +1,8212 @@
+{
+ "clients": {
+  "airbus": {
+   "ced": {
+    "dag_id": "airbus-ced",
+    "ressources": {
+     "employee": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_employee"
+      }
+     ]
+    }
+   },
+   "dags": {
+    "airbus-etl_group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "medical_member_and_portal_user",
+      "zone",
+      "center",
+      "location",
+      "location_room"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employment_contract",
+      "employment_contract_info"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-employee_other_0": {
+     "groupe": "employee_other_0",
+     "ressources": [
+      "employee_contact",
+      "emergency_contact"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-employee_other_1": {
+     "groupe": "employee_other_1",
+     "ressources": [
+      "document"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-employee_other_2": {
+     "groupe": "employee_other_2",
+     "ressources": [
+      "employee_consent"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-manual_reminder": {
+     "groupe": "manual_reminder",
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-planning": {
+     "groupe": "planning",
+     "ressources": [
+      "planning_item_exam",
+      "planning_item_event",
+      "planning_item_vacation",
+      "planning_item_assistant_vacation",
+      "planning_item_unavailability",
+      "planning_item_non_clinical_zone"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_a_0": {
+     "groupe": "ressource_a_0",
+     "ressources": [
+      "wr_group",
+      "exposure_histo"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "med_tag"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_a_3": {
+     "groupe": "ressource_a_3",
+     "ressources": [
+      "site"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_b_0": {
+     "groupe": "ressource_b_0",
+     "ressources": [
+      "measure_audio_test",
+      "measure_blood_pressure"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_b_1": {
+     "groupe": "ressource_b_1",
+     "ressources": [
+      "measure_body_structure",
+      "measure_spirometry"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_b_2": {
+     "groupe": "ressource_b_2",
+     "ressources": [
+      "measure_electrocardiogram"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_b_3": {
+     "groupe": "ressource_b_3",
+     "ressources": [
+      "measure_vision_distant",
+      "measure_vision_near",
+      "measure_vision_astigmate",
+      "measure_vision_phoria"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_b_4": {
+     "groupe": "ressource_b_4",
+     "ressources": [
+      "measure_vision_color_ishihara",
+      "measure_vision_other"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_b_5": {
+     "groupe": "ressource_b_5",
+     "ressources": [
+      "measure_other",
+      "measure_covid19_test",
+      "measure_urine_test",
+      "measure_blood_test",
+      "measure_capillary_glycemia"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_c_0": {
+     "groupe": "ressource_c_0",
+     "ressources": [
+      "note_doctor_exam"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_c_1": {
+     "groupe": "ressource_c_1",
+     "ressources": [
+      "note_treatment",
+      "note_memo"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_c_2": {
+     "groupe": "ressource_c_2",
+     "ressources": [
+      "family_situation"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_c_3": {
+     "groupe": "ressource_c_3",
+     "ressources": [
+      "note_work_accident",
+      "note_pro_disease_declaration"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_c_4": {
+     "groupe": "ressource_c_4",
+     "ressources": [
+      "note_habitus",
+      "note_work_appreciation"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_c_5": {
+     "groupe": "ressource_c_5",
+     "ressources": [
+      "note_pathology"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_c_6": {
+     "groupe": "ressource_c_6",
+     "ressources": [
+      "note_academic",
+      "note_personal_history",
+      "note_family_history"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_d_0": {
+     "groupe": "ressource_d_0",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection",
+      "vaccine_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_d_1": {
+     "groupe": "ressource_d_1",
+     "ressources": [
+      "bet",
+      "bet_scales"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-ressource_d_2": {
+     "groupe": "ressource_d_2",
+     "ressources": [
+      "gen_tag"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-etl_group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl_group"
+    },
+    "airbus-transform_and_load-center": {
+     "ressources": [
+      "center"
+     ],
+     "type": "transform_and_load"
+    },
+    "airbus-transform_and_load-location": {
+     "ressources": [
+      "location"
+     ],
+     "type": "transform_and_load"
+    },
+    "airbus-transform_and_load-location_room": {
+     "ressources": [
+      "location_room"
+     ],
+     "type": "transform_and_load"
+    },
+    "airbus-transform_and_load-medical_member_and_portal_user": {
+     "ressources": [
+      "medical_member_and_portal_user"
+     ],
+     "type": "transform_and_load"
+    },
+    "airbus-transform_and_load-sector": {
+     "ressources": [
+      "sector"
+     ],
+     "type": "transform_and_load"
+    },
+    "airbus-transform_and_load-sector_mtm": {
+     "ressources": [
+      "sector_mtm"
+     ],
+     "type": "transform_and_load"
+    },
+    "airbus-transform_and_load-wr_group_sirh": {
+     "ressources": [
+      "wr_group_sirh"
+     ],
+     "type": "transform_and_load"
+    },
+    "airbus-transform_and_load-zone": {
+     "ressources": [
+      "zone"
+     ],
+     "type": "transform_and_load"
+    }
+   },
+   "logiciel": "airbus"
+  },
+  "aprevya": {
+   "ced": {
+    "dag_id": "aprevya-ced",
+    "ressources": {
+     "amt": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_6"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_9"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_45"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_71"
+      }
+     ],
+     "employee": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_0"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_2"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_14_employee"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_17"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_18"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_36"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_39"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_40"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_49"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_52"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_54"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_60"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_65"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_67"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_68"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_72"
+      }
+     ],
+     "firm": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_pilote_ced"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_13"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_20"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_21"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_37"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_42"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_43"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_57"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_59"
+      }
+     ],
+     "invoice_histo": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_pilote_invoice"
+      }
+     ],
+     "measure": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_14"
+      }
+     ],
+     "standalone_event": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_41"
+      }
+     ],
+     "visit_histo": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_55"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_56"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_66"
+      }
+     ]
+    }
+   },
+   "dags": {
+    "aprevya-etl-boeth": {
+     "ressources": [
+      "boeth"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-employee_paper_file_location": {
+     "ressources": [
+      "employee_paper_file_location"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-employment_contract": {
+     "ressources": [
+      "employment_contract"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-employment_contract_info": {
+     "ressources": [
+      "employment_contract_info"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-fe": {
+     "ressources": [
+      "fe"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-firm": {
+     "ressources": [
+      "firm"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-firm_info": {
+     "ressources": [
+      "firm_info"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-firm_location": {
+     "ressources": [
+      "firm_location"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-gen_tag": {
+     "ressources": [
+      "gen_tag"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-measure_allergy": {
+     "ressources": [
+      "measure_allergy"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-measure_dosimetry": {
+     "ressources": [
+      "measure_dosimetry"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-measure_request": {
+     "ressources": [
+      "measure_request"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-measure_vision_color_ishihara": {
+     "ressources": [
+      "measure_vision_color_ishihara"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-med_tag": {
+     "ressources": [
+      "med_tag"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-note_memo": {
+     "ressources": [
+      "note_memo"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-note_pathology": {
+     "ressources": [
+      "note_pathology"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-note_pro_disease_declaration": {
+     "ressources": [
+      "note_pro_disease_declaration"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl-note_social_personal_situation": {
+     "ressources": [
+      "note_social_personal_situation"
+     ],
+     "type": "etl"
+    },
+    "aprevya-etl_group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "medical_member_and_portal_user",
+      "center",
+      "location",
+      "sector",
+      "sector_mtm"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_owner",
+      "amt_perimeter",
+      "amt_status",
+      "amt_task"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employment_contract"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-employee_other_0": {
+     "groupe": "employee_other_0",
+     "ressources": [
+      "former_job",
+      "employee_contact",
+      "employee_consent",
+      "employee_paper_file_location"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-employee_other_1": {
+     "groupe": "employee_other_1",
+     "ressources": [
+      "employment_contract_info"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-fe_module": {
+     "groupe": "fe_module",
+     "ressources": [
+      "fe",
+      "prevention_action",
+      "risk",
+      "work_unit",
+      "work_unit_risk"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status",
+      "firm_info"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "firm_contact",
+      "postal_address",
+      "firm_postal_address"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-firm_other_1": {
+     "groupe": "firm_other_1",
+     "ressources": [
+      "collection",
+      "firm_collection"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-firm_other_2": {
+     "groupe": "firm_other_2",
+     "ressources": [
+      "invoice_histo",
+      "debit_mandate"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-firm_other_3": {
+     "groupe": "firm_other_3",
+     "ressources": [
+      "crm_firm",
+      "crm_report",
+      "crm_note"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-firm_other_4": {
+     "groupe": "firm_other_4",
+     "ressources": [
+      "firm_location",
+      "firm_sector"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-firm_other_7": {
+     "groupe": "firm_other_7",
+     "ressources": [
+      "gen_tag"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-measure": {
+     "groupe": "measure",
+     "ressources": [
+      "measure_allergy",
+      "measure_audio",
+      "measure_audio_test",
+      "measure_spirometry"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-measure_1": {
+     "groupe": "measure_1",
+     "ressources": [
+      "measure_vision_other",
+      "measure_vision_field",
+      "measure_vision_color_ishihara",
+      "measure_radio"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-measure_2": {
+     "groupe": "measure_2",
+     "ressources": [
+      "measure_blood_test",
+      "measure_urine_test",
+      "measure_covid19_test",
+      "measure_capillary_glycemia",
+      "measure_body_structure",
+      "measure_blood_pressure"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-measure_3": {
+     "groupe": "measure_3",
+     "ressources": [
+      "measure_other",
+      "measure_electrocardiogram",
+      "measure_stress_electrocardiogram",
+      "measure_cardiovascular_risk_10_years"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-measure_4": {
+     "groupe": "measure_4",
+     "ressources": [
+      "measure_psychometric",
+      "measure_sleep"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-ressource_a_0": {
+     "groupe": "ressource_a_0",
+     "ressources": [
+      "note_family_history",
+      "note_personal_history",
+      "note_memo"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "note_sick_leave",
+      "note_therapeutic_part_time",
+      "note_treatment",
+      "note_pro_disease_declaration",
+      "note_work_accident"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-ressource_a_2": {
+     "groupe": "ressource_a_2",
+     "ressources": [
+      "note_academic",
+      "document"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-ressource_a_3": {
+     "groupe": "ressource_a_3",
+     "ressources": [
+      "note_pathology"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-ressource_b_0": {
+     "groupe": "ressource_b_0",
+     "ressources": [
+      "standalone_event",
+      "standalone_event_participant",
+      "note_work_appreciation",
+      "bet",
+      "bet_scales",
+      "med_tag"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-ressource_b_1": {
+     "groupe": "ressource_b_1",
+     "ressources": [
+      "note_social_personal_situation",
+      "boeth",
+      "family_situation",
+      "basic_skills"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-ressource_b_2": {
+     "groupe": "ressource_b_2",
+     "ressources": [
+      "note_habitus"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-ressource_c_1": {
+     "groupe": "ressource_c_1",
+     "ressources": [
+      "measure_request"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-ressource_d_0": {
+     "groupe": "ressource_d_0",
+     "ressources": [
+      "note_doctor_exam"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-ressource_d_1": {
+     "groupe": "ressource_d_1",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection",
+      "vaccine_record",
+      "vaccine_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-ressource_d_3": {
+     "groupe": "ressource_d_3",
+     "ressources": [
+      "wr_group"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-ressource_d_4": {
+     "groupe": "ressource_d_4",
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-ressource_d_5": {
+     "groupe": "ressource_d_5",
+     "ressources": [
+      "exposure_histo"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-user": {
+     "groupe": "user",
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-etl_group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl_group"
+    },
+    "aprevya-transform_and_load-group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_owner",
+      "amt_perimeter",
+      "amt_status",
+      "amt_task"
+     ],
+     "type": "transform_and_load-group"
+    }
+   },
+   "logiciel": "uegar"
+  },
+  "apst2607": {
+   "ced": {
+    "dag_id": "apst2607-ced",
+    "ressources": {
+     "amt": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_6"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_45"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_58"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_71"
+      }
+     ],
+     "employee": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_14_employee"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_17"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_18"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_36"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_39"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_40"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_46"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_49"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_52"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_60"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_62"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_65"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_67"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_68"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_72"
+      }
+     ],
+     "firm": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_pilote_ced"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_13"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_20"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_21"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_42"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_59"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_61"
+      }
+     ],
+     "invoice_histo": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_pilote_invoice"
+      }
+     ],
+     "measure": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_14"
+      }
+     ],
+     "standalone_event": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_41"
+      }
+     ],
+     "visit_histo": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_55"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_56"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_66"
+      }
+     ]
+    }
+   },
+   "dags": {
+    "apst2607-etl-employee": {
+     "ressources": [
+      "employee"
+     ],
+     "type": "etl"
+    },
+    "apst2607-etl-exposure_histo": {
+     "ressources": [
+      "exposure_histo"
+     ],
+     "type": "etl"
+    },
+    "apst2607-etl-fe": {
+     "ressources": [
+      "fe"
+     ],
+     "type": "etl"
+    },
+    "apst2607-etl-firm_status": {
+     "ressources": [
+      "firm_status"
+     ],
+     "type": "etl"
+    },
+    "apst2607-etl-measure_request": {
+     "ressources": [
+      "measure_request"
+     ],
+     "type": "etl"
+    },
+    "apst2607-etl-measure_vision_distant": {
+     "ressources": [
+      "measure_vision_distant"
+     ],
+     "type": "etl"
+    },
+    "apst2607-etl-note_habitus": {
+     "ressources": [
+      "note_habitus"
+     ],
+     "type": "etl"
+    },
+    "apst2607-etl-note_memo": {
+     "ressources": [
+      "note_memo"
+     ],
+     "type": "etl"
+    },
+    "apst2607-etl-note_pro_disease_declaration": {
+     "ressources": [
+      "note_pro_disease_declaration"
+     ],
+     "type": "etl"
+    },
+    "apst2607-etl-wr_group": {
+     "ressources": [
+      "wr_group"
+     ],
+     "type": "etl"
+    },
+    "apst2607-etl_group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "medical_member_and_portal_user",
+      "center",
+      "location",
+      "sector",
+      "sector_mtm"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_owner",
+      "amt_perimeter",
+      "amt_status",
+      "amt_task"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employment_contract"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-employee_other_0": {
+     "groupe": "employee_other_0",
+     "ressources": [
+      "former_job",
+      "employee_contact",
+      "employee_consent",
+      "employee_paper_file_location"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-employee_other_1": {
+     "groupe": "employee_other_1",
+     "ressources": [
+      "employment_contract_info"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status",
+      "firm_info"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "firm_contact",
+      "postal_address",
+      "firm_postal_address"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-firm_other_2": {
+     "groupe": "firm_other_2",
+     "ressources": [
+      "invoice_histo",
+      "debit_mandate"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-firm_other_3": {
+     "groupe": "firm_other_3",
+     "ressources": [
+      "crm_firm",
+      "crm_ticket_status",
+      "crm_report",
+      "crm_ticket",
+      "crm_note"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-firm_other_4": {
+     "groupe": "firm_other_4",
+     "ressources": [
+      "firm_location",
+      "firm_sector"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-measure_1": {
+     "groupe": "measure_1",
+     "ressources": [
+      "measure_vision_color_ishihara",
+      "measure_vision_field"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-measure_2": {
+     "groupe": "measure_2",
+     "ressources": [
+      "measure_blood_pressure",
+      "measure_electrocardiogram",
+      "measure_stress_electrocardiogram",
+      "measure_nasal_fibroscopy",
+      "measure_psychometric",
+      "measure_allergy"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-measure_3": {
+     "groupe": "measure_3",
+     "ressources": [
+      "measure_urine_test",
+      "measure_blood_test",
+      "measure_radio",
+      "measure_other",
+      "measure_dosimetry"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-measure_4": {
+     "groupe": "measure_4",
+     "ressources": [
+      "measure_audio",
+      "measure_audio_test",
+      "measure_vision_other",
+      "measure_spirometry",
+      "measure_body_structure"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-ressource_a_0": {
+     "groupe": "ressource_a_0",
+     "ressources": [
+      "note_family_history",
+      "note_personal_history",
+      "note_memo"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "note_sick_leave",
+      "note_therapeutic_part_time",
+      "note_treatment",
+      "note_pro_disease_declaration",
+      "note_work_accident"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-ressource_a_2": {
+     "groupe": "ressource_a_2",
+     "ressources": [
+      "note_academic",
+      "document"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-ressource_a_3": {
+     "groupe": "ressource_a_3",
+     "ressources": [
+      "note_pathology"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-ressource_b_0": {
+     "groupe": "ressource_b_0",
+     "ressources": [
+      "standalone_event",
+      "standalone_event_participant",
+      "note_work_appreciation",
+      "bet",
+      "bet_scales",
+      "med_tag"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-ressource_b_1": {
+     "groupe": "ressource_b_1",
+     "ressources": [
+      "note_social_personal_situation",
+      "boeth",
+      "family_situation",
+      "basic_skills"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-ressource_b_2": {
+     "groupe": "ressource_b_2",
+     "ressources": [
+      "note_habitus"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-ressource_d_0": {
+     "groupe": "ressource_d_0",
+     "ressources": [
+      "note_doctor_exam"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-ressource_d_1": {
+     "groupe": "ressource_d_1",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection",
+      "vaccine_record",
+      "vaccine_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-ressource_d_2": {
+     "groupe": "ressource_d_2",
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-ressource_d_3": {
+     "groupe": "ressource_d_3",
+     "ressources": [
+      "wr_group"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-ressource_d_4": {
+     "groupe": "ressource_d_4",
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-ressource_d_5": {
+     "groupe": "ressource_d_5",
+     "ressources": [
+      "exposure_histo"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-etl_group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl_group"
+    },
+    "apst2607-transform_and_load-employment_contract": {
+     "ressources": [
+      "employment_contract"
+     ],
+     "type": "transform_and_load"
+    },
+    "apst2607-transform_and_load-employment_contract_info": {
+     "ressources": [
+      "employment_contract_info"
+     ],
+     "type": "transform_and_load"
+    }
+   },
+   "logiciel": "uegar"
+  },
+  "apst_btp_rp": {
+   "dags": {
+    "apst_btp_rp-etl-employment_contract_info": {
+     "ressources": [
+      "employment_contract_info"
+     ],
+     "type": "etl"
+    }
+   },
+   "logiciel": "addeo"
+  },
+  "bas": {
+   "ced": {
+    "dag_id": "bas-ced",
+    "ressources": {
+     "employee": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_employee"
+      }
+     ],
+     "firm": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_firm"
+      }
+     ],
+     "invoice_histo": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_invoice"
+      }
+     ],
+     "measure": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_measure"
+      }
+     ]
+    }
+   },
+   "dags": {
+    "bas-etl-center": {
+     "ressources": [
+      "center"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-collection": {
+     "ressources": [
+      "collection"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-crm_firm": {
+     "ressources": [
+      "crm_firm"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-crm_note": {
+     "ressources": [
+      "crm_note"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-crm_sale_opportunity": {
+     "ressources": [
+      "crm_sale_opportunity"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-crm_sale_opportunity_description": {
+     "ressources": [
+      "crm_sale_opportunity_description"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-crm_sale_opportunity_details": {
+     "ressources": [
+      "crm_sale_opportunity_details"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-crm_sale_opportunity_owner": {
+     "ressources": [
+      "crm_sale_opportunity_owner"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-crm_sale_opportunity_status": {
+     "ressources": [
+      "crm_sale_opportunity_status"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-crm_ticket": {
+     "ressources": [
+      "crm_ticket"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-crm_ticket_owner": {
+     "ressources": [
+      "crm_ticket_owner"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-crm_ticket_status": {
+     "ressources": [
+      "crm_ticket_status"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-employee": {
+     "ressources": [
+      "employee"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-employer_user": {
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-employment_contract": {
+     "ressources": [
+      "employment_contract"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-firm": {
+     "ressources": [
+      "firm"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-firm_basic_care": {
+     "ressources": [
+      "firm_basic_care"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-firm_collection": {
+     "ressources": [
+      "firm_collection"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-firm_contact": {
+     "ressources": [
+      "firm_contact"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-firm_employee_info": {
+     "ressources": [
+      "firm_employee_info"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-firm_location": {
+     "ressources": [
+      "firm_location"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-firm_owner": {
+     "ressources": [
+      "firm_owner"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-firm_postal_address": {
+     "ressources": [
+      "firm_postal_address"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-firm_sector": {
+     "ressources": [
+      "firm_sector"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-firm_status": {
+     "ressources": [
+      "firm_status"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-gen_tag": {
+     "ressources": [
+      "gen_tag"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-invoice_histo": {
+     "ressources": [
+      "invoice_histo"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-location": {
+     "ressources": [
+      "location"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-location_room": {
+     "ressources": [
+      "location_room"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-measure_psychometric": {
+     "ressources": [
+      "measure_psychometric"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-medical_member_and_portal_user": {
+     "ressources": [
+      "medical_member_and_portal_user"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-note_doctor_exam": {
+     "ressources": [
+      "note_doctor_exam"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-note_habitus": {
+     "ressources": [
+      "note_habitus"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-note_memo": {
+     "ressources": [
+      "note_memo"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-note_pathology": {
+     "ressources": [
+      "note_pathology"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-note_personal_history": {
+     "ressources": [
+      "note_personal_history"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-note_social_personal_situation": {
+     "ressources": [
+      "note_social_personal_situation"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-note_treatment": {
+     "ressources": [
+      "note_treatment"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-planning_item_event": {
+     "ressources": [
+      "planning_item_event"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-planning_item_unavailability": {
+     "ressources": [
+      "planning_item_unavailability"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-postal_address": {
+     "ressources": [
+      "postal_address"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-sector": {
+     "ressources": [
+      "sector"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-sector_mtm": {
+     "ressources": [
+      "sector_mtm"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-vaccine": {
+     "ressources": [
+      "vaccine"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-vaccine_injection": {
+     "ressources": [
+      "vaccine_injection"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-vaccine_record": {
+     "ressources": [
+      "vaccine_record"
+     ],
+     "type": "etl"
+    },
+    "bas-etl-visit_histo": {
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl"
+    },
+    "bas-etl_group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "zone",
+      "center",
+      "location",
+      "medical_member_and_portal_user",
+      "sector",
+      "sector_mtm",
+      "firm_sector",
+      "firm_location"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_owner",
+      "amt_status",
+      "amt_perimeter"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-crm": {
+     "groupe": "crm",
+     "ressources": [
+      "crm_ticket",
+      "crm_ticket_owner",
+      "crm_ticket_status",
+      "crm_sale_opportunity",
+      "crm_sale_opportunity_description",
+      "crm_sale_opportunity_details",
+      "crm_sale_opportunity_status",
+      "crm_sale_opportunity_owner",
+      "crm_firm",
+      "crm_note"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-crm_file": {
+     "groupe": "crm_file",
+     "ressources": [
+      "crm_sale_opportunity_file"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employment_contract"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "collection",
+      "firm_collection"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-firm_other_1": {
+     "groupe": "firm_other_1",
+     "ressources": [
+      "employer_user",
+      "firm_contact",
+      "firm_owner"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-firm_other_2": {
+     "groupe": "firm_other_2",
+     "ressources": [
+      "firm_basic_care",
+      "firm_basic_care_contract",
+      "firm_employee_info"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-firm_other_4": {
+     "groupe": "firm_other_4",
+     "ressources": [
+      "postal_address",
+      "firm_postal_address"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-firm_other_7": {
+     "groupe": "firm_other_7",
+     "ressources": [
+      "gen_tag"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-planning": {
+     "groupe": "planning",
+     "ressources": [
+      "planning_item_event",
+      "planning_item_unavailability"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-ressource_a_0": {
+     "groupe": "ressource_a_0",
+     "ressources": [
+      "note_memo",
+      "note_personal_history",
+      "note_family_history",
+      "note_social_personal_situation"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "note_habitus",
+      "note_doctor_exam",
+      "note_pathology",
+      "note_treatment"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-ressource_b_0": {
+     "groupe": "ressource_b_0",
+     "ressources": [
+      "measure_blood_pressure",
+      "measure_blood_test"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-ressource_b_1": {
+     "groupe": "ressource_b_1",
+     "ressources": [
+      "measure_body_structure",
+      "measure_psychometric",
+      "measure_urine_test"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-ressource_b_2": {
+     "groupe": "ressource_b_2",
+     "ressources": [
+      "measure_vision_other",
+      "measure_electrocardiogram",
+      "measure_audio",
+      "measure_spirometry"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-vaccine": {
+     "groupe": "vaccine",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection",
+      "vaccine_reminder",
+      "vaccine_record"
+     ],
+     "type": "etl_group"
+    },
+    "bas-etl_group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl_group"
+    },
+    "bas-transform_and_load-center": {
+     "ressources": [
+      "center"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-crm_ticket_owner": {
+     "ressources": [
+      "crm_ticket_owner"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-employee": {
+     "ressources": [
+      "employee"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-employer_user": {
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-employment_contract": {
+     "ressources": [
+      "employment_contract"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-firm": {
+     "ressources": [
+      "firm"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-firm_location": {
+     "ressources": [
+      "firm_location"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-firm_status": {
+     "ressources": [
+      "firm_status"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-gen_tag": {
+     "ressources": [
+      "gen_tag"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "zone",
+      "center",
+      "location",
+      "medical_member_and_portal_user",
+      "sector",
+      "sector_mtm",
+      "firm_sector",
+      "firm_location"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_owner",
+      "amt_status",
+      "amt_perimeter"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-group-crm": {
+     "groupe": "crm",
+     "ressources": [
+      "crm_ticket",
+      "crm_ticket_owner",
+      "crm_ticket_status",
+      "crm_sale_opportunity",
+      "crm_sale_opportunity_description",
+      "crm_sale_opportunity_details",
+      "crm_sale_opportunity_status",
+      "crm_sale_opportunity_owner",
+      "crm_firm",
+      "crm_note"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-group-crm_file": {
+     "groupe": "crm_file",
+     "ressources": [
+      "crm_sale_opportunity_file"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employment_contract"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "collection",
+      "firm_collection"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-group-firm_other_1": {
+     "groupe": "firm_other_1",
+     "ressources": [
+      "employer_user",
+      "firm_contact",
+      "firm_owner"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-group-firm_other_2": {
+     "groupe": "firm_other_2",
+     "ressources": [
+      "firm_basic_care",
+      "firm_basic_care_contract",
+      "firm_employee_info"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-group-firm_other_7": {
+     "groupe": "firm_other_7",
+     "ressources": [
+      "gen_tag"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-group-planning": {
+     "groupe": "planning",
+     "ressources": [
+      "planning_item_event",
+      "planning_item_unavailability"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-group-ressource_a_0": {
+     "groupe": "ressource_a_0",
+     "ressources": [
+      "note_memo",
+      "note_personal_history",
+      "note_family_history",
+      "note_social_personal_situation"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "note_habitus",
+      "note_doctor_exam",
+      "note_pathology",
+      "note_treatment"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-group-ressource_b_0": {
+     "groupe": "ressource_b_0",
+     "ressources": [
+      "measure_blood_pressure",
+      "measure_blood_test"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-group-ressource_b_1": {
+     "groupe": "ressource_b_1",
+     "ressources": [
+      "measure_body_structure",
+      "measure_psychometric",
+      "measure_urine_test"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-group-vaccine": {
+     "groupe": "vaccine",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection",
+      "vaccine_reminder",
+      "vaccine_record"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "bas-transform_and_load-invoice_histo": {
+     "ressources": [
+      "invoice_histo"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-location": {
+     "ressources": [
+      "location"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-measure_audio": {
+     "ressources": [
+      "measure_audio"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-measure_blood_pressure": {
+     "ressources": [
+      "measure_blood_pressure"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-measure_blood_test": {
+     "ressources": [
+      "measure_blood_test"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-measure_body_structure": {
+     "ressources": [
+      "measure_body_structure"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-measure_electrocardiogram": {
+     "ressources": [
+      "measure_electrocardiogram"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-measure_psychometric": {
+     "ressources": [
+      "measure_psychometric"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-measure_spirometry": {
+     "ressources": [
+      "measure_spirometry"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-measure_urine_test": {
+     "ressources": [
+      "measure_urine_test"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-measure_vision_other": {
+     "ressources": [
+      "measure_vision_other"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-medical_member_and_portal_user": {
+     "ressources": [
+      "medical_member_and_portal_user"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-note_doctor_exam": {
+     "ressources": [
+      "note_doctor_exam"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-note_family_history": {
+     "ressources": [
+      "note_family_history"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-note_habitus": {
+     "ressources": [
+      "note_habitus"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-note_pathology": {
+     "ressources": [
+      "note_pathology"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-note_personal_history": {
+     "ressources": [
+      "note_personal_history"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-planning_item_event": {
+     "ressources": [
+      "planning_item_event"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-planning_item_exam": {
+     "ressources": [
+      "planning_item_exam"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-planning_item_unavailability": {
+     "ressources": [
+      "planning_item_unavailability"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-sector": {
+     "ressources": [
+      "sector"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-sector_mtm": {
+     "ressources": [
+      "sector_mtm"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-vaccine": {
+     "ressources": [
+      "vaccine"
+     ],
+     "type": "transform_and_load"
+    },
+    "bas-transform_and_load-visit_histo": {
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "transform_and_load"
+    }
+   },
+   "logiciel": "zoho"
+  },
+  "biomerieux": {
+   "ced": {
+    "dag_id": "biomerieux-ced",
+    "ressources": {
+     "employee": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_17"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_18"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_36"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_39"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_49"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_55"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_56"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_65"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_67"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_68"
+      }
+     ],
+     "measure": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_14"
+      }
+     ],
+     "standalone_event": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_41"
+      }
+     ]
+    }
+   },
+   "dags": {
+    "biomerieux-etl_group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "medical_member_and_portal_user",
+      "zone",
+      "center",
+      "location",
+      "sector",
+      "sector_mtm"
+     ],
+     "type": "etl_group"
+    },
+    "biomerieux-etl_group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employment_contract"
+     ],
+     "type": "etl_group"
+    },
+    "biomerieux-etl_group-employee_other_0": {
+     "groupe": "employee_other_0",
+     "ressources": [
+      "employee_contact",
+      "employee_consent",
+      "employee_rights_awareness",
+      "employee_paper_file_location"
+     ],
+     "type": "etl_group"
+    },
+    "biomerieux-etl_group-employee_other_1": {
+     "groupe": "employee_other_1",
+     "ressources": [
+      "employment_contract_info",
+      "former_job"
+     ],
+     "type": "etl_group"
+    },
+    "biomerieux-etl_group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status"
+     ],
+     "type": "etl_group"
+    },
+    "biomerieux-etl_group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "fe"
+     ],
+     "type": "etl_group"
+    },
+    "biomerieux-etl_group-ressource_a_0": {
+     "groupe": "ressource_a_0",
+     "ressources": [
+      "note_family_history",
+      "note_personal_history",
+      "note_memo"
+     ],
+     "type": "etl_group"
+    },
+    "biomerieux-etl_group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "note_sick_leave",
+      "note_therapeutic_part_time",
+      "note_treatment",
+      "note_pro_disease_declaration",
+      "note_work_accident"
+     ],
+     "type": "etl_group"
+    },
+    "biomerieux-etl_group-ressource_a_2": {
+     "groupe": "ressource_a_2",
+     "ressources": [
+      "note_academic",
+      "document"
+     ],
+     "type": "etl_group"
+    },
+    "biomerieux-etl_group-ressource_a_3": {
+     "groupe": "ressource_a_3",
+     "ressources": [],
+     "type": "etl_group"
+    },
+    "biomerieux-etl_group-ressource_c_0": {
+     "groupe": "ressource_c_0",
+     "ressources": [
+      "measure_dosimetry",
+      "measure_body_structure",
+      "measure_blood_pressure"
+     ],
+     "type": "etl_group"
+    },
+    "biomerieux-etl_group-ressource_c_1": {
+     "groupe": "ressource_c_1",
+     "ressources": [
+      "measure_allergy",
+      "measure_audio_test",
+      "measure_blood_test",
+      "measure_blood_pressure",
+      "measure_body_structure",
+      "measure_capillary_glycemia",
+      "measure_covid19_test",
+      "measure_dosimetry",
+      "measure_electrocardiogram",
+      "measure_other",
+      "measure_radio",
+      "measure_spirometry",
+      "measure_urine_test",
+      "measure_vision_color_ishihara",
+      "measure_vision_other"
+     ],
+     "type": "etl_group"
+    },
+    "biomerieux-etl_group-ressource_c_2": {
+     "groupe": "ressource_c_2",
+     "ressources": [
+      "measure_request"
+     ],
+     "type": "etl_group"
+    },
+    "biomerieux-etl_group-ressource_c_4": {
+     "groupe": "ressource_c_4",
+     "ressources": [
+      "measure_blood_test"
+     ],
+     "type": "etl_group"
+    },
+    "biomerieux-etl_group-ressource_d_4": {
+     "groupe": "ressource_d_4",
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "biomerieux-etl_group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl_group"
+    }
+   },
+   "logiciel": "preventiel_postgres"
+  },
+  "cdg27": {
+   "ced": {
+    "dag_id": "cdg27-ced",
+    "ressources": {
+     "employee": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_employee"
+      }
+     ]
+    }
+   },
+   "dags": {},
+   "logiciel": "agirhe"
+  },
+  "cdg59": {
+   "ced": {
+    "dag_id": "cdg59-ced",
+    "ressources": {
+     "employee": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_employee"
+      }
+     ]
+    }
+   },
+   "dags": {
+    "cdg59-etl_group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "medical_member_and_portal_user",
+      "location",
+      "center",
+      "location_room"
+     ],
+     "type": "etl_group"
+    },
+    "cdg59-etl_group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_status",
+      "amt_owner",
+      "amt_perimeter"
+     ],
+     "type": "etl_group"
+    },
+    "cdg59-etl_group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employee_contact",
+      "employment_contract",
+      "employment_contract_info"
+     ],
+     "type": "etl_group"
+    },
+    "cdg59-etl_group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status",
+      "firm_location",
+      "firm_sector"
+     ],
+     "type": "etl_group"
+    },
+    "cdg59-etl_group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "postal_address",
+      "firm_postal_address"
+     ],
+     "type": "etl_group"
+    },
+    "cdg59-etl_group-firm_other_1": {
+     "groupe": "firm_other_1",
+     "ressources": [
+      "firm_contact",
+      "employer_user",
+      "gen_tag"
+     ],
+     "type": "etl_group"
+    },
+    "cdg59-etl_group-manual_reminder": {
+     "groupe": "manual_reminder",
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "cdg59-etl_group-planning": {
+     "groupe": "planning",
+     "ressources": [
+      "planning_item_event",
+      "planning_item_event_amt",
+      "planning_item_non_clinical_zone",
+      "planning_item_exam",
+      "planning_item_vacation",
+      "planning_item_unavailability",
+      "planning_item_exam_slot"
+     ],
+     "type": "etl_group"
+    },
+    "cdg59-etl_group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "boeth",
+      "former_job",
+      "note_academic",
+      "basic_skills",
+      "note_family_history",
+      "note_personal_history",
+      "note_social_personal_situation",
+      "family_situation",
+      "note_pro_disease_declaration",
+      "note_work_accident",
+      "note_treatment",
+      "note_sick_leave",
+      "note_work_appreciation",
+      "note_memo",
+      "med_tag"
+     ],
+     "type": "etl_group"
+    },
+    "cdg59-etl_group-ressource_a_2": {
+     "groupe": "ressource_a_2",
+     "ressources": [
+      "note_doctor_exam",
+      "note_habitus",
+      "document"
+     ],
+     "type": "etl_group"
+    },
+    "cdg59-etl_group-ressource_b_1": {
+     "groupe": "ressource_b_1",
+     "ressources": [
+      "measure_blood_pressure",
+      "measure_body_structure",
+      "measure_vision_field",
+      "measure_vision_phoria",
+      "measure_audio_test",
+      "measure_vision_duochrome",
+      "measure_vision_near",
+      "measure_vision_distant",
+      "measure_vision_color_ishihara",
+      "measure_vision_other"
+     ],
+     "type": "etl_group"
+    },
+    "cdg59-etl_group-ressource_c_1": {
+     "groupe": "ressource_c_1",
+     "ressources": [
+      "measure_other",
+      "wr_group",
+      "exposure_histo"
+     ],
+     "type": "etl_group"
+    },
+    "cdg59-etl_group-vaccine": {
+     "groupe": "vaccine",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection"
+     ],
+     "type": "etl_group"
+    },
+    "cdg59-etl_group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl_group"
+    },
+    "cdg59-transform_and_load-basic_skills": {
+     "ressources": [
+      "basic_skills"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-boeth": {
+     "ressources": [
+      "boeth"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-employee": {
+     "ressources": [
+      "employee"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-employee_contact": {
+     "ressources": [
+      "employee_contact"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-employer_user": {
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-employment_contract": {
+     "ressources": [
+      "employment_contract"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-employment_contract_info": {
+     "ressources": [
+      "employment_contract_info"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-family_situation": {
+     "ressources": [
+      "family_situation"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-firm": {
+     "ressources": [
+      "firm"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-firm_contact": {
+     "ressources": [
+      "firm_contact"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-firm_location": {
+     "ressources": [
+      "firm_location"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-firm_postal_address": {
+     "ressources": [
+      "firm_postal_address"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-firm_sector": {
+     "ressources": [
+      "firm_sector"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-firm_status": {
+     "ressources": [
+      "firm_status"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-former_job": {
+     "ressources": [
+      "former_job"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-gen_tag": {
+     "ressources": [
+      "gen_tag"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-measure_audio_test": {
+     "ressources": [
+      "measure_audio_test"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-measure_blood_pressure": {
+     "ressources": [
+      "measure_blood_pressure"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-measure_body_structure": {
+     "ressources": [
+      "measure_body_structure"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-measure_other": {
+     "ressources": [
+      "measure_other"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-measure_vision_astigmate": {
+     "ressources": [
+      "measure_vision_astigmate"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-measure_vision_color_ishihara": {
+     "ressources": [
+      "measure_vision_color_ishihara"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-measure_vision_distant": {
+     "ressources": [
+      "measure_vision_distant"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-measure_vision_duochrome": {
+     "ressources": [
+      "measure_vision_duochrome"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-measure_vision_field": {
+     "ressources": [
+      "measure_vision_field"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-measure_vision_near": {
+     "ressources": [
+      "measure_vision_near"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-measure_vision_other": {
+     "ressources": [
+      "measure_vision_other"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-measure_vision_phoria": {
+     "ressources": [
+      "measure_vision_phoria"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-med_tag": {
+     "ressources": [
+      "med_tag"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-note_academic": {
+     "ressources": [
+      "note_academic"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-note_family_history": {
+     "ressources": [
+      "note_family_history"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-note_memo": {
+     "ressources": [
+      "note_memo"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-note_personal_history": {
+     "ressources": [
+      "note_personal_history"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-note_pro_disease_declaration": {
+     "ressources": [
+      "note_pro_disease_declaration"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-note_sick_leave": {
+     "ressources": [
+      "note_sick_leave"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-note_social_personal_situation": {
+     "ressources": [
+      "note_social_personal_situation"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-note_treatment": {
+     "ressources": [
+      "note_treatment"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-note_work_accident": {
+     "ressources": [
+      "note_work_accident"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-note_work_appreciation": {
+     "ressources": [
+      "note_work_appreciation"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-postal_address": {
+     "ressources": [
+      "postal_address"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-sector": {
+     "ressources": [
+      "sector"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-sector_mtm": {
+     "ressources": [
+      "sector_mtm"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-vaccine": {
+     "ressources": [
+      "vaccine"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-vaccine_injection": {
+     "ressources": [
+      "vaccine_injection"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-visit_histo": {
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg59-transform_and_load-wr_group": {
+     "ressources": [
+      "wr_group"
+     ],
+     "type": "transform_and_load"
+    }
+   },
+   "logiciel": "agirhe"
+  },
+  "cdg61": {
+   "ced": {
+    "dag_id": "cdg61-ced",
+    "ressources": {
+     "employee": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_employee_mee"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_employee"
+      }
+     ]
+    }
+   },
+   "dags": {},
+   "logiciel": "agirhe"
+  },
+  "cdg62": {
+   "ced": {
+    "dag_id": "cdg62-ced",
+    "ressources": {
+     "employee": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_employee"
+      }
+     ]
+    }
+   },
+   "dags": {
+    "cdg62-etl_group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "medical_member_and_portal_user",
+      "location",
+      "center"
+     ],
+     "type": "etl_group"
+    },
+    "cdg62-etl_group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_status",
+      "amt_owner",
+      "amt_perimeter"
+     ],
+     "type": "etl_group"
+    },
+    "cdg62-etl_group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employee_contact",
+      "employment_contract",
+      "employment_contract_info"
+     ],
+     "type": "etl_group"
+    },
+    "cdg62-etl_group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status",
+      "firm_location",
+      "firm_sector"
+     ],
+     "type": "etl_group"
+    },
+    "cdg62-etl_group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "postal_address",
+      "firm_postal_address"
+     ],
+     "type": "etl_group"
+    },
+    "cdg62-etl_group-firm_other_1": {
+     "groupe": "firm_other_1",
+     "ressources": [
+      "firm_contact",
+      "employer_user",
+      "gen_tag"
+     ],
+     "type": "etl_group"
+    },
+    "cdg62-etl_group-manual_reminder": {
+     "groupe": "manual_reminder",
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "cdg62-etl_group-planning": {
+     "groupe": "planning",
+     "ressources": [
+      "planning_item_event",
+      "planning_item_event_amt",
+      "planning_item_non_clinical_zone",
+      "planning_item_exam",
+      "planning_item_vacation",
+      "planning_item_unavailability",
+      "planning_item_exam_slot"
+     ],
+     "type": "etl_group"
+    },
+    "cdg62-etl_group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "boeth",
+      "former_job",
+      "note_academic",
+      "basic_skills",
+      "note_family_history",
+      "note_personal_history",
+      "note_social_personal_situation",
+      "family_situation",
+      "note_pro_disease_declaration",
+      "note_work_accident",
+      "note_treatment",
+      "note_sick_leave",
+      "note_work_appreciation",
+      "note_memo",
+      "med_tag"
+     ],
+     "type": "etl_group"
+    },
+    "cdg62-etl_group-ressource_a_2": {
+     "groupe": "ressource_a_2",
+     "ressources": [
+      "note_doctor_exam",
+      "note_habitus",
+      "document"
+     ],
+     "type": "etl_group"
+    },
+    "cdg62-etl_group-ressource_b_1": {
+     "groupe": "ressource_b_1",
+     "ressources": [
+      "measure_blood_pressure",
+      "measure_body_structure",
+      "measure_vision_field",
+      "measure_vision_phoria",
+      "measure_audio_test",
+      "measure_vision_duochrome",
+      "measure_vision_near",
+      "measure_vision_distant",
+      "measure_vision_color_ishihara",
+      "measure_vision_other"
+     ],
+     "type": "etl_group"
+    },
+    "cdg62-etl_group-ressource_c_1": {
+     "groupe": "ressource_c_1",
+     "ressources": [
+      "measure_other",
+      "wr_group",
+      "exposure_histo"
+     ],
+     "type": "etl_group"
+    },
+    "cdg62-etl_group-vaccine": {
+     "groupe": "vaccine",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection"
+     ],
+     "type": "etl_group"
+    },
+    "cdg62-etl_group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl_group"
+    },
+    "cdg62-transform_and_load-basic_skills": {
+     "ressources": [
+      "basic_skills"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-boeth": {
+     "ressources": [
+      "boeth"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-employee": {
+     "ressources": [
+      "employee"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-employee_contact": {
+     "ressources": [
+      "employee_contact"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-employer_user": {
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-employment_contract": {
+     "ressources": [
+      "employment_contract"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-employment_contract_info": {
+     "ressources": [
+      "employment_contract_info"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-family_situation": {
+     "ressources": [
+      "family_situation"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-firm": {
+     "ressources": [
+      "firm"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-firm_contact": {
+     "ressources": [
+      "firm_contact"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-firm_location": {
+     "ressources": [
+      "firm_location"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-firm_postal_address": {
+     "ressources": [
+      "firm_postal_address"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-firm_sector": {
+     "ressources": [
+      "firm_sector"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-firm_status": {
+     "ressources": [
+      "firm_status"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-former_job": {
+     "ressources": [
+      "former_job"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-gen_tag": {
+     "ressources": [
+      "gen_tag"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-measure_audio_test": {
+     "ressources": [
+      "measure_audio_test"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-measure_blood_pressure": {
+     "ressources": [
+      "measure_blood_pressure"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-measure_body_structure": {
+     "ressources": [
+      "measure_body_structure"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-measure_other": {
+     "ressources": [
+      "measure_other"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-measure_vision_astigmate": {
+     "ressources": [
+      "measure_vision_astigmate"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-measure_vision_color_ishihara": {
+     "ressources": [
+      "measure_vision_color_ishihara"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-measure_vision_distant": {
+     "ressources": [
+      "measure_vision_distant"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-measure_vision_duochrome": {
+     "ressources": [
+      "measure_vision_duochrome"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-measure_vision_field": {
+     "ressources": [
+      "measure_vision_field"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-measure_vision_near": {
+     "ressources": [
+      "measure_vision_near"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-measure_vision_other": {
+     "ressources": [
+      "measure_vision_other"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-measure_vision_phoria": {
+     "ressources": [
+      "measure_vision_phoria"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-med_tag": {
+     "ressources": [
+      "med_tag"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-note_academic": {
+     "ressources": [
+      "note_academic"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-note_family_history": {
+     "ressources": [
+      "note_family_history"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-note_memo": {
+     "ressources": [
+      "note_memo"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-note_personal_history": {
+     "ressources": [
+      "note_personal_history"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-note_pro_disease_declaration": {
+     "ressources": [
+      "note_pro_disease_declaration"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-note_sick_leave": {
+     "ressources": [
+      "note_sick_leave"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-note_social_personal_situation": {
+     "ressources": [
+      "note_social_personal_situation"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-note_treatment": {
+     "ressources": [
+      "note_treatment"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-note_work_accident": {
+     "ressources": [
+      "note_work_accident"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-note_work_appreciation": {
+     "ressources": [
+      "note_work_appreciation"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-postal_address": {
+     "ressources": [
+      "postal_address"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-sector": {
+     "ressources": [
+      "sector"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-sector_mtm": {
+     "ressources": [
+      "sector_mtm"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-vaccine": {
+     "ressources": [
+      "vaccine"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-vaccine_injection": {
+     "ressources": [
+      "vaccine_injection"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-visit_histo": {
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg62-transform_and_load-wr_group": {
+     "ressources": [
+      "wr_group"
+     ],
+     "type": "transform_and_load"
+    }
+   },
+   "logiciel": "agirhe"
+  },
+  "cdg67": {
+   "ced": {
+    "dag_id": "cdg67-ced",
+    "ressources": {
+     "employee": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_employee"
+      }
+     ]
+    }
+   },
+   "dags": {
+    "cdg67-etl_group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "medical_member_and_portal_user",
+      "location",
+      "center"
+     ],
+     "type": "etl_group"
+    },
+    "cdg67-etl_group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_status",
+      "amt_owner",
+      "amt_perimeter"
+     ],
+     "type": "etl_group"
+    },
+    "cdg67-etl_group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employee_contact",
+      "employment_contract",
+      "employment_contract_info"
+     ],
+     "type": "etl_group"
+    },
+    "cdg67-etl_group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status",
+      "firm_location",
+      "firm_sector"
+     ],
+     "type": "etl_group"
+    },
+    "cdg67-etl_group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "postal_address",
+      "firm_postal_address"
+     ],
+     "type": "etl_group"
+    },
+    "cdg67-etl_group-firm_other_1": {
+     "groupe": "firm_other_1",
+     "ressources": [
+      "firm_contact",
+      "employer_user",
+      "gen_tag"
+     ],
+     "type": "etl_group"
+    },
+    "cdg67-etl_group-manual_reminder": {
+     "groupe": "manual_reminder",
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "cdg67-etl_group-planning": {
+     "groupe": "planning",
+     "ressources": [
+      "planning_item_event",
+      "planning_item_event_amt",
+      "planning_item_non_clinical_zone",
+      "planning_item_exam",
+      "planning_item_vacation",
+      "planning_item_unavailability",
+      "planning_item_exam_slot"
+     ],
+     "type": "etl_group"
+    },
+    "cdg67-etl_group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "boeth",
+      "former_job",
+      "note_academic",
+      "basic_skills",
+      "note_family_history",
+      "note_personal_history",
+      "note_social_personal_situation",
+      "family_situation",
+      "note_pro_disease_declaration",
+      "note_work_accident",
+      "note_treatment",
+      "note_sick_leave",
+      "note_work_appreciation",
+      "note_memo",
+      "med_tag"
+     ],
+     "type": "etl_group"
+    },
+    "cdg67-etl_group-ressource_a_2": {
+     "groupe": "ressource_a_2",
+     "ressources": [
+      "note_doctor_exam",
+      "note_habitus",
+      "document"
+     ],
+     "type": "etl_group"
+    },
+    "cdg67-etl_group-ressource_b_1": {
+     "groupe": "ressource_b_1",
+     "ressources": [
+      "measure_blood_pressure",
+      "measure_body_structure",
+      "measure_vision_field",
+      "measure_vision_phoria",
+      "measure_audio_test",
+      "measure_vision_duochrome",
+      "measure_vision_near",
+      "measure_vision_distant",
+      "measure_vision_color_ishihara",
+      "measure_vision_other"
+     ],
+     "type": "etl_group"
+    },
+    "cdg67-etl_group-ressource_c_1": {
+     "groupe": "ressource_c_1",
+     "ressources": [
+      "measure_other",
+      "wr_group",
+      "exposure_histo"
+     ],
+     "type": "etl_group"
+    },
+    "cdg67-etl_group-vaccine": {
+     "groupe": "vaccine",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection"
+     ],
+     "type": "etl_group"
+    },
+    "cdg67-etl_group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl_group"
+    },
+    "cdg67-transform_and_load-basic_skills": {
+     "ressources": [
+      "basic_skills"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-boeth": {
+     "ressources": [
+      "boeth"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-employee": {
+     "ressources": [
+      "employee"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-employee_contact": {
+     "ressources": [
+      "employee_contact"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-employer_user": {
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-employment_contract": {
+     "ressources": [
+      "employment_contract"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-employment_contract_info": {
+     "ressources": [
+      "employment_contract_info"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-family_situation": {
+     "ressources": [
+      "family_situation"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-firm": {
+     "ressources": [
+      "firm"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-firm_contact": {
+     "ressources": [
+      "firm_contact"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-firm_location": {
+     "ressources": [
+      "firm_location"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-firm_postal_address": {
+     "ressources": [
+      "firm_postal_address"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-firm_sector": {
+     "ressources": [
+      "firm_sector"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-firm_status": {
+     "ressources": [
+      "firm_status"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-former_job": {
+     "ressources": [
+      "former_job"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-gen_tag": {
+     "ressources": [
+      "gen_tag"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-measure_audio_test": {
+     "ressources": [
+      "measure_audio_test"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-measure_blood_pressure": {
+     "ressources": [
+      "measure_blood_pressure"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-measure_body_structure": {
+     "ressources": [
+      "measure_body_structure"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-measure_other": {
+     "ressources": [
+      "measure_other"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-measure_vision_astigmate": {
+     "ressources": [
+      "measure_vision_astigmate"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-measure_vision_color_ishihara": {
+     "ressources": [
+      "measure_vision_color_ishihara"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-measure_vision_distant": {
+     "ressources": [
+      "measure_vision_distant"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-measure_vision_duochrome": {
+     "ressources": [
+      "measure_vision_duochrome"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-measure_vision_field": {
+     "ressources": [
+      "measure_vision_field"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-measure_vision_near": {
+     "ressources": [
+      "measure_vision_near"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-measure_vision_other": {
+     "ressources": [
+      "measure_vision_other"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-measure_vision_phoria": {
+     "ressources": [
+      "measure_vision_phoria"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-med_tag": {
+     "ressources": [
+      "med_tag"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-note_academic": {
+     "ressources": [
+      "note_academic"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-note_family_history": {
+     "ressources": [
+      "note_family_history"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-note_memo": {
+     "ressources": [
+      "note_memo"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-note_personal_history": {
+     "ressources": [
+      "note_personal_history"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-note_pro_disease_declaration": {
+     "ressources": [
+      "note_pro_disease_declaration"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-note_sick_leave": {
+     "ressources": [
+      "note_sick_leave"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-note_social_personal_situation": {
+     "ressources": [
+      "note_social_personal_situation"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-note_treatment": {
+     "ressources": [
+      "note_treatment"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-note_work_accident": {
+     "ressources": [
+      "note_work_accident"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-note_work_appreciation": {
+     "ressources": [
+      "note_work_appreciation"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-postal_address": {
+     "ressources": [
+      "postal_address"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-sector": {
+     "ressources": [
+      "sector"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-sector_mtm": {
+     "ressources": [
+      "sector_mtm"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-vaccine": {
+     "ressources": [
+      "vaccine"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-vaccine_injection": {
+     "ressources": [
+      "vaccine_injection"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-visit_histo": {
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "transform_and_load"
+    },
+    "cdg67-transform_and_load-wr_group": {
+     "ressources": [
+      "wr_group"
+     ],
+     "type": "transform_and_load"
+    }
+   },
+   "logiciel": "agirhe"
+  },
+  "louisvuitton": {
+   "dags": {
+    "louisvuitton-transform_and_load-center": {
+     "ressources": [
+      "center"
+     ],
+     "type": "transform_and_load"
+    },
+    "louisvuitton-transform_and_load-group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "center",
+      "location",
+      "medical_member_and_portal_user",
+      "sector_mtm",
+      "sector"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "louisvuitton-transform_and_load-location": {
+     "ressources": [
+      "location"
+     ],
+     "type": "transform_and_load"
+    },
+    "louisvuitton-transform_and_load-medical_member_and_portal_user": {
+     "ressources": [
+      "medical_member_and_portal_user"
+     ],
+     "type": "transform_and_load"
+    },
+    "louisvuitton-transform_and_load-sector": {
+     "ressources": [
+      "sector"
+     ],
+     "type": "transform_and_load"
+    },
+    "louisvuitton-transform_and_load-sector_mtm": {
+     "ressources": [
+      "sector_mtm"
+     ],
+     "type": "transform_and_load"
+    }
+   },
+   "logiciel": "louisvuitton"
+  },
+  "nestle": {
+   "ced": {
+    "dag_id": "nestle-ced",
+    "ressources": {
+     "employee": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_employee"
+      }
+     ]
+    }
+   },
+   "dags": {
+    "nestle-etl-basic_skills": {
+     "ressources": [
+      "basic_skills"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-bet": {
+     "ressources": [
+      "bet"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-bet_scales": {
+     "ressources": [
+      "bet_scales"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-boeth": {
+     "ressources": [
+      "boeth"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-center": {
+     "ressources": [
+      "center"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-document": {
+     "ressources": [
+      "document"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-emergency_contact": {
+     "ressources": [
+      "emergency_contact"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-employee": {
+     "ressources": [
+      "employee"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-employee_consent": {
+     "ressources": [
+      "employee_consent"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-employee_contact": {
+     "ressources": [
+      "employee_contact"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-employee_location": {
+     "ressources": [
+      "employee_location"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-employee_rights_awareness": {
+     "ressources": [
+      "employee_rights_awareness"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-employee_sector_current": {
+     "ressources": [
+      "employee_sector_current"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-employer_user": {
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-employment_contract": {
+     "ressources": [
+      "employment_contract"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-employment_contract_info": {
+     "ressources": [
+      "employment_contract_info"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-exposure_histo": {
+     "ressources": [
+      "exposure_histo"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-family_situation": {
+     "ressources": [
+      "family_situation"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-firm": {
+     "ressources": [
+      "firm"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-firm_contact": {
+     "ressources": [
+      "firm_contact"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-firm_info": {
+     "ressources": [
+      "firm_info"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-firm_location": {
+     "ressources": [
+      "firm_location"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-firm_postal_address": {
+     "ressources": [
+      "firm_postal_address"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-firm_sector": {
+     "ressources": [
+      "firm_sector"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-firm_status": {
+     "ressources": [
+      "firm_status"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-former_job": {
+     "ressources": [
+      "former_job"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-location": {
+     "ressources": [
+      "location"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-manual_reminder": {
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_audio": {
+     "ressources": [
+      "measure_audio"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_audio_test": {
+     "ressources": [
+      "measure_audio_test"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_blood_pressure": {
+     "ressources": [
+      "measure_blood_pressure"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_blood_pressure_mapa": {
+     "ressources": [
+      "measure_blood_pressure_mapa"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_blood_test": {
+     "ressources": [
+      "measure_blood_test"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_body_structure": {
+     "ressources": [
+      "measure_body_structure"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_capillary_glycemia": {
+     "ressources": [
+      "measure_capillary_glycemia"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_covid19_test": {
+     "ressources": [
+      "measure_covid19_test"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_electrocardiogram": {
+     "ressources": [
+      "measure_electrocardiogram"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_other": {
+     "ressources": [
+      "measure_other"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_oxygen_saturation": {
+     "ressources": [
+      "measure_oxygen_saturation"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_psychometric": {
+     "ressources": [
+      "measure_psychometric"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_radio": {
+     "ressources": [
+      "measure_radio"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_spirometry": {
+     "ressources": [
+      "measure_spirometry"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_stress_electrocardiogram": {
+     "ressources": [
+      "measure_stress_electrocardiogram"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_temperature": {
+     "ressources": [
+      "measure_temperature"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_urine_test": {
+     "ressources": [
+      "measure_urine_test"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_vision_astigmate": {
+     "ressources": [
+      "measure_vision_astigmate"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_vision_color_ishihara": {
+     "ressources": [
+      "measure_vision_color_ishihara"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_vision_distant": {
+     "ressources": [
+      "measure_vision_distant"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_vision_duochrome": {
+     "ressources": [
+      "measure_vision_duochrome"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_vision_field": {
+     "ressources": [
+      "measure_vision_field"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_vision_near": {
+     "ressources": [
+      "measure_vision_near"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_vision_other": {
+     "ressources": [
+      "measure_vision_other"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-measure_vision_phoria": {
+     "ressources": [
+      "measure_vision_phoria"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-med_tag": {
+     "ressources": [
+      "med_tag"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-medical_member_and_portal_user": {
+     "ressources": [
+      "medical_member_and_portal_user"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-note_academic": {
+     "ressources": [
+      "note_academic"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-note_doctor_exam": {
+     "ressources": [
+      "note_doctor_exam"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-note_family_history": {
+     "ressources": [
+      "note_family_history"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-note_habitus": {
+     "ressources": [
+      "note_habitus"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-note_memo": {
+     "ressources": [
+      "note_memo"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-note_pathology": {
+     "ressources": [
+      "note_pathology"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-note_personal_history": {
+     "ressources": [
+      "note_personal_history"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-note_pro_disease_declaration": {
+     "ressources": [
+      "note_pro_disease_declaration"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-note_sick_leave": {
+     "ressources": [
+      "note_sick_leave"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-note_social_personal_situation": {
+     "ressources": [
+      "note_social_personal_situation"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-note_therapeutic_part_time": {
+     "ressources": [
+      "note_therapeutic_part_time"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-note_treatment": {
+     "ressources": [
+      "note_treatment"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-note_work_accident": {
+     "ressources": [
+      "note_work_accident"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-note_work_appreciation": {
+     "ressources": [
+      "note_work_appreciation"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-postal_address": {
+     "ressources": [
+      "postal_address"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-sector": {
+     "ressources": [
+      "sector"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-sector_mtm": {
+     "ressources": [
+      "sector_mtm"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-standalone_event": {
+     "ressources": [
+      "standalone_event"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-standalone_event_participant": {
+     "ressources": [
+      "standalone_event_participant"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-vaccine": {
+     "ressources": [
+      "vaccine"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-vaccine_injection": {
+     "ressources": [
+      "vaccine_injection"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-vaccine_reminder": {
+     "ressources": [
+      "vaccine_reminder"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-visit_histo": {
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-wr_group": {
+     "ressources": [
+      "wr_group"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl-zone": {
+     "ressources": [
+      "zone"
+     ],
+     "type": "etl"
+    },
+    "nestle-etl_group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "zone",
+      "center",
+      "location",
+      "medical_member_and_portal_user",
+      "sector",
+      "sector_mtm"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_owner",
+      "amt_perimeter",
+      "amt_status"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-atmp": {
+     "groupe": "atmp",
+     "ressources": [
+      "note_pro_disease_declaration",
+      "note_sick_leave",
+      "note_work_accident",
+      "note_therapeutic_part_time"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employment_contract",
+      "employment_contract_info"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-employee_other_0": {
+     "groupe": "employee_other_0",
+     "ressources": [
+      "employee_contact",
+      "emergency_contact",
+      "former_job",
+      "employee_rights_awareness",
+      "employee_consent",
+      "employee_sector_current",
+      "employee_location"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status",
+      "firm_info"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "firm_contact",
+      "postal_address",
+      "firm_postal_address",
+      "firm_sector",
+      "firm_location"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-manual_reminder": {
+     "groupe": "manual_reminder",
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-measure_1": {
+     "groupe": "measure_1",
+     "ressources": [
+      "measure_other",
+      "measure_body_structure",
+      "measure_covid19_test",
+      "measure_temperature"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-measure_2": {
+     "groupe": "measure_2",
+     "ressources": [
+      "measure_capillary_glycemia",
+      "measure_blood_test",
+      "measure_urine_test",
+      "measure_psychometric"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-measure_audio": {
+     "groupe": "measure_audio",
+     "ressources": [
+      "measure_audio",
+      "measure_audio_test"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-measure_cardiology": {
+     "groupe": "measure_cardiology",
+     "ressources": [
+      "measure_electrocardiogram",
+      "measure_stress_electrocardiogram",
+      "measure_blood_pressure",
+      "measure_blood_pressure_mapa"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-measure_pulmonology": {
+     "groupe": "measure_pulmonology",
+     "ressources": [
+      "measure_oxygen_saturation",
+      "measure_spirometry",
+      "measure_radio"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-measure_vision": {
+     "groupe": "measure_vision",
+     "ressources": [
+      "measure_vision_astigmate",
+      "measure_vision_distant",
+      "measure_vision_near",
+      "measure_vision_duochrome",
+      "measure_vision_field",
+      "measure_vision_phoria",
+      "measure_vision_color_ishihara",
+      "measure_vision_other"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-planning": {
+     "groupe": "planning",
+     "ressources": [
+      "planning_item_assistant_vacation",
+      "planning_item_event",
+      "planning_item_exam",
+      "planning_item_non_clinical_zone",
+      "planning_item_unavailability",
+      "planning_item_vacation"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-ressource_a_0": {
+     "groupe": "ressource_a_0",
+     "ressources": [
+      "boeth",
+      "note_academic",
+      "note_social_personal_situation",
+      "basic_skills",
+      "family_situation"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "note_memo",
+      "note_family_history",
+      "note_pathology",
+      "note_personal_history",
+      "note_treatment",
+      "note_habitus"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-ressource_a_2": {
+     "groupe": "ressource_a_2",
+     "ressources": [
+      "note_doctor_exam",
+      "document"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-ressource_a_3": {
+     "groupe": "ressource_a_3",
+     "ressources": [
+      "exposure_histo",
+      "wr_group",
+      "med_tag"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-ressource_a_4": {
+     "groupe": "ressource_a_4",
+     "ressources": [
+      "bet",
+      "bet_scales",
+      "note_work_appreciation"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-standalone_event": {
+     "groupe": "standalone_event",
+     "ressources": [
+      "standalone_event",
+      "standalone_event_participant"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-user": {
+     "groupe": "user",
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-vaccine": {
+     "groupe": "vaccine",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection",
+      "vaccine_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-etl_group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl_group"
+    },
+    "nestle-transform_and_load-firm": {
+     "ressources": [
+      "firm"
+     ],
+     "type": "transform_and_load"
+    },
+    "nestle-transform_and_load-group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status",
+      "firm_info"
+     ],
+     "type": "transform_and_load-group"
+    }
+   },
+   "logiciel": "kenora"
+  },
+  "presoa-pulse": {
+   "ced": {
+    "dag_id": "presoa-pulse-ced",
+    "ressources": {
+     "amt": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_amt"
+      },
+      {
+       "niveau": "client",
+       "requete": "query_file_type_sensi"
+      },
+      {
+       "niveau": "client",
+       "requete": "query_file_type_request"
+      }
+     ],
+     "employee": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_employee"
+      }
+     ],
+     "firm": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_firm"
+      }
+     ],
+     "invoice_histo": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_invoice_histo"
+      }
+     ]
+    }
+   },
+   "dags": {
+    "presoa-pulse-etl-boeth": {
+     "ressources": [
+      "boeth"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-crm_note": {
+     "ressources": [
+      "crm_note"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-debit_mandate": {
+     "ressources": [
+      "debit_mandate"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-employee_consent": {
+     "ressources": [
+      "employee_consent"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-employee_paper_file_location": {
+     "ressources": [
+      "employee_paper_file_location"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-employment_contract": {
+     "ressources": [
+      "employment_contract"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-employment_contract_info": {
+     "ressources": [
+      "employment_contract_info"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-family_situation": {
+     "ressources": [
+      "family_situation"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-firm_location": {
+     "ressources": [
+      "firm_location"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-gen_tag": {
+     "ressources": [
+      "gen_tag"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-invoice_histo": {
+     "ressources": [
+      "invoice_histo"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-manual_reminder": {
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-measure_audio_test": {
+     "ressources": [
+      "measure_audio_test"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-measure_blood_test": {
+     "ressources": [
+      "measure_blood_test"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-med_tag": {
+     "ressources": [
+      "med_tag"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-medical_member_and_portal_user": {
+     "ressources": [
+      "medical_member_and_portal_user"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-note_habitus": {
+     "ressources": [
+      "note_habitus"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-note_memo": {
+     "ressources": [
+      "note_memo"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-note_pro_disease_declaration": {
+     "ressources": [
+      "note_pro_disease_declaration"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-note_work_appreciation": {
+     "ressources": [
+      "note_work_appreciation"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl-planning_item_event_amt": {
+     "ressources": [
+      "planning_item_event_amt"
+     ],
+     "type": "etl"
+    },
+    "presoa-pulse-etl_group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "zone",
+      "center",
+      "location",
+      "location_room",
+      "medical_member_and_portal_user",
+      "sector",
+      "sector_mtm",
+      "firm_sector",
+      "firm_location"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_owner",
+      "amt_perimeter",
+      "amt_status",
+      "amt_task"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employment_contract",
+      "employment_contract_info"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-employee_other_0": {
+     "groupe": "employee_other_0",
+     "ressources": [
+      "employee_contact",
+      "employee_paper_file_location",
+      "employee_consent"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "firm_contact",
+      "postal_address",
+      "firm_postal_address",
+      "fe"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-firm_other_1": {
+     "groupe": "firm_other_1",
+     "ressources": [
+      "debit_mandate",
+      "invoice_histo",
+      "firm_info"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-firm_other_2": {
+     "groupe": "firm_other_2",
+     "ressources": [
+      "crm_firm",
+      "crm_note",
+      "crm_report"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-firm_other_3": {
+     "groupe": "firm_other_3",
+     "ressources": [
+      "collection",
+      "firm_collection"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-manual_reminder": {
+     "groupe": "manual_reminder",
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-mee_plan": {
+     "groupe": "mee_plan",
+     "ressources": [
+      "mee_plan",
+      "mee_plan_followup",
+      "mee_plan_context",
+      "mee_plan_info",
+      "mee_plan_intervenant",
+      "mee_plan_note"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-planning": {
+     "groupe": "planning",
+     "ressources": [
+      "planning_item_assistant_vacation",
+      "planning_item_exam_slot",
+      "planning_item_event",
+      "planning_item_exam",
+      "planning_item_non_clinical_zone",
+      "planning_item_unavailability",
+      "planning_item_vacation",
+      "planning_item_event_amt",
+      "planning_item_event_collective",
+      "planning_event_participant"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-ressource_a_0": {
+     "groupe": "ressource_a_0",
+     "ressources": [
+      "note_academic",
+      "note_memo",
+      "note_pro_disease_declaration",
+      "note_treatment",
+      "note_sick_leave",
+      "note_work_accident",
+      "note_therapeutic_part_time"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "med_tag",
+      "boeth"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-ressource_a_2": {
+     "groupe": "ressource_a_2",
+     "ressources": [
+      "note_pathology",
+      "note_personal_history",
+      "note_family_history",
+      "note_habitus"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-ressource_a_3": {
+     "groupe": "ressource_a_3",
+     "ressources": [
+      "note_doctor_exam",
+      "document",
+      "note_social_personal_situation",
+      "basic_skills",
+      "family_situation"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-ressource_a_4": {
+     "groupe": "ressource_a_4",
+     "ressources": [
+      "note_work_appreciation"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-ressource_b_0": {
+     "groupe": "ressource_b_0",
+     "ressources": [
+      "measure_vision_astigmate",
+      "measure_vision_distant",
+      "measure_vision_near",
+      "measure_vision_duochrome",
+      "measure_vision_field",
+      "measure_vision_phoria",
+      "measure_vision_color_ishihara",
+      "measure_vision_other"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-ressource_b_1": {
+     "groupe": "ressource_b_1",
+     "ressources": [
+      "measure_audio_test",
+      "measure_other",
+      "measure_body_structure"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-ressource_b_2": {
+     "groupe": "ressource_b_2",
+     "ressources": [
+      "measure_blood_pressure",
+      "measure_blood_test"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-ressource_b_3": {
+     "groupe": "ressource_b_3",
+     "ressources": [
+      "measure_radio",
+      "measure_spirometry",
+      "measure_urine_test"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-ressource_c_0": {
+     "groupe": "ressource_c_0",
+     "ressources": [
+      "wr_group",
+      "former_job",
+      "exposure_histo"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-ressource_c_1": {
+     "groupe": "ressource_c_1",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-ressource_c_2": {
+     "groupe": "ressource_c_2",
+     "ressources": [
+      "standalone_event",
+      "standalone_event_participant"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-user": {
+     "groupe": "user",
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-pulse-etl_group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl_group"
+    }
+   },
+   "logiciel": "pulse"
+  },
+  "presoa-uegar": {
+   "ced": {
+    "dag_id": "presoa-uegar-ced",
+    "ressources": {
+     "amt": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_6"
+      },
+      {
+       "niveau": "client",
+       "requete": "query_file_type_37"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_45"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_58"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_71"
+      }
+     ],
+     "employee": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_14_employee"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_17"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_18"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_36"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_39"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_40"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_46"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_49"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_52"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_54"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_60"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_62"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_65"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_67"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_68"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_72"
+      }
+     ],
+     "firm": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_pilote_ced"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_13"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_20"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_21"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_42"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_43"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_59"
+      }
+     ],
+     "invoice_histo": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_pilote_invoice"
+      }
+     ],
+     "measure": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_14"
+      }
+     ],
+     "standalone_event": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_41"
+      }
+     ],
+     "visit_histo": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_55"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_56"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_66"
+      }
+     ]
+    }
+   },
+   "dags": {
+    "presoa-uegar-etl-center": {
+     "ressources": [
+      "center"
+     ],
+     "type": "etl"
+    },
+    "presoa-uegar-etl-debit_mandate": {
+     "ressources": [
+      "debit_mandate"
+     ],
+     "type": "etl"
+    },
+    "presoa-uegar-etl-employment_contract_info": {
+     "ressources": [
+      "employment_contract_info"
+     ],
+     "type": "etl"
+    },
+    "presoa-uegar-etl-firm": {
+     "ressources": [
+      "firm"
+     ],
+     "type": "etl"
+    },
+    "presoa-uegar-etl-location": {
+     "ressources": [
+      "location"
+     ],
+     "type": "etl"
+    },
+    "presoa-uegar-etl-med_tag": {
+     "ressources": [
+      "med_tag"
+     ],
+     "type": "etl"
+    },
+    "presoa-uegar-etl-medical_member_and_portal_user": {
+     "ressources": [
+      "medical_member_and_portal_user"
+     ],
+     "type": "etl"
+    },
+    "presoa-uegar-etl-note_treatment": {
+     "ressources": [
+      "note_treatment"
+     ],
+     "type": "etl"
+    },
+    "presoa-uegar-etl-planning_item_assistant_vacation": {
+     "ressources": [
+      "planning_item_assistant_vacation"
+     ],
+     "type": "etl"
+    },
+    "presoa-uegar-etl-planning_item_exam": {
+     "ressources": [
+      "planning_item_exam"
+     ],
+     "type": "etl"
+    },
+    "presoa-uegar-etl-planning_item_vacation": {
+     "ressources": [
+      "planning_item_vacation"
+     ],
+     "type": "etl"
+    },
+    "presoa-uegar-etl-sector": {
+     "ressources": [
+      "sector"
+     ],
+     "type": "etl"
+    },
+    "presoa-uegar-etl-sector_mtm": {
+     "ressources": [
+      "sector_mtm"
+     ],
+     "type": "etl"
+    },
+    "presoa-uegar-etl-zone": {
+     "ressources": [
+      "zone"
+     ],
+     "type": "etl"
+    },
+    "presoa-uegar-etl_group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "medical_member_and_portal_user",
+      "center",
+      "location",
+      "sector",
+      "sector_mtm",
+      "zone"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_owner",
+      "amt_perimeter",
+      "amt_status",
+      "amt_task"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employment_contract"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-employee_other_0": {
+     "groupe": "employee_other_0",
+     "ressources": [
+      "former_job",
+      "employee_contact",
+      "employee_consent",
+      "employee_paper_file_location"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-employee_other_1": {
+     "groupe": "employee_other_1",
+     "ressources": [
+      "employment_contract_info"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-employee_other_5": {
+     "groupe": "employee_other_5",
+     "ressources": [
+      "employee_rights_awareness"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-fe_module": {
+     "groupe": "fe_module",
+     "ressources": [
+      "fe",
+      "prevention_action",
+      "risk",
+      "work_unit",
+      "work_unit_risk"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status",
+      "firm_info"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "firm_contact",
+      "postal_address",
+      "firm_postal_address"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-firm_other_1": {
+     "groupe": "firm_other_1",
+     "ressources": [
+      "collection",
+      "firm_collection"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-firm_other_2": {
+     "groupe": "firm_other_2",
+     "ressources": [
+      "invoice_histo",
+      "debit_mandate"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-firm_other_3": {
+     "groupe": "firm_other_3",
+     "ressources": [
+      "crm_firm",
+      "crm_report",
+      "crm_note"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-firm_other_4": {
+     "groupe": "firm_other_4",
+     "ressources": [
+      "firm_location",
+      "firm_sector"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-manual_reminder": {
+     "groupe": "manual_reminder",
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-planning": {
+     "groupe": "planning",
+     "ressources": [
+      "planning_item_event_amt",
+      "planning_item_event_collective",
+      "planning_item_unavailability",
+      "planning_item_non_clinical_zone",
+      "planning_item_event",
+      "planning_item_exam",
+      "planning_item_vacation",
+      "planning_item_assistant_vacation"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-ressource_a_0": {
+     "groupe": "ressource_a_0",
+     "ressources": [
+      "note_family_history",
+      "note_personal_history",
+      "note_memo"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "note_sick_leave",
+      "note_therapeutic_part_time",
+      "note_treatment",
+      "note_pro_disease_declaration",
+      "note_work_accident"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-ressource_a_2": {
+     "groupe": "ressource_a_2",
+     "ressources": [
+      "note_academic",
+      "document"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-ressource_a_3": {
+     "groupe": "ressource_a_3",
+     "ressources": [
+      "note_pathology"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-ressource_b_0": {
+     "groupe": "ressource_b_0",
+     "ressources": [
+      "standalone_event",
+      "standalone_event_participant",
+      "note_work_appreciation",
+      "bet",
+      "bet_scales",
+      "med_tag"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-ressource_b_1": {
+     "groupe": "ressource_b_1",
+     "ressources": [
+      "note_social_personal_situation",
+      "boeth",
+      "family_situation",
+      "basic_skills"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-ressource_b_2": {
+     "groupe": "ressource_b_2",
+     "ressources": [
+      "note_habitus"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-ressource_c_0": {
+     "groupe": "ressource_c_0",
+     "ressources": [
+      "measure_dosimetry",
+      "measure_body_structure",
+      "measure_blood_pressure"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-ressource_c_1": {
+     "groupe": "ressource_c_1",
+     "ressources": [
+      "measure_request"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-ressource_c_2": {
+     "groupe": "ressource_c_2",
+     "ressources": [
+      "measure_vision_other",
+      "measure_vision_color_ishihara",
+      "measure_vision_distant",
+      "measure_vision_field",
+      "measure_audio_test",
+      "measure_audio",
+      "measure_electrocardiogram",
+      "measure_holter_electrocardiogram",
+      "measure_stress_electrocardiogram",
+      "measure_cardiovascular_risk_10_years",
+      "measure_echocardiography",
+      "measure_psychometric",
+      "measure_sleep",
+      "measure_blood_test",
+      "measure_blood_pressure",
+      "measure_urine_test",
+      "measure_covid19_test",
+      "measure_nasal_fibroscopy",
+      "measure_spirometry",
+      "measure_radio",
+      "measure_dosimetry",
+      "measure_temperature",
+      "measure_allergy",
+      "measure_body_structure",
+      "measure_other"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-ressource_d_0": {
+     "groupe": "ressource_d_0",
+     "ressources": [
+      "note_doctor_exam"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-ressource_d_3": {
+     "groupe": "ressource_d_3",
+     "ressources": [
+      "wr_group"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-ressource_d_5": {
+     "groupe": "ressource_d_5",
+     "ressources": [
+      "exposure_histo"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-user": {
+     "groupe": "user",
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-vaccine": {
+     "groupe": "vaccine",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection",
+      "vaccine_record",
+      "vaccine_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-etl_group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl_group"
+    },
+    "presoa-uegar-transform_and_load-document": {
+     "ressources": [
+      "document"
+     ],
+     "type": "transform_and_load"
+    },
+    "presoa-uegar-transform_and_load-firm": {
+     "ressources": [
+      "firm"
+     ],
+     "type": "transform_and_load"
+    },
+    "presoa-uegar-transform_and_load-group-ressource_a_3": {
+     "groupe": "ressource_a_3",
+     "ressources": [
+      "note_pathology"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "presoa-uegar-transform_and_load-group-ressource_d_3": {
+     "groupe": "ressource_d_3",
+     "ressources": [
+      "wr_group"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "presoa-uegar-transform_and_load-group-vaccine": {
+     "groupe": "vaccine",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection",
+      "vaccine_record",
+      "vaccine_reminder"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "presoa-uegar-transform_and_load-measure_vision_other": {
+     "ressources": [
+      "measure_vision_other"
+     ],
+     "type": "transform_and_load"
+    },
+    "presoa-uegar-transform_and_load-visit_histo": {
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "transform_and_load"
+    }
+   },
+   "logiciel": "uegar"
+  },
+  "preveam": {
+   "ced": {
+    "dag_id": "preveam-ced",
+    "ressources": {
+     "amt": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_6"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_45"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_71"
+      }
+     ],
+     "employee": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_14_employee"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_17"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_18"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_36"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_39"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_40"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_46"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_49"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_52"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_54"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_60"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_65"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_67"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_68"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_72"
+      }
+     ],
+     "firm": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_pilote_ced"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_20"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_21"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_37"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_43"
+      }
+     ],
+     "invoice_histo": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_pilote_invoice"
+      }
+     ],
+     "measure": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_14"
+      }
+     ],
+     "standalone_event": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_41"
+      }
+     ],
+     "visit_histo": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_55"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_56"
+      },
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_66"
+      }
+     ]
+    }
+   },
+   "dags": {
+    "preveam-etl_group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "medical_member_and_portal_user",
+      "center",
+      "location",
+      "sector",
+      "sector_mtm"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_owner",
+      "amt_perimeter",
+      "amt_status",
+      "amt_task"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employment_contract"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-employee_other_0": {
+     "groupe": "employee_other_0",
+     "ressources": [
+      "former_job",
+      "employee_contact",
+      "employee_consent",
+      "employee_paper_file_location"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-employee_other_1": {
+     "groupe": "employee_other_1",
+     "ressources": [
+      "employment_contract_info"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-fe_module": {
+     "groupe": "fe_module",
+     "ressources": [
+      "fe",
+      "prevention_action",
+      "risk",
+      "work_unit",
+      "work_unit_risk"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status",
+      "firm_info"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "firm_contact",
+      "postal_address",
+      "firm_postal_address"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-firm_other_1": {
+     "groupe": "firm_other_1",
+     "ressources": [
+      "collection",
+      "firm_collection"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-firm_other_2": {
+     "groupe": "firm_other_2",
+     "ressources": [
+      "invoice_histo",
+      "debit_mandate"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-firm_other_3": {
+     "groupe": "firm_other_3",
+     "ressources": [
+      "crm_firm",
+      "crm_report",
+      "crm_note"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-measure": {
+     "groupe": "measure",
+     "ressources": [
+      "measure_allergy",
+      "measure_audio_test",
+      "measure_blood_test",
+      "measure_blood_pressure",
+      "measure_body_structure",
+      "measure_dosimetry",
+      "measure_electrocardiogram",
+      "measure_holter_electrocardiogram",
+      "measure_nasal_fibroscopy",
+      "measure_other",
+      "measure_radio",
+      "measure_request",
+      "measure_spirometry",
+      "measure_urine_test",
+      "measure_vision_other"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-mee_plan": {
+     "groupe": "mee_plan",
+     "ressources": [
+      "mee_plan",
+      "mee_plan_note",
+      "mee_plan_context",
+      "mee_plan_info",
+      "mee_plan_followup",
+      "mee_plan_intervenant"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-planning": {
+     "groupe": "planning",
+     "ressources": [
+      "planning_item_event_amt",
+      "planning_item_event_collective",
+      "planning_item_unavailability",
+      "planning_item_non_clinical_zone",
+      "planning_item_event",
+      "planning_item_exam",
+      "planning_item_exam_slot",
+      "planning_item_vacation",
+      "planning_item_assistant_vacation"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-ressource_a_0": {
+     "groupe": "ressource_a_0",
+     "ressources": [
+      "note_family_history",
+      "note_personal_history",
+      "note_memo"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "note_sick_leave",
+      "note_therapeutic_part_time",
+      "note_treatment",
+      "note_pro_disease_declaration",
+      "note_work_accident"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-ressource_a_2": {
+     "groupe": "ressource_a_2",
+     "ressources": [
+      "note_academic",
+      "document"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-ressource_a_3": {
+     "groupe": "ressource_a_3",
+     "ressources": [
+      "note_pathology"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-ressource_b_0": {
+     "groupe": "ressource_b_0",
+     "ressources": [
+      "standalone_event",
+      "standalone_event_participant",
+      "note_work_appreciation",
+      "bet",
+      "bet_scales",
+      "med_tag"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-ressource_b_1": {
+     "groupe": "ressource_b_1",
+     "ressources": [
+      "note_social_personal_situation",
+      "boeth",
+      "family_situation",
+      "basic_skills"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-ressource_b_2": {
+     "groupe": "ressource_b_2",
+     "ressources": [
+      "note_habitus"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-ressource_c_0": {
+     "groupe": "ressource_c_0",
+     "ressources": [
+      "measure_dosimetry",
+      "measure_body_structure",
+      "measure_blood_pressure"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-ressource_c_1": {
+     "groupe": "ressource_c_1",
+     "ressources": [
+      "measure_request"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-ressource_d_0": {
+     "groupe": "ressource_d_0",
+     "ressources": [
+      "note_doctor_exam"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-ressource_d_1": {
+     "groupe": "ressource_d_1",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection",
+      "vaccine_record",
+      "vaccine_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-ressource_d_2": {
+     "groupe": "ressource_d_2",
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-ressource_d_3": {
+     "groupe": "ressource_d_3",
+     "ressources": [
+      "wr_group"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-ressource_d_4": {
+     "groupe": "ressource_d_4",
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-ressource_d_5": {
+     "groupe": "ressource_d_5",
+     "ressources": [
+      "exposure_histo"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-etl_group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl_group"
+    },
+    "preveam-transform_and_load-employee": {
+     "ressources": [
+      "employee"
+     ],
+     "type": "transform_and_load"
+    },
+    "preveam-transform_and_load-employment_contract": {
+     "ressources": [
+      "employment_contract"
+     ],
+     "type": "transform_and_load"
+    },
+    "preveam-transform_and_load-firm": {
+     "ressources": [
+      "firm"
+     ],
+     "type": "transform_and_load"
+    },
+    "preveam-transform_and_load-firm_info": {
+     "ressources": [
+      "firm_info"
+     ],
+     "type": "transform_and_load"
+    },
+    "preveam-transform_and_load-firm_status": {
+     "ressources": [
+      "firm_status"
+     ],
+     "type": "transform_and_load"
+    },
+    "preveam-transform_and_load-group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "medical_member_and_portal_user",
+      "center",
+      "location",
+      "sector",
+      "sector_mtm"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_owner",
+      "amt_perimeter",
+      "amt_status",
+      "amt_task"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employment_contract"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-employee_other_0": {
+     "groupe": "employee_other_0",
+     "ressources": [
+      "former_job",
+      "employee_contact",
+      "employee_consent",
+      "employee_paper_file_location"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-employee_other_1": {
+     "groupe": "employee_other_1",
+     "ressources": [
+      "employment_contract_info"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-fe_module": {
+     "groupe": "fe_module",
+     "ressources": [
+      "fe",
+      "prevention_action",
+      "risk",
+      "work_unit",
+      "work_unit_risk"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status",
+      "firm_info"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "firm_contact",
+      "postal_address",
+      "firm_postal_address"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-firm_other_1": {
+     "groupe": "firm_other_1",
+     "ressources": [
+      "collection",
+      "firm_collection"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-firm_other_2": {
+     "groupe": "firm_other_2",
+     "ressources": [
+      "invoice_histo",
+      "debit_mandate"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-firm_other_3": {
+     "groupe": "firm_other_3",
+     "ressources": [
+      "crm_firm",
+      "crm_report",
+      "crm_note"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-firm_other_4": {
+     "groupe": "firm_other_4",
+     "ressources": [
+      "firm_location",
+      "firm_sector"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-measure": {
+     "groupe": "measure",
+     "ressources": [
+      "measure_allergy",
+      "measure_audio_test",
+      "measure_blood_test",
+      "measure_blood_pressure",
+      "measure_body_structure",
+      "measure_dosimetry",
+      "measure_electrocardiogram",
+      "measure_holter_electrocardiogram",
+      "measure_nasal_fibroscopy",
+      "measure_other",
+      "measure_radio",
+      "measure_request",
+      "measure_spirometry",
+      "measure_urine_test",
+      "measure_vision_other"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-mee_plan": {
+     "groupe": "mee_plan",
+     "ressources": [
+      "mee_plan",
+      "mee_plan_note",
+      "mee_plan_context",
+      "mee_plan_info",
+      "mee_plan_followup",
+      "mee_plan_intervenant"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-planning": {
+     "groupe": "planning",
+     "ressources": [
+      "planning_item_event_amt",
+      "planning_item_event_collective",
+      "planning_item_unavailability",
+      "planning_item_non_clinical_zone",
+      "planning_item_event",
+      "planning_item_exam",
+      "planning_item_exam_slot",
+      "planning_item_vacation",
+      "planning_item_assistant_vacation"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-ressource_a_0": {
+     "groupe": "ressource_a_0",
+     "ressources": [
+      "note_family_history",
+      "note_personal_history",
+      "note_memo"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "note_sick_leave",
+      "note_therapeutic_part_time",
+      "note_treatment",
+      "note_pro_disease_declaration",
+      "note_work_accident"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-ressource_a_2": {
+     "groupe": "ressource_a_2",
+     "ressources": [
+      "note_academic",
+      "document"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-ressource_a_3": {
+     "groupe": "ressource_a_3",
+     "ressources": [
+      "note_pathology"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-ressource_b_0": {
+     "groupe": "ressource_b_0",
+     "ressources": [
+      "standalone_event",
+      "standalone_event_participant",
+      "note_work_appreciation",
+      "bet",
+      "bet_scales",
+      "med_tag"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-ressource_b_1": {
+     "groupe": "ressource_b_1",
+     "ressources": [
+      "note_social_personal_situation",
+      "boeth",
+      "family_situation",
+      "basic_skills"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-ressource_b_2": {
+     "groupe": "ressource_b_2",
+     "ressources": [
+      "note_habitus"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-ressource_c_0": {
+     "groupe": "ressource_c_0",
+     "ressources": [
+      "measure_dosimetry",
+      "measure_body_structure",
+      "measure_blood_pressure"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-ressource_c_1": {
+     "groupe": "ressource_c_1",
+     "ressources": [
+      "measure_request"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-ressource_d_0": {
+     "groupe": "ressource_d_0",
+     "ressources": [
+      "note_doctor_exam"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-ressource_d_1": {
+     "groupe": "ressource_d_1",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection",
+      "vaccine_record",
+      "vaccine_reminder"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-ressource_d_2": {
+     "groupe": "ressource_d_2",
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-ressource_d_3": {
+     "groupe": "ressource_d_3",
+     "ressources": [
+      "wr_group"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-ressource_d_4": {
+     "groupe": "ressource_d_4",
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-ressource_d_5": {
+     "groupe": "ressource_d_5",
+     "ressources": [
+      "exposure_histo"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-user": {
+     "groupe": "user",
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "preveam-transform_and_load-group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "transform_and_load-group"
+    }
+   },
+   "logiciel": "uegar"
+  },
+  "pst35": {
+   "ced": {
+    "dag_id": "pst35-ced",
+    "ressources": {
+     "employee": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_employee"
+      }
+     ],
+     "firm": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_firm"
+      }
+     ],
+     "invoice_histo": [
+      {
+       "niveau": "logiciel",
+       "requete": "query_file_type_invoice_histo"
+      }
+     ],
+     "measure": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_measure"
+      }
+     ]
+    }
+   },
+   "dags": {
+    "pst35-transform_and_load-basic_skills": {
+     "ressources": [
+      "basic_skills"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-document": {
+     "ressources": [
+      "document"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-employee": {
+     "ressources": [
+      "employee"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-employment_contract": {
+     "ressources": [
+      "employment_contract"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-employment_contract_info": {
+     "ressources": [
+      "employment_contract_info"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-exposure_histo": {
+     "ressources": [
+      "exposure_histo"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-family_situation": {
+     "ressources": [
+      "family_situation"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-firm": {
+     "ressources": [
+      "firm"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-firm_contact": {
+     "ressources": [
+      "firm_contact"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-firm_info": {
+     "ressources": [
+      "firm_info"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-firm_postal_address": {
+     "ressources": [
+      "firm_postal_address"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-firm_status": {
+     "ressources": [
+      "firm_status"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "zone",
+      "center",
+      "location",
+      "location_room",
+      "medical_member_and_portal_user",
+      "sector",
+      "sector_mtm"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_owner",
+      "amt_perimeter",
+      "amt_status",
+      "amt_task"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employment_contract",
+      "employment_contract_info",
+      "end_user_company"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-employee_other_0": {
+     "groupe": "employee_other_0",
+     "ressources": [
+      "employee_consent",
+      "employee_contact"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-employee_other_1": {
+     "groupe": "employee_other_1",
+     "ressources": [
+      "exposure_histo",
+      "wr_group",
+      "former_job"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-employee_other_2": {
+     "groupe": "employee_other_2",
+     "ressources": [
+      "standalone_event",
+      "standalone_event_participant"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-employee_other_3": {
+     "groupe": "employee_other_3",
+     "ressources": [
+      "employee_paper_file_location"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status",
+      "firm_info"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "firm_postal_address",
+      "postal_address",
+      "firm_contact"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-firm_other_1": {
+     "groupe": "firm_other_1",
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-firm_other_2": {
+     "groupe": "firm_other_2",
+     "ressources": [
+      "debit_mandate",
+      "invoice_histo"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-firm_other_5": {
+     "groupe": "firm_other_5",
+     "ressources": [
+      "fe"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-firm_other_6": {
+     "groupe": "firm_other_6",
+     "ressources": [
+      "crm_firm",
+      "crm_report"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-firm_other_7": {
+     "groupe": "firm_other_7",
+     "ressources": [
+      "gen_tag"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-firm_other_8": {
+     "groupe": "firm_other_8",
+     "ressources": [
+      "firm_location",
+      "firm_sector",
+      "firm_owner"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-manual_reminder": {
+     "groupe": "manual_reminder",
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-measure": {
+     "groupe": "measure",
+     "ressources": [
+      "measure_allergy",
+      "measure_audio",
+      "measure_audio_test",
+      "measure_blood_pressure",
+      "measure_blood_pressure_mapa",
+      "measure_blood_test",
+      "measure_body_structure",
+      "measure_capillary_glycemia",
+      "measure_covid19_test",
+      "measure_dosimetry",
+      "measure_echocardiography",
+      "measure_electrocardiogram",
+      "measure_nasal_fibroscopy",
+      "measure_other",
+      "measure_spirometry",
+      "measure_radio",
+      "measure_sleep",
+      "measure_urine_test",
+      "measure_vision_near",
+      "measure_vision_distant",
+      "measure_vision_color_ishihara",
+      "measure_vision_field",
+      "measure_vision_other",
+      "measure_request"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-planning": {
+     "groupe": "planning",
+     "ressources": [
+      "planning_item_exam",
+      "planning_item_exam_slot",
+      "planning_item_event",
+      "planning_item_event_amt",
+      "planning_item_event_collective",
+      "planning_item_vacation",
+      "planning_item_non_clinical_zone",
+      "planning_item_unavailability"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-ressource_a_0": {
+     "groupe": "ressource_a_0",
+     "ressources": [
+      "mee_plan",
+      "mee_plan_context",
+      "mee_plan_followup",
+      "mee_plan_info",
+      "mee_plan_intervenant"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "med_tag",
+      "boeth",
+      "gen_tag"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-ressource_c_0": {
+     "groupe": "ressource_c_0",
+     "ressources": [
+      "note_personal_history",
+      "note_family_history"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-ressource_c_1": {
+     "groupe": "ressource_c_1",
+     "ressources": [
+      "note_pathology"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-ressource_c_3": {
+     "groupe": "ressource_c_3",
+     "ressources": [
+      "note_sick_leave",
+      "note_pro_disease_declaration",
+      "note_therapeutic_part_time"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-ressource_c_4": {
+     "groupe": "ressource_c_4",
+     "ressources": [
+      "note_treatment"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-ressource_c_5": {
+     "groupe": "ressource_c_5",
+     "ressources": [
+      "note_habitus",
+      "note_work_appreciation"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-ressource_c_7": {
+     "groupe": "ressource_c_7",
+     "ressources": [
+      "note_memo",
+      "basic_skills"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-ressource_d_1": {
+     "groupe": "ressource_d_1",
+     "ressources": [
+      "note_social_personal_situation",
+      "note_work_accident"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-vaccine": {
+     "groupe": "vaccine",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo",
+      "visit_exemption"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "pst35-transform_and_load-measure_allergy": {
+     "ressources": [
+      "measure_allergy"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_audio": {
+     "ressources": [
+      "measure_audio"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_audio_test": {
+     "ressources": [
+      "measure_audio_test"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_blood_pressure": {
+     "ressources": [
+      "measure_blood_pressure"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_blood_test": {
+     "ressources": [
+      "measure_blood_test"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_body_structure": {
+     "ressources": [
+      "measure_body_structure"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_capillary_glycemia": {
+     "ressources": [
+      "measure_capillary_glycemia"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_covid19_test": {
+     "ressources": [
+      "measure_covid19_test"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_dosimetry": {
+     "ressources": [
+      "measure_dosimetry"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_electrocardiogram": {
+     "ressources": [
+      "measure_electrocardiogram"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_nasal_fibroscopy": {
+     "ressources": [
+      "measure_nasal_fibroscopy"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_other": {
+     "ressources": [
+      "measure_other"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_radio": {
+     "ressources": [
+      "measure_radio"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_request": {
+     "ressources": [
+      "measure_request"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_sleep": {
+     "ressources": [
+      "measure_sleep"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_spirometry": {
+     "ressources": [
+      "measure_spirometry"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_urine_test": {
+     "ressources": [
+      "measure_urine_test"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_vision_color_ishihara": {
+     "ressources": [
+      "measure_vision_color_ishihara"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_vision_distant": {
+     "ressources": [
+      "measure_vision_distant"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_vision_field": {
+     "ressources": [
+      "measure_vision_field"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_vision_near": {
+     "ressources": [
+      "measure_vision_near"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-measure_vision_other": {
+     "ressources": [
+      "measure_vision_other"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-note_academic": {
+     "ressources": [
+      "note_academic"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-note_habitus": {
+     "ressources": [
+      "note_habitus"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-note_social_personal_situation": {
+     "ressources": [
+      "note_social_personal_situation"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-note_work_accident": {
+     "ressources": [
+      "note_work_accident"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-note_work_appreciation": {
+     "ressources": [
+      "note_work_appreciation"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-postal_address": {
+     "ressources": [
+      "postal_address"
+     ],
+     "type": "transform_and_load"
+    },
+    "pst35-transform_and_load-wr_group": {
+     "ressources": [
+      "wr_group"
+     ],
+     "type": "transform_and_load"
+    }
+   },
+   "logiciel": "medtra_4"
+  },
+  "safran": {
+   "dags": {
+    "safran-etl_group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl_group"
+    },
+    "safran-transform_and_load-group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "safran-transform_and_load-visit_histo": {
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "transform_and_load"
+    }
+   },
+   "logiciel": "preventiel_postgres"
+  },
+  "sistbtp77": {
+   "ced": {
+    "dag_id": "sistbtp77-ced",
+    "ressources": {
+     "firm": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_firm"
+      }
+     ]
+    }
+   },
+   "dags": {
+    "sistbtp77-etl-medical_member_and_portal_user": {
+     "ressources": [
+      "medical_member_and_portal_user"
+     ],
+     "type": "etl"
+    },
+    "sistbtp77-etl-wr_group": {
+     "ressources": [
+      "wr_group"
+     ],
+     "type": "etl"
+    },
+    "sistbtp77-etl_group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "zone",
+      "center",
+      "location",
+      "location_room",
+      "medical_member_and_portal_user",
+      "sector",
+      "sector_mtm",
+      "firm_sector",
+      "firm_location"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_owner",
+      "amt_perimeter",
+      "amt_status",
+      "amt_task"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employment_contract",
+      "employment_contract_info"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-employee_other_0": {
+     "groupe": "employee_other_0",
+     "ressources": [
+      "employee_contact",
+      "employee_paper_file_location",
+      "employee_consent"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "firm_contact",
+      "postal_address",
+      "firm_postal_address",
+      "fe"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-firm_other_1": {
+     "groupe": "firm_other_1",
+     "ressources": [
+      "invoice_histo",
+      "firm_info"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-firm_other_2": {
+     "groupe": "firm_other_2",
+     "ressources": [
+      "crm_firm",
+      "crm_note",
+      "crm_report"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-firm_other_3": {
+     "groupe": "firm_other_3",
+     "ressources": [
+      "collection",
+      "firm_collection"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-manual_reminder": {
+     "groupe": "manual_reminder",
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-mee_plan": {
+     "groupe": "mee_plan",
+     "ressources": [
+      "mee_plan",
+      "mee_plan_followup",
+      "mee_plan_context",
+      "mee_plan_info",
+      "mee_plan_intervenant",
+      "mee_plan_note"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-planning": {
+     "groupe": "planning",
+     "ressources": [
+      "planning_item_assistant_vacation",
+      "planning_item_exam_slot",
+      "planning_item_event",
+      "planning_item_exam",
+      "planning_item_non_clinical_zone",
+      "planning_item_unavailability",
+      "planning_item_vacation",
+      "planning_item_event_amt",
+      "planning_item_event_collective",
+      "planning_event_participant"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-ressource_a_0": {
+     "groupe": "ressource_a_0",
+     "ressources": [
+      "note_academic",
+      "note_memo",
+      "note_pro_disease_declaration",
+      "note_treatment",
+      "note_sick_leave",
+      "note_work_accident",
+      "note_therapeutic_part_time"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "boeth"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-ressource_a_2": {
+     "groupe": "ressource_a_2",
+     "ressources": [
+      "note_pathology",
+      "note_personal_history",
+      "note_family_history",
+      "note_habitus"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-ressource_a_3": {
+     "groupe": "ressource_a_3",
+     "ressources": [
+      "note_doctor_exam",
+      "document",
+      "note_social_personal_situation",
+      "basic_skills",
+      "family_situation"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-ressource_a_4": {
+     "groupe": "ressource_a_4",
+     "ressources": [
+      "note_work_appreciation"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-ressource_b_0": {
+     "groupe": "ressource_b_0",
+     "ressources": [
+      "measure_vision_astigmate",
+      "measure_vision_distant",
+      "measure_vision_near",
+      "measure_vision_field",
+      "measure_vision_phoria",
+      "measure_vision_color_ishihara",
+      "measure_vision_other"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-ressource_b_1": {
+     "groupe": "ressource_b_1",
+     "ressources": [
+      "measure_audio_test",
+      "measure_other",
+      "measure_body_structure"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-ressource_b_2": {
+     "groupe": "ressource_b_2",
+     "ressources": [
+      "measure_blood_pressure",
+      "measure_blood_test"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-ressource_b_3": {
+     "groupe": "ressource_b_3",
+     "ressources": [
+      "measure_radio",
+      "measure_electrocardiogram",
+      "measure_spirometry",
+      "measure_urine_test"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-ressource_c_0": {
+     "groupe": "ressource_c_0",
+     "ressources": [
+      "wr_group",
+      "former_job",
+      "exposure_histo"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-ressource_c_1": {
+     "groupe": "ressource_c_1",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection",
+      "vaccine_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-ressource_c_2": {
+     "groupe": "ressource_c_2",
+     "ressources": [
+      "standalone_event",
+      "standalone_event_participant"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-user": {
+     "groupe": "user",
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-etl_group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl_group"
+    },
+    "sistbtp77-transform_and_load-amt": {
+     "ressources": [
+      "amt"
+     ],
+     "type": "transform_and_load"
+    },
+    "sistbtp77-transform_and_load-amt_owner": {
+     "ressources": [
+      "amt_owner"
+     ],
+     "type": "transform_and_load"
+    },
+    "sistbtp77-transform_and_load-amt_perimeter": {
+     "ressources": [
+      "amt_perimeter"
+     ],
+     "type": "transform_and_load"
+    },
+    "sistbtp77-transform_and_load-amt_status": {
+     "ressources": [
+      "amt_status"
+     ],
+     "type": "transform_and_load"
+    },
+    "sistbtp77-transform_and_load-amt_task": {
+     "ressources": [
+      "amt_task"
+     ],
+     "type": "transform_and_load"
+    }
+   },
+   "logiciel": "pulse"
+  },
+  "spbtp35": {
+   "dags": {
+    "spbtp35-etl-basic_skills": {
+     "ressources": [
+      "basic_skills"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-document": {
+     "ressources": [
+      "document"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-employee": {
+     "ressources": [
+      "employee"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-employment_contract": {
+     "ressources": [
+      "employment_contract"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-family_situation": {
+     "ressources": [
+      "family_situation"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-fe": {
+     "ressources": [
+      "fe"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-firm": {
+     "ressources": [
+      "firm"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-firm_info": {
+     "ressources": [
+      "firm_info"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-manual_reminder": {
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_allergy": {
+     "ressources": [
+      "measure_allergy"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_audio": {
+     "ressources": [
+      "measure_audio"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_audio_test": {
+     "ressources": [
+      "measure_audio_test"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_blood_pressure": {
+     "ressources": [
+      "measure_blood_pressure"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_blood_test": {
+     "ressources": [
+      "measure_blood_test"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_body_structure": {
+     "ressources": [
+      "measure_body_structure"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_capillary_glycemia": {
+     "ressources": [
+      "measure_capillary_glycemia"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_covid19_test": {
+     "ressources": [
+      "measure_covid19_test"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_dosimetry": {
+     "ressources": [
+      "measure_dosimetry"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_electrocardiogram": {
+     "ressources": [
+      "measure_electrocardiogram"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_nasal_fibroscopy": {
+     "ressources": [
+      "measure_nasal_fibroscopy"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_other": {
+     "ressources": [
+      "measure_other"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_radio": {
+     "ressources": [
+      "measure_radio"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_request": {
+     "ressources": [
+      "measure_request"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_sleep": {
+     "ressources": [
+      "measure_sleep"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_spirometry": {
+     "ressources": [
+      "measure_spirometry"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_urine_test": {
+     "ressources": [
+      "measure_urine_test"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_vision_distant": {
+     "ressources": [
+      "measure_vision_distant"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_vision_near": {
+     "ressources": [
+      "measure_vision_near"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-measure_vision_other": {
+     "ressources": [
+      "measure_vision_other"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-note_academic": {
+     "ressources": [
+      "note_academic"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-note_pathology": {
+     "ressources": [
+      "note_pathology"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-note_sick_leave": {
+     "ressources": [
+      "note_sick_leave"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-note_social_personal_situation": {
+     "ressources": [
+      "note_social_personal_situation"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-note_work_accident": {
+     "ressources": [
+      "note_work_accident"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-planning_item_event": {
+     "ressources": [
+      "planning_item_event"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-vaccine": {
+     "ressources": [
+      "vaccine"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl-visit_histo": {
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl"
+    },
+    "spbtp35-etl_group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "zone",
+      "center",
+      "location",
+      "medical_member_and_portal_user",
+      "sector",
+      "sector_mtm"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_owner",
+      "amt_perimeter",
+      "amt_status",
+      "amt_task"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employment_contract",
+      "employment_contract_info",
+      "end_user_company"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-employee_other_0": {
+     "groupe": "employee_other_0",
+     "ressources": [
+      "employee_consent",
+      "employee_contact"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-employee_other_1": {
+     "groupe": "employee_other_1",
+     "ressources": [
+      "exposure_histo",
+      "wr_group",
+      "former_job"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-employee_other_2": {
+     "groupe": "employee_other_2",
+     "ressources": [
+      "standalone_event"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-employee_other_3": {
+     "groupe": "employee_other_3",
+     "ressources": [
+      "employee_paper_file_location"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status",
+      "firm_info"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "firm_postal_address",
+      "postal_address",
+      "firm_contact"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-firm_other_1": {
+     "groupe": "firm_other_1",
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-firm_other_2": {
+     "groupe": "firm_other_2",
+     "ressources": [
+      "debit_mandate",
+      "invoice_histo"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-firm_other_4": {
+     "groupe": "firm_other_4",
+     "ressources": [
+      "collection",
+      "firm_collection"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-firm_other_5": {
+     "groupe": "firm_other_5",
+     "ressources": [
+      "fe"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-firm_other_6": {
+     "groupe": "firm_other_6",
+     "ressources": [
+      "crm_firm",
+      "crm_report"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-firm_other_8": {
+     "groupe": "firm_other_8",
+     "ressources": [
+      "firm_location",
+      "firm_sector",
+      "firm_owner"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-manual_reminder": {
+     "groupe": "manual_reminder",
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-measure": {
+     "groupe": "measure",
+     "ressources": [
+      "measure_allergy",
+      "measure_audio",
+      "measure_audio_test",
+      "measure_blood_pressure",
+      "measure_blood_test",
+      "measure_body_structure",
+      "measure_capillary_glycemia",
+      "measure_covid19_test",
+      "measure_dosimetry",
+      "measure_electrocardiogram",
+      "measure_nasal_fibroscopy",
+      "measure_other",
+      "measure_spirometry",
+      "measure_radio",
+      "measure_urine_test",
+      "measure_request"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-planning": {
+     "groupe": "planning",
+     "ressources": [
+      "planning_item_exam",
+      "planning_item_exam_slot",
+      "planning_item_event",
+      "planning_item_event_amt",
+      "planning_item_event_collective",
+      "planning_item_vacation",
+      "planning_item_non_clinical_zone",
+      "planning_item_unavailability"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "med_tag",
+      "boeth",
+      "gen_tag"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-ressource_c_0": {
+     "groupe": "ressource_c_0",
+     "ressources": [
+      "note_personal_history",
+      "note_family_history"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-ressource_c_1": {
+     "groupe": "ressource_c_1",
+     "ressources": [
+      "note_pathology"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-ressource_c_2": {
+     "groupe": "ressource_c_2",
+     "ressources": [
+      "family_situation"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-ressource_c_3": {
+     "groupe": "ressource_c_3",
+     "ressources": [
+      "note_sick_leave",
+      "note_pro_disease_declaration",
+      "note_therapeutic_part_time"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-ressource_c_4": {
+     "groupe": "ressource_c_4",
+     "ressources": [
+      "note_treatment"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-ressource_c_5": {
+     "groupe": "ressource_c_5",
+     "ressources": [
+      "note_habitus",
+      "note_work_appreciation"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-ressource_c_7": {
+     "groupe": "ressource_c_7",
+     "ressources": [
+      "note_memo",
+      "basic_skills"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-ressource_c_8": {
+     "groupe": "ressource_c_8",
+     "ressources": [
+      "note_academic"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-ressource_d_0": {
+     "groupe": "ressource_d_0",
+     "ressources": [
+      "document"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-ressource_d_1": {
+     "groupe": "ressource_d_1",
+     "ressources": [
+      "note_social_personal_situation",
+      "note_work_accident"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-vaccine": {
+     "groupe": "vaccine",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection",
+      "vaccine_record"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-etl_group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo",
+      "visit_exemption"
+     ],
+     "type": "etl_group"
+    },
+    "spbtp35-transform_and_load-basic_skills": {
+     "ressources": [
+      "basic_skills"
+     ],
+     "type": "transform_and_load"
+    },
+    "spbtp35-transform_and_load-firm": {
+     "ressources": [
+      "firm"
+     ],
+     "type": "transform_and_load"
+    },
+    "spbtp35-transform_and_load-group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_owner",
+      "amt_perimeter",
+      "amt_status",
+      "amt_task"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "spbtp35-transform_and_load-group-employee_other_1": {
+     "groupe": "employee_other_1",
+     "ressources": [
+      "exposure_histo",
+      "wr_group",
+      "former_job"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "spbtp35-transform_and_load-group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status",
+      "firm_info"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "spbtp35-transform_and_load-visit_histo": {
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "transform_and_load"
+    }
+   },
+   "logiciel": "medtra_4_2_25"
+  },
+  "spsti16": {
+   "ced": {
+    "dag_id": "spsti16-ced",
+    "ressources": {
+     "amt": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_amt"
+      },
+      {
+       "niveau": "client",
+       "requete": "query_file_type_sensi"
+      },
+      {
+       "niveau": "client",
+       "requete": "query_file_type_request"
+      }
+     ],
+     "employee": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_employee"
+      }
+     ],
+     "firm": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_firm"
+      }
+     ],
+     "invoice_histo": [
+      {
+       "niveau": "client",
+       "requete": "query_file_type_invoice_histo"
+      }
+     ]
+    }
+   },
+   "dags": {
+    "spsti16-etl-center": {
+     "ressources": [
+      "center"
+     ],
+     "type": "etl"
+    },
+    "spsti16-etl-crm_note": {
+     "ressources": [
+      "crm_note"
+     ],
+     "type": "etl"
+    },
+    "spsti16-etl-employment_contract": {
+     "ressources": [
+      "employment_contract"
+     ],
+     "type": "etl"
+    },
+    "spsti16-etl-firm": {
+     "ressources": [
+      "firm"
+     ],
+     "type": "etl"
+    },
+    "spsti16-etl-firm_contact": {
+     "ressources": [
+      "firm_contact"
+     ],
+     "type": "etl"
+    },
+    "spsti16-etl-firm_postal_address": {
+     "ressources": [
+      "firm_postal_address"
+     ],
+     "type": "etl"
+    },
+    "spsti16-etl-firm_status": {
+     "ressources": [
+      "firm_status"
+     ],
+     "type": "etl"
+    },
+    "spsti16-etl-former_job": {
+     "ressources": [
+      "former_job"
+     ],
+     "type": "etl"
+    },
+    "spsti16-etl-location": {
+     "ressources": [
+      "location"
+     ],
+     "type": "etl"
+    },
+    "spsti16-etl-medical_member_and_portal_user": {
+     "ressources": [
+      "medical_member_and_portal_user"
+     ],
+     "type": "etl"
+    },
+    "spsti16-etl-note_work_accident": {
+     "ressources": [
+      "note_work_accident"
+     ],
+     "type": "etl"
+    },
+    "spsti16-etl-note_work_appreciation": {
+     "ressources": [
+      "note_work_appreciation"
+     ],
+     "type": "etl"
+    },
+    "spsti16-etl-postal_address": {
+     "ressources": [
+      "postal_address"
+     ],
+     "type": "etl"
+    },
+    "spsti16-etl-sector": {
+     "ressources": [
+      "sector"
+     ],
+     "type": "etl"
+    },
+    "spsti16-etl-sector_mtm": {
+     "ressources": [
+      "sector_mtm"
+     ],
+     "type": "etl"
+    },
+    "spsti16-etl-standalone_event": {
+     "ressources": [
+      "standalone_event"
+     ],
+     "type": "etl"
+    },
+    "spsti16-etl_group-administratif": {
+     "groupe": "administratif",
+     "ressources": [
+      "center",
+      "location",
+      "medical_member_and_portal_user",
+      "sector",
+      "sector_mtm",
+      "firm_sector",
+      "firm_location"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-amt": {
+     "groupe": "amt",
+     "ressources": [
+      "amt",
+      "amt_owner",
+      "amt_perimeter",
+      "amt_status",
+      "amt_task"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employment_contract",
+      "employment_contract_info"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-employee_other_0": {
+     "groupe": "employee_other_0",
+     "ressources": [
+      "employee_contact",
+      "employee_paper_file_location",
+      "employee_consent"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-firm_other_0": {
+     "groupe": "firm_other_0",
+     "ressources": [
+      "firm_contact",
+      "postal_address",
+      "firm_postal_address",
+      "fe"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-firm_other_1": {
+     "groupe": "firm_other_1",
+     "ressources": [
+      "invoice_histo",
+      "gen_tag",
+      "firm_info"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-firm_other_2": {
+     "groupe": "firm_other_2",
+     "ressources": [
+      "crm_firm",
+      "crm_note",
+      "crm_report"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-firm_other_3": {
+     "groupe": "firm_other_3",
+     "ressources": [
+      "collection",
+      "firm_collection"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-manual_reminder": {
+     "groupe": "manual_reminder",
+     "ressources": [
+      "manual_reminder"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-mee_plan": {
+     "groupe": "mee_plan",
+     "ressources": [
+      "mee_plan",
+      "mee_plan_followup",
+      "mee_plan_context",
+      "mee_plan_info",
+      "mee_plan_intervenant",
+      "mee_plan_note"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-planning": {
+     "groupe": "planning",
+     "ressources": [
+      "planning_item_assistant_vacation",
+      "planning_item_event",
+      "planning_item_exam",
+      "planning_item_non_clinical_zone",
+      "planning_item_unavailability",
+      "planning_item_vacation",
+      "planning_item_event_amt",
+      "planning_item_event_collective",
+      "planning_event_participant"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-ressource_a_0": {
+     "groupe": "ressource_a_0",
+     "ressources": [
+      "note_academic",
+      "note_memo",
+      "note_pro_disease_declaration",
+      "note_treatment",
+      "note_sick_leave",
+      "note_work_accident",
+      "note_therapeutic_part_time"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "med_tag",
+      "boeth"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-ressource_a_2": {
+     "groupe": "ressource_a_2",
+     "ressources": [
+      "note_pathology",
+      "note_personal_history",
+      "note_family_history",
+      "note_habitus"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-ressource_a_3": {
+     "groupe": "ressource_a_3",
+     "ressources": [
+      "note_doctor_exam",
+      "document",
+      "note_social_personal_situation",
+      "basic_skills",
+      "family_situation"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-ressource_a_4": {
+     "groupe": "ressource_a_4",
+     "ressources": [
+      "note_work_appreciation"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-ressource_b_0": {
+     "groupe": "ressource_b_0",
+     "ressources": [
+      "measure_vision_astigmate",
+      "measure_vision_distant",
+      "measure_vision_near",
+      "measure_vision_duochrome",
+      "measure_vision_field",
+      "measure_vision_phoria",
+      "measure_vision_color_ishihara",
+      "measure_vision_other"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-ressource_b_1": {
+     "groupe": "ressource_b_1",
+     "ressources": [
+      "measure_audio_test",
+      "measure_other",
+      "measure_body_structure"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-ressource_b_2": {
+     "groupe": "ressource_b_2",
+     "ressources": [
+      "measure_blood_pressure",
+      "measure_blood_test"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-ressource_b_3": {
+     "groupe": "ressource_b_3",
+     "ressources": [
+      "measure_radio",
+      "measure_electrocardiogram",
+      "measure_spirometry",
+      "measure_urine_test"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-ressource_c_0": {
+     "groupe": "ressource_c_0",
+     "ressources": [
+      "wr_group",
+      "former_job",
+      "exposure_histo"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-ressource_c_1": {
+     "groupe": "ressource_c_1",
+     "ressources": [
+      "vaccine",
+      "vaccine_injection"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-ressource_c_2": {
+     "groupe": "ressource_c_2",
+     "ressources": [
+      "standalone_event"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-user": {
+     "groupe": "user",
+     "ressources": [
+      "employer_user"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-etl_group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "etl_group"
+    },
+    "spsti16-transform_and_load-firm": {
+     "ressources": [
+      "firm"
+     ],
+     "type": "transform_and_load"
+    },
+    "spsti16-transform_and_load-firm_info": {
+     "ressources": [
+      "firm_info"
+     ],
+     "type": "transform_and_load"
+    },
+    "spsti16-transform_and_load-firm_status": {
+     "ressources": [
+      "firm_status"
+     ],
+     "type": "transform_and_load"
+    },
+    "spsti16-transform_and_load-group-employee_base": {
+     "groupe": "employee_base",
+     "ressources": [
+      "employee",
+      "employment_contract",
+      "employment_contract_info"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "spsti16-transform_and_load-group-firm_base": {
+     "groupe": "firm_base",
+     "ressources": [
+      "firm",
+      "firm_status"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "spsti16-transform_and_load-group-ressource_a_0": {
+     "groupe": "ressource_a_0",
+     "ressources": [
+      "note_academic",
+      "note_memo",
+      "note_pro_disease_declaration",
+      "note_treatment",
+      "note_sick_leave",
+      "note_work_accident",
+      "note_therapeutic_part_time"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "spsti16-transform_and_load-group-ressource_a_1": {
+     "groupe": "ressource_a_1",
+     "ressources": [
+      "med_tag",
+      "boeth"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "spsti16-transform_and_load-group-ressource_a_2": {
+     "groupe": "ressource_a_2",
+     "ressources": [
+      "note_pathology",
+      "note_personal_history",
+      "note_family_history",
+      "note_habitus"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "spsti16-transform_and_load-group-ressource_a_3": {
+     "groupe": "ressource_a_3",
+     "ressources": [
+      "note_doctor_exam",
+      "document",
+      "note_social_personal_situation",
+      "basic_skills",
+      "family_situation"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "spsti16-transform_and_load-group-visit_histo_base": {
+     "groupe": "visit_histo_base",
+     "ressources": [
+      "visit_histo"
+     ],
+     "type": "transform_and_load-group"
+    },
+    "spsti16-transform_and_load-note_memo": {
+     "ressources": [
+      "note_memo"
+     ],
+     "type": "transform_and_load"
+    }
+   },
+   "logiciel": "pulse"
+  }
+ },
+ "commit_orchestrator": "aba66c4 2026-11-05",
+ "genere_le": "2026-11-05 18:00"
+}

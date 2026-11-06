@@ -1,0 +1,96 @@
+{% import "_icons.html" as ic %}
+{# Attend : deployments, show_client. Cartes d'injection regroupées par ressources liées (Deployment.injection_blocks) :
+   un bloc par ressource, son état, le DAG à lancer une fois pour toutes les cartes du bloc. #}
+{% import "_charts.html" as charts with context %}
+<div class="toolbar blocks-toolbar" data-blocks-toolbar>
+  <input type="search" placeholder="Rechercher une ressource ou une carte…" aria-label="Rechercher">
+  <div class="segmented" role="group" aria-label="Filtrer les blocs">
+    <a href="#" data-show="" class="active">Tous</a><a href="#" data-show="ko">Avec KO</a><a href="#" data-show="in_progress">En cours</a><a href="#" data-show="todo">À faire</a><a href="#" data-show="done">Terminés</a>
+  </div>
+  <button type="button" class="secondary" data-toggle-all>Tout déplier</button>
+  <span class="muted count-label"></span>
+</div>
+{% for d in deployments %}
+{% if show_client and d.injection_blocks %}<h2>{{ d.client }}</h2>{% endif %}
+<div class="res-blocks">
+{% for b in d.injection_blocks %}
+  {% set choices = dags_for(d.orchestrator, b.resources) %}
+  <details class="res-block worst-{{ b.worst }}" id="{{ d.slug }}-{{ b.id }}" data-groups="{{ b.counts | dictsort | selectattr('1') | map(attribute='0') | join(' ') }}"{% if b.worst == 0 %} open{% endif %}>
+    <summary>
+      <span class="res-name">{% for r in b.resources %}<code class="res">{{ r }}</code> {% else %}<span class="muted">{{ b.label }}</span>{% endfor %}</span>
+      <span class="res-count muted">{{ b.cards | length }} carte(s)</span>
+      <span class="res-bar">{{ charts.segbar("", b.counts, thin=true) }}</span>
+      <span class="res-status">{% for g, n in b.counts.items() if n %}<span class="badge g-{{ g }}">{{ n }} {{ {"todo": "à faire", "in_progress": "en cours", "ko": "KO", "done": "terminé"}[g] }}</span>{% endfor %}</span>
+    </summary>
+    <div class="res-body">
+      {% if choices %}
+      <form class="dag-form" hx-post="/actions/injection/{{ d.slug }}" hx-target="next .dag-out" data-dag-form>
+        <input type="hidden" name="card" value="{{ b.label }}">
+        <span class="muted">Relancer :</span>
+        <select name="dag_id" aria-label="DAG">{% for c in choices %}<option value="{{ c.dag_id }}" title="{{ c.dag_id }}">{{ c.label }}</option>{% endfor %}</select>
+        <select name="padoa_env" aria-label="Stack cible">{% for e in padoa_envs %}<option value="{{ e }}">{{ e }}</option>{% endfor %}</select>
+        <button type="submit">Lancer</button>
+      </form>
+      <div class="dag-out"></div>
+      {% elif b.resources %}<p class="muted">Aucun DAG de {{ d.orchestrator | join(", ") or d.client }} ne traite {{ b.label }}.</p>
+      {% else %}<p class="muted">Ces cartes n'ont pas de ressource liée dans Notion (ni sur la carte, ni sur sa carte Bible).</p>{% endif %}
+      <table>
+        <tbody>
+        {% for a in b.cards %}
+          <tr><td>{% if a.notion_url %}<a href="{{ a.notion_url }}" target="_blank" rel="noopener">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}{% if a.vigilance %} {{ ic.icon("alert", "Point de vigilance", "ic-alert") }}{% endif %}</td>
+            <td><span class="badge g-{{ a.injection_group }}">{{ a.injection_status }}</span></td>
+            <td class="muted">{{ a.due.strftime("%d/%m/%Y") if a.due else "—" }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+{% else %}{% if not d.resources %}<p class="muted">Aucune carte d'injection{% if show_client %} pour {{ d.client }}{% endif %}.</p>{% endif %}{% endfor %}
+</div>
+{% if d.resources %}
+<table>
+  <thead><tr><th>Ressource (fiche)</th><th>Statut</th><th data-nosort>Actions</th></tr></thead>
+  <tbody>
+  {% for r in d.resources %}
+    <tr><td><code class="res">{{ r.name }}</code>{% if r.note %} <span class="muted">{{ r.note }}</span>{% endif %}</td>
+      <td><span class="badge g-{{ r.group }}">{{ r.status }}</span></td>
+      <td class="actions">{% set out = "out-" ~ d.slug ~ "-" ~ r.name %}
+        {% if r.dag_id %}<button hx-post="/actions/dag/{{ r.dag_id }}" hx-target="#{{ out }}" hx-confirm="Déclencher {{ r.dag_id }} ?">Lancer le DAG</button>{% endif %}
+        <button class="secondary" hx-post="/actions/claude/{{ d.slug }}/{{ r.name }}" hx-target="#{{ out }}" hx-confirm="Lancer Claude sur {{ r.name }} ?">Lancer Claude</button>
+        <div id="{{ out }}"></div></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endfor %}
+<script>
+  // Blocs de ressources : recherche, filtre par état, tout déplier ; un lien #<client>-<ressource> ouvre le bloc.
+  (function () {
+    const bar = document.querySelector("[data-blocks-toolbar]"), blocks = [...document.querySelectorAll(".res-block")];
+    if (!bar) return;
+    const search = bar.querySelector("input"), count = bar.querySelector(".count-label"), toggle = bar.querySelector("[data-toggle-all]");
+    let show = "";
+    function apply() {
+      const q = search.value.toLowerCase(); let n = 0;
+      for (const b of blocks) {
+        const ok = (!q || b.textContent.toLowerCase().includes(q)) && (!show || b.dataset.groups.split(" ").includes(show));
+        b.hidden = !ok; n += ok;
+        if (q && ok) b.open = true;
+      }
+      count.textContent = `${n} / ${blocks.length} ressources`;
+    }
+    search.addEventListener("input", apply);
+    bar.querySelectorAll("[data-show]").forEach((a) => a.addEventListener("click", (e) => {
+      e.preventDefault(); show = a.dataset.show;
+      bar.querySelectorAll("[data-show]").forEach((x) => x.classList.toggle("active", x === a)); apply();
+    }));
+    toggle.addEventListener("click", () => {
+      const open = toggle.textContent === "Tout déplier";
+      blocks.forEach((b) => { if (!b.hidden) b.open = open; });
+      toggle.textContent = open ? "Tout replier" : "Tout déplier";
+    });
+    const target = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    if (target && target.classList.contains("res-block")) { target.open = true; target.scrollIntoView({ block: "start" }); }
+    apply();
+  })();
+</script>

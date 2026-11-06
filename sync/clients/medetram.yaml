@@ -1,0 +1,25 @@
+# Client synchronisé depuis Notion par la routine « deploy-hub-sync ».
+slug: medetram
+client: Medetram
+software: à préciser  # « Ancien logiciel » vide dans Notion au 2026-11-04
+page_id: 3ec4976cdfac8113b6fbf0d50dcf0035  # page « Clients en déploiement » (synchro directe par l'API)
+orchestrator: []  # clés client de l'orchestrator ; Medetram n'est pas encore dans dags/config_deployment.py (2026-11-05)
+notion_url: https://app.notion.com/p/padoa/Dashboard-int-gration-Medetram-1f74976cdfac820a949001c436184bc2
+requetes:
+  client: client-medetram.sql
+  actions: actions-medetram.sql
+  recette: recette-medetram.sql
+  regles: regles-medetram.sql
+# Synchro incrémentale : seules les lignes modifiées depuis la dernière synchro (paramètre ? = date).
+deltas:
+  actions: actions-delta-medetram.sql
+  recette: recette-delta-medetram.sql
+# Vérifiées en début de passage : inchangé → client sauté ; modifié → delta ; nombre de lignes changé → complet.
+empreintes:
+  actions: empreinte-actions-medetram.sql
+  recette: recette-empreinte-medetram.sql
+# Stacks Padoa du client, affichées en tête de fiche et sur la vue d'ensemble (lues à chaque page, sans synchro).
+# env : prod, recette, formation… (court, affiché en petit) ; label : nom du bouton.
+stacks: []
+#  - {env: prod, label: Production, url: "https://…"}
+#  - {env: recette, label: Snap recette, url: "https://…"}

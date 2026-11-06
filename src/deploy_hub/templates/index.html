@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% import "_icons.html" as ic %}
+{% block content %}
+{% import "_charts.html" as charts with context %}
+
+<div class="page-head">
+  <h1>Clients</h1>
+<div class="refresh">
+  <button type="button" class="secondary" hx-post="/actions/rafraichir" hx-target="next .refresh-out" hx-indicator="closest .refresh" hx-disabled-elt="this"{% if not notion_ready %} disabled title="Jeton Notion absent : voir README"{% endif %}>{{ ic.icon("sync") }} Tout rafraîchir</button>
+  <span class="refresh-wait muted">Jarvis interroge Notion…</span>
+  <div class="refresh-out"></div>
+</div>
+  <div class="segmented" aria-label="Vues tous clients"><span class="muted">Tous les clients :</span>{% for path, label in cross_pages %}<a href="{{ path }}">{{ label }}</a>{% endfor %}</div>
+</div>
+{% if not deployments %}<p class="muted">Aucune fiche de déploiement trouvée.</p>{% endif %}
+<div class="grid">
+  {% for d in deployments %}
+  <div class="card card-linked">
+    <div class="card-head"><a class="card-link" href="/deploiements/{{ d.slug }}/synthese"><strong>{{ ic.health(d) }} {{ d.client }}</strong></a><span class="badge">{{ d.software }}</span></div>
+    {{ charts.segbar("", d.injection_groups, thin=true) }}
+    <p class="muted">{{ d.progress }} % intégré{% if d.expected_progress is not none %} · attendu {{ d.expected_progress }} %{% endif %}</p>
+    <p class="muted">{{ d.open_retours | length }} retour(s) ouvert(s) · {{ d.vigilance | length }} point(s) de vigilance</p>
+    {% if d.go_live %}
+      <p>Déploiement {{ d.go_live.strftime("%d/%m/%Y") }}
+        <span class="badge {{ 'g-ko' if d.days_left < 14 }}">J{{ '%+d' % (-d.days_left) }}</span></p>
+    {% endif %}
+    {% if d.stacks %}<div class="stacks card-stacks">{% for st in d.stacks %}<a href="{{ st.url }}" target="_blank" rel="noopener" title="{{ st.url }}">{% if st.env %}<span class="env">{{ st.env }}</span>{% endif %}{{ st.label }} ↗</a>{% endfor %}</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

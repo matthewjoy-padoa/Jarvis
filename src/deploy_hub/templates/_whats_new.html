@@ -1,0 +1,25 @@
+{# Attend : changes (sources/journal.Change), since, show_client. #}
+<p class="muted">Depuis le {{ since.strftime("%d/%m à %H:%M") }} · {{ changes | length }} changement(s) noté(s) par la synchro.</p>
+{% if changes %}
+<ul class="changes" data-limit="10">
+  {% for c in changes %}
+  <li class="change" data-client="{{ c.deployment.client }}" data-kind="{{ c.kind }}">
+    <span class="date" title="{{ c.when.strftime('%d/%m/%Y %H:%M') }}">{{ c.when.strftime("%d/%m %H:%M") }}</span>
+    <span class="badge">{{ c.kind }}</span>
+    {% if c.link %}<a href="{{ c.link }}">{{ c.label }}</a>{% else %}{{ c.label }}{% endif %}
+    {% if show_client %}<span class="muted">· {{ c.deployment.client }}</span>{% endif %}
+    <span class="what">
+      {% if c.type == "modifie" and not c.is_text %}
+        {{ c.field_label }} : <s class="muted">{{ c.before if c.before is not none else "vide" }}</s> → <strong>{{ c.after if c.after is not none else "vide" }}</strong>
+      {% else %}<strong>{{ c.verb }}</strong>{% endif %}
+    </span>
+    {% if c.type == "modifie" and c.is_text %}
+    <details class="diff"><summary>voir avant / après</summary>
+      <div class="diff-cols"><div><span class="muted">Avant</span><p>{{ c.before or "—" }}</p></div><div><span class="muted">Après</span><p>{{ c.after or "—" }}</p></div></div>
+    </details>
+    {% endif %}
+    {% if c.notion_url %}<a class="btn-link" href="{{ c.notion_url }}" target="_blank" rel="noopener">Notion ↗</a>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% else %}<p class="muted">Rien à signaler sur cette période. (Le journal de Jarvis démarre à la première synchro qui suit sa mise en place.)</p>{% endif %}

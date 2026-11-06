@@ -1,0 +1,15 @@
+{# Attend : deployments. Notion : « Catalogue RDD ». #}
+{% import "_charts.html" as charts with context %}
+{% for d in deployments if d.regles %}
+{% set ns = namespace(c={}) %}
+{% for r in d.regles %}{% set _ = ns.c.update({(r.type or "Non précisé"): ns.c.get(r.type or "Non précisé", 0) + 1}) %}{% endfor %}
+<div class="chart-row">{{ charts.hbars("Règles par type", ns.c | dictsort(by="value", reverse=true), 6, filter_key="type") }}</div>
+{% endfor %}
+<table data-filterable>
+  <thead><tr><th>Règle</th><th data-filter>Table</th><th data-filter="type">Type</th><th data-filter>Application</th><th data-filter>Statut</th></tr></thead>
+  <tbody>
+  {% for d in deployments %}{% for r in d.regles %}
+    <tr><td>{{ r.title }}</td><td><code>{{ r.resource_table or "—" }}</code></td><td class="muted">{{ r.type }}</td><td class="muted">{{ r.application }}</td><td><span class="badge">{{ r.status }}</span></td></tr>
+  {% else %}<tr><td colspan="5" class="muted">Aucune règle.</td></tr>{% endfor %}{% endfor %}
+  </tbody>
+</table>

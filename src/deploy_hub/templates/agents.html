@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% import "_icons.html" as ic %}
+{% block title %}Agents · Jarvis
+<h2>DAGs lancés</h2>
+<table data-filterable>
+  <thead><tr><th>Lancé à</th><th data-filter="client">Client</th><th>Carte</th><th>DAG</th><th data-filter>Stack</th><th>Résultat</th></tr></thead>
+  <tbody>
+  {% for r in dag_runs %}
+    <tr>
+      <td class="muted">{{ r.started_at.strftime("%d/%m %H:%M") }}</td><td>{{ r.client }}</td><td>{{ r.card }}</td>
+      <td><code>{{ r.dag_id }}</code></td><td><span class="badge {{ 'g-ko' if r.padoa_env == 'prod' }}">{{ r.padoa_env }}</span></td>
+      <td class="muted">{% if r.simulated %}{{ ic.icon("flask", "Simulation", "ic-muted") }} {% endif %}{{ r.result }}</td>
+    </tr>
+  {% else %}<tr><td colspan="6" class="muted">Aucun DAG lancé.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}
+{% block content %}
+<h1>Agents lancés</h1>
+<p class="muted">Lancements de cette exécution de l'app (non conservés au redémarrage).</p>
+<table data-filterable>
+  <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>Sujet</th><th>Branche</th><th data-filter>État</th></tr></thead>
+  <tbody>
+  {% for r in runs %}
+    <tr>
+      <td>{{ r.id }}</td><td class="muted">{{ r.started_at.strftime("%d/%m %H:%M") }}</td>
+      <td><a href="/deploiements/{{ r.slug }}/recette">{{ r.client }}</a></td>
+      <td>{{ r.subject }}<details><summary class="muted">brief</summary><pre>{{ r.prompt }}</pre></details></td>
+      <td><code>{{ r.branch }}</code></td><td><span class="badge">{{ r.status }}</span></td>
+    </tr>
+  {% else %}<tr><td colspan="6" class="muted">Aucun agent lancé.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

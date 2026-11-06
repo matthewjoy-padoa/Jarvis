@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Deadlines · Jarvis{% endblock %}
+{% block content %}
+<h1>Deadlines</h1>
+{% import "_charts.html" as charts with context %}
+{% set ns = namespace(late=0, week=0, month=0) %}
+{% for i in items %}{% set days = (i.date - today).days %}
+  {% if days < 0 and i.kind != "Jalon" %}{% set ns.late = ns.late + 1 %}{% elif 0 <= days <= 7 %}{% set ns.week = ns.week + 1 %}{% elif 7 < days <= 30 %}{% set ns.month = ns.month + 1 %}{% endif %}
+{% endfor %}
+{{ charts.stats([("En retard (actions et retours)", ns.late, "ko"), ("Dans les 7 jours", ns.week, "todo"), ("Entre 8 et 30 jours", ns.month, "")]) }}
+<table data-filterable>
+  <thead><tr><th>Date</th><th data-nosort>Dans</th><th data-filter>Type</th><th>Quoi</th><th data-filter>Client</th></tr></thead>
+  <tbody>
+  {% for i in items %}
+    {% set days = (i.date - today).days %}
+    <tr class="{{ 'past' if days < 0 }}">
+      <td data-sort="{{ i.date.isoformat() }}">{{ i.date.strftime("%d/%m/%Y") }}</td>
+      <td><span class="badge {{ 'danger' if 0 <= days < 7 }}">J{{ '%+d' % (-days) }}</span></td>
+      <td><span class="badge">{{ i.kind }}</span></td>
+      <td>{{ i.label }}</td>
+      <td><a href="/deploiements/{{ i.d.slug }}/synthese">{{ i.d.client }}</a></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="muted">Aucune échéance.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

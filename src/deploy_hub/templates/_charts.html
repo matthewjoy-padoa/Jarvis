@@ -1,0 +1,88 @@
+{# Résumés visuels, rendus côté serveur. Couleurs de statut = celles des badges ; toujours accompagnées d'un libellé. #}
+{% set GROUP_LABELS = {"todo": "À faire", "in_progress": "En cours", "ko": "KO", "done": "Terminé"} %}
+
+{# Attributs qui rendent un élément de graphique cliquable : il applique le filtre key=value (plus scope) au tableau
+   ou à la liste de la page, ou ouvre href avec ces filtres. Voir static/filters.js. #}
+{% macro _clickable(key, value, scope={}, href=None) -%}
+{%- if key and value -%}
+{%- set spec = [key ~ "=" ~ value] + (scope | dictsort | map("join", "=") | list) -%}
+ data-filter-set="{{ spec | join(';') }}"{% if href %} data-filter-href="{{ href }}"{% endif %} role="button" tabindex="0"
+{%- endif -%}
+{%- endmacro %}
+
+{# Barre segmentée : un tout découpé par groupe de statut, légende chiffrée en dessous.
+   filter_key : clé de filtre du groupe (« groupe ») ; scope : filtres ajoutés (ex. client) ; href : page à ouvrir ;
+   hrefs : page à ouvrir pour un groupe donné (ex. les retours terminés, masqués par défaut). #}
+{% macro segbar(title, groups, unit="", thin=false, filter_key=None, scope={}, href=None, hrefs={}) %}
+{% set total = groups.values() | sum %}
+<figure class="chart segbar-chart{{ ' thin' if thin }}"{% if filter_key %} data-filterable-chart title="Clique sur un segment pour filtrer"{% endif %}>
+  {% if title %}<figcaption>{{ title }} <span class="muted">· {{ total }}{{ ' ' ~ unit if unit }}</span></figcaption>{% endif %}
+  {% if total %}
+  <div class="segbar" role="img" aria-label="{{ title }} : {% for g, n in groups.items() if n %}{{ GROUP_LABELS[g] }} {{ n }}{{ ', ' if not loop.last }}{% endfor %}">
+    {% for g, n in groups.items() if n %}
+    <span class="seg g-{{ g }}" style="flex-grow: {{ n }}" title="{{ GROUP_LABELS[g] }} : {{ n }} ({{ (100 * n / total) | round | int }} %)"{{ _clickable(filter_key, g, scope, hrefs.get(g, href)) }}></span>
+    {% endfor %}
+  </div>
+  {% if not thin %}
+  <ul class="legend">
+    {% for g, n in groups.items() %}
+    <li class="{{ 'zero' if not n }}"{{ _clickable(filter_key, g, scope, hrefs.get(g, href)) if n }}><span class="key g-{{ g }}"></span>{{ GROUP_LABELS[g] }} <strong>{{ n }}</strong>{% if n %} <span class="muted">{{ (100 * n / total) | round | int }} %</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% else %}
+  <p class="muted">Rien pour l'instant.</p>
+  {% endif %}
+</figure>
+{% endmacro %}
+
+{# Barres horizontales : classement d'une seule mesure, valeur au bout de la barre. filter_key, scope, href : comme segbar. #}
+{% macro hbars(title, items, limit=6, filter_key=None, scope={}, href=None) %}
+{% set shown = items[:limit] %}
+{% set top = (shown | map(attribute=1) | max) if shown else 0 %}
+<figure class="chart"{% if filter_key %} data-filterable-chart title="Clique sur une barre pour filtrer"{% endif %}>
+  <figcaption>{{ title }}</figcaption>
+  {% if shown %}
+  <ul class="hbars">
+    {% for label, n in shown %}
+    <li title="{{ label }} : {{ n }}"{{ _clickable(filter_key, label if label != "Non précisé" else "", scope, href) }}>
+      <span class="hbar-label">{{ label }}</span>
+      <span class="hbar-track"><span class="hbar" style="width: {{ (100 * n / top) | round(1) }}%"></span></span>
+      <span class="hbar-value">{{ n }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% if items | length > limit %}<p class="muted">+ {{ items | length - limit }} autre(s)</p>{% endif %}
+  {% else %}
+  <p class="muted">Rien pour l'instant.</p>
+  {% endif %}
+</figure>
+{% endmacro %}
+
+{# Frise du projet : jalons et position d'aujourd'hui entre le début et le déploiement. #}
+{% macro timeline(t) %}
+{% if t %}
+<figure class="chart">
+  <figcaption>Avancement dans le calendrier <span class="muted">· {{ t.start.strftime("%d/%m/%Y") }} → {{ t.end.strftime("%d/%m/%Y") }}</span></figcaption>
+  <div class="tl" role="img" aria-label="Aujourd'hui à {{ t.today | round | int }} % du calendrier">
+    <div class="tl-track"><div class="tl-elapsed" style="width: {{ t.today }}%"></div></div>
+    {% for label, day, pos in t.marks %}
+    <span class="tl-mark" style="left: {{ pos }}%" title="{{ label }} : {{ day.strftime('%d/%m/%Y') }}"></span>
+    {% endfor %}
+    <span class="tl-today{{ ' end' if t.today > 80 }}" style="left: {{ t.today }}%" title="Aujourd'hui"><span>Aujourd'hui</span></span>
+  </div>
+  <ol class="tl-legend">
+    {% for label, day, pos in t.marks %}<li class="{{ 'past' if day < today }}"><span class="date">{{ day.strftime("%d/%m") }}</span> {{ label }}</li>{% endfor %}
+  </ol>
+</figure>
+{% endif %}
+{% endmacro %}
+
+{# Chiffres clés : une valeur et son libellé, avec un ton facultatif (ko pour une alerte). #}
+{% macro stats(items) %}
+<div class="stats">
+  {% for label, value, tone in items %}
+  <div class="stat{{ ' stat-' ~ tone if tone and value }}"><strong>{{ value }}</strong><span>{{ label }}</span></div>
+  {% endfor %}
+</div>
+{% endmacro %}

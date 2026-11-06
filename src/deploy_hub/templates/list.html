@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · Jarvis{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ title }} <span class="muted">· tous les clients</span></h1>
+  <div class="segmented" aria-label="Vues tous clients">{% for path, label in cross_pages %}<a href="{{ path }}" class="{{ 'active' if path == active }}">{{ label }}</a>{% endfor %}</div>
+</div>
+{% with show_client = true %}{% include "_" ~ part ~ ".html" %}{% endwith %}
+{% endblock %}

@@ -1,0 +1,28 @@
+{% import "_icons.html" as ic %}
+{# Attend : d. Notion : fiche « Clients en déploiement » + points de vigilance. Jalons dans la frise ; liens en tête de fiche. #}
+{% import "_charts.html" as charts with context %}
+<div class="kpis">
+  <div class="kpi"><span class="muted">Avancement</span><strong>{{ d.progress }} %</strong>
+    {% if d.expected_progress is not none %}<span class="muted">attendu {{ d.expected_progress }} % ({{ '%+d' % (d.progress - d.expected_progress) }} pts)</span>{% endif %}</div>
+  {% if d.days_to_freeze is not none %}<div class="kpi"><span class="muted">Freeze</span><strong>J{{ '%+d' % (-d.days_to_freeze) }}</strong></div>{% endif %}
+  <a class="kpi kpi-link" href="/deploiements/{{ d.slug }}/recette"><span class="muted">Retours ouverts</span><strong>{{ d.open_retours | length }}</strong><span class="muted">voir la recette →</span></a>
+  <a class="kpi kpi-link" href="/deploiements/{{ d.slug }}/actions"><span class="muted">Points de vigilance</span><strong>{{ d.vigilance | length }}</strong><span class="muted">voir les actions →</span></a>
+</div>
+
+{{ charts.timeline(d.timeline) }}
+{% if not d.timeline and milestones %}
+<section class="panel"><h2>Jalons</h2><ul class="timeline">{% for label, day in milestones %}<li class="{{ 'past' if day < today }}"><span class="date">{{ day.strftime("%d/%m/%Y") }}</span> {{ label }}</li>{% endfor %}</ul></section>
+{% endif %}
+<div class="chart-row">
+  {{ charts.segbar("Injections (cartes)", d.injection_groups, "cartes", filter_key="groupe", href="/deploiements/" ~ d.slug ~ "/injections") }}
+  {% set recette = "/deploiements/" ~ d.slug ~ "/recette" %}
+  {{ charts.segbar("Retours de recette", d.retour_groups, "retours", filter_key="groupe", href=recette, hrefs={"done": recette ~ "?tous=true"}) }}
+</div>
+
+<section class="panel">
+  <h2>{{ ic.icon("alert", "", "ic-alert") }} Points de vigilance</h2>
+  <ul class="plain">
+    {% for a in d.vigilance %}<li>{% if a.notion_url %}<a href="{{ a.notion_url }}" target="_blank" rel="noopener">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}{% if a.due %} <span class="muted">· {{ a.due.strftime("%d/%m") }}</span>{% endif %}{% if a.comment %} <span class="muted">· {{ a.comment }}</span>{% endif %}</li>
+    {% else %}<li class="muted">Aucun.</li>{% endfor %}
+  </ul>
+</section>

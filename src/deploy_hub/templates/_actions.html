@@ -1,0 +1,31 @@
+{% import "_icons.html" as ic %}
+{# Attend : deployments, show_client, show_all. Notion : « Actions de déploiement » ; par défaut les actives (vigilance, dates clés, échéances à J-7/J+30, en cours). #}
+{% import "_charts.html" as charts with context %}
+{% set ns = namespace(late=0, week=0, vig=0, evt=0) %}
+{% for d in deployments %}{% for a in d.actions if a.group != "done" %}
+  {% if a.due and a.due < today %}{% set ns.late = ns.late + 1 %}{% elif a.due and (a.due - today).days <= 7 %}{% set ns.week = ns.week + 1 %}{% endif %}
+  {% if a.vigilance %}{% set ns.vig = ns.vig + 1 %}{% endif %}{% if a.event %}{% set ns.evt = ns.evt + 1 %}{% endif %}
+{% endfor %}{% endfor %}
+{{ charts.stats([("En retard", ns.late, "ko"), ("À échéance sous 7 jours", ns.week, "todo"), ("Points de vigilance", ns.vig, "ko"), ("Dates clés à venir", ns.evt, "")]) }}
+{% set base = request.url.path %}
+<div class="segmented" role="group" aria-label="Actions affichées">
+  <a href="{{ base }}" class="{{ 'active' if not show_all }}" title="Vigilance, dates clés, en cours, échéance entre J-7 et J+30">Actives</a><a href="{{ base }}?tous=true" class="{{ 'active' if show_all }}">Toutes</a>
+</div>
+{% set has_owner = deployments | map(attribute="actions") | sum(start=[]) | selectattr("owner") | list | length > 0 %}
+<table data-filterable>
+  <thead><tr>{% if show_client %}<th data-filter>Client</th>{% endif %}<th>Intitulé</th><th data-filter="equipe" data-multi>Équipe</th><th data-filter>Statut</th><th data-filter>Injection</th>{% if has_owner %}<th data-filter>Responsable</th>{% endif %}<th>Deadline</th></tr></thead>
+  <tbody>
+  {% for d in deployments %}{% for a in (d.actions if show_all else d.active_actions) %}
+    <tr class="{{ 'done' if a.group == 'done' }}">
+      {% if show_client %}<td><a href="/deploiements/{{ d.slug }}/actions">{{ d.client }}</a></td>{% endif %}
+      <td>{% if a.vigilance %}{{ ic.icon("alert", "Point de vigilance", "ic-alert") }} {% endif %}{% if a.event %}{{ ic.icon("flag", "Date clé", "ic-muted") }} {% endif %}{% if a.notion_url %}<a href="{{ a.notion_url }}" target="_blank" rel="noopener">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}
+        {% if a.comment %}<br><span class="muted">{{ a.comment }}</span>{% endif %}</td>
+      <td data-values="{{ a.teams | join('|') if a.teams else 'Sans équipe' }}">{% for t in a.teams %}<span class="team team-{{ t | lower }}">{{ t }}</span>{% else %}<span class="muted">—</span>{% endfor %}</td>
+      <td><span class="badge g-{{ a.group }}">{{ a.status }}</span></td>
+      <td>{% if a.injection_status %}<span class="badge g-{{ a.injection_group }}">{{ a.injection_status }}</span>{% else %}—{% endif %}</td>
+      {% if has_owner %}<td class="muted">{{ a.owner or "—" }}</td>{% endif %}
+      <td class="muted" data-sort="{{ a.due.isoformat() if a.due else '' }}">{{ a.due.strftime("%d/%m/%Y") if a.due else "—" }}</td>
+    </tr>
+  {% else %}{% endfor %}{% endfor %}
+  </tbody>
+</table>

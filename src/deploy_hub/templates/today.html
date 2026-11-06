@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% import "_icons.html" as ic %}
+{% block title %}Accueil · Jarvis{% endblock %}
+{% block content %}
+{% import "_charts.html" as charts with context %}
+{% set days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"] %}
+{% set months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"] %}
+{% set hour = now.hour %}
+<div class="page-head">
+  <div>
+    <h1>{{ "Bonsoir" if hour >= 18 or hour < 5 else "Bonjour" }}. <span class="muted">{{ days[today.weekday()] | capitalize }} {{ today.day }} {{ months[today.month - 1] }}</span></h1>
+    <p class="jarvis-line">
+      {% if late or ko or due_today %}Jarvis a relevé
+        {%- if late %} <strong>{{ late | length }}</strong> élément(s) en retard{% endif %}
+        {%- if due_today %}{{ "," if late }} <strong>{{ due_today | length }}</strong> échéance(s) aujourd'hui{% endif %}
+        {%- if ko %}{{ " et" if late or due_today }} <strong>{{ ko | length }}</strong> injection(s) KO{% endif %}. Par quoi commence-t-on ?
+      {% else %}Tous les systèmes sont au vert. Rien d'urgent aujourd'hui.{% endif %}
+    </p>
+  </div>
+</div>
+{{ charts.stats([("En retard", late | length, "ko"), ("À échéance aujourd'hui", due_today | length, "todo"), ("Dans les 7 jours", due_week | length, ""), ("Injections KO", ko | length, "ko")]) }}
+
+<section class="panel" id="whats-new">
+  <div class="panel-head">
+    <h2>Quoi de neuf</h2>
+    <div class="segmented" role="group" aria-label="Période">
+      <a href="#" data-since="visit" class="active">Depuis ma dernière visite</a><a href="#" data-since="1">24 h</a><a href="#" data-since="7">7 jours</a>
+      <button type="button" class="secondary" id="mark-seen" title="Les changements actuels ne seront plus affichés comme nouveaux">Tout marquer comme vu</button>
+    </div>
+  </div>
+  <div id="whats-new-body" hx-get="/quoi-de-neuf" hx-trigger="load-changes from:body" hx-swap="innerHTML"><p class="muted">Jarvis consulte le journal…</p></div>
+</section>
+
+<div class="two-col">
+  <section class="panel">
+    <h2>À traiter</h2>
+    {% set groups = [("En retard", late), ("Aujourd'hui", due_today), ("Dans les 7 jours", due_week)] %}
+    {% for title, items in groups if items %}
+    <h3 class="list-title">{{ title }} <span class="muted">· {{ items | length }}</span></h3>
+    <ul class="todo" data-limit="5">
+      {% for i in items %}
+      <li>
+        <span class="date {{ 'late' if i.date < today }}">{{ i.date.strftime("%d/%m") }}</span>
+        <span class="badge">{{ i.kind }}</span>
+        {% if i.url %}<a href="{{ i.url }}"{% if i.url.startswith('http') %} target="_blank" rel="noopener"{% endif %}>{{ i.label }}</a>{% else %}{{ i.label }}{% endif %}
+        {% if i.action and i.action.vigilance %}{{ ic.icon("alert", "Point de vigilance", "ic-alert") }}{% endif %}
+        <span class="muted">· {{ i.d.client }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="muted">Rien en retard ni à échéance cette semaine. Jarvis reste en veille.</p>{% endfor %}
+  </section>
+  <section>
+    <section class="panel">
+      <h2>Injections KO <span class="muted">· {{ ko | length }}</span></h2>
+      <ul class="todo" data-limit="5">
+        {% for d, a in ko %}
+        <li><span class="badge g-ko">{{ a.injection_status }}</span>
+          {% if a.notion_url %}<a href="{{ a.notion_url }}" target="_blank" rel="noopener">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}
+          <span class="muted">· {% for r in a.resources %}<code class="res">{{ r }}</code> {% endfor %}{{ d.client }}</span>
+          <a class="btn-link" href="/deploiements/{{ d.slug }}/injections#{{ d.slug }}-{{ a.resources | join('-') or 'sans-ressource' }}">Relancer ↗</a></li>
+        {% else %}<li class="muted">Aucune injection KO. Tous les systèmes sont opérationnels.</li>{% endfor %}
+      </ul>
+    </section>
+    <section class="panel">
+      <h2>Prochains jalons <span class="muted">· 3 semaines</span></h2>
+      <ul class="todo" data-limit="5">
+        {% for i in milestones %}<li><span class="date">{{ i.date.strftime("%d/%m") }}</span> <a href="{{ i.url }}">{{ i.label }}</a> <span class="muted">· {{ i.d.client }} · J{{ '%+d' % -((i.date - today).days) }}</span></li>
+        {% else %}<li class="muted">Aucun jalon dans les 3 semaines.</li>{% endfor %}
+      </ul>
+    </section>
+  </section>
+</div>
+
+<script>
+  // « Dernière visite » : mémorisée dans le navigateur quand on clique « Tout marquer comme vu ».
+  (function () {
+    const KEY = "deploy-hub-last-seen", body = document.getElementById("whats-new-body");
+    const get = () => { try { return localStorage.getItem(KEY); } catch (e) { return null; } };
+    let mode = "visit";
+    function load() {
+      const since = mode === "visit" ? (get() || new Date(Date.now() - 864e5).toISOString())
+                                     : new Date(Date.now() - Number(mode) * 864e5).toISOString();
+      body.setAttribute("hx-get", "/quoi-de-neuf?depuis=" + encodeURIComponent(since));
+      htmx.process(body);
+      htmx.trigger(document.body, "load-changes");
+    }
+    document.querySelectorAll("#whats-new [data-since]").forEach((a) => a.addEventListener("click", (e) => {
+      e.preventDefault();
+      mode = a.dataset.since;
+      document.querySelectorAll("#whats-new [data-since]").forEach((x) => x.classList.toggle("active", x === a));
+      load();
+    }));
+    document.getElementById("mark-seen").addEventListener("click", () => {
+      try { localStorage.setItem(KEY, new Date().toISOString()); } catch (e) {}
+      load();
+    });
+    document.addEventListener("DOMContentLoaded", load);
+  })();
+</script>
+{% endblock %}

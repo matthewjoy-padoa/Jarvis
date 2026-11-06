@@ -1,0 +1,11 @@
+{# Attend : deployments. Notion : « Remontées Opsbot » (Slack), filtrées sur la reprise de données. #}
+<table data-filterable>
+  <thead><tr><th>Remontée</th><th data-filter>Contexte</th><th data-filter>Statut</th><th>Posté le</th><th data-nosort>Slack</th></tr></thead>
+  <tbody>
+  {% for d in deployments %}{% for r in d.remontees %}
+    <tr><td>{{ r.title }}</td><td class="muted">{{ r.contexte }}</td><td><span class="badge">{{ r.status }}</span></td>
+      <td class="muted" data-sort="{{ r.posted.isoformat() if r.posted else '' }}">{{ r.posted.strftime("%d/%m/%Y") if r.posted else "—" }}</td>
+      <td>{% if r.slack_url %}<a href="{{ r.slack_url }}" target="_blank" rel="noopener">Ouvrir</a>{% else %}—{% endif %}</td></tr>
+  {% else %}<tr><td colspan="5" class="muted">Aucune remontée.</td></tr>{% endfor %}{% endfor %}
+  </tbody>
+</table>
