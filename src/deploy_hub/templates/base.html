@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=35">
+  <link rel="stylesheet" href="/static/style.css?v=37">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=3" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
@@ -48,7 +48,7 @@
         {% for d in clients %}
         <a href="/deploiements/{{ d.slug }}" class="client-chip h-{{ d.health_level }} {{ 'active' if active == '/deploiements/' ~ d.slug }}"
            title="{{ d.client }} · {{ d.progress }} % intégré{% if d.go_live %} · déploiement le {{ d.go_live.strftime('%d/%m/%Y') }}{% endif %}">
-          <span class="dot" aria-hidden="true"></span>{{ d.client }}{% if d.go_live and d.days_left >= 0 %}<span class="jx">J-{{ d.days_left }}</span>{% endif %}</a>
+          <span class="dot" aria-hidden="true"></span><span class="client-name">{{ d.client }}</span>{% if d.go_live and d.days_left >= 0 %}<span class="jx {{ 'soon' if d.days_left < 14 }}">J-{{ d.days_left }}</span>{% endif %}</a>
         {% endfor %}
       </div>
       {% endif %}
