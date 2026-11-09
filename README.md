@@ -63,6 +63,55 @@ L'onglet Injections propose, pour chaque carte, les DAGs de l'orchestrator qui t
 - **Catalogue des DAGs** : `sync/dags/catalogue.json`, généré depuis un clone de l'orchestrator. À régénérer quand `dags/config_deployment.py` change (commande en tête de [`sync/dags/generer_catalogue.py`](sync/dags/generer_catalogue.py)).
 - Pour réactiver la prod : ajouter `"prod"` à `PADOA_ENVS` dans `src/deploy_hub/sources/airflow.py` (il faut alors taper PROD pour confirmer chaque lancement).
 
+## Lancer des agents Claude
+
+Sur un retour de recette, « Lancer un agent » envoie le brief (relu et modifiable) à Claude Code en mode headless. Avec `JARVIS_MODE=live` :
+
+1. Jarvis crée un **worktree** de l'orchestrator depuis `origin/main`, sur la branche `fix-<client>-<retour>` (sous `<ORCHESTRATOR_DIR>/.claude/worktrees/jarvis/`). Ton clone de travail n'est jamais modifié. Relancé sur la même branche, l'agent reprend le même worktree.
+2. Il lance `claude -p` dans ce worktree, brief sur l'entrée standard, sortie dans `data/agents/<id>.jsonl`.
+3. La page **Agents** suit chaque agent : état, journal mis à jour toutes les 5 s, compte rendu, lien de la PR détecté, bouton « Arrêter ». Une notification arrive à la fin.
+
+Ce que l'agent peut faire :
+- il charge comme une session normale ton `~/.claude/CLAUDE.md`, tes hooks et le `CLAUDE.md` du dépôt (pas d'option `--bare`) ;
+- il ne lit hors de son worktree que les dossiers de `JARVIS_AGENT_ADD_DIRS` ;
+- ses outils sont limités à `JARVIS_AGENT_ALLOWED_TOOLS` (par défaut : lire, modifier, `uv run`, git sans reset ni checkout, `gh pr create`). Tout autre appel est refusé, sans question, puisqu'il n'y a personne pour répondre. Ces règles filtrent le texte des commandes : ce n'est pas une barrière de sécurité, d'où l'intérêt d'un hook qui bloque le push sur main ;
+- les jetons de Jarvis (`NOTION_TOKEN`, `AIRFLOW_*`) ne lui sont pas transmis.
+
+Prérequis : Claude Code installé et connecté (`claude` une fois en interactif), `gh` connecté pour ouvrir la PR. Les worktrees ne sont pas supprimés : `git worktree remove <chemin>` quand la PR est mergée.
+
+## Faire tourner Jarvis sur une VM
+
+Utile pour que les agents travaillent sans ton poste : Jarvis tourne en service systemd utilisateur sur la VM, tu l'ouvres depuis ton poste par un transfert de port.
+
+1. **Cloner et installer**, sur la VM :
+   ```bash
+   cd ~/Dev && gh repo clone <organisation>/Jarvis && cd Jarvis && uv sync
+   ```
+2. **Copier ta configuration et tes données**, depuis ton poste (l'historique des agents reste propre à chaque machine) :
+   ```bash
+   rsync -a --exclude agents/ config data <vm>:Dev/Jarvis/
+   ```
+3. **Installer le service**, sur la VM. Les réglages non secrets vont dans un complément du service :
+   ```bash
+   mkdir -p ~/.config/systemd/user/jarvis.service.d && cp ~/Dev/Jarvis/deploy/jarvis.service ~/.config/systemd/user/
+   printf '[Service]\nEnvironment=JARVIS_MODE=live\nEnvironment=ORCHESTRATOR_DIR=%%h/Dev/integration-orchestrator\nEnvironment=CLAUDE_BIN=%%h/Dev/Jarvis/deploy/claude-vscode.sh\nEnvironment=JARVIS_AGENT_ADD_DIRS=%%h/Documents/Claude_vault\nEnvironment=AIRFLOW_BASE_URL=http://localhost:8888\n' > ~/.config/systemd/user/jarvis.service.d/vm.conf
+   systemctl --user daemon-reload && systemctl --user enable --now jarvis
+   ```
+   Adapte les chemins et l'adresse d'Airflow à ta VM. `JARVIS_AGENT_ADD_DIRS` est facultatif : c'est le dossier de notes que l'agent peut lire en plus de son worktree.
+4. **Garder le service actif** quand tu te déconnectes (sinon il s'arrête avec ta session SSH) :
+   ```bash
+   loginctl enable-linger $USER
+   ```
+5. **Secrets** : mets `AIRFLOW_USER`, `AIRFLOW_PASSWORD` et, si besoin, `NOTION_TOKEN` dans `~/Dev/Jarvis/.env`, puis `systemctl --user restart jarvis`.
+6. **Ouvrir Jarvis depuis ton poste** : transfert du port 8765, par l'onglet Ports de VS Code (Remote-SSH) ou `ssh -L 8765:localhost:8765 <vm>`, puis http://localhost:8765.
+
+Bon à savoir :
+- **Binaire Claude** : sans installation de Claude Code sur la VM, `deploy/claude-vscode.sh` utilise celui de l'extension VS Code Remote-SSH, en prenant toujours la version la plus récente (son chemin change à chaque mise à jour). Claude doit être connecté sur la VM (`~/.claude/.credentials.json`).
+- **Ce que l'agent charge** : tes `~/.claude/CLAUDE.md` et hooks de la VM, comme une session normale. Un hook de fin de session (synchro de notes, par exemple) s'exécute donc aussi à la fin de chaque agent.
+- **Synchro Notion** : la routine Claude Code de ton poste écrit dans le `data/` de ton poste, pas dans celui de la VM. Sur la VM, utilise le jeton Notion (« Rafraîchir depuis Notion ») ou recopie `data/` (étape 2).
+- **Suivi** : `systemctl --user status jarvis` et `journalctl --user -u jarvis -f`.
+- **Mise à jour** : `git pull && uv sync && systemctl --user restart jarvis`.
+
 ## Données et confidentialité
 
 - **Rien de ce qui vient de Notion n'est versionné** : `data/` (fiches, caches, journal des changements, notifications) et `config/` sont exclus de git.
@@ -78,7 +127,7 @@ Tous facultatifs, voir [`.env.example`](.env.example) :
 | `JARVIS_CONFIG_DIR`, `JARVIS_DATA_DIR` | Emplacement de la configuration et des données (par défaut `./config` et `./data`) |
 | `NOTION_TOKEN` | Active « Rafraîchir depuis Notion » |
 | `AIRFLOW_BASE_URL`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD` | Lancement réel des DAGs |
-| `ORCHESTRATOR_DIR`, `JARVIS_MODE` | Lancement réel des agents Claude (à brancher) |
+| `ORCHESTRATOR_DIR`, `JARVIS_MODE`, `CLAUDE_BIN`, `JARVIS_AGENT_*` | Lancement réel des agents Claude (section ci-dessus) |
 
 ## Développement
 
@@ -99,6 +148,6 @@ uv run uvicorn deploy_hub.main:app --port 8765 --reload --reload-dir src
 
 ## Limites connues
 
-- Le lancement réel des agents Claude n'est pas encore branché (simulé).
+- L'historique des DAGs lancés n'est pas conservé au redémarrage (celui des agents l'est).
 - En synchro incrémentale, un changement fait uniquement sur une carte Bible n'est vu qu'à la synchro complète suivante (7 jours au plus).
 - Les notifications du navigateur ne s'affichent que tant qu'un onglet de l'app est ouvert.

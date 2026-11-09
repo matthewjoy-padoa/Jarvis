@@ -35,6 +35,9 @@ def deployments_dir(root: Path = PROJECT_ROOT) -> Path:
     return data_dir(root) / "deploiements"
 
 
+ENV_FILE_KEYS: set[str] = set()  # variables venues du .env : réglages de Jarvis, jamais transmis aux agents
+
+
 def load_env_file(path: Path | None = None) -> None:
     """Variables de .env (non versionné) ajoutées à l'environnement, sans écraser celles déjà définies."""
     path = path or Path(os.getenv("JARVIS_ENV_FILE") or PROJECT_ROOT / ".env")
@@ -43,8 +46,9 @@ def load_env_file(path: Path | None = None) -> None:
     for line in path.read_text(encoding="utf-8").splitlines():
         key, sep, value = line.partition("=")
         key = key.strip()
-        if sep and key and not key.startswith("#"):
-            os.environ.setdefault(key, value.split(" #")[0].strip().strip('"').strip("'"))
+        if sep and key and not key.startswith("#") and key not in os.environ:  # l'environnement garde la main
+            ENV_FILE_KEYS.add(key)
+            os.environ[key] = value.split(" #")[0].strip().strip('"').strip("'")
 
 
 def load_settings() -> Settings:
