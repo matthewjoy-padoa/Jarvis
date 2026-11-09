@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from deploy_hub import client_config
-from deploy_hub.config import PROJECT_ROOT, clients_dir, load_settings
+from deploy_hub.config import PROJECT_ROOT, clients_dir, data_dir, load_settings
 from deploy_hub.models import DONE, INJECTION_STATUSES, MILESTONE_LABELS, Deployment, status_group
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
@@ -29,7 +29,7 @@ live = settings.mode == "live"
 fiches = FicheSource(settings.deployments_dir, clients_dir())
 airflow = AirflowSource.from_env()
 notifications = NotificationStore(Path(os.getenv("DEPLOY_HUB_NOTIFICATIONS") or settings.deployments_dir.parent / "notifications.json"))
-claude = ClaudeRunner(settings.orchestrator_dir, live=live, notifications=notifications)
+claude = ClaudeRunner.from_env(settings.orchestrator_dir, live, notifications, data_dir() / "agents")
 _refresh_lock = threading.Lock()  # un seul rafraîchissement Notion à la fois
 
 app = FastAPI(title="Jarvis")
@@ -224,7 +224,34 @@ def deadlines(request: Request):
 
 @app.get("/agents", response_class=HTMLResponse)
 def agents(request: Request):
-    return _render(request, "agents.html", "/agents", runs=claude.runs, dag_runs=airflow.runs)
+    return _render(request, "agents.html", "/agents", runs=claude.runs, dag_runs=airflow.runs, live=claude.live)
+
+
+def _run_or_404(run_id: int):
+    run = claude.get(run_id)
+    if not run:
+        raise HTTPException(404, f"Agent #{run_id} inconnu")
+    return run
+
+
+@app.get("/agents/{run_id}", response_class=HTMLResponse)
+def agent_detail(request: Request, run_id: int):
+    run = _run_or_404(run_id)
+    return _render(request, "agent.html", "/agents", run=run, log=claude.log(run))
+
+
+@app.get("/agents/{run_id}/journal", response_class=HTMLResponse)
+def agent_journal(request: Request, run_id: int):
+    """Rafraîchi toutes les 5 s par la page de l'agent tant qu'il travaille."""
+    run = _run_or_404(run_id)
+    return templates.TemplateResponse(request, "_agent_log.html", {"run": run, "log": claude.log(run)})
+
+
+@app.post("/agents/{run_id}/arreter")
+def agent_stop(run_id: int):
+    _run_or_404(run_id)
+    claude.stop(run_id)
+    return RedirectResponse(f"/agents/{run_id}", status_code=303)
 
 
 @app.get("/sources", response_class=HTMLResponse)

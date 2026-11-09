@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Agent #{{ run.id }} · Jarvis{% endblock %}
+{% block content %}
+<p class="muted"><a href="/agents">← Agents</a></p>
+<div class="page-head">
+  <h1>Agent #{{ run.id }} · {{ run.client }}</h1>
+</div>
+<dl class="meta-list">
+  <dt>Sujet</dt><dd><a href="/deploiements/{{ run.slug }}/recette">{{ run.subject }}</a></dd>
+  <dt>Branche</dt><dd><code>{{ run.branch }}</code></dd>
+  {% if run.worktree %}<dt>Worktree</dt><dd><code>{{ run.worktree }}</code></dd>{% endif %}
+  <dt>Lancé</dt><dd>{{ run.started_at.strftime("%d/%m/%Y %H:%M") }}{% if run.ended_at %} · fini à {{ run.ended_at.strftime("%H:%M") }}{% endif %}</dd>
+</dl>
+{% include "_agent_log.html" %}
+<details class="panel"><summary>Brief envoyé à l'agent</summary><pre>{{ run.prompt }}</pre></details>
+{% endblock %}

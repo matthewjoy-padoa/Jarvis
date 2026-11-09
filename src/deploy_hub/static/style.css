@@ -91,13 +91,13 @@ code { font-size: 12px; }
 .retour { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin: 12px 0; }
 .retour.done { opacity: .6; }
 .retour header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.retour dl { display: grid; grid-template-columns: 160px 1fr; gap: 4px 12px; margin: 12px 0; font-size: 14px; }
-.retour dt { color: var(--muted); }
-.retour dd { margin: 0; }
+.retour dl, .meta-list { display: grid; grid-template-columns: 160px 1fr; gap: 4px 12px; margin: 12px 0; font-size: 14px; }
+.retour dt, .meta-list dt { color: var(--muted); }
+.retour dd, .meta-list dd { margin: 0; }
 details summary { cursor: pointer; font-size: 13px; color: var(--muted); margin-top: 8px; }
 pre { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-size: 12px; }
 .count { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 99px; background: var(--danger); color: #fff; font-size: 11px; text-align: center; }
-@media (max-width: 700px) { .retour dl { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .retour dl, .meta-list { grid-template-columns: 1fr; } }
 .nav { scrollbar-width: none; } .nav::-webkit-scrollbar { display: none; }
 .counts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 16px; }
 .agent-form { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
@@ -459,3 +459,11 @@ button .ic { margin-right: 2px; }
 .req { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--bg); border-radius: 999px; padding: 1px 7px; margin-left: 4px; }
 .form-actions { display: flex; gap: 10px; align-items: center; margin-top: 6px; }
 .danger-zone { max-width: 860px; border-color: var(--pa-ko); }
+
+/* Agents : page d'un agent et son journal */
+.agent-log { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.agent-log li { display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: start; }
+.agent-log pre, .agent-summary { margin: 0; word-break: break-word; font-size: 13px; }
+.log-kind { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding-top: 2px; }
+.log-outil pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
+.log-refus pre, .log-brut pre { color: var(--danger); }

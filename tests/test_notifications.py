@@ -63,11 +63,11 @@ def test_new_open_retour_is_urgent_and_far_deadline_is_not():
 
 
 def test_agent_end_is_notified(store, tmp_path):
-    runner = ClaudeRunner(tmp_path, notifications=store)
+    runner = ClaudeRunner(tmp_path, tmp_path / "agents", notifications=store)
     d = Deployment(slug="acme", client="Acme", software="Uegar", retours=[RetourRecette(id="01DB10", status="À faire")])
     runner.launch_retour(d, d.retours[0], prompt="brief")
     note = store.all()[0]
-    assert note.kind == "agent" and note.title == "Agent #1 terminé (simulé) · Acme" and runner.runs[0].status == "terminé (simulé)"
+    assert note.kind == "agent" and note.title == "Agent #1 terminé (simulé) · Acme" and runner.runs[0].status == "terminé" and runner.runs[0].simulated
 
 
 @pytest.fixture

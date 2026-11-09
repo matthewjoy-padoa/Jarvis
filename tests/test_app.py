@@ -326,3 +326,15 @@ def test_env_file_settings_are_read(tmp_path, monkeypatch):
     load_env_file(tmp_path / ".env")
     assert os.environ["JARVIS_DATA_DIR"] == "/tmp/ailleurs"
     monkeypatch.delenv("JARVIS_DATA_DIR")
+
+
+def test_agent_page_shows_status_brief_and_log():
+    claude.runs.clear()
+    client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief de la page agent"})
+    run = claude.runs[0]
+    assert f'href="/agents/{run.id}"' in client.get("/agents").text
+    page = client.get(f"/agents/{run.id}")
+    assert page.status_code == 200 and "Brief de la page agent" in page.text and "terminé (simulé)" in page.text
+    assert "every 5s" not in page.text  # fini : plus de rafraîchissement
+    assert client.get(f"/agents/{run.id}/journal").status_code == 200
+    assert client.get("/agents/9999").status_code == 404

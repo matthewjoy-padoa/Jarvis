@@ -63,6 +63,22 @@ L'onglet Injections propose, pour chaque carte, les DAGs de l'orchestrator qui t
 - **Catalogue des DAGs** : `sync/dags/catalogue.json`, généré depuis un clone de l'orchestrator. À régénérer quand `dags/config_deployment.py` change (commande en tête de [`sync/dags/generer_catalogue.py`](sync/dags/generer_catalogue.py)).
 - Pour réactiver la prod : ajouter `"prod"` à `PADOA_ENVS` dans `src/deploy_hub/sources/airflow.py` (il faut alors taper PROD pour confirmer chaque lancement).
 
+## Lancer des agents Claude
+
+Sur un retour de recette, « Lancer un agent » envoie le brief (relu et modifiable) à Claude Code en mode headless. Avec `JARVIS_MODE=live` :
+
+1. Jarvis crée un **worktree** de l'orchestrator depuis `origin/main`, sur la branche `fix-<client>-<retour>` (sous `<ORCHESTRATOR_DIR>/.claude/worktrees/jarvis/`). Ton clone de travail n'est jamais modifié. Relancé sur la même branche, l'agent reprend le même worktree.
+2. Il lance `claude -p` dans ce worktree, brief sur l'entrée standard, sortie dans `data/agents/<id>.jsonl`.
+3. La page **Agents** suit chaque agent : état, journal mis à jour toutes les 5 s, compte rendu, lien de la PR détecté, bouton « Arrêter ». Une notification arrive à la fin.
+
+Ce que l'agent peut faire :
+- il charge comme une session normale ton `~/.claude/CLAUDE.md`, tes hooks et le `CLAUDE.md` du dépôt (pas d'option `--bare`) ;
+- il ne lit hors de son worktree que les dossiers de `JARVIS_AGENT_ADD_DIRS` ;
+- ses outils sont limités à `JARVIS_AGENT_ALLOWED_TOOLS` (par défaut : lire, modifier, `uv run`, git sans reset ni checkout, `gh pr create`). Tout autre appel est refusé, sans question, puisqu'il n'y a personne pour répondre. Ces règles filtrent le texte des commandes : ce n'est pas une barrière de sécurité, d'où l'intérêt d'un hook qui bloque le push sur main ;
+- les jetons de Jarvis (`NOTION_TOKEN`, `AIRFLOW_*`) ne lui sont pas transmis.
+
+Prérequis : Claude Code installé et connecté (`claude` une fois en interactif), `gh` connecté pour ouvrir la PR. Les worktrees ne sont pas supprimés : `git worktree remove <chemin>` quand la PR est mergée.
+
 ## Données et confidentialité
 
 - **Rien de ce qui vient de Notion n'est versionné** : `data/` (fiches, caches, journal des changements, notifications) et `config/` sont exclus de git.
@@ -78,7 +94,7 @@ Tous facultatifs, voir [`.env.example`](.env.example) :
 | `JARVIS_CONFIG_DIR`, `JARVIS_DATA_DIR` | Emplacement de la configuration et des données (par défaut `./config` et `./data`) |
 | `NOTION_TOKEN` | Active « Rafraîchir depuis Notion » |
 | `AIRFLOW_BASE_URL`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD` | Lancement réel des DAGs |
-| `ORCHESTRATOR_DIR`, `JARVIS_MODE` | Lancement réel des agents Claude (à brancher) |
+| `ORCHESTRATOR_DIR`, `JARVIS_MODE`, `CLAUDE_BIN`, `JARVIS_AGENT_*` | Lancement réel des agents Claude (section ci-dessus) |
 
 ## Développement
 
@@ -99,6 +115,6 @@ uv run uvicorn deploy_hub.main:app --port 8765 --reload --reload-dir src
 
 ## Limites connues
 
-- Le lancement réel des agents Claude n'est pas encore branché (simulé).
+- L'historique des DAGs lancés n'est pas conservé au redémarrage (celui des agents l'est).
 - En synchro incrémentale, un changement fait uniquement sur une carte Bible n'est vu qu'à la synchro complète suivante (7 jours au plus).
 - Les notifications du navigateur ne s'affichent que tant qu'un onglet de l'app est ouvert.

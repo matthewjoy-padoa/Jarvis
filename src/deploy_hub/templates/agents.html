@@ -1,6 +1,25 @@
 {% extends "base.html" %}
 {% import "_icons.html" as ic %}
-{% block title %}Agents · Jarvis
+{% block title %}Agents · Jarvis{% endblock %}
+{% block content %}
+<h1>Agents lancés</h1>
+<p class="muted">{% if live %}Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.{% else %}Mode démo : les lancements sont simulés (<code>JARVIS_MODE=live</code> pour de vrais agents).{% endif %}</p>
+<table data-filterable>
+  <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>Sujet</th><th>Branche</th><th data-filter>État</th><th>PR</th></tr></thead>
+  <tbody>
+  {% for r in runs %}
+    <tr>
+      <td><a href="/agents/{{ r.id }}">#{{ r.id }}</a></td><td class="muted">{{ r.started_at.strftime("%d/%m %H:%M") }}</td>
+      <td><a href="/deploiements/{{ r.slug }}/recette">{{ r.client }}</a></td>
+      <td><a href="/agents/{{ r.id }}">{{ r.subject }}</a></td>
+      <td><code>{{ r.branch }}</code></td>
+      <td><span class="badge g-{{ r.group }}">{{ r.status }}</span>{% if r.simulated %} {{ ic.icon("flask", "Simulation", "ic-muted") }}{% endif %}</td>
+      <td>{% if r.pr_url %}<a href="{{ r.pr_url }}" target="_blank" rel="noopener">PR ↗</a>{% endif %}</td>
+    </tr>
+  {% else %}<tr><td colspan="7" class="muted">Aucun agent lancé.</td></tr>{% endfor %}
+  </tbody>
+</table>
+
 <h2>DAGs lancés</h2>
 <table data-filterable>
   <thead><tr><th>Lancé à</th><th data-filter="client">Client</th><th>Carte</th><th>DAG</th><th data-filter>Stack</th><th>Résultat</th></tr></thead>
@@ -11,24 +30,7 @@
       <td><code>{{ r.dag_id }}</code></td><td><span class="badge {{ 'g-ko' if r.padoa_env == 'prod' }}">{{ r.padoa_env }}</span></td>
       <td class="muted">{% if r.simulated %}{{ ic.icon("flask", "Simulation", "ic-muted") }} {% endif %}{{ r.result }}</td>
     </tr>
-  {% else %}<tr><td colspan="6" class="muted">Aucun DAG lancé.</td></tr>{% endfor %}
-  </tbody>
-</table>
-{% endblock %}
-{% block content %}
-<h1>Agents lancés</h1>
-<p class="muted">Lancements de cette exécution de l'app (non conservés au redémarrage).</p>
-<table data-filterable>
-  <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>Sujet</th><th>Branche</th><th data-filter>État</th></tr></thead>
-  <tbody>
-  {% for r in runs %}
-    <tr>
-      <td>{{ r.id }}</td><td class="muted">{{ r.started_at.strftime("%d/%m %H:%M") }}</td>
-      <td><a href="/deploiements/{{ r.slug }}/recette">{{ r.client }}</a></td>
-      <td>{{ r.subject }}<details><summary class="muted">brief</summary><pre>{{ r.prompt }}</pre></details></td>
-      <td><code>{{ r.branch }}</code></td><td><span class="badge">{{ r.status }}</span></td>
-    </tr>
-  {% else %}<tr><td colspan="6" class="muted">Aucun agent lancé.</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="6" class="muted">Aucun DAG lancé (cette exécution de l'app).</td></tr>{% endfor %}
   </tbody>
 </table>
 {% endblock %}
