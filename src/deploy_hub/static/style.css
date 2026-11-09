@@ -537,3 +537,7 @@ a.wn-title:hover { color: var(--accent); }
 .nav a.client-chip.active .dot { box-shadow: 0 0 0 2px rgba(255, 255, 255, .85); }
 .nav a.client-chip .jx.soon { background: var(--pa-ko); color: var(--text); }
 .nav a.client-chip.active .jx { background: rgba(255, 255, 255, .22); color: #fff; }
+
+/* Logo : monogramme J sur carré arrondi en dégradé (même fichier que l'icône d'onglet) */
+.brand-mark { width: 30px; height: 30px; border-radius: 9px; filter: none; box-shadow: 0 2px 8px rgba(135, 103, 249, .35); transition: transform .2s; }
+.brand:hover .brand-mark { transform: rotate(-6deg) scale(1.05); }
