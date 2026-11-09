@@ -79,6 +79,39 @@ Ce que l'agent peut faire :
 
 Prérequis : Claude Code installé et connecté (`claude` une fois en interactif), `gh` connecté pour ouvrir la PR. Les worktrees ne sont pas supprimés : `git worktree remove <chemin>` quand la PR est mergée.
 
+## Faire tourner Jarvis sur une VM
+
+Utile pour que les agents travaillent sans ton poste : Jarvis tourne en service systemd utilisateur sur la VM, tu l'ouvres depuis ton poste par un transfert de port.
+
+1. **Cloner et installer**, sur la VM :
+   ```bash
+   cd ~/Dev && gh repo clone <organisation>/Jarvis && cd Jarvis && uv sync
+   ```
+2. **Copier ta configuration et tes données**, depuis ton poste (l'historique des agents reste propre à chaque machine) :
+   ```bash
+   rsync -a --exclude agents/ config data <vm>:Dev/Jarvis/
+   ```
+3. **Installer le service**, sur la VM. Les réglages non secrets vont dans un complément du service :
+   ```bash
+   mkdir -p ~/.config/systemd/user/jarvis.service.d && cp ~/Dev/Jarvis/deploy/jarvis.service ~/.config/systemd/user/
+   printf '[Service]\nEnvironment=JARVIS_MODE=live\nEnvironment=ORCHESTRATOR_DIR=%%h/Dev/integration-orchestrator\nEnvironment=CLAUDE_BIN=%%h/Dev/Jarvis/deploy/claude-vscode.sh\nEnvironment=JARVIS_AGENT_ADD_DIRS=%%h/Documents/Claude_vault\nEnvironment=AIRFLOW_BASE_URL=http://localhost:8888\n' > ~/.config/systemd/user/jarvis.service.d/vm.conf
+   systemctl --user daemon-reload && systemctl --user enable --now jarvis
+   ```
+   Adapte les chemins et l'adresse d'Airflow à ta VM. `JARVIS_AGENT_ADD_DIRS` est facultatif : c'est le dossier de notes que l'agent peut lire en plus de son worktree.
+4. **Garder le service actif** quand tu te déconnectes (sinon il s'arrête avec ta session SSH) :
+   ```bash
+   loginctl enable-linger $USER
+   ```
+5. **Secrets** : mets `AIRFLOW_USER`, `AIRFLOW_PASSWORD` et, si besoin, `NOTION_TOKEN` dans `~/Dev/Jarvis/.env`, puis `systemctl --user restart jarvis`.
+6. **Ouvrir Jarvis depuis ton poste** : transfert du port 8765, par l'onglet Ports de VS Code (Remote-SSH) ou `ssh -L 8765:localhost:8765 <vm>`, puis http://localhost:8765.
+
+Bon à savoir :
+- **Binaire Claude** : sans installation de Claude Code sur la VM, `deploy/claude-vscode.sh` utilise celui de l'extension VS Code Remote-SSH, en prenant toujours la version la plus récente (son chemin change à chaque mise à jour). Claude doit être connecté sur la VM (`~/.claude/.credentials.json`).
+- **Ce que l'agent charge** : tes `~/.claude/CLAUDE.md` et hooks de la VM, comme une session normale. Un hook de fin de session (synchro de notes, par exemple) s'exécute donc aussi à la fin de chaque agent.
+- **Synchro Notion** : la routine Claude Code de ton poste écrit dans le `data/` de ton poste, pas dans celui de la VM. Sur la VM, utilise le jeton Notion (« Rafraîchir depuis Notion ») ou recopie `data/` (étape 2).
+- **Suivi** : `systemctl --user status jarvis` et `journalctl --user -u jarvis -f`.
+- **Mise à jour** : `git pull && uv sync && systemctl --user restart jarvis`.
+
 ## Données et confidentialité
 
 - **Rien de ce qui vient de Notion n'est versionné** : `data/` (fiches, caches, journal des changements, notifications) et `config/` sont exclus de git.
