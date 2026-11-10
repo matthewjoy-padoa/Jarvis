@@ -338,3 +338,20 @@ def test_agent_page_shows_status_brief_and_log():
     assert "every 5s" not in page.text  # fini : plus de rafraîchissement
     assert client.get(f"/agents/{run.id}/journal").status_code == 200
     assert client.get("/agents/9999").status_code == 404
+
+
+@pytest.mark.parametrize("path", ["/actions?vue=kanban&tous=true", "/recette?vue=kanban&tous=true",
+                                  "/deploiements/client-demo/actions?vue=kanban", "/deploiements/client-demo/recette?vue=kanban&tous=true"])
+def test_kanban_views(path):
+    r = client.get(path)
+    assert r.status_code == 200 and 'class="kanban"' in r.text and 'class="kb-card"' in r.text
+    assert "Kanban</a>" in r.text and "<table" not in r.text.split('class="kanban"')[1]
+
+
+def test_kanban_columns_follow_notion_order():
+    from types import SimpleNamespace as S
+    from deploy_hub.models import RETOUR_STATUSES, kanban_columns, status_group
+    def r(status):
+        return S(status=status, group=status_group(status, RETOUR_STATUSES))
+    cols = kanban_columns([(None, r("Validé")), (None, r("INTE - En cours")), (None, r("À faire")), (None, r("À faire"))], RETOUR_STATUSES)
+    assert [c["status"] for c in cols] == ["À faire", "INTE - En cours", "Validé"] and len(cols[0]["cards"]) == 2

@@ -30,11 +30,27 @@ def _recette_content(path: Path) -> dict[str, dict]:
     return json.loads(file.read_text(encoding="utf-8")) if file.is_file() else {}
 
 
+def _users_path(path: Path) -> Path:
+    """Annuaire uuid Notion → nom (data/notion/utilisateurs.json, hors git), rempli par la synchro."""
+    return path.parent.parent / "notion" / "utilisateurs.json"
+
+
+def _users(path: Path) -> dict[str, str]:
+    file = _users_path(path)
+    return json.loads(file.read_text(encoding="utf-8")) if file.is_file() else {}
+
+
+def _names(ids: list[str], users: dict[str, str]) -> list[str]:
+    """Noms des personnes ; une personne absente de l'annuaire reste visible sous un nom provisoire."""
+    return [users.get(i) or f"Inconnu ({i[:8]})" for i in ids or []]
+
+
 def parse_deployment(path: Path, clients_dir: Path | None = None) -> Deployment:
     """Fiche synchronisée, avec par-dessus ce qui appartient à la configuration du client (nom, logiciel, statut,
     dashboard, stacks, clés orchestrator) : une modification dans l'app s'affiche tout de suite, sans attendre la synchro."""
     data = _split_frontmatter(path.read_text(encoding="utf-8"))
     content = _recette_content(path)
+    users = _users(path)
     config_path = _config_path(clients_dir, path.stem)
     cfg = read_file(config_path) if config_path else None
     return Deployment(
@@ -51,7 +67,8 @@ def parse_deployment(path: Path, clients_dir: Path | None = None) -> Deployment:
         orchestrator=cfg.orchestrator if cfg else data.get("orchestrator") or [],
         resources=[ResourceInjection(**r) for r in data.get("resources", [])],
         actions=[Action(**{**a, "notion_url": notion_link(a.get("notion_url", ""))}) for a in data.get("actions", [])],
-        retours=[RetourRecette(**{**r, **content.get(r.get("notion_url", ""), {}), "notion_url": notion_link(r.get("notion_url", ""))})
+        retours=[RetourRecette(**{**r, **content.get(r.get("notion_url", ""), {}), "notion_url": notion_link(r.get("notion_url", "")),
+                                    "owners": _names(r.get("owners"), users)})
                  for r in data.get("retours", [])],
         regles=[Regle(**r) for r in data.get("regles", [])],
         remontees=[Remontee(**r) for r in data.get("remontees", [])],
@@ -72,9 +89,10 @@ class FicheSource:
             return 0
 
     def _parse(self, path: Path) -> Deployment:
-        """Fiche analysée, gardée en mémoire tant que ni elle, ni son contenu de recette, ni la config du client n'ont changé
+        """Fiche analysée, gardée en mémoire tant que ni elle, ni son contenu de recette, ni la config du client, ni l'annuaire n'ont changé
         (le menu et chaque page relisent toutes les fiches)."""
-        stamps = (self._stamp(path), self._stamp(_content_path(path)), self._stamp(_config_path(self.clients_dir, path.stem)))
+        stamps = (self._stamp(path), self._stamp(_content_path(path)), self._stamp(_config_path(self.clients_dir, path.stem)),
+                  self._stamp(_users_path(path)))
         cached = self._cache.get(path)
         if cached and cached[0] == stamps:
             return cached[1]

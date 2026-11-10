@@ -3,6 +3,7 @@ SELECT
   CASE WHEN "Statut" IN ('À faire', 'INTE - Prio déploiement', 'INTE - En cours', 'INTE - Post déploiement', 'INTE - En attente donnée client', 'INTE - Fixed : à réinjecter', 'INTE - En attente d''injection', 'INTE - Vérifié en INTEGRATION', 'INTE - Ancien retour - OK', 'OPS - À vérifier avec le client', 'OPS - En attente décision client', 'OPS - À faire directement en front Padoa', 'OPS - Validation à faire en INTEGRATION', 'OPS - Validation à faire en SNAP', 'OPS - Vérifié en INTEGRATION', 'OPS - Vérifié en SNAP', 'OPS - Vérifié et pas OK', 'OPS - Paramétrage Admin Panel', 'PRODUIT - Demande amélioration', 'Non vérifié', 'Non vérifié par le client', 'Non vérifié par le client sans motif', 'A revoir', 'Action identifiée', 'Validé', 'Validé avec commentaire', 'terminé', 'Abandonné', 'Doublon', 'Non concerné') THEN "Statut" ELSE 'Autre' END AS statut,
   CASE WHEN length("Type de données") <= 40 THEN "Type de données" ELSE 'Autre' END AS type_donnees,
   "Logiciel" AS logiciel,
+  "Responsable" AS responsables,
   "date:Deadline:start" AS deadline,
   createdTime AS cree_le,
   "Last edited time" AS modifie,

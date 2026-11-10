@@ -10,7 +10,8 @@ from fastapi.templating import Jinja2Templates
 
 from deploy_hub import client_config
 from deploy_hub.config import PROJECT_ROOT, clients_dir, data_dir, load_settings
-from deploy_hub.models import DONE, INJECTION_STATUSES, MILESTONE_LABELS, Deployment, status_group
+from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
+                               kanban_columns, status_group)
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
@@ -36,6 +37,9 @@ app = FastAPI(title="Jarvis")
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
 templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STATUSES)
+templates.env.globals["kanban_columns"] = kanban_columns
+templates.env.globals["ACTION_STATUSES"] = ACTION_STATUSES
+templates.env.globals["RETOUR_STATUSES"] = RETOUR_STATUSES
 
 # Pages globales (barre du haut) et onglets d'une fiche, calqués sur les blocs du dashboard Notion.
 PAGES = [
@@ -205,16 +209,17 @@ def injections(request: Request, vue: str = "ressources"):
 
 
 @app.get("/actions", response_class=HTMLResponse)
-def actions(request: Request, tous: bool = False):
+def actions(request: Request, tous: bool = False, vue: str = "tableau"):
     return _render(
-        request, "list.html", "/actions", title="Actions", part="actions", deployments=_deployments(request), show_all=tous
+        request, "list.html", "/actions", title="Actions", part="actions", deployments=_deployments(request), show_all=tous, vue=vue
     )
 
 
 @app.get("/recette", response_class=HTMLResponse)
-def recette(request: Request, tous: bool = False):
+def recette(request: Request, tous: bool = False, vue: str = "liste"):
     return _render(
-        request, "list.html", "/recette", title="Retours de recette", part="recette", deployments=_deployments(request), show_all=tous
+        request, "list.html", "/recette", title="Retours de recette", part="recette", deployments=_deployments(request), show_all=tous,
+        vue=vue,
     )
 
 

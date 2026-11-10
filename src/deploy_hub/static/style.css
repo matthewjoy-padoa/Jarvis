@@ -549,3 +549,26 @@ a.wn-title:hover { color: var(--accent); }
 /* Logo : monogramme J sur carré arrondi en dégradé (même fichier que l'icône d'onglet) */
 .brand-mark { width: 30px; height: 30px; border-radius: 9px; filter: none; box-shadow: 0 2px 8px rgba(135, 103, 249, .35); transition: transform .2s; }
 .brand:hover .brand-mark { transform: rotate(-6deg) scale(1.05); }
+
+/* Vue kanban (actions, retours de recette) : une colonne par statut, défilement horizontal */
+.view-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 280px); gap: 12px; overflow-x: auto;
+  padding: 4px 2px 12px; margin-top: 12px; align-items: start; scroll-snap-type: x proximity; }
+.kb-col { background: color-mix(in srgb, var(--surface) 55%, var(--bg)); border: 1px solid var(--border); border-radius: 14px;
+  padding: 8px; scroll-snap-align: start; border-top: 3px solid var(--border); }
+.kb-col.kb-todo { border-top-color: var(--st-todo); }
+.kb-col.kb-in_progress { border-top-color: var(--st-progress); }
+.kb-col.kb-ko { border-top-color: var(--st-ko); }
+.kb-col.kb-done { border-top-color: var(--st-done); }
+.kb-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 4px 8px; }
+.kb-head .badge { white-space: normal; }
+.kb-count { font-size: 12px; font-variant-numeric: tabular-nums; }
+.kb-cards { display: grid; gap: 8px; max-height: 70vh; overflow-y: auto; }
+.kb-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; box-shadow: var(--shadow); }
+.kb-card:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+.kb-card[hidden] { display: none; }
+.kb-title { margin: 0 0 4px; font-size: 14px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.kb-title a { color: var(--text); }
+.kb-title a:hover { color: var(--accent); }
+.kb-meta { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 12px; }
+.kb-col:not(:has(.kb-card:not([hidden]))) .kb-cards::after { content: "Aucune carte pour ces filtres"; color: var(--muted); font-size: 12px; padding: 4px; }

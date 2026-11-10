@@ -130,7 +130,7 @@ def test_recette_asks_only_the_listed_properties(root):
     refresh("acme", client_for(fake), root)
     recette_queries = [r for r in fake.requests if r.url.path.endswith(f"{notion_api.RECETTE_DS}/query")]
     asked = set(recette_queries[0].url.params.get_list("filter_properties[]"))
-    assert asked == {"rs", "rt", "rl", "rd", "rtitle", "tr", "cc", "ex", "an", "so", "di", "ec"}  # ni responsable, ni raison d'abandon
+    assert asked == {"rs", "rt", "rl", "re", "rd", "rtitle", "tr", "cc", "ex", "an", "so", "di", "ec"}  # responsable oui, raison d'abandon non
     assert not any("/blocks" in r.url.path for r in fake.requests)  # corps des pages jamais lu
     body = json.loads(recette_queries[0].content)
     assert {"property": "Client", "select": {"equals": "acme-uegar"}} in body["filter"]["or"]
@@ -147,7 +147,7 @@ def test_recette_content_goes_to_the_local_file_only(root):
     rows = sorted(cache.values(), key=lambda r: r["cree_le"])
     assert rows[0]["url"] == "https://app.notion.com/" + "a" * 32  # adresse reconstruite sans le titre
     assert rows[1]["statut"] == "Autre" and rows[1]["type_donnees"] == "Autre"
-    assert set(rows[0]) <= {"url", "statut", "type_donnees", "logiciel", "deadline", "cree_le", "modifie"}
+    assert set(rows[0]) <= {"url", "statut", "type_donnees", "logiciel", "responsables", "deadline", "cree_le", "modifie"}
     assert (root / "data" / "recette-pages.txt").read_text().split() == ["a" * 32, "b" * 32]
 
 
@@ -187,3 +187,8 @@ def test_refresh_button_without_token(monkeypatch):
     monkeypatch.setattr(notion_api, "load_token", lambda root=None: None)
     r = TestClient(main.app).post("/actions/rafraichir")
     assert "Jeton Notion absent" in r.text and "HX-Refresh" not in r.headers
+
+
+def test_people_column_keeps_notion_ids():
+    assert notion_api.value({"type": "people", "people": [{"id": "u-1", "name": "X"}, {"id": "u-2"}]}) == '["user://u-1", "user://u-2"]'
+    assert notion_api.value({"type": "people", "people": []}) is None

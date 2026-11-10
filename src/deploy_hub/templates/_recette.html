@@ -1,6 +1,7 @@
 {% import "_icons.html" as ic %}
 {# Attend : deployments, show_client, show_all. Notion : « Retours Recette » ; contenu lu depuis contenu-recette.json (exclu de git). #}
 {% import "_charts.html" as charts with context %}
+{% import "_kanban.html" as kb %}
 {% set base = request.url.path %}
 {% for d in deployments if d.retours %}
 {% set scope = {"client": d.client} if show_client else {} %}
@@ -9,20 +10,40 @@
   {{ charts.hbars("Retours ouverts par type de données", d.open_retours_by_type, 6, filter_key="type", scope=scope) }}
 </section>
 {% endfor %}
+{% set kanban = vue == "kanban" %}
+<div class="view-bar">
+<div class="segmented" role="group" aria-label="Présentation">
+  <a href="{{ base }}{{ '?tous=true' if show_all }}" class="{{ 'active' if not kanban }}">Liste</a><a href="{{ base }}?vue=kanban{{ '&tous=true' if show_all }}" class="{{ 'active' if kanban }}">Kanban</a>
+</div>
 <div class="segmented" role="group" aria-label="Retours affichés">
-  <a href="{{ base }}" class="{{ 'active' if not show_all }}">Ouverts</a><a href="{{ base }}?tous=true" class="{{ 'active' if show_all }}">Tous</a>
+  <a href="{{ base }}{{ '?vue=kanban' if kanban }}" class="{{ 'active' if not show_all }}">Ouverts</a><a href="{{ base }}?tous=true{{ '&vue=kanban' if kanban }}" class="{{ 'active' if show_all }}">Tous</a>
   <span class="muted note" title="Le contenu des retours (commentaire, exemple, analyse…) est gardé sur cette machine : il n'est jamais versionné dans git.">Contenu des retours gardé en local, hors GitHub</span>
 </div>
-<div data-filterable data-items=".retour" data-filters="Statut:statut,Type de données:type,Logiciel:logiciel{{ ',Client:client' if show_client }}" data-sorts="Deadline:deadline,Création:cree,Statut:statut">
+</div>
+{% if kanban %}
+{% set ns_kb = namespace(cards=[]) %}
+{% for d in deployments %}{% for r in d.retours if show_all or r.is_open %}{% set ns_kb.cards = ns_kb.cards + [(d, r)] %}{% endfor %}{% endfor %}
+{% call(d, r) kb.board(kanban_columns(ns_kb.cards, RETOUR_STATUSES), "Responsable:responsable,Type de données:type,Logiciel:logiciel" ~ (",Client:client" if show_client else ""), "Retours par statut") %}
+<article class="kb-card" data-group="{{ r.group }}" data-responsable="{{ r.owners | join('|') if r.owners else 'Sans responsable' }}" data-type="{{ r.data_type }}" data-logiciel="{{ r.software or d.software }}" data-client="{{ d.client }}">
+  <p class="kb-title"><a href="/deploiements/{{ d.slug }}/recette{{ '?tous=true' if not r.is_open }}#{{ r.id }}">{{ r.ligne or r.data_type or "Type de données non précisé" }}</a></p>
+  <p class="kb-meta"><code>{{ r.id }}</code>{% if r.ligne and r.data_type %} <span class="muted">{{ r.data_type }}</span>{% endif %}
+    {% if show_client %}<span class="muted">· {{ d.client }}</span>{% endif %}</p>
+  <p class="kb-meta">{% if r.owners %}<span class="muted">{{ ic.icon("user") }} {{ r.owners | join(", ") }}</span>{% endif %}
+    {% if r.due %}<span class="{{ 'late' if r.is_open and r.due < today else 'muted' }}">{{ ic.icon("calendar") }} {{ r.due.strftime("%d/%m") }}</span>{% endif %}
+    {% if r.notion_url %}<a href="{{ r.notion_url }}" target="_blank" rel="noopener">Notion ↗</a>{% endif %}</p>
+</article>
+{% endcall %}
+{% else %}
+<div data-filterable data-items=".retour" data-filters="Statut:statut,Responsable:responsable,Type de données:type,Logiciel:logiciel{{ ',Client:client' if show_client }}" data-sorts="Deadline:deadline,Création:cree,Statut:statut">
 {% for d in deployments %}{% for r in d.retours if show_all or r.is_open %}
-<article id="{{ r.id }}" class="retour {{ 'done' if not r.is_open }}" data-group="{{ r.group }}" data-statut="{{ r.status }}" data-type="{{ r.data_type }}" data-logiciel="{{ r.software or d.software }}" data-client="{{ d.client }}" data-deadline="{{ r.due.isoformat() if r.due else '' }}" data-cree="{{ r.created.isoformat() if r.created else '' }}">
+<article id="{{ r.id }}" class="retour {{ 'done' if not r.is_open }}" data-group="{{ r.group }}" data-statut="{{ r.status }}" data-type="{{ r.data_type }}" data-logiciel="{{ r.software or d.software }}" data-responsable="{{ r.owners | join('|') if r.owners else 'Sans responsable' }}" data-client="{{ d.client }}" data-deadline="{{ r.due.isoformat() if r.due else '' }}" data-cree="{{ r.created.isoformat() if r.created else '' }}">
   <div class="retour-main">
     <header>
       <span class="badge g-{{ r.group }}">{{ r.status }}</span>
       <strong>{{ r.ligne or r.data_type or "Type de données non précisé" }}</strong>{% if r.ligne and r.data_type %} <span class="muted">· {{ r.data_type }}</span>{% endif %}
       {% if show_client %}<a href="/deploiements/{{ d.slug }}/recette" class="muted">{{ d.client }}</a>{% endif %}
     </header>
-    <p class="muted"><code>{{ r.id }}</code> · {{ r.software or d.software }}{% if r.resource %} · <code>{{ r.resource }}</code>{% endif %}{% if r.due %} · <span class="{{ 'late' if r.is_open and r.due < today }}">deadline {{ r.due.strftime("%d/%m/%Y") }}</span>{% endif %}{% if r.created %} · créé le {{ r.created.strftime("%d/%m/%Y") }}{% endif %}</p>
+    <p class="muted"><code>{{ r.id }}</code> · {{ r.software or d.software }}{% if r.owners %} · {{ ic.icon("user") }} {{ r.owners | join(", ") }}{% endif %}{% if r.resource %} · <code>{{ r.resource }}</code>{% endif %}{% if r.due %} · <span class="{{ 'late' if r.is_open and r.due < today }}">deadline {{ r.due.strftime("%d/%m/%Y") }}</span>{% endif %}{% if r.created %} · créé le {{ r.created.strftime("%d/%m/%Y") }}{% endif %}</p>
   </div>
   <div class="retour-actions">
     {% if r.notion_url %}<a class="btn-link" href="{{ r.notion_url }}" target="_blank" rel="noopener">Notion ↗</a>{% endif %}
@@ -42,4 +63,5 @@
 </article>
 {% endfor %}{% endfor %}
 </div>
+{% endif %}
 {% if not deployments | map(attribute="retours") | sum(start=[]) %}<p class="muted">Aucun retour de recette.</p>{% endif %}

@@ -43,6 +43,10 @@ Pour chaque <slug> (dossier des résultats : HUB/data/notion/<slug>/, appelé R 
 4. Lance : cd <DOSSIER_JARVIS> && uv run python -m deploy_hub.sync_notion <slug>
    Le script fusionne dans le cache et n'écrit la fiche que si tout est valide.
 
+APRÈS LES CLIENTS : NOMS DES RESPONSABLES
+Lance : cd <DOSSIER_JARVIS> && uv run python -m deploy_hub.sync_notion utilisateurs
+Il affiche la liste des identifiants de responsables sans nom (souvent vide). Pour chacun, outil Notion `notion-get-users` avec `user_id` = l'identifiant ; garde seulement son nom. Puis lance une seule fois : cd <DOSSIER_JARVIS> && uv run python -m deploy_hub.sync_notion utilisateurs '{"<identifiant>": "<nom>", ...}'. N'écris ni e-mail ni autre information. Un identifiant introuvable est laissé de côté.
+
 SI UNE ÉTAPE ÉCHOUE
 - Ne modifie pas la fiche existante ni les caches à la main.
 - Envoie un message Slack court dans le canal <CANAL_SLACK> : « jarvis-sync ÉCHEC <slug> : <étape> : <raison en une phrase> ». En cas de succès ou de client inchangé, n'envoie rien.
