@@ -17,8 +17,8 @@
 </div>
 <div class="segmented" role="group" aria-label="Retours affichés">
   <a href="{{ base }}{{ '?vue=kanban' if kanban }}" class="{{ 'active' if not show_all }}">Ouverts</a><a href="{{ base }}?tous=true{{ '&vue=kanban' if kanban }}" class="{{ 'active' if show_all }}">Tous</a>
-  <span class="muted note" title="Le contenu des retours (commentaire, exemple, analyse…) est gardé sur cette machine : il n'est jamais versionné dans git.">Contenu des retours gardé en local, hors GitHub</span>
 </div>
+<span class="muted note" title="Le contenu des retours (commentaire, exemple, analyse…) est gardé sur cette machine : il n'est jamais versionné dans git.">Contenu des retours gardé en local, hors GitHub</span>
 </div>
 {% if kanban %}
 {% set ns_kb = namespace(cards=[]) %}
