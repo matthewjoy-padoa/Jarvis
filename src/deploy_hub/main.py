@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from deploy_hub import client_config
 from deploy_hub.config import PROJECT_ROOT, clients_dir, data_dir, load_settings
 from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
-                               kanban_columns, status_group)
+                               kanban_columns, notion_link, status_group)
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
@@ -105,9 +105,9 @@ def _deadlines(deployments: list[Deployment]) -> list[dict]:
     for d in deployments:
         items += [{"date": v, "kind": "Jalon", "label": MILESTONE_LABELS.get(k, k), "d": d, "url": f"/deploiements/{d.slug}/synthese"}
                   for k, v in d.milestones.items()]
-        items += [{"date": a.due, "kind": "Action", "label": a.title, "d": d, "url": a.notion_url, "action": a}
+        items += [{"date": a.due, "kind": "Action", "label": a.title, "d": d, "url": ticket_url(d.slug, "action", a.ref) if a.ref else a.notion_url, "action": a}
                   for a in d.actions if a.due and a.group != DONE]
-        items += [{"date": r.due, "kind": "Retour", "label": r.label, "d": d, "url": f"/deploiements/{d.slug}/recette#{r.id}", "retour": r}
+        items += [{"date": r.due, "kind": "Retour", "label": r.label, "d": d, "url": ticket_url(d.slug, "retour", r.id), "retour": r}
                   for r in d.open_retours if r.due]
     return sorted(items, key=lambda i: i["date"])
 
@@ -317,6 +317,35 @@ def _retour(slug: str, retour_id: str):
     if retour is None:
         raise HTTPException(404, f"Retour inconnu : {retour_id}")
     return d, retour
+
+
+TICKET_KINDS = ("retour", "action")
+
+
+def ticket_url(slug: str, kind: str, ref: str) -> str:
+    return f"/deploiements/{slug}/ticket/{kind}/{ref}"
+
+
+templates.env.globals["ticket_url"] = ticket_url
+
+
+@app.get("/deploiements/{slug}/ticket/{kind}/{ref}", response_class=HTMLResponse)
+def ticket(request: Request, slug: str, kind: str, ref: str):
+    """Tout ce qu'on sait d'un retour ou d'une carte d'action : fiche, contenu, agents, historique.
+    Panneau latéral quand la page l'appelle (htmx), page entière sinon (lien ouvert dans un nouvel onglet)."""
+    if kind not in TICKET_KINDS:
+        raise HTTPException(404, f"Type inconnu : {kind}")
+    d = _get(slug)
+    items = d.retours if kind == "retour" else d.actions
+    item = next((i for i in items if (i.id if kind == "retour" else i.ref) == ref.upper()), None)
+    if item is None:
+        raise HTTPException(404, f"{'Retour' if kind == 'retour' else 'Carte'} {ref} introuvable chez {d.client}")
+    history = [c for c in changes_since(d, settings.deployments_dir, datetime.min) if c.notion_url == notion_link(item.notion_url)]
+    runs = [r for r in claude.runs if r.slug == slug and r.subject == f"retour {ref.upper()}"] if kind == "retour" else []
+    context = {"d": d, "kind": kind, "item": item, "history": history, "runs": runs, "today": date.today()}
+    if request.headers.get("HX-Request"):
+        return templates.TemplateResponse(request, "_ticket.html", context)
+    return _render(request, "ticket.html", f"/deploiements/{slug}", **context)
 
 
 @app.get("/deploiements/{slug}/recette/{retour_id}/brief", response_class=HTMLResponse)

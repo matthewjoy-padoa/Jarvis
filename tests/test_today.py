@@ -71,7 +71,7 @@ def test_changes_since_are_linked_to_retours_and_cards(acme):
     d, deployments_dir = acme
     changes = changes_since(d, deployments_dir, datetime.now() - timedelta(days=1))
     assert [c.verb for c in changes] == ["statut", "commentaire client modifié"]
-    assert changes[0].label == "Retour 0001AB · Adhérents" and changes[0].link.endswith("recette?tous=true#0001AB")
+    assert changes[0].label == "Retour 0001AB · Adhérents" and changes[0].link == "/deploiements/acme/ticket/retour/0001AB"
     assert len(changes_since(d, deployments_dir, datetime.now() - timedelta(days=7))) == 3
 
 
@@ -157,3 +157,27 @@ def test_word_diff_like_git():
     assert diff[0] == ("=", "… de juin, il faut corriger le filtre ")  # contexte raccourci avant la modification
     assert word_diff("", "Nouvelle analyse.") == [("+", "Nouvelle analyse.")]
     assert word_diff("Texte retiré.", "") == [("-", "Texte retiré.")]
+
+
+def test_ticket_of_a_retour_shows_details_content_and_history(app):
+    html = app.get("/deploiements/acme/ticket/retour/0001ab", headers={"HX-Request": "true"}).text
+    assert 'class="ticket"' in html and "<html" not in html  # fragment pour le panneau
+    assert "Informations" in html and "Contenu du retour" in html and "Historique" in html
+    assert "Non vérifié" in html and "Nouveau" in html  # changement de statut et texte ajouté, notés par la synchro
+    assert "Lancer un agent" in html or "Aucun agent" in html
+    page = app.get("/deploiements/acme/ticket/retour/0001AB").text
+    assert "<html" in page and 'class="ticket"' in page  # page entière dans un nouvel onglet
+
+
+def test_ticket_of_an_action_and_unknown_tickets(app, acme):
+    d, _ = acme
+    a = next(a for a in d.actions if a.ref)
+    html = app.get(f"/deploiements/acme/ticket/action/{a.ref}", headers={"HX-Request": "true"}).text
+    assert a.title in html and "Équipe(s)" in html and "Ouvrir dans Notion" in html
+    assert app.get("/deploiements/acme/ticket/retour/ZZZZZZ").status_code == 404
+    assert app.get("/deploiements/acme/ticket/autre/0001AB").status_code == 404
+
+
+def test_lists_open_tickets_in_the_drawer(app):
+    for path in ["/deploiements/acme/recette?tous=true", "/deploiements/acme/actions?tous=true", "/deploiements/acme/recette?vue=kanban&tous=true", "/"]:
+        assert 'data-ticket href="/deploiements/acme/ticket/' in app.get(path).text, path

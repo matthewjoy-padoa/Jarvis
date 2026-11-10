@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}{{ (item.id if kind == "retour" else item.ref) }} · {{ d.client }} · Jarvis{% endblock %}
+{% block content %}
+<p class="muted"><a href="/deploiements/{{ d.slug }}/{{ 'recette' if kind == 'retour' else 'actions' }}">← {{ d.client }}</a></p>
+<div class="ticket-page panel">{% include "_ticket.html" %}</div>
+{% endblock %}

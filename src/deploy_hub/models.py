@@ -137,6 +137,12 @@ class Action:
         return status_group(self.injection_status, INJECTION_STATUSES)
 
     @property
+    def ref(self) -> str:
+        """Référence courte de la carte (6 derniers caractères de l'id Notion), comme l'id d'un retour."""
+        found = re.findall(r"[0-9a-f]{32}", (self.notion_url or "").replace("-", ""))
+        return found[-1][-6:].upper() if found else ""
+
+    @property
     def is_ced(self) -> bool:
         """Carte d'intégration sur les fichiers (CED) : « CED », « GED » ou « fichier(s) » dans l'intitulé d'une carte
         d'injection ou préfixée [INTE]. Notion n'a pas de champ dédié : règle sur l'intitulé, à revoir si besoin."""
