@@ -24,7 +24,7 @@
 {% set ns_kb = namespace(cards=[]) %}
 {% for d in deployments %}{% for r in d.retours if show_all or r.is_open %}{% set ns_kb.cards = ns_kb.cards + [(d, r)] %}{% endfor %}{% endfor %}
 {% call(d, r) kb.board(kanban_columns(ns_kb.cards, RETOUR_STATUSES), "Responsable:responsable,Type de données:type,Logiciel:logiciel" ~ (",Client:client" if show_client else ""), "Retours par statut") %}
-<article class="kb-card" data-group="{{ r.group }}" data-responsable="{{ r.owners | join('|') if r.owners else 'Sans responsable' }}" data-type="{{ r.data_type }}" data-logiciel="{{ r.software or d.software }}" data-client="{{ d.client }}">
+<article class="kb-card" data-ticket-card data-group="{{ r.group }}" data-responsable="{{ r.owners | join('|') if r.owners else 'Sans responsable' }}" data-type="{{ r.data_type }}" data-logiciel="{{ r.software or d.software }}" data-client="{{ d.client }}">
   <p class="kb-title"><a data-ticket href="{{ ticket_url(d.slug, 'retour', r.id) }}">{{ r.ligne or r.data_type or "Type de données non précisé" }}</a></p>
   <p class="kb-meta"><code>{{ r.id }}</code>{% if r.ligne and r.data_type %} <span class="muted">{{ r.data_type }}</span>{% endif %}
     {% if show_client %}<span class="muted">· {{ d.client }}</span>{% endif %}</p>
@@ -36,7 +36,7 @@
 {% else %}
 <div data-filterable data-items=".retour" data-filters="Statut:statut,Responsable:responsable,Type de données:type,Logiciel:logiciel{{ ',Client:client' if show_client }}" data-sorts="Deadline:deadline,Création:cree,Statut:statut">
 {% for d in deployments %}{% for r in d.retours if show_all or r.is_open %}
-<article id="{{ r.id }}" class="retour {{ 'done' if not r.is_open }}" data-group="{{ r.group }}" data-statut="{{ r.status }}" data-type="{{ r.data_type }}" data-logiciel="{{ r.software or d.software }}" data-responsable="{{ r.owners | join('|') if r.owners else 'Sans responsable' }}" data-client="{{ d.client }}" data-deadline="{{ r.due.isoformat() if r.due else '' }}" data-cree="{{ r.created.isoformat() if r.created else '' }}">
+<article id="{{ r.id }}" data-ticket-card class="retour {{ 'done' if not r.is_open }}" data-group="{{ r.group }}" data-statut="{{ r.status }}" data-type="{{ r.data_type }}" data-logiciel="{{ r.software or d.software }}" data-responsable="{{ r.owners | join('|') if r.owners else 'Sans responsable' }}" data-client="{{ d.client }}" data-deadline="{{ r.due.isoformat() if r.due else '' }}" data-cree="{{ r.created.isoformat() if r.created else '' }}">
   <div class="retour-main">
     <header>
       <span class="badge g-{{ r.group }}">{{ r.status }}</span>

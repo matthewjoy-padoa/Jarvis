@@ -180,4 +180,6 @@ def test_ticket_of_an_action_and_unknown_tickets(app, acme):
 
 def test_lists_open_tickets_in_the_drawer(app):
     for path in ["/deploiements/acme/recette?tous=true", "/deploiements/acme/actions?tous=true", "/deploiements/acme/recette?vue=kanban&tous=true", "/"]:
-        assert 'data-ticket href="/deploiements/acme/ticket/' in app.get(path).text, path
+        html = app.get(path).text
+        assert 'data-ticket href="/deploiements/acme/ticket/' in html, path
+        assert path == "/" or "data-ticket-card" in html, path  # toute la carte ou la ligne est cliquable

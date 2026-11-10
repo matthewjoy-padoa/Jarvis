@@ -23,7 +23,7 @@
 {% set ns_kb = namespace(cards=[]) %}
 {% for d in deployments %}{% for a in (d.actions if show_all else d.active_actions) %}{% set ns_kb.cards = ns_kb.cards + [(d, a)] %}{% endfor %}{% endfor %}
 {% call(d, a) kb.board(kanban_columns(ns_kb.cards, ACTION_STATUSES), "Équipe:equipe,Injection:injection" ~ (",Client:client" if show_client else ""), "Actions par statut") %}
-<article class="kb-card" data-group="{{ a.group }}" data-equipe="{{ a.teams | join('|') if a.teams else 'Sans équipe' }}" data-injection="{{ a.injection_status or 'Sans injection' }}" data-client="{{ d.client }}">
+<article class="kb-card"{% if a.ref %} data-ticket-card{% endif %} data-group="{{ a.group }}" data-equipe="{{ a.teams | join('|') if a.teams else 'Sans équipe' }}" data-injection="{{ a.injection_status or 'Sans injection' }}" data-client="{{ d.client }}">
   <p class="kb-title">{% if a.vigilance %}{{ ic.icon("alert", "Point de vigilance", "ic-alert") }} {% endif %}{% if a.event %}{{ ic.icon("flag", "Date clé", "ic-muted") }} {% endif %}{% if a.ref %}<a data-ticket href="{{ ticket_url(d.slug, 'action', a.ref) }}">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}</p>
   <p class="kb-meta">{% for t in a.teams %}<span class="team team-{{ t | lower }}">{{ t }}</span>{% endfor %}
     {% if show_client %}<a class="muted" href="/deploiements/{{ d.slug }}/actions?vue=kanban">{{ d.client }}</a>{% endif %}
@@ -37,7 +37,7 @@
   <thead><tr>{% if show_client %}<th data-filter>Client</th>{% endif %}<th>Intitulé</th><th data-filter="equipe" data-multi>Équipe</th><th data-filter>Statut</th><th data-filter>Injection</th>{% if has_owner %}<th data-filter>Responsable</th>{% endif %}<th>Deadline</th></tr></thead>
   <tbody>
   {% for d in deployments %}{% for a in (d.actions if show_all else d.active_actions) %}
-    <tr class="{{ 'done' if a.group == 'done' }}">
+    <tr class="{{ 'done' if a.group == 'done' }}"{% if a.ref %} data-ticket-card{% endif %}>
       {% if show_client %}<td><a href="/deploiements/{{ d.slug }}/actions">{{ d.client }}</a></td>{% endif %}
       <td>{% if a.vigilance %}{{ ic.icon("alert", "Point de vigilance", "ic-alert") }} {% endif %}{% if a.event %}{{ ic.icon("flag", "Date clé", "ic-muted") }} {% endif %}{% if a.ref %}<a data-ticket href="{{ ticket_url(d.slug, 'action', a.ref) }}">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}
         {% if a.notion_url %}<a class="muted notion-mini" href="{{ a.notion_url }}" target="_blank" rel="noopener" title="Ouvrir dans Notion">↗</a>{% endif %}

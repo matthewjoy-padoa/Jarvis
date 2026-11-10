@@ -693,3 +693,17 @@ html.drawer-open { overflow: hidden; }
 .ticket-page .ticket-title { padding-right: 0; }
 a[data-ticket] { color: inherit; }
 a[data-ticket]:hover { color: var(--accent); }
+
+/* Fenêtre de détail centrée (remplace le panneau latéral) et cartes entièrement cliquables */
+.drawer.modal { display: grid; place-items: center; padding: 4vh 16px; }
+.drawer.modal[hidden] { display: none; }
+.drawer.modal .drawer-panel { position: relative; inset: auto; width: min(820px, 100%); max-height: 92vh; border: var(--line) solid var(--border);
+  border-radius: 20px; box-shadow: 0 24px 60px -20px rgba(0, 18, 53, .45); padding: 22px 28px 28px; animation: pop .18s var(--ease); }
+.drawer.modal .drawer-backdrop { background: rgba(0, 18, 53, .4); backdrop-filter: blur(2px); }
+@keyframes pop { from { transform: translateY(8px) scale(.985); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .drawer.modal .drawer-panel { animation: none; } }
+@media (max-width: 700px) { .drawer.modal { padding: 0; } .drawer.modal .drawer-panel { max-height: 100vh; height: 100%; border-radius: 0; } }
+[data-ticket-card] { cursor: pointer; }
+.retour[data-ticket-card]:hover { box-shadow: var(--shadow-lift); } /* le liseré de statut garde sa couleur */
+.retour[data-ticket-card] { transition: box-shadow .18s var(--ease), border-color .18s; }
+tr[data-ticket-card]:hover td { background: color-mix(in srgb, var(--accent-soft) 35%, transparent); }
