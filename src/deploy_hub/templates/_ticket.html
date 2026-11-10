@@ -13,6 +13,7 @@
       {% if not is_retour %}{% for t in item.teams %}<span class="team team-{{ t | lower }}">{{ t }}</span>{% endfor %}{% endif %}
     </div>
     <div class="ticket-actions">
+      {% if is_retour and item.is_open %}<button type="button" class="ticket-agent-btn" onclick="const a = this.closest('.ticket').querySelector('details.agent'); a.open = true; a.scrollIntoView({behavior: 'smooth', block: 'start'})">{{ ic.icon("bot") }} Lancer un agent</button>{% endif %}
       {% if item.notion_url %}<a class="btn-link" href="{{ item.notion_url }}" target="_blank" rel="noopener">Ouvrir dans Notion ↗</a>{% endif %}
       <a class="btn-link" href="{{ ticket_url(d.slug, kind, item.id if is_retour else item.ref) }}" target="_blank" rel="noopener" title="Ouvrir ce ticket dans un nouvel onglet">Nouvel onglet ↗</a>
     </div>

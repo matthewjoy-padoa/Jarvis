@@ -707,3 +707,25 @@ a[data-ticket]:hover { color: var(--accent); }
 .retour[data-ticket-card]:hover { box-shadow: var(--shadow-lift); } /* le liseré de statut garde sa couleur */
 .retour[data-ticket-card] { transition: box-shadow .18s var(--ease), border-color .18s; }
 tr[data-ticket-card]:hover td { background: color-mix(in srgb, var(--accent-soft) 35%, transparent); }
+
+/* « Lancer un agent » : bouton plein bien visible (liste des retours et fenêtre de détail) ; ouvert, il passe en secondaire */
+.retour details.agent > summary, .ticket details.agent > summary {
+  display: inline-flex; align-items: center; gap: 8px; width: max-content; list-style: none; cursor: pointer;
+  margin: 12px 0 2px; padding: 8px 18px 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 700; color: var(--on-accent);
+  background: linear-gradient(100deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, #8767f9) 100%);
+  border: var(--line) solid transparent; box-shadow: 0 2px 6px -1px color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: transform .15s var(--ease), box-shadow .15s var(--ease), filter .15s; }
+.retour details.agent > summary::-webkit-details-marker, .ticket details.agent > summary::-webkit-details-marker { display: none; }
+.retour details.agent > summary .ic, .ticket details.agent > summary .ic { width: 18px; height: 18px; }
+.retour details.agent > summary::after, .ticket details.agent > summary::after { content: "→"; font-weight: 700; transition: transform .15s var(--ease); }
+.retour details.agent > summary:hover, .ticket details.agent > summary:hover {
+  transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 8px 18px -6px color-mix(in srgb, var(--accent) 60%, transparent); }
+.retour details.agent > summary:hover::after, .ticket details.agent > summary:hover::after { transform: translateX(3px); }
+.retour details.agent > summary:focus-visible, .ticket details.agent > summary:focus-visible { outline: none; box-shadow: var(--ring); }
+.retour details.agent[open] > summary, .ticket details.agent[open] > summary {
+  background: var(--surface); color: var(--text); border-color: var(--border); box-shadow: var(--shadow-card); filter: none; }
+.retour details.agent[open] > summary::after, .ticket details.agent[open] > summary::after { content: "▴"; }
+.retour details.agent[open], .ticket details.agent[open] { background: color-mix(in srgb, var(--accent-soft) 30%, transparent);
+  border-radius: 14px; padding: 2px 12px 12px; margin-top: 8px; }
+.ticket-agent-btn { background: linear-gradient(100deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, #8767f9) 100%); border-color: transparent; }
+.ticket-agent-btn .ic { width: 17px; height: 17px; }
