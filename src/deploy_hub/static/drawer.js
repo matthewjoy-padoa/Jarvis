@@ -29,7 +29,9 @@
     document.documentElement.classList.remove("drawer-open");
     if (lastFocus) lastFocus.focus();
   }
-  const INTERACTIVE = "a, button, summary, details, input, select, textarea, label, form";
+  // Un bloc <details> fermé prend toute la largeur de la carte : seul son bouton (summary) lui appartient.
+  // Déplié, son contenu (texte du retour, brief de l'agent) reste à lui : on y lit, on y sélectionne, on y écrit.
+  const INTERACTIVE = "a, button, summary, input, select, textarea, label, form, details[open] > :not(summary)";
   document.addEventListener("click", (e) => {
     if (e.button !== 0) return;
     let a = e.target.closest("a[data-ticket]");
