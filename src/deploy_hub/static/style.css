@@ -572,3 +572,92 @@ a.wn-title:hover { color: var(--accent); }
 .kb-title a:hover { color: var(--accent); }
 .kb-meta { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 12px; }
 .kb-col:not(:has(.kb-card:not([hidden]))) .kb-cards::after { content: "Aucune carte pour ces filtres"; color: var(--muted); font-size: 12px; padding: 4px; }
+
+/* ============================================================ Boutons et cartes (retouche 2026-11-10)
+   Un seul langage : bord 1,5 px, ombre douce, relief au survol pour ce qui est cliquable, anneau de focus au clavier. */
+:root {
+  --line: 1.5px;
+  --shadow-card: 0 1px 2px rgba(0, 18, 53, .05), 0 1px 1px rgba(0, 18, 53, .03);
+  --shadow-lift: 0 6px 18px -6px rgba(0, 18, 53, .18), 0 2px 4px rgba(0, 18, 53, .06);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+  --ease: cubic-bezier(.2, .7, .3, 1);
+}
+:root[data-theme="dark"] { --shadow-card: none; --shadow-lift: 0 8px 22px -8px rgba(0, 0, 0, .55); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --shadow-card: none; --shadow-lift: 0 8px 22px -8px rgba(0, 0, 0, .55); } }
+
+/* --- Boutons ---------------------------------------------------------------------------------------- */
+button, .btn-primary, .btn-link {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 34px; padding: 6px 16px; border-radius: 999px; font-size: 13.5px; font-weight: 600; line-height: 1.2;
+  transition: background-color .15s var(--ease), border-color .15s var(--ease), box-shadow .15s var(--ease), transform .15s var(--ease), color .15s;
+}
+button, .btn-primary { background: var(--accent); color: var(--on-accent); border: var(--line) solid var(--accent);
+  box-shadow: 0 1px 2px rgba(0, 18, 53, .12), inset 0 1px 0 rgba(255, 255, 255, .14); }
+button:hover:not(:disabled), .btn-primary:hover { background: color-mix(in srgb, var(--accent) 88%, #000); border-color: color-mix(in srgb, var(--accent) 88%, #000);
+  transform: translateY(-1px); box-shadow: var(--shadow-lift); filter: none; }
+button:active:not(:disabled), .btn-primary:active, .btn-link:active { transform: translateY(0); box-shadow: none; }
+button.secondary, .theme-toggle, .btn-link {
+  background: var(--surface); color: var(--text); border: var(--line) solid var(--border); box-shadow: var(--shadow-card); }
+button.secondary:hover:not(:disabled), .theme-toggle:hover, .btn-link:hover {
+  background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--text); transform: translateY(-1px); box-shadow: var(--shadow-card); }
+.btn-link { min-height: 28px; padding: 3px 12px; font-size: 12.5px; }
+button .ic, .btn-primary .ic, .btn-link .ic { width: 15px; height: 15px; }
+button:focus-visible, .btn-primary:focus-visible, .btn-link:focus-visible, .segmented a:focus-visible, .theme-toggle:focus-visible,
+.card-linked:focus-within, a.kpi-link:focus-visible { outline: none; box-shadow: var(--ring); }
+button:disabled { opacity: .45; box-shadow: none; transform: none; }
+.dag-form.is-prod button { background: var(--st-ko); border-color: var(--st-ko); }
+.dag-form.is-prod button:hover:not(:disabled) { background: color-mix(in srgb, var(--st-ko) 85%, #000); border-color: color-mix(in srgb, var(--st-ko) 85%, #000); }
+.link-btn { min-height: 0; padding: 0; border: 0; background: none; box-shadow: none; color: var(--accent); }
+.link-btn:hover:not(:disabled) { background: none; transform: none; box-shadow: none; text-decoration: underline; }
+
+/* --- Contrôles segmentés (vues, filtres Actives/Toutes…) : une piste, l'option choisie en relief ---------- */
+.segmented { display: inline-flex; gap: 2px; padding: 3px; margin: 8px 0 4px; border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 55%, var(--bg)); }
+.segmented a { border: 0; background: none; padding: 5px 14px; border-radius: 999px; color: var(--muted); font-weight: 500;
+  transition: color .15s, background-color .15s var(--ease), box-shadow .15s var(--ease); }
+.segmented a:hover { color: var(--text); background: color-mix(in srgb, var(--surface) 55%, transparent); }
+.segmented a.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 18, 53, .14); }
+.segmented > .muted:not(a), .segmented .note { padding: 0 8px; }
+.view-bar { gap: 8px 12px; margin: 8px 0 4px; }
+.view-bar .segmented { margin: 0; }
+.view-bar .note { font-size: 12.5px; }
+
+/* --- Cartes ----------------------------------------------------------------------------------------- */
+.card, .kpi, .stat, .chart, .panel, .retour, .res-block, table, .wn-item, .kb-card, .pending-card {
+  border: var(--line) solid var(--border); box-shadow: var(--shadow-card); }
+.card, .kpi, .stat, .chart, .panel, .retour, .res-block { border-radius: var(--radius); }
+.card { padding: 16px 18px; }
+.card-head { gap: 10px; }
+.card-head strong { font-size: 15.5px; }
+.card-linked, a.kpi-link, .kb-card, .wn-item { transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s; }
+.card-linked:hover, a.kpi-link:hover, .kb-card:hover, .wn-item:hover {
+  transform: translateY(-2px); box-shadow: var(--shadow-lift); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.card-config { font-size: 12.5px; font-weight: 600; }
+.pending-card { border-style: dashed; box-shadow: none; background: color-mix(in srgb, var(--surface) 60%, transparent); }
+.empty-state { text-align: center; padding: 28px 20px; }
+.empty-state .btn-primary { margin: 6px 0 10px; }
+
+/* Tuiles de chiffres : liseré de couleur à gauche plutôt qu'un contour coloré */
+.stat { position: relative; overflow: hidden; padding: 14px 16px 14px 20px; gap: 2px; }
+.stat::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--border); }
+.stat-ko, .stat-todo { border-color: var(--border); }
+.stat-ko::before { background: var(--st-ko); }
+.stat-todo::before { background: var(--st-todo); }
+.stat-ko span::before { display: none; }
+.stat strong { letter-spacing: -.02em; }
+
+/* Panneaux et retours de recette */
+.panel { padding: 6px 18px 12px; }
+.panel h2 { font-size: 15px; letter-spacing: -.005em; }
+.retour { padding: 12px 16px; border-left-width: 4px; }
+.retour[data-group="todo"] { border-left-color: var(--st-todo); }
+.retour[data-group="in_progress"] { border-left-color: var(--st-progress); }
+.retour[data-group="ko"] { border-left-color: var(--st-ko); }
+.retour[data-group="done"] { border-left-color: var(--st-done); }
+.retour .agent summary, .retour .retour-content summary { font-weight: 600; font-size: 13px; }
+
+/* Kanban et Quoi de neuf : mêmes cartes */
+.kb-col { border-radius: var(--radius); border-width: var(--line); }
+.kb-card { border-radius: 12px; padding: 10px 12px; }
+.wn-item { border-radius: 12px; }
