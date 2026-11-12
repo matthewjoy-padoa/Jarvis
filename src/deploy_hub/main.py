@@ -1,4 +1,5 @@
 import os
+import re
 from contextlib import asynccontextmanager
 import threading
 from datetime import date, datetime, timedelta
@@ -53,13 +54,17 @@ templates.env.globals["kanban_columns"] = kanban_columns
 templates.env.globals["ACTION_STATUSES"] = ACTION_STATUSES
 templates.env.globals["RETOUR_STATUSES"] = RETOUR_STATUSES
 
-# Pages globales (barre du haut) et onglets d'une fiche, calqués sur les blocs du dashboard Notion.
+# Pages globales et onglets d'une fiche, calqués sur les blocs du dashboard Notion.
+# On travaille sur un client à la fois : la barre du haut montre le client en cours (sélecteur) et NAV_PAGES ;
+# « Clients » (tous les clients, réglages) se rejoint depuis le sélecteur. PAGES reste la liste complète (palette ⌘K).
 PAGES = [
     ("/", "Accueil"),
     ("/clients", "Clients"),
     ("/deadlines", "Deadlines"),
     ("/agents", "Agents"),
 ]
+NAV_PAGES = [p for p in PAGES if p[0] != "/clients"]
+CLIENT_COOKIE = "jarvis_client"  # client en cours : celui de la dernière fiche ouverte
 # Vues tous clients, proposées sur la page Clients (et toujours joignables par leur URL).
 CROSS_PAGES = [
     ("/injections", "Injections"),
@@ -83,12 +88,34 @@ def _deployments(request: Request) -> list[Deployment]:
     return request.state.deployments
 
 
+def _closest_go_live(d: Deployment) -> tuple:
+    """Ordre par défaut : le déploiement à venir le plus proche d'abord, puis les autres."""
+    upcoming = bool(d.go_live) and d.days_left >= 0
+    return (not upcoming, d.days_left if upcoming else 0, d.client)
+
+
+def _current(request: Request) -> Deployment | None:
+    """Client en cours : celui du cookie (dernière fiche ouverte), sinon le déploiement le plus proche."""
+    if not hasattr(request.state, "current"):
+        deployments = _deployments(request)
+        slug = request.cookies.get(CLIENT_COOKIE)
+        request.state.current = next((d for d in deployments if d.slug == slug), None) or \
+            (min(deployments, key=_closest_go_live) if deployments else None)
+    return request.state.current
+
+
+def _remember(response, slug: str):
+    response.set_cookie(CLIENT_COOKIE, slug, max_age=365 * 24 * 3600, samesite="lax")
+    return response
+
+
 def _render(request: Request, template: str, active: str, **context) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
         template,
         {
-            "pages": PAGES,
+            "pages": NAV_PAGES,
+            "current": _current(request),
             "cross_pages": CROSS_PAGES,
             "clients": _deployments(request),
             "active": active,
@@ -130,8 +157,9 @@ def _result(request: Request, result: ActionResult) -> HTMLResponse:
 
 @app.get("/", response_class=HTMLResponse)
 def today_page(request: Request):
-    """Ce qui demande de l'attention aujourd'hui, tous clients : retards, échéances, KO, jalons, et « Quoi de neuf »."""
-    deployments = _deployments(request)
+    """Ce qui demande de l'attention aujourd'hui chez le client en cours : retards, échéances, KO, jalons, « Quoi de neuf »."""
+    current = _current(request)
+    deployments = [current] if current else []
     today = date.today()
     items = [i for i in _deadlines(deployments) if i["kind"] != "Jalon"]
     return _render(
@@ -265,8 +293,11 @@ def recette(request: Request, tous: bool = False, vue: str = "liste"):
 
 
 @app.get("/deadlines", response_class=HTMLResponse)
-def deadlines(request: Request):
-    return _render(request, "deadlines.html", "/deadlines", items=_deadlines(_deployments(request)))
+def deadlines(request: Request, tous: bool = False):
+    """Échéances du client en cours ; tous=true : tous les clients."""
+    current = _current(request)
+    deployments = _deployments(request) if tous or not current else [current]
+    return _render(request, "deadlines.html", "/deadlines", items=_deadlines(deployments), all_clients=tous or not current)
 
 
 @app.get("/agents", response_class=HTMLResponse)
@@ -342,12 +373,26 @@ def deployment_root(slug: str):
     return RedirectResponse(f"/deploiements/{slug}/synthese")
 
 
+@app.get("/client/{slug}")
+def switch_client(slug: str, vers: str = "/"):
+    """Change de client en cours en restant sur la même page : même onglet de fiche, ou même page globale."""
+    _get(slug)
+    if m := re.match(r"^/deploiements/[^/]+(/[a-z]+)?$", vers):
+        target = f"/deploiements/{slug}{m[1] or '/synthese'}"
+    elif vers in ("/", "/deadlines"):
+        target = vers
+    else:
+        target = f"/deploiements/{slug}/synthese"
+    return _remember(RedirectResponse(target, status_code=303), slug)
+
+
 @app.get("/deploiements/{slug}/{tab}", response_class=HTMLResponse)
 def deployment_tab(request: Request, slug: str, tab: str, tous: bool = False, vue: str = "ressources"):
     if tab not in dict(DEPLOYMENT_TABS):
         raise HTTPException(404, f"Onglet inconnu : {tab}")
     d = _get(slug)
-    return _render(
+    request.state.current = d  # la fiche ouverte devient le client en cours
+    return _remember(_render(
         request,
         "deployment.html",
         f"/deploiements/{slug}",
@@ -358,7 +403,7 @@ def deployment_tab(request: Request, slug: str, tab: str, tous: bool = False, vu
         show_all=tous,
         vue=vue,
         milestones=[(MILESTONE_LABELS.get(k, k), v) for k, v in sorted(d.milestones.items(), key=lambda kv: kv[1])],
-    )
+    ), slug)
 
 
 def _launch(dag_id: str, padoa_env: str, d: Deployment | None = None, card: str = "") -> ActionResult:

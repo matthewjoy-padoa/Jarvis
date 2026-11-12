@@ -86,7 +86,7 @@ def test_recette_hides_closed_retours_unless_asked():
 
 
 def test_deadlines_skip_done_actions_and_closed_retours():
-    r = client.get("/deadlines").text
+    r = TestClient(app).get("/deadlines").text  # sans cookie : le client en cours est Client Démo, quel que soit l'ordre des tests
     assert "Recevoir l'extraction complète" not in r  # action terminée
     assert "R-02" in r and "R-01" not in r
     assert r.index("Kick-off") < r.index("Freeze")
@@ -224,11 +224,13 @@ def test_theme_switch_is_in_every_page():
     assert 'id="theme-toggle"' in html and 'localStorage.getItem("theme")' in html
 
 
-def test_navigation_lists_clients_and_marks_the_current_one():
-    html = client.get("/deploiements/client-demo/synthese").text
+def test_navigation_shows_the_current_client_and_the_others_in_its_menu():
+    """Un client à la fois : le client en cours dans la barre, les autres seulement dans le menu du sélecteur."""
+    html = TestClient(app).get("/deploiements/client-demo/synthese").text
     nav = html.split("<main>", 1)[0]
-    assert 'href="/deploiements/client-demo" class="client-chip' in nav and 'h-' in nav and "Client Exemple" in nav
-    assert nav.count('client-chip') >= 2 and 'class="client-chip h-' in nav and ' active"' in nav.split('href="/deploiements/client-demo"', 1)[1].split('>', 1)[0]
+    assert nav.count('class="client-chip') == 1 and "Client en cours : Client Démo" in nav
+    assert 'href="/client/client-exemple?vers=/deploiements/client-demo/synthese"' in nav and "Tous les clients et réglages" in nav
+    assert 'class="nav-item' in nav and '<span>Clients</span>' not in nav  # « Clients » quitte le menu principal
 
 
 def test_empty_columns_are_hidden():

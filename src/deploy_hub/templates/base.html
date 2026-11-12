@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=54">
+  <link rel="stylesheet" href="/static/style.css?v=55">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=4" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
@@ -32,6 +32,26 @@
       "/deadlines": '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
       "/agents": '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9.5 13h.01M14.5 13h.01M9.5 16.5h5"/>',
     } %}
+    {# Le client en cours : on travaille sur un client à la fois ; les autres sont dans le menu, pas à côté. #}
+    {% if current %}
+    <details class="client-switch" data-client-switch>
+      <summary class="client-chip strong h-{{ current.health_level }} {{ 'active' if active == '/deploiements/' ~ current.slug }}"
+               title="Client en cours : {{ current.client }} · {{ current.progress }} % intégré{% if current.go_live %} · déploiement le {{ current.go_live.strftime('%d/%m/%Y') }}{% endif %}">
+        <span class="dot" aria-hidden="true"></span><span class="client-name">{{ current.client }}</span>{{ ic.countdown(current) }}
+        <svg class="switch-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></summary>
+      <div class="client-menu" role="menu">
+        <a role="menuitem" href="/deploiements/{{ current.slug }}/synthese">Ouvrir la fiche de {{ current.client }}</a>
+        {% if clients | length > 1 %}
+        <p class="client-menu-label">Changer de client</p>
+        {% for d in clients if d.slug != current.slug %}
+        <a role="menuitem" class="client-menu-item" href="/client/{{ d.slug }}?vers={{ request.url.path | urlencode }}">
+          <span class="health h-{{ d.health_level }}" aria-hidden="true"></span>{{ d.client }}{{ ic.countdown(d) }}</a>
+        {% endfor %}
+        {% endif %}
+        <a role="menuitem" class="client-menu-all" href="/clients">Tous les clients et réglages</a>
+      </div>
+    </details>
+    {% endif %}
     <nav class="nav" aria-label="Navigation">
       <div class="nav-group">
         {% for path, label in pages %}
@@ -39,15 +59,6 @@
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">{{ icons.get(path, '') | safe }}</svg><span>{{ label }}</span></a>
         {% endfor %}
       </div>
-      {% if clients %}
-      <div class="nav-clients" aria-label="Clients">
-        {% for d in clients %}
-        <a href="/deploiements/{{ d.slug }}" class="client-chip h-{{ d.health_level }} {{ 'active' if active == '/deploiements/' ~ d.slug }}"
-           title="{{ d.client }} · {{ d.progress }} % intégré{% if d.go_live %} · déploiement le {{ d.go_live.strftime('%d/%m/%Y') }}{% endif %}">
-          <span class="dot" aria-hidden="true"></span><span class="client-name">{{ d.client }}</span>{{ ic.countdown(d) }}</a>
-        {% endfor %}
-      </div>
-      {% endif %}
     </nav>
     <button type="button" class="secondary pal-open" data-palette-open aria-label="Rechercher dans Jarvis" title="Demander à Jarvis">{{ ic.icon("search") }}<span class="pal-open-label">Rechercher</span><kbd data-palette-key>⌘K</kbd></button>
     <div class="bell-wrap">
@@ -83,6 +94,15 @@
     })();
   </script>
   <main>{% block content %}{% endblock %}</main>
+  <script>
+    // Sélecteur du client en cours : se ferme au clic ailleurs et à Échap.
+    (function () {
+      const menu = document.querySelector("[data-client-switch]");
+      if (!menu) return;
+      document.addEventListener("click", (e) => { if (menu.open && !menu.contains(e.target)) menu.open = false; });
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape" && menu.open) { menu.open = false; menu.querySelector("summary").focus(); } });
+    })();
+  </script>
   <script>
     // Hauteur réelle du menu (elle change avec la largeur) : les onglets d'un client se collent juste dessous.
     (function () {

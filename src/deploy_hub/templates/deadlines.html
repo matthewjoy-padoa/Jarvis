@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Deadlines · Jarvis{% endblock %}
 {% block content %}
-<h1>Deadlines</h1>
+<div class="page-head">
+  <h1>Deadlines{% if not all_clients and current %} <span class="muted">· {{ current.client }}</span>{% endif %}</h1>
+  {% if all_clients %}{% if current %}<a class="btn-link" href="/deadlines">Seulement {{ current.client }}</a>{% endif %}
+  {% else %}<a class="btn-link" href="/deadlines?tous=true">Tous les clients</a>{% endif %}
+</div>
 {% import "_charts.html" as charts with context %}
 {% set ns = namespace(late=0, week=0, month=0) %}
 {% for i in items %}{% set days = (i.date - today).days %}
