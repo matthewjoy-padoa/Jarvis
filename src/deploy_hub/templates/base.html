@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=49">
+  <link rel="stylesheet" href="/static/style.css?v=50">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=4" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
@@ -49,10 +49,7 @@
       </div>
       {% endif %}
     </nav>
-    <div class="pal-buttons">
     <button type="button" class="secondary pal-open" data-palette-open aria-label="Rechercher dans Jarvis" title="Demander à Jarvis">{{ ic.icon("search") }}<span class="pal-open-label">Rechercher</span><kbd data-palette-key>⌘K</kbd></button>
-    <button type="button" class="secondary icon-btn pal-console-open" data-palette-open=">" aria-label="Console Jarvis" title="Console : lancer un DAG, un agent, rafraîchir un client… (touche >)">{{ ic.icon("terminal") }}</button>
-    </div>
     <div class="bell-wrap">
       <button type="button" class="bell secondary icon-btn" aria-label="Notifications" aria-haspopup="true" aria-expanded="false"
               hx-get="/notifications/panneau" hx-target="#notif-panel" hx-trigger="click">{{ ic.icon("bell") }}<span id="bell-count" hx-target="this" hx-get="/notifications/compte" hx-trigger="load, every 60s, notifs-changed from:body" hx-swap="innerHTML"></span></button>
@@ -128,6 +125,9 @@
       </div>
     </div>
   </div>
+  {# Console (>dag, >agent…) : bouton flottant en bas à droite, comme un bouton de discussion ; la touche « > » fait pareil. #}
+  <button type="button" class="console-fab" data-palette-open=">" aria-label="Console Jarvis" title="Console : lancer un DAG, un agent, rafraîchir un client… (touche >)">
+    {{ ic.icon("terminal") }}<span class="console-fab-label">Console</span><kbd>&gt;</kbd></button>
   <footer class="footer muted">Jarvis · <em>Just A Rather Very Intelligent System</em>, au service de l'équipe Integration · <a href="/sources">État des systèmes</a></footer>
 </body>
 </html>

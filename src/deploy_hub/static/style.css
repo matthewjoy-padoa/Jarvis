@@ -737,9 +737,8 @@ kbd { display: inline-block; min-width: 20px; padding: 1px 6px; border: 1px soli
 button.pal-open { flex: none; gap: 8px; padding: 6px 10px 6px 12px; color: var(--muted); font-weight: 500; }
 button.pal-open:hover:not(:disabled) { color: var(--text); }
 button.pal-open .ic { width: 16px; height: 16px; margin: 0; }
-/* Sous 1440 px, la barre garde ses icônes (loupe, console, thème) : les puces clients passent d'abord. */
-@media (max-width: 1440px) { .pal-open-label, .pal-open kbd, .theme-label { display: none; } button.pal-open { padding: 6px 12px; } }
-.pal-buttons { display: flex; gap: 4px; flex: none; }
+/* Le libellé et le raccourci ne s'affichent que si la barre a la place : les clients passent d'abord. */
+@media (max-width: 1440px) { .pal-open-label, .pal-open kbd { display: none; } button.pal-open { padding: 6px 12px; } }
 
 html.palette-open { overflow: hidden; }
 .palette { position: fixed; inset: 0; z-index: 70; display: flex; justify-content: center; align-items: flex-start; padding: 11vh 16px 16px; }
@@ -816,7 +815,23 @@ button.pal-hint:hover:not(:disabled) { border-style: solid; border-color: var(--
 /* ============================================================ Console Jarvis (palette en mode « > », 2026-11-12)
    Bouton >_ de la barre, invite « jarvis › », police à chasse fixe ; formulaire de lancement d'un DAG et journal des lancements. */
 .palette { --mono: ui-monospace, SFMono-Regular, Menlo, monospace; }
-button.pal-console-open .ic { width: 17px; height: 17px; }
+/* Bouton flottant, en bas à droite : rond, il s'allonge au survol pour dire ce qu'il ouvre. Sous les fenêtres (ticket 60, palette 70). */
+button.console-fab { position: fixed; right: 24px; bottom: 24px; z-index: 50; display: inline-flex; align-items: center; gap: 0;
+  height: 54px; min-width: 54px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent);
+  box-shadow: 0 14px 30px -10px color-mix(in srgb, var(--accent) 70%, transparent), 0 3px 8px rgba(0, 18, 53, .18);
+  transition: gap .2s var(--ease), padding .2s var(--ease), transform .2s var(--ease), box-shadow .2s var(--ease); }
+button.console-fab .ic { width: 22px; height: 22px; margin: 0; flex: none; }
+.console-fab-label, button.console-fab kbd { max-width: 0; overflow: hidden; opacity: 0; transition: max-width .2s var(--ease), opacity .15s ease; }
+.console-fab-label { font: 600 14px/1 var(--mono, ui-monospace, monospace); white-space: nowrap; }
+button.console-fab kbd { border-color: rgba(255, 255, 255, .35); background: rgba(255, 255, 255, .14); color: inherit; padding: 1px 0; min-width: 0; }
+button.console-fab:hover:not(:disabled), button.console-fab:focus-visible { gap: 10px; padding: 0 18px; transform: translateY(-2px); background: var(--accent); color: var(--on-accent);
+  box-shadow: 0 18px 36px -10px color-mix(in srgb, var(--accent) 75%, transparent), 0 4px 10px rgba(0, 18, 53, .2); }
+button.console-fab:hover .console-fab-label, button.console-fab:focus-visible .console-fab-label { max-width: 90px; opacity: 1; }
+button.console-fab:hover kbd, button.console-fab:focus-visible kbd { max-width: 30px; opacity: 1; padding: 1px 6px; }
+html.palette-open .console-fab, html.drawer-open .console-fab { display: none; }
+@media (max-width: 640px) { button.console-fab { right: 16px; bottom: 16px; height: 50px; min-width: 50px; } }
+@media (prefers-reduced-motion: reduce) { button.console-fab { transition: none; } }
+@media print { button.console-fab { display: none; } }
 .palette-prompt { display: none; font: 600 15px/1 var(--mono); color: var(--accent); white-space: nowrap; }
 .palette.is-console .palette-head > .ic { display: none; }
 .palette.is-console .palette-prompt { display: inline; }
