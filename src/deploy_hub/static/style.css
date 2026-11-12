@@ -858,3 +858,6 @@ html.palette-open .console-fab, html.drawer-open .console-fab { display: none; }
 .pal-log.ko { border-left-color: var(--danger); }
 .pal-log-at { color: var(--muted); font-variant-numeric: tabular-nums; }
 .pal-log span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+
+/* ============================================================ Suivi des runs (air.py, 2026-11-12) : journal et rapport bruts */
+pre.watch-scroll { max-height: 480px; overflow: auto; }  /* sur le style .agent-summary des comptes rendus d'agent */

@@ -20,6 +20,22 @@
   </tbody>
 </table>
 
+<h2>Suivis de DAG</h2>
+<p class="muted">Après chaque lancement réel, <code>air.py</code> suit le run : relances automatiques des erreurs passagères, notifications, rapport à la fin.</p>
+<table data-filterable>
+  <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>DAG</th><th data-filter>Stack</th><th data-filter>État</th><th>Dernière nouvelle</th></tr></thead>
+  <tbody>
+  {% for w in watches %}
+    <tr>
+      <td><a href="/agents/suivis/{{ w.id }}">#{{ w.id }}</a></td><td class="muted">{{ w.started_at.strftime("%d/%m %H:%M") }}</td>
+      <td>{{ w.client }}</td><td><a href="/agents/suivis/{{ w.id }}"><code>{{ w.dag_id }}</code></a></td>
+      <td><span class="badge">{{ w.padoa_env }}</span></td><td><span class="badge g-{{ w.group }}">{{ w.status }}</span></td>
+      <td class="muted">{{ w.summary | truncate(120) }}</td>
+    </tr>
+  {% else %}<tr><td colspan="7" class="muted">Aucun suivi : ils démarrent avec les lancements réels (Airflow configuré).</td></tr>{% endfor %}
+  </tbody>
+</table>
+
 <h2>DAGs lancés</h2>
 <table data-filterable>
   <thead><tr><th>Lancé à</th><th data-filter="client">Client</th><th>Carte</th><th>DAG</th><th data-filter>Stack</th><th>Résultat</th></tr></thead>

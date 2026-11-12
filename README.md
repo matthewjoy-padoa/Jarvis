@@ -62,6 +62,14 @@ L'onglet Injections propose, pour chaque carte, les DAGs de l'orchestrator qui t
 - **Airflow** : renseigner `AIRFLOW_BASE_URL`, `AIRFLOW_USER` et `AIRFLOW_PASSWORD` dans `.env` (API REST v1). Sans eux, les lancements sont simulés et listés dans « Agents ».
 - **Catalogue des DAGs** : `sync/dags/catalogue.json`, généré depuis un clone de l'orchestrator. À régénérer quand `dags/config_deployment.py` change (commande en tête de [`sync/dags/generer_catalogue.py`](sync/dags/generer_catalogue.py)).
 - Pour réactiver la prod : ajouter `"prod"` à `PADOA_ENVS` dans `src/deploy_hub/sources/airflow.py` (il faut alors taper PROD pour confirmer chaque lancement).
+- **Un DAG en pause** est sorti de pause avant le lancement (sinon le run attendrait) ; le message le dit.
+
+### Suivi automatique des runs (`air.py`)
+Après chaque lancement réel (onglets Injections et CED, console `>dag`), Jarvis lance en tâche de fond `python -m deploy_hub.air watch <dag> <run> --client <client>` : le script d'Arthur ([`src/deploy_hub/air.py`](src/deploy_hub/air.py)), repris tel quel à trois adaptations près (repérées « Jarvis »).
+- Toutes les 60 s, il relit le run. Une tâche en échec **passager** (disque plein, délai, connexion, tâche tuée par manque de mémoire) est relancée avec ses suites, 3 fois au plus ; les lots d'une tâche « mappée » le sont par vagues adaptatives. Une erreur SQL ou Python n'est jamais relancée.
+- Ses alertes deviennent des **notifications** de Jarvis ; à la fin, un **rapport** (durée, volumes du loader, compare, cleaner, mappings manquants) s'affiche sur la page du suivi (**Agents → Suivis de DAG**), avec le journal des relances et un bouton « Arrêter le suivi » (le run, lui, continue).
+- Pour classer les erreurs et faire le rapport, le suivi **lit les logs des tâches qu'il suit**. État, rapports et journal vont dans `data/airflow/` (hors de git) : ils peuvent contenir des valeurs client.
+- Un redémarrage de Jarvis (rechargement compris) coupe les suivis puis les **reprend** : `air.py` repart de son état (relances déjà faites, notifications déjà envoyées). Sans Airflow configuré au redémarrage, ils passent « interrompu » et le run continue sans relances.
 
 ## Lancer des agents Claude
 

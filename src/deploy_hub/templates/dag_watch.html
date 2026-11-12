@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Suivi #{{ w.id }} · Jarvis{% endblock %}
+{% block content %}
+<p class="muted"><a href="/agents">← Agents</a></p>
+<div class="page-head">
+  <h1>Suivi #{{ w.id }} · {{ w.client }}</h1>
+</div>
+<dl class="meta-list">
+  <dt>DAG</dt><dd><code>{{ w.dag_id }}</code> · <span class="badge">{{ w.padoa_env }}</span></dd>
+  <dt>Run</dt><dd><code>{{ w.run_id }}</code></dd>
+  {% if w.card %}<dt>Carte</dt><dd><a href="/deploiements/{{ w.slug }}/injections">{{ w.card }}</a></dd>{% endif %}
+  <dt>Lancé</dt><dd>{{ w.started_at.strftime("%d/%m/%Y %H:%M") }}{% if w.ended_at %} · fini à {{ w.ended_at.strftime("%H:%M") }}{% endif %}</dd>
+</dl>
+<p class="muted">Suivi par <code>air.py</code> (script d'Arthur) : relance seul les tâches en échec passager (disque plein, délai, connexion, mémoire), 3 fois au plus, par vagues pour les lots ; une erreur SQL ou Python n'est jamais relancée et te notifie aussitôt.</p>
+{% include "_dag_watch_log.html" %}
+{% endblock %}
