@@ -9,6 +9,25 @@
   <a class="kpi kpi-link" href="/deploiements/{{ d.slug }}/actions"><span class="muted">Points de vigilance</span><strong>{{ d.vigilance | length }}</strong><span class="muted">voir les actions →</span></a>
 </div>
 
+{# Où ça coince : les 5 points avec le plus de KO (blocs d'injection, types de retours), chacun mène à sa liste. #}
+{% set points = d.blocking_points %}
+<section class="panel blocking">
+  <h2>{{ ic.icon("alert", "", "ic-alert") }} Où ça coince{% if points %} <span class="muted">· KO d'abord, puis le plus d'éléments ouverts</span>{% endif %}</h2>
+  {% for p in points[:5] %}
+  <a class="blocking-row" href="{{ p.href }}">
+    <span class="blocking-rank">{{ loop.index }}</span>
+    <span class="blocking-main">
+      <span class="blocking-name">{% for r in p.resources %}<code class="res">{{ r }}</code> {% else %}{{ p.label }}{% endfor %}<span class="blocking-kind k-{{ p.kind }}">{{ "Injection" if p.kind == "injection" else "Recette" }}</span></span>
+      <span class="muted">{{ p.open }} {{ "carte(s)" if p.kind == "injection" else "retour(s)" }} ouvert(s) sur {{ p.total }}</span>
+    </span>
+    <span class="blocking-counts">{% for g, label in (("ko", "KO"), ("in_progress", "en cours"), ("todo", "à faire")) if p.counts[g] %}<span class="badge g-{{ g }}">{{ p.counts[g] }} {{ label }}</span>{% endfor %}</span>
+  </a>
+  {% else %}
+  <p class="blocking-none">{{ ic.icon("check") }} Aucun point bloquant : aucun KO en injection ni en recette.</p>
+  {% endfor %}
+  {% if points | length > 5 %}<p class="muted blocking-more">+ {{ points | length - 5 }} autre(s) point(s) avec un KO · <a href="/deploiements/{{ d.slug }}/injections">Injections</a> · <a href="/deploiements/{{ d.slug }}/recette">Recette</a></p>{% endif %}
+</section>
+
 {{ charts.timeline(d.timeline) }}
 {% if not d.timeline and milestones %}
 <section class="panel"><h2>Jalons</h2><ul class="timeline">{% for label, day in milestones %}<li class="{{ 'past' if day < today }}"><span class="date">{{ day.strftime("%d/%m/%Y") }}</span> {{ label }}</li>{% endfor %}</ul></section>
