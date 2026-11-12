@@ -2,7 +2,9 @@
 
 Lance un DAG avec le paramètre `padoa_env` (stack cible : integration, snap ou recette ; prod désactivée, contrôlé par
 `handle_padoa_env_coherence` dans dags/dag_params/handle_functions.py de l'orchestrator) et lit l'état des runs.
-Ne lit jamais les logs des DAGs (règle de l'équipe).
+Un DAG en pause est d'abord sorti de pause (sinon le run attendrait), et le message le dit.
+Ce module ne lit pas les logs ; le suivi lancé ensuite (dag_watch.py → air.py d'Arthur) les lit pour les runs qu'il suit
+(dérogation décidée par Matthew le 2026-11-12).
 
 Réel dès que AIRFLOW_BASE_URL, AIRFLOW_USER et AIRFLOW_PASSWORD sont renseignés (environnement ou .env de l'app) ;
 sinon simulé.
@@ -37,6 +39,7 @@ class AirflowSource:
     def __init__(self, base_url: str, user: str = "", password: str = "", transport: httpx.BaseTransport | None = None):
         self.base_url = base_url.rstrip("/")
         self.live = bool(base_url and user and password)
+        self.user, self.password = user, password  # transmis au suivi des runs (air.py), jamais affichés
         self.runs: list[DagRun] = []
         self.http = httpx.Client(base_url=f"{self.base_url}/api/v1", auth=(user, password), timeout=20, transport=transport) if self.live else None
 
@@ -63,6 +66,13 @@ class AirflowSource:
             if dag.status_code == 404:
                 return ActionResult(False, f"{dag_id} absent de cet Airflow (client inactif ou erreur d'import ?)", simulated=False)
             dag.raise_for_status()
+            was_paused = bool(dag.json().get("is_paused"))
+            if was_paused:  # un DAG en pause garderait le run en attente : comme air.py d'Arthur, on le sort de pause
+                p = self.http.patch(f"/dags/{dag_id}", params={"update_mask": "is_paused"}, json={"is_paused": False})
+                if p.status_code in (401, 403):
+                    return ActionResult(False, f"{dag_id} est en pause et Airflow refuse de l'en sortir ({p.status_code}) : "
+                                               "il faut le droit de modifier les DAGs, ou le sortir de pause dans l'interface.", simulated=False)
+                p.raise_for_status()
             r = self.http.post(f"/dags/{dag_id}/dagRuns", json={"conf": {"padoa_env": padoa_env}})
             if r.status_code in (401, 403):
                 return ActionResult(False, f"Airflow refuse l'accès ({r.status_code}) : vérifie AIRFLOW_USER / AIRFLOW_PASSWORD.", simulated=False)
@@ -70,9 +80,10 @@ class AirflowSource:
         except httpx.HTTPError as e:
             return ActionResult(False, f"Airflow injoignable ou en erreur : {e}", simulated=False)
         run = r.json()
-        paused = " (attention : le DAG est en pause dans Airflow, le run attendra)" if dag.json().get("is_paused") else ""
+        unpause = " · DAG sorti de pause" if was_paused else ""
         return self._log(dag_id, padoa_env, client, card, ActionResult(
-            True, f"{dag_id} lancé sur {padoa_env} (run {run.get('dag_run_id')}, état {run.get('state')}){paused}", simulated=False))
+            True, f"{dag_id} lancé sur {padoa_env} (run {run.get('dag_run_id')}, état {run.get('state')}){unpause}", simulated=False,
+            run_id=run.get("dag_run_id") or ""))
 
     def last_run_state(self, dag_id: str) -> str:
         if not self.live:

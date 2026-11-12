@@ -24,6 +24,12 @@ Credentials: AIRFLOW_USER / AIRFLOW_PASSWORD (UI login), from the environment or
 (git-ignored, KEY=VALUE lines). AIRFLOW_URL defaults to http://localhost:8081.
 State: .claude/state/air.json (default client) and .claude/state/air/ (watch state, reports).
 Journal of finished runs: journal/airflow-runs.md.
+
+Jarvis : script d'Arthur repris tel quel, sauf trois adaptations repérées « Jarvis » (2026-11-12).
+Jarvis lance `python -m deploy_hub.air watch DAG_ID RUN_ID --client C` après chaque « Lancer » réel
+(sources/dag_watch.py) avec AIRFLOW_URL / AIRFLOW_USER / AIRFLOW_PASSWORD, AIR_STATE_DIR (data/airflow : état,
+rapports, journal, jamais le vault : ils contiennent des valeurs client) et AIR_NOTIFY=print (notifications de Jarvis).
+Ce suivi lit les logs des tâches qu'il suit (classement des erreurs, rapport) : dérogation décidée par Matthew le 2026-11-12.
 """
 import argparse, ast, base64, html, http.client, http.cookiejar, json, os, re, shutil, subprocess, sys, time, urllib.error, urllib.parse, urllib.request
 from collections import defaultdict
@@ -31,10 +37,11 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 VAULT = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", ".."))
-STATE = os.path.join(VAULT, ".claude", "state")
+# Jarvis : état, rapports et journal dans AIR_STATE_DIR (data/airflow) quand il est donné
+STATE = os.environ.get("AIR_STATE_DIR") or os.path.join(VAULT, ".claude", "state")
 CONF = os.path.join(STATE, "air.json")
 RUNS = os.path.join(STATE, "air")
-JOURNAL = os.path.join(VAULT, "journal", "airflow-runs.md")
+JOURNAL = os.path.join(STATE, "airflow-runs.md") if os.environ.get("AIR_STATE_DIR") else os.path.join(VAULT, "journal", "airflow-runs.md")
 # Short names Arthur uses for a resource or group → the name in the dag_id
 ALIASES = {"fe": "fe_module"}   # FE = fiche d'entreprise
 STACKS = {"snap": "snap", "recette": "recette", "integration": "integration", "inte": "integration", "prod": "prod"}
@@ -139,7 +146,11 @@ def client_of(args):
 
 def notify(title, msg, open_url=None):
     """macOS notification. With terminal-notifier (brew install terminal-notifier) a click opens the run journal in
-    Obsidian; with the osascript fallback a click opens Script Editor on an empty document (macOS behaviour)."""
+    Obsidian; with the osascript fallback a click opens Script Editor on an empty document (macOS behaviour).
+    Jarvis : AIR_NOTIFY=print, ou pas de macOS (VM) → une ligne « [notif] {json} » seule, que Jarvis change en notification."""
+    if os.environ.get("AIR_NOTIFY") == "print" or not (shutil.which("terminal-notifier") or shutil.which("osascript")):
+        print("[notif] " + json.dumps({"title": title, "msg": msg}, ensure_ascii=False), flush=True)  # lu par dag_watch.py
+        return
     open_url = open_url or "obsidian://open?vault=" + q(os.path.basename(VAULT)) + "&file=" + q("journal/airflow-runs")
     tn = shutil.which("terminal-notifier") or next((p for p in ("/opt/homebrew/bin/terminal-notifier",
                                                                 "/usr/local/bin/terminal-notifier") if os.path.exists(p)), None)
@@ -733,6 +744,7 @@ def main():
     s = sub.add_parser("resolve"); s.add_argument("kind", choices=["ETL", "TL", "etl", "tl"]); s.add_argument("words", nargs="+"); s.add_argument("--client")
     s = sub.add_parser("run"); s.add_argument("dag_id"); s.add_argument("stack"); s.add_argument("--yes", action="store_true"); s.add_argument("--prod-authorized", action="store_true")
     s = sub.add_parser("watch"); s.add_argument("dag_id"); s.add_argument("run_id", nargs="?"); s.add_argument("--max-clears", type=int, default=3); s.add_argument("--interval", type=int, default=60); s.add_argument("--clear-killed", action=argparse.BooleanOptionalAction, default=True, help="also clear tasks killed with return code -9 (default: yes)")
+    s.add_argument("--client")  # Jarvis : le client vient de Jarvis, pas de air.json
     s = sub.add_parser("report"); s.add_argument("dag_id"); s.add_argument("run_id", nargs="?"); s.add_argument("--journal", action="store_true")
     a = p.parse_args()
 
@@ -840,7 +852,7 @@ def main():
             print(f"Lancé : run_id {r['dag_run_id']}")
         elif a.cmd == "watch":
             run_id = a.run_id or latest_run(a.dag_id)["dag_run_id"]
-            sys.exit(watch(a.dag_id, run_id, a.max_clears, a.interval, load_conf().get("client", ""), a.clear_killed))
+            sys.exit(watch(a.dag_id, run_id, a.max_clears, a.interval, a.client or load_conf().get("client", ""), a.clear_killed))
         elif a.cmd == "report":
             run_id = a.run_id or latest_run(a.dag_id)["dag_run_id"]
             text, s = build_report(a.dag_id, run_id, journal=a.journal)

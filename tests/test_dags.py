@@ -98,7 +98,9 @@ def test_live_trigger_sends_padoa_env():
         return httpx.Response(200, json={"dag_run_id": "manual__1", "state": "queued"})
 
     result = airflow_with(handler).trigger_dag("acme-uegar-etl-firm", "recette", "Acme", "carte")
-    assert result.ok and not result.simulated and "manual__1" in result.message and "en pause" in result.message
+    assert result.ok and not result.simulated and result.run_id == "manual__1" and "sorti de pause" in result.message
+    patch = seen[1]  # DAG en pause : sorti de pause avant le lancement, sinon le run attendrait
+    assert patch.method == "PATCH" and patch.url.params["update_mask"] == "is_paused" and json.loads(patch.content) == {"is_paused": False}
     post = seen[-1]
     assert post.url.path == "/api/v1/dags/acme-uegar-etl-firm/dagRuns" and json.loads(post.content) == {"conf": {"padoa_env": "recette"}}
     assert post.headers["authorization"].startswith("Basic ")
@@ -135,3 +137,13 @@ def test_ced_view_and_launch(app, monkeypatch):
     r = app.post("/actions/injection/acme", data={"dag_id": "acme-pulse-ced", "padoa_env": "recette", "card": "CED acme-pulse"})
     assert "Simulation : acme-pulse-ced sur recette" in r.text
     assert "Par ressource" in app.get("/deploiements/acme/injections").text  # vue par défaut : groupée
+
+
+def test_unpause_refused_is_named():
+    def handler(request):
+        if request.method == "GET":
+            return httpx.Response(200, json={"is_paused": True})
+        return httpx.Response(403, json={})
+
+    result = airflow_with(handler).trigger_dag("acme-uegar-etl-firm", "snap")
+    assert not result.ok and "refuse de l'en sortir (403)" in result.message

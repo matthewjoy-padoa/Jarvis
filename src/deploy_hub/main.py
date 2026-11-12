@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 import threading
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -17,6 +18,7 @@ from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
 from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, retour_prompt
+from deploy_hub.sources.dag_watch import DagWatcher
 from deploy_hub.sources import notion_api
 from deploy_hub.sources.external import external_statuses
 from deploy_hub.sources.journal import changes_since, group_changes
@@ -32,9 +34,18 @@ fiches = FicheSource(settings.deployments_dir, clients_dir())
 airflow = AirflowSource.from_env()
 notifications = NotificationStore(Path(os.getenv("DEPLOY_HUB_NOTIFICATIONS") or settings.deployments_dir.parent / "notifications.json"))
 claude = ClaudeRunner.from_env(settings.orchestrator_dir, live, notifications, data_dir() / "agents")
+# Suivi des runs lancés (air.py d'Arthur) ; les suivis en cours au démarrage reprennent si Airflow est configuré.
+dag_watch = DagWatcher(data_dir() / "airflow", notifications, {"AIRFLOW_URL": airflow.base_url, "AIRFLOW_USER": airflow.user,
+                                                               "AIRFLOW_PASSWORD": airflow.password} if airflow.live else None)
 _refresh_lock = threading.Lock()  # un seul rafraîchissement Notion à la fois
 
-app = FastAPI(title="Jarvis")
+@asynccontextmanager
+async def lifespan(_app):
+    yield
+    dag_watch.shutdown()  # à l'arrêt (rechargement compris) : coupe les air.py, que le Jarvis suivant reprendra
+
+
+app = FastAPI(title="Jarvis", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
 templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STATUSES)
@@ -260,7 +271,7 @@ def deadlines(request: Request):
 
 @app.get("/agents", response_class=HTMLResponse)
 def agents(request: Request):
-    return _render(request, "agents.html", "/agents", runs=claude.runs, dag_runs=airflow.runs, live=claude.live)
+    return _render(request, "agents.html", "/agents", runs=claude.runs, dag_runs=airflow.runs, watches=dag_watch.watches, live=claude.live)
 
 
 def _run_or_404(run_id: int):
@@ -288,6 +299,37 @@ def agent_stop(run_id: int):
     _run_or_404(run_id)
     claude.stop(run_id)
     return RedirectResponse(f"/agents/{run_id}", status_code=303)
+
+
+def _watch_or_404(watch_id: int):
+    w = dag_watch.get(watch_id)
+    if not w:
+        raise HTTPException(404, f"Suivi #{watch_id} inconnu")
+    return w
+
+
+def _watch_context(watch_id: int) -> dict:
+    w = _watch_or_404(watch_id)
+    return {"w": w, "log": dag_watch.log(w), "report": dag_watch.report(w)}
+
+
+@app.get("/agents/suivis/{watch_id}", response_class=HTMLResponse)
+def dag_watch_detail(request: Request, watch_id: int):
+    """Suivi d'un run lancé depuis Jarvis : journal (relances, vagues, notifications) et rapport de fin d'air.py."""
+    return _render(request, "dag_watch.html", "/agents", **_watch_context(watch_id))
+
+
+@app.get("/agents/suivis/{watch_id}/journal", response_class=HTMLResponse)
+def dag_watch_journal(request: Request, watch_id: int):
+    """Rafraîchi toutes les 10 s par la page du suivi tant qu'il tourne."""
+    return templates.TemplateResponse(request, "_dag_watch_log.html", _watch_context(watch_id))
+
+
+@app.post("/agents/suivis/{watch_id}/arreter")
+def dag_watch_stop(watch_id: int):
+    _watch_or_404(watch_id)
+    dag_watch.stop(watch_id)
+    return RedirectResponse(f"/agents/suivis/{watch_id}", status_code=303)
 
 
 @app.get("/sources", response_class=HTMLResponse)
@@ -319,10 +361,22 @@ def deployment_tab(request: Request, slug: str, tab: str, tous: bool = False, vu
     )
 
 
+def _launch(dag_id: str, padoa_env: str = "integration", d: Deployment | None = None, card: str = "") -> ActionResult:
+    """Lance le DAG ; si le lancement est réel, air.py suit le run (relances, notifications, rapport)."""
+    result = airflow.trigger_dag(dag_id, padoa_env, d.client if d else "", card)
+    if result.ok and result.run_id:
+        customers = d.orchestrator if d else []
+        customer = next((c.customer for c in dag_catalogue.dags_for(customers) if c.dag_id == dag_id), "") or \
+            next((c["customer"] for c in dag_catalogue.ced_for(customers) if c["dag_id"] == dag_id), "")  # client du catalogue
+        w = dag_watch.start(d.slug if d else "", d.client if d else "", customer, dag_id, result.run_id, padoa_env, card)
+        result.message += f" · suivi #{w.id} lancé (relances automatiques, rapport à la fin) : Agents → Suivis de DAG"
+    return result
+
+
 @app.post("/actions/dag/{dag_id}", response_class=HTMLResponse)
 def trigger_dag(request: Request, dag_id: str):
-    """DAG d'une ressource de la fiche (démo)."""
-    return _result(request, airflow.trigger_dag(dag_id))
+    """DAG d'une ressource de la fiche."""
+    return _result(request, _launch(dag_id))
 
 
 @app.post("/actions/injection/{slug}", response_class=HTMLResponse)
@@ -333,7 +387,7 @@ def trigger_injection(request: Request, slug: str, dag_id: str = Form(...), pado
         return _result(request, ActionResult(False, f"{dag_id} n'est pas un DAG de {d.client} dans le catalogue.", simulated=False))
     if padoa_env == "prod" and "prod" in PADOA_ENVS and request.headers.get("HX-Prompt", "").strip() != CONFIRM_PROD:
         return _result(request, ActionResult(False, f"Lancement en prod annulé : tape {CONFIRM_PROD} pour confirmer.", simulated=False))
-    return _result(request, airflow.trigger_dag(dag_id, padoa_env, d.client, card))
+    return _result(request, _launch(dag_id, padoa_env, d, card))
 
 
 @app.post("/actions/claude/{slug}/{resource}", response_class=HTMLResponse)
