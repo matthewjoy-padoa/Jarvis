@@ -12,6 +12,7 @@ from deploy_hub import client_config
 from deploy_hub.config import PROJECT_ROOT, clients_dir, data_dir, load_settings
 from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
                                kanban_columns, notion_link, status_group)
+from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
@@ -134,6 +135,25 @@ def today_page(request: Request):
         ko=[(d, a) for d in deployments for a in d.injection_cards if a.injection_group == "ko"],
         milestones=[i for i in _deadlines(deployments) if i["kind"] == "Jalon" and today <= i["date"] <= today + timedelta(days=21)],
     )
+
+
+_index: tuple[tuple, Index] | None = None  # index de la palette, refait quand une fiche, le jour ou un agent change
+
+
+def _search_index(deployments: list[Deployment]) -> Index:
+    """Les fiches sont gardées en mémoire par FicheSource : tant que ce sont les mêmes objets, l'index reste valable.
+    La clé compare des id() : sûr parce que l'Index garde ces fiches en vie (self.deployments), Python ne peut pas réutiliser leurs id."""
+    global _index
+    key = (tuple(id(d) for d in deployments), date.today(), tuple((r.id, r.status) for r in claude.runs))
+    if _index is None or _index[0] != key:
+        _index = (key, Index(deployments, claude.runs, date.today(), PAGES + CROSS_PAGES, DEPLOYMENT_TABS, ticket_url))
+    return _index[1]
+
+
+@app.get("/palette", response_class=HTMLResponse)
+def palette(request: Request, q: str = ""):
+    """Résultats de la palette de commandes (⌘K) : pages, clients, retours, cartes, règles et agents qui répondent à q."""
+    return templates.TemplateResponse(request, "_palette.html", {"r": _search_index(_deployments(request)).search(q), "today": date.today()})
 
 
 @app.get("/quoi-de-neuf", response_class=HTMLResponse)

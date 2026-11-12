@@ -729,3 +729,88 @@ tr[data-ticket-card]:hover td { background: color-mix(in srgb, var(--accent-soft
   border-radius: 14px; padding: 2px 12px 12px; margin-top: 8px; }
 .ticket-agent-btn { background: linear-gradient(100deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, #8767f9) 100%); border-color: transparent; }
 .ticket-agent-btn .ic { width: 17px; height: 17px; }
+
+/* ============================================================ Palette de commandes ⌘K « Demander à Jarvis » (2026-11-10)
+   Au-dessus de tout, y compris de la fenêtre de ticket (z-index 60). Résultats : _palette.html ; clavier : palette.js. */
+kbd { display: inline-block; min-width: 20px; padding: 1px 6px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 6px;
+  background: var(--bg); color: var(--muted); font: 600 11px/1.5 inherit; font-family: inherit; text-align: center; white-space: nowrap; }
+button.pal-open { flex: none; gap: 8px; padding: 6px 10px 6px 12px; color: var(--muted); font-weight: 500; }
+button.pal-open:hover:not(:disabled) { color: var(--text); }
+button.pal-open .ic { width: 16px; height: 16px; margin: 0; }
+/* Le libellé et le raccourci ne s'affichent que si la barre a la place : les clients passent d'abord. */
+@media (max-width: 1440px) { .pal-open-label, .pal-open kbd { display: none; } button.pal-open { padding: 6px 12px; } }
+
+html.palette-open { overflow: hidden; }
+.palette { position: fixed; inset: 0; z-index: 70; display: flex; justify-content: center; align-items: flex-start; padding: 11vh 16px 16px; }
+.palette[hidden] { display: none; }
+.palette-backdrop { position: absolute; inset: 0; background: rgba(0, 18, 53, .42); backdrop-filter: blur(3px); animation: fade .15s ease; }
+.palette-panel { position: relative; display: flex; flex-direction: column; width: min(700px, 100%); max-height: min(640px, 76vh);
+  background: var(--surface); border: var(--line) solid var(--border); border-radius: 18px; overflow: hidden;
+  box-shadow: 0 30px 70px -20px rgba(0, 18, 53, .5), 0 6px 18px rgba(0, 18, 53, .12); animation: pal-in .18s var(--ease); }
+@keyframes pal-in { from { opacity: 0; transform: translateY(-8px) scale(.985); } to { opacity: 1; transform: none; } }
+
+.palette-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: var(--line) solid var(--border); }
+.palette-head .ic { width: 20px; height: 20px; color: var(--accent); }
+.palette-head input { flex: 1; min-width: 0; padding: 4px 0; border: 0; outline: 0; box-shadow: none; background: none; color: var(--text); font: inherit; font-size: 17px; }
+.palette-head input:focus, .palette-head input:focus-visible { outline: 0; box-shadow: none; border: 0; }
+.palette-head input::placeholder { color: var(--muted); opacity: .8; }
+
+.palette-results { flex: 1; min-height: 120px; overflow-y: auto; padding: 8px; overscroll-behavior: contain; scroll-padding: 34px 0 8px; }
+.pal-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 10px 8px; }
+.pal-chips-label { font-size: 12px; color: var(--muted); margin-right: 2px; }
+.pal-chip { padding: 2px 10px; border-radius: 999px; background: var(--pa-progress); color: var(--text); font-size: 12px; font-weight: 600; }
+.pal-note { margin: 4px 10px 8px; font-size: 13px; color: var(--muted); }
+.pal-note strong { color: var(--text); }
+
+.pal-group { margin: 0 0 6px; }
+.pal-group-title { position: sticky; top: -8px; z-index: 1; display: flex; align-items: baseline; gap: 8px; margin: 0; padding: 10px 10px 4px;
+  background: var(--surface); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.pal-group-title span { font-weight: 600; letter-spacing: 0; opacity: .75; }
+.pal-more { margin: 2px 10px 4px 50px; font-size: 12px; color: var(--muted); }
+
+.pal-item, .pal-card { color: var(--text); text-decoration: none; border-radius: 12px; cursor: pointer; scroll-margin: 34px 0 8px; }
+.pal-item { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 7px 10px; }
+.pal-item:hover, .pal-card:hover { color: var(--text); text-decoration: none; }
+.pal-item.is-selected { background: color-mix(in srgb, var(--accent) 9%, var(--surface)); box-shadow: inset 3px 0 0 var(--accent); }
+.pal-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--bg); color: var(--text); font-size: 15px; }
+.pal-icon .ic { width: 16px; height: 16px; }
+.pal-icon.k-retour { background: var(--pa-ko); } .pal-icon.k-action { background: var(--pa-todo); }
+.pal-icon.k-injection, .pal-icon.k-agent { background: var(--pa-progress); } .pal-icon.k-regle, .pal-icon.k-client { background: var(--pa-done); }
+.pal-main { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.pal-title { font-size: 14px; font-weight: 600; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-title .muted { font-size: 12px; font-weight: 500; }
+.pal-sub, .pal-snippet { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-snippet-label { font-weight: 700; }
+.palette mark { background: color-mix(in srgb, var(--st-todo) 34%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+.pal-side { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; max-width: 190px; }
+.pal-side .badge { max-width: 190px; overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; }
+.pal-due { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pal-due.late { color: var(--danger); font-weight: 700; } .pal-due.today { color: var(--accent); font-weight: 700; }
+
+.pal-card { display: block; margin: 2px 2px 8px; padding: 12px 14px; border: var(--line) solid var(--border); background: var(--bg); }
+.pal-card.is-selected { border-color: var(--accent); box-shadow: var(--ring); }
+.pal-card-head { display: flex; align-items: center; gap: 10px; font-size: 16px; }
+.pal-card-head .muted { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-card .jx { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--surface); }
+.pal-card .jx.soon { background: var(--pa-ko); }
+.pal-card .progress { display: block; height: 6px; margin: 10px 0 8px; overflow: hidden; background: var(--border); border-radius: 3px; }
+.pal-card .progress > span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.pal-stats { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 12.5px; color: var(--muted); }
+.pal-stats strong { color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; }
+.pal-stats .bad strong { color: var(--danger); }
+
+.pal-empty { padding: 34px 20px 38px; text-align: center; }
+.pal-empty p { margin: 0 0 6px; }
+
+.palette-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 9px 14px;
+  border-top: var(--line) solid var(--border); background: var(--bg); font-size: 12px; color: var(--muted); }
+.palette-keys { display: flex; align-items: center; gap: 5px; }
+.palette-keys kbd, .palette-head kbd { background: var(--surface); }
+.palette-keys kbd + kbd { margin-left: -2px; }
+.palette-keys kbd:not(:first-child):not(kbd + kbd) { margin-left: 8px; }
+.palette-hints { display: flex; flex-wrap: wrap; gap: 5px; }
+button.pal-hint, button.pal-hint:hover:not(:disabled) { min-height: 0; padding: 2px 9px; border: 1px dashed var(--border); border-radius: 999px; background: var(--surface);
+  color: var(--muted); font-size: 12px; font-weight: 500; box-shadow: none; transform: none; }
+button.pal-hint:hover:not(:disabled) { border-style: solid; border-color: var(--accent); color: var(--accent); }
+@media (max-width: 640px) { .palette { padding: 0; } .palette-panel { width: 100%; max-height: 100vh; height: 100%; border-radius: 0; border: 0; } .palette-keys { display: none; } .pal-side { max-width: 120px; } }
+@media (prefers-reduced-motion: reduce) { .palette-panel, .palette-backdrop { animation: none; } }
