@@ -1,30 +1,34 @@
 :root {
-  /* DA Padoa 2026 (padoa-slides/references/brand-guidelines.md) : Figtree, beige, navy, bleu padoa, pastels. */
-  --bg: #faefe9; --surface: #ffffff; --text: #001235; --muted: #717c92; --border: #e9e1dc;
-  --accent: #3333eb; --accent-soft: #d1ddff; --on-accent: #ffffff;
-  /* Statuts : couleurs vives de la charte, assombries pour rester lisibles (validate_palette.js, clair) */
-  --st-todo: #c98a00; --st-progress: #3333eb; --st-ko: #e25ac5; --st-done: #3a9f2c;
-  /* Pastels : fonds de badges et de tags, texte navy */
-  --pa-todo: #ffedad; --pa-progress: #d1ddff; --pa-ko: #f7cfee; --pa-done: #caecc6;
+  /* Ambiance du logo « Anneaux » (2026-11-12) : marine #001235, bleu Padoa #3333eb, cyan #5ce1ff ; Figtree conservé.
+     Clair : fond gris-bleu froid. KO en rouge corail (le rose de la charte jurait avec le cyan). */
+  --bg: #eef2f8; --surface: #ffffff; --text: #001235; --muted: #5d6883; --border: #dde4ef;
+  --accent: #3333eb; --accent-soft: #dbe3ff; --on-accent: #ffffff; --cyan: #0fa3cf;
+  /* Statuts : couleurs vives, assombries pour rester lisibles sur fond clair */
+  --st-todo: #c98a00; --st-progress: #3333eb; --st-ko: #c4344b; --st-done: #1f7a45;
+  /* Pastels : fonds de badges et de tags, texte marine */
+  --pa-todo: #ffedad; --pa-progress: #dbe3ff; --pa-ko: #fbdce1; --pa-done: #cdeed8;
   --warn: var(--st-todo); --danger: var(--st-ko); --ok: var(--st-done);
   --radius: 16px; --shadow: 0 1px 2px rgba(0, 18, 53, .04);
+  --brand-grad: linear-gradient(100deg, #3333eb 0%, #2f8fe8 40%, #0fa3cf 70%, #3333eb 100%);
   color-scheme: light;
 }
-/* Mode nuit : navy en fond, beige en texte ; statuts revalidés sur la surface sombre. */
+/* Mode nuit : le marine du logo en fond, le cyan en accent ; statuts revalidés sur la surface sombre. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #001235; --surface: #0e1f42; --text: #faefe9; --muted: #a3acc0; --border: #23365e;
-    --accent: #8f8fff; --accent-soft: #23306b; --on-accent: #001235;
-    --st-todo: #b07e00; --st-progress: #7b7bff; --st-ko: #d455b6; --st-done: #43a836;
-    --pa-todo: rgba(250, 193, 0, .22); --pa-progress: rgba(123, 123, 255, .26); --pa-ko: rgba(226, 90, 197, .26); --pa-done: rgba(92, 203, 77, .24);
+    --bg: #001235; --surface: #0b1d40; --text: #e6eefb; --muted: #9fb0cc; --border: #1f3561;
+    --accent: #5ce1ff; --accent-soft: #123a5c; --on-accent: #001235; --cyan: #5ce1ff;
+    --st-todo: #e0a422; --st-progress: #5ce1ff; --st-ko: #ff6b81; --st-done: #4cc985;
+    --pa-todo: rgba(224, 164, 34, .22); --pa-progress: rgba(92, 225, 255, .18); --pa-ko: rgba(255, 107, 129, .22); --pa-done: rgba(76, 201, 133, .22);
+    --brand-grad: linear-gradient(100deg, #8fa8ff 0%, #5ce1ff 40%, #b8f2ff 70%, #8fa8ff 100%);
     --shadow: none; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #001235; --surface: #0e1f42; --text: #faefe9; --muted: #a3acc0; --border: #23365e;
-  --accent: #8f8fff; --accent-soft: #23306b; --on-accent: #001235;
-  --st-todo: #b07e00; --st-progress: #7b7bff; --st-ko: #d455b6; --st-done: #43a836;
-  --pa-todo: rgba(250, 193, 0, .22); --pa-progress: rgba(123, 123, 255, .26); --pa-ko: rgba(226, 90, 197, .26); --pa-done: rgba(92, 203, 77, .24);
+  --bg: #001235; --surface: #0b1d40; --text: #e6eefb; --muted: #9fb0cc; --border: #1f3561;
+  --accent: #5ce1ff; --accent-soft: #123a5c; --on-accent: #001235; --cyan: #5ce1ff;
+  --st-todo: #e0a422; --st-progress: #5ce1ff; --st-ko: #ff6b81; --st-done: #4cc985;
+  --pa-todo: rgba(224, 164, 34, .22); --pa-progress: rgba(92, 225, 255, .18); --pa-ko: rgba(255, 107, 129, .22); --pa-done: rgba(76, 201, 133, .22);
+  --brand-grad: linear-gradient(100deg, #8fa8ff 0%, #5ce1ff 40%, #b8f2ff 70%, #8fa8ff 100%);
   --shadow: none; color-scheme: dark;
 }
 :root[data-theme="light"] { color-scheme: light; }
@@ -371,7 +375,7 @@ code.res, code.req { border-radius: 6px; border-width: 1px; }
 .brand-mark { width: 30px; height: 30px; flex: none; filter: drop-shadow(0 0 5px rgba(92, 225, 255, .45)); }
 @media (prefers-reduced-motion: no-preference) {
   .bell-count.urgent { animation: jarvis-pulse 2s ease-in-out infinite; }
-  @keyframes jarvis-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(226, 90, 197, .55); } 50% { box-shadow: 0 0 0 6px rgba(226, 90, 197, 0); } }
+  @keyframes jarvis-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(217, 63, 86, .55); } 50% { box-shadow: 0 0 0 6px rgba(217, 63, 86, 0); } }
 }
 
 /* Logo « Anneaux » : les deux anneaux tournent en sens opposés, le cœur respire (rien si le système réduit les animations) */
@@ -511,15 +515,15 @@ a.wn-title:hover { color: var(--accent); }
 /* Nom de l'app : dégradé aux couleurs de la charte, graisse forte, reflet discret qui passe */
 .brand-name {
   font-size: 21px; font-weight: 800; letter-spacing: -.02em; line-height: 1;
-  background: linear-gradient(100deg, #3333eb 0%, #8767f9 38%, #e25ac5 70%, #3333eb 100%);
+  background: var(--brand-grad);
   background-size: 220% 100%; background-position: 0% 50%;
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 .brand-dot { width: 7px; height: 7px; border-radius: 50%; background: #5ccb4d; margin-left: 1px; align-self: flex-end; margin-bottom: 5px;
   box-shadow: 0 0 0 3px color-mix(in srgb, #5ccb4d 25%, transparent); }
-:root[data-theme="dark"] .brand-name { background-image: linear-gradient(100deg, #9b9bff 0%, #b8a6ff 38%, #f08ad8 70%, #9b9bff 100%); }
+:root[data-theme="dark"] .brand-name { background-image: var(--brand-grad); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .brand-name { background-image: linear-gradient(100deg, #9b9bff 0%, #b8a6ff 38%, #f08ad8 70%, #9b9bff 100%); }
+  :root:not([data-theme="light"]) .brand-name { background-image: var(--brand-grad); }
 }
 @media (prefers-reduced-motion: no-preference) {
   .brand-name { animation: jarvis-sheen 9s ease-in-out infinite; }
@@ -531,7 +535,7 @@ a.wn-title:hover { color: var(--accent); }
 
 /* Puces clients du menu : contour en dégradé de la charte, nom en gras, client ouvert en plein, J-x en alerte sous 14 jours */
 .client-chip.strong {
-  --chip-grad: linear-gradient(100deg, #3333eb, #8767f9 55%, #e25ac5);
+  --chip-grad: linear-gradient(100deg, #3333eb, #2f8fe8 55%, var(--cyan));
   border: 2px solid transparent; padding: 5px 13px 5px 11px; font-weight: 700;
   background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--chip-grad) border-box;
   box-shadow: 0 1px 4px rgba(51, 51, 235, .12); transition: transform .15s, box-shadow .15s;
@@ -539,14 +543,14 @@ a.wn-title:hover { color: var(--accent); }
 .client-chip.strong:hover { border-color: transparent; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(51, 51, 235, .22); }
 .client-chip.strong .client-name { letter-spacing: -.01em; }
 .client-chip.strong.active { color: #fff; border-color: transparent; background: var(--chip-grad) padding-box, var(--chip-grad) border-box;
-  box-shadow: 0 4px 14px rgba(135, 103, 249, .35); }
+  box-shadow: 0 4px 14px rgba(15, 163, 207, .35); }
 .client-chip.strong .dot { width: 10px; height: 10px; }
 .client-chip.strong.active .dot { box-shadow: 0 0 0 2px rgba(255, 255, 255, .85); }
 .client-chip.strong .jx.soon { background: var(--pa-ko); color: var(--text); }
 .client-chip.strong.active .jx { background: rgba(255, 255, 255, .22); color: #fff; }
 
 /* Logo : monogramme J sur carré arrondi en dégradé (même fichier que l'icône d'onglet) */
-.brand-mark { width: 30px; height: 30px; border-radius: 9px; filter: none; box-shadow: 0 2px 8px rgba(135, 103, 249, .35); transition: transform .2s; }
+.brand-mark { width: 30px; height: 30px; border-radius: 9px; filter: none; box-shadow: 0 2px 8px rgba(15, 163, 207, .35); transition: transform .2s; }
 .brand:hover .brand-mark { transform: rotate(-6deg) scale(1.05); }
 
 /* Vue kanban (actions, retours de recette) : une colonne par statut, défilement horizontal */
@@ -711,7 +715,7 @@ tr[data-ticket-card]:hover td { background: color-mix(in srgb, var(--accent-soft
 .retour details.agent > summary, .ticket details.agent > summary {
   display: inline-flex; align-items: center; gap: 8px; width: max-content; list-style: none; cursor: pointer;
   margin: 12px 0 2px; padding: 8px 18px 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 700; color: var(--on-accent);
-  background: linear-gradient(100deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, #8767f9) 100%);
+  background: linear-gradient(100deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, var(--cyan)) 100%);
   border: var(--line) solid transparent; box-shadow: 0 2px 6px -1px color-mix(in srgb, var(--accent) 45%, transparent);
   transition: transform .15s var(--ease), box-shadow .15s var(--ease), filter .15s; }
 .retour details.agent > summary::-webkit-details-marker, .ticket details.agent > summary::-webkit-details-marker { display: none; }
@@ -726,7 +730,7 @@ tr[data-ticket-card]:hover td { background: color-mix(in srgb, var(--accent-soft
 .retour details.agent[open] > summary::after, .ticket details.agent[open] > summary::after { content: "▴"; }
 .retour details.agent[open], .ticket details.agent[open] { background: color-mix(in srgb, var(--accent-soft) 30%, transparent);
   border-radius: 14px; padding: 2px 12px 12px; margin-top: 8px; }
-.ticket-agent-btn { background: linear-gradient(100deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, #8767f9) 100%); border-color: transparent; }
+.ticket-agent-btn { background: linear-gradient(100deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, var(--cyan)) 100%); border-color: transparent; }
 .ticket-agent-btn .ic { width: 17px; height: 17px; }
 
 /* ============================================================ Palette de commandes ⌘K « Demander à Jarvis » (2026-11-10)
