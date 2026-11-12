@@ -18,12 +18,15 @@ from pathlib import Path
 import httpx
 
 from deploy_hub.config import PROJECT_ROOT, data_dir
+from deploy_hub.queries import ConfigError, page_id_of
 from deploy_hub.sync_notion import (RECETTE_COLUMNS, RECETTE_CONTENT, SyncError, add_users, load_config, publish,
                                     summary, unknown_users, versions)
 
 API = "https://api.notion.com/v1"
 VERSION = "2025-09-03"
 
+ICON_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp"}  # pas de SVG (script possible)
+ICON_MAX = 512 * 1024
 CLIENTS_DS = "28d3f790-e4ca-404c-84de-8ea4087bce14"
 ACTIONS_DS = "5055cf48-4d55-4606-8c83-92ae3dfaa8a2"
 RECETTE_DS = "9e3440bc-941b-4c76-8b65-6fc15bbb02a7"
@@ -155,6 +158,7 @@ class NotionClient:
             timeout=30,
             transport=transport,
         )
+        self.transport = transport  # aussi pour télécharger les icônes (tests : faux Notion)
         self.pause = pause  # l'API accepte environ 3 requêtes par seconde
         self._schemas: dict[str, dict] = {}
 
@@ -244,6 +248,45 @@ class NotionClient:
                 row[by_id[prop["id"]]] = value(prop)
         return row
 
+    def page_icon(self, url: str, folder: Path) -> dict:
+        """Icône d'une page (ici le dashboard d'intégration du client), seule chose lue de la page :
+        {"emoji": "🦖", "icone": ""} ou, pour une image, {"emoji": "", "icone": "icone.png"} téléchargée dans folder.
+        Rien (deux "") sans adresse, sans icône ou si la page n'est pas partagée avec l'intégration."""
+        try:
+            icon = self._call("GET", f"/pages/{_uuid(page_id_of(url))}", params=[("filter_properties[]", "title")]).get("icon") or {}
+        except (ConfigError, SyncError):
+            icon = {}
+        kind = icon.get("type")
+        if kind in ("file", "external", "custom_emoji"):  # image : Notion la signe pour une heure, on la garde sur disque
+            name = self._download_icon((icon.get(kind) or {}).get("url") or "", folder)
+            return {"emoji": "", "icone": name or _kept_icon(folder)}  # téléchargement raté : l'ancienne image reste
+        for old in folder.glob("icone.*"):
+            old.unlink()
+        return {"emoji": icon.get("emoji", "") if kind == "emoji" else "", "icone": ""}
+
+    def _download_icon(self, src: str, folder: Path) -> str:
+        """Image d'icône (PNG, JPEG, GIF, WebP ; 512 Ko au plus) écrite en folder/icone.<ext> ; "" si refusée.
+        Client HTTP à part : le jeton Notion ne part jamais vers l'hébergeur de l'image."""
+        if not src.startswith("https://"):
+            return ""
+        try:
+            with httpx.Client(timeout=10, follow_redirects=True, transport=self.transport) as http:
+                r = http.get(src)
+        except httpx.HTTPError:
+            return ""
+        ext = ICON_TYPES.get(r.headers.get("content-type", "").split(";")[0].strip())
+        if r.status_code != 200 or not ext or len(r.content) > ICON_MAX:
+            return ""
+        folder.mkdir(parents=True, exist_ok=True)
+        for old in folder.glob("icone.*"):
+            old.unlink()
+        (folder / f"icone{ext}").write_bytes(r.content)
+        return f"icone{ext}"
+
+
+def _kept_icon(folder: Path) -> str:
+    return next((p.name for p in sorted(folder.glob("icone.*"))), "")
+
 
 def recette_row(row: dict) -> dict:
     """Ligne de recette réduite aux colonnes autorisées, statut et type ramenés à « Autre » si hors liste."""
@@ -296,6 +339,7 @@ def refresh(slug: str, notion: NotionClient, root: Path = PROJECT_ROOT) -> dict:
         raise SyncError(f"{slug} : page_id absent de la configuration du client")
     started = time.monotonic()
     data = fetch(config, notion)
+    data["client"].update(notion.page_icon(config.get("notion_url") or "", data_dir(root) / "notion" / slug))
     caches = {base: {r["url"]: r for r in data[base]} for base in ("actions", "recette")}
     out = publish(slug, root, config, data["client"], data["regles"], caches)
     notion.name_users(root)

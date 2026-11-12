@@ -247,6 +247,8 @@ def build_deployment(config: dict, client: dict, regles_rows: list[dict], caches
     ]
     return {
         "client": config["client"],
+        "emoji": client.get("emoji") or "",
+        "icone": client.get("icone") or "",  # image de l'icône, dans data/notion/<slug>/
         "software": config.get("software", "?"),
         "status": config.get("status", "en cours"),
         "notion_url": config.get("notion_url", ""),
@@ -257,6 +259,16 @@ def build_deployment(config: dict, client: dict, regles_rows: list[dict], caches
         "retours": retours,
         "regles": regles,
     }
+
+
+def _fiche_icon(fiche: Path) -> dict:
+    """Emoji et image de la fiche déjà écrite ; vides si elle manque ou est illisible (décoratif : ne bloque jamais la synchro)."""
+    from deploy_hub.sources.fiches import _split_frontmatter
+    try:
+        data = _split_frontmatter(fiche.read_text(encoding="utf-8"))
+    except (OSError, ValueError, yaml.YAMLError):
+        data = {}
+    return {k: str(data.get(k) or "") for k in ("emoji", "icone")}
 
 
 def write_fiche(deployment: dict, out: Path) -> None:
@@ -536,9 +548,12 @@ def publish(slug: str, root: Path, config: dict, client: dict, regles_rows: list
     _check_recette(list(caches["recette"].values()))
     when = datetime.now().isoformat(timespec="seconds")
     events = [e for base in BASES for e in diff_caches(_load_cache(raw, base), caches[base], base, when)]
+    fiche = data_dir(root) / "deploiements" / f"{slug}.md"
+    if "emoji" not in client:  # la routine SQL ne voit pas les icônes : on garde celle de la synchro directe
+        client = {**client, **_fiche_icon(fiche)}
     deployment = build_deployment(config, client, regles_rows, caches)
     blocked = update_blocklist(deployment["retours"], data_dir(root) / "recette-pages.txt")
-    write_fiche(deployment, data_dir(root) / "deploiements" / f"{slug}.md")
+    write_fiche(deployment, fiche)
     write_caches(raw, caches)
     append_journal(raw, events)
     NotificationStore(data_dir(root) / "notifications.json").add_many(sync_notes(slug, config["client"], events, caches, when))

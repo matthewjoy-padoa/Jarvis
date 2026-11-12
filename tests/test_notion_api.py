@@ -14,6 +14,9 @@ from deploy_hub.sync_notion import SyncError, plan_client
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGE = "0123456789abcdef0123456789abcdef"
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 20
+CARD = "c" * 32  # dashboard d'intégration du client
+CARD_UUID = f"{CARD[:8]}-{CARD[8:12]}-{CARD[12:16]}-{CARD[16:20]}-{CARD[20:]}"
 
 
 def prop(pid, kind, v):
@@ -79,15 +82,22 @@ class FakeNotion:
     def __init__(self, n_actions=150):
         self.requests: list[httpx.Request] = []
         self.actions = actions_pages(n_actions)
+        self.card_icon = {"type": "emoji", "emoji": "🦖"}
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
+        if request.url.host == "images.test":  # hébergeur de l'image d'icône (S3 de Notion ou site externe)
+            kind, body = {"/logo.png": ("image/png", PNG), "/geant.png": ("image/png", b"x" * (notion_api.ICON_MAX + 1)),
+                          "/page.html": ("text/html", b"<script>")}.get(request.url.path, ("text/plain", b""))
+            return httpx.Response(200, headers={"content-type": kind}, content=body)
         path = request.url.path.removeprefix("/v1")
         if m := re.fullmatch(r"/data_sources/([0-9a-f-]+)", path):
             props = {name: {"id": i, "type": t, "name": name} for name, (i, t) in SCHEMAS[m.group(1)].items()}
             return httpx.Response(200, json={"properties": props})
+        if path == f"/pages/{CARD_UUID}":  # dashboard d'intégration : seule l'icône compte
+            return httpx.Response(200, json={"id": CARD, "icon": self.card_icon, "properties": {}})
         if path.startswith("/pages/"):
-            return httpx.Response(200, json={"id": PAGE, "properties": {
+            return httpx.Response(200, json={"id": PAGE, "icon": {"type": "emoji", "emoji": "🚀"}, "properties": {
                 "Nom": prop("t", "title", [{"plain_text": "Acme"}]), "Date de Kick-off": prop("k", "date", {"start": "2026-04-16"}),
                 "Date déploiement": prop("d", "date", {"start": "2026-11-17"}), "Date du Freeze": prop("f", "date", None)}})
         if m := re.fullmatch(r"/data_sources/([0-9a-f-]+)/query", path):
@@ -106,7 +116,7 @@ class FakeNotion:
 def root(tmp_path):
     (tmp_path / "config" / "clients").mkdir(parents=True)
     (tmp_path / "config" / "clients" / "acme.yaml").write_text(
-        f"slug: acme\nclient: Acme\nsoftware: Pulse\npage_id: {PAGE}\nrecette_clients: [acme_pulse, acme-uegar]\n")
+        f"slug: acme\nclient: Acme\nsoftware: Pulse\npage_id: {PAGE}\nnotion_url: https://app.notion.com/p/padoa/Dashboard-Acme-{CARD}\nrecette_clients: [acme_pulse, acme-uegar]\n")
     return tmp_path
 
 
@@ -123,6 +133,80 @@ def test_refresh_writes_the_fiche_from_notion(root):
     assert d.injection_counts == {"KO": 1, "A faire": 99}
     assert {a.title: a.resources for a in d.actions}["Carte 0"] == ["firm"] and {a.title: a.resources for a in d.actions}["Carte 1"] == ["visit_histo"]
     assert len(d.vigilance) == 1 and str(d.go_live) == "2026-11-17"
+
+
+@pytest.mark.parametrize(("icon", "emoji"), [
+    ({"type": "emoji", "emoji": "🦖"}, "🦖"),                                  # emoji du dashboard, pas le 🚀 de la page de déploiement
+    (None, ""),                                                                # fiche sans icône
+    ({"type": "external", "external": {"url": "https://exemple.test/logo.png"}}, ""),  # image : pas un emoji
+])
+def test_the_client_emoji_comes_from_the_integration_dashboard(root, icon, emoji):
+    fake = FakeNotion()
+    fake.card_icon = icon
+    refresh("acme", client_for(fake), root)
+    assert parse_deployment(root / "data" / "deploiements" / "acme.md").emoji == emoji
+    card = [r for r in fake.requests if r.url.path.endswith(CARD_UUID)]
+    assert card and all(r.url.params.get_list("filter_properties[]") == ["title"] for r in card)  # aucune propriété du dashboard lue
+
+
+def test_an_unshared_dashboard_leaves_no_emoji_but_the_sync_goes_on(root):
+    def unshared(request):
+        return httpx.Response(404, json={}) if request.url.path.endswith(CARD_UUID) else FakeNotion()(request)
+    assert refresh("acme", client_for(unshared), root)["cartes"] == 150
+    assert parse_deployment(root / "data" / "deploiements" / "acme.md").emoji == ""
+
+
+def image(name):
+    return {"type": "file", "file": {"url": f"https://images.test/{name}?X-Amz-Signature=signe", "expiry_time": "2026-11-12T17:00:00Z"}}
+
+
+def test_an_image_icon_is_downloaded_without_the_notion_token_and_served(root, monkeypatch):
+    fake = FakeNotion()
+    fake.card_icon = image("logo.png")
+    refresh("acme", client_for(fake), root)
+    d = parse_deployment(root / "data" / "deploiements" / "acme.md")
+    assert (d.emoji, d.icone) == ("", "icone.png")
+    assert (root / "data" / "notion" / "acme" / "icone.png").read_bytes() == PNG
+    download = [r for r in fake.requests if r.url.host == "images.test"]
+    assert download and "authorization" not in download[0].headers  # le jeton Notion reste chez Notion
+    assert "Signature" not in (root / "data" / "deploiements" / "acme.md").read_text()  # l'adresse signée n'est pas gardée
+
+    from fastapi.testclient import TestClient
+    from deploy_hub import main
+    from deploy_hub.sources.fiches import FicheSource
+    monkeypatch.setattr(main, "fiches", FicheSource(root / "data" / "deploiements"))
+    r = TestClient(main.app).get("/icones/acme")
+    assert r.status_code == 200 and r.content == PNG and r.headers["content-type"] == "image/png"
+    assert TestClient(main.app).get("/icones/inconnu").status_code == 404
+
+
+@pytest.mark.parametrize("name", ["geant.png", "page.html"])
+def test_a_too_big_or_non_image_icon_is_refused(root, name):
+    fake = FakeNotion()
+    fake.card_icon = image(name)
+    refresh("acme", client_for(fake), root)
+    assert parse_deployment(root / "data" / "deploiements" / "acme.md").icone == ""
+    assert not list((root / "data" / "notion" / "acme").glob("icone.*"))
+
+
+def test_an_emoji_replaces_an_old_image(root):
+    fake = FakeNotion()
+    fake.card_icon = image("logo.png")
+    refresh("acme", client_for(fake), root)
+    fake.card_icon = {"type": "emoji", "emoji": "🦖"}
+    refresh("acme", client_for(fake), root)
+    d = parse_deployment(root / "data" / "deploiements" / "acme.md")
+    assert (d.emoji, d.icone) == ("🦖", "")
+    assert not list((root / "data" / "notion" / "acme").glob("icone.*"))
+
+
+def test_no_dashboard_no_emoji_and_no_extra_call(root):
+    cfg = root / "config" / "clients" / "acme.yaml"
+    cfg.write_text("\n".join(l for l in cfg.read_text().splitlines() if not l.startswith("notion_url")) + "\n")
+    fake = FakeNotion()
+    refresh("acme", client_for(fake), root)
+    assert parse_deployment(root / "data" / "deploiements" / "acme.md").emoji == ""
+    assert not [r for r in fake.requests if r.url.path.endswith(CARD_UUID)]
 
 
 def test_recette_asks_only_the_listed_properties(root):
