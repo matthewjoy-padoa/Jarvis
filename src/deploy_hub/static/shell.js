@@ -52,9 +52,16 @@
         return;
       }
       xterm = new window.Terminal({
-        cursorBlink: true, fontSize: 13.5, scrollback: 5000, allowProposedApi: false,
-        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-        theme: { background: "#0b1222", foreground: "#d7def0", cursor: "#7ee2a0", selectionBackground: "#a9a3ff59" },
+        cursorBlink: true, fontSize: 13.5, scrollback: 5000, allowProposedApi: false, drawBoldTextInBrightColors: true,
+        // Polices Nerd Font d'abord (thèmes Oh My Zsh à glyphes : agnoster, powerlevel10k), si elles sont installées sur le poste.
+        fontFamily: '"MesloLGS NF", "JetBrainsMono Nerd Font", "Hack Nerd Font", ui-monospace, SFMono-Regular, Menlo, monospace',
+        // Palette ANSI lisible sur le fond de la console, pensée pour robbyrussell (➜ vert, dossier cyan, git bleu/rouge, ✗ jaune).
+        theme: {
+          background: "#0b1222", foreground: "#d7def0", cursor: "#7ee2a0", cursorAccent: "#0b1222", selectionBackground: "#a9a3ff59",
+          black: "#1b2338", red: "#ff7b7b", green: "#7ee2a0", yellow: "#f5c76a", blue: "#7aa2ff", magenta: "#c792ea", cyan: "#7fdbff", white: "#d7def0",
+          brightBlack: "#5c6884", brightRed: "#ff9e9e", brightGreen: "#a4f0c0", brightYellow: "#ffd98a", brightBlue: "#9dbcff",
+          brightMagenta: "#ddb3ff", brightCyan: "#a6e8ff", brightWhite: "#ffffff",
+        },
       });
       fit = new window.FitAddon.FitAddon();
       xterm.loadAddon(fit);

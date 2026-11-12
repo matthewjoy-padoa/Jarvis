@@ -25,7 +25,7 @@ def url(token=None):
 @pytest.fixture
 def enabled(monkeypatch):
     monkeypatch.setenv("JARVIS_SHELL", "1")
-    monkeypatch.setenv("SHELL", "/bin/sh")  # shell court et prévisible pour les tests
+    monkeypatch.setenv("JARVIS_SHELL_PROGRAM", "/bin/sh")  # shell court et prévisible, à la place du shell de connexion
     monkeypatch.setattr(shell, "LOCAL_HOSTS", {"testclient"})  # l'adresse que donne le TestClient
     monkeypatch.setattr(shell, "LOCAL_NAMES", shell.LOCAL_NAMES | {"testserver"})  # le nom d'hôte du TestClient
 
@@ -109,3 +109,13 @@ def test_the_page_carries_the_token_only_when_enabled(monkeypatch):
     assert "data-shell-token" not in TestClient(app).get("/").text
     monkeypatch.setenv("JARVIS_SHELL", "1")
     assert f'data-shell-token="{shell.TOKEN}"' in TestClient(app).get("/").text
+
+
+def test_the_login_shell_is_the_one_declared_for_the_user(monkeypatch):
+    """Sur la VM, c'est le shell de connexion (zsh + Oh My Zsh) qui s'ouvre, même si le service n'a pas $SHELL."""
+    import pwd, os
+    monkeypatch.delenv("JARVIS_SHELL_PROGRAM", raising=False)
+    monkeypatch.delenv("SHELL", raising=False)
+    assert shell.login_shell() == pwd.getpwuid(os.getuid()).pw_shell
+    env = shell._environment()
+    assert env["SHELL"] == shell.login_shell() and env["LANG"]  # toujours une locale, UTF-8 par défaut pour ➜ et ✗

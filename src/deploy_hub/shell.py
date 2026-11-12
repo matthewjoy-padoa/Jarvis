@@ -14,6 +14,7 @@ import fcntl
 import json
 import os
 import pty
+import pwd
 import secrets
 import signal
 import struct
@@ -57,8 +58,9 @@ def refusal(ws: WebSocket) -> str:
 
 
 def _environment() -> dict[str, str]:
-    env = {k: v for k, v in os.environ.items() if k not in SECRETS and k not in ENV_FILE_KEYS and k != "JARVIS_SHELL"}
-    return {**env, "TERM": "xterm-256color", "COLORTERM": "truecolor"}
+    env = {k: v for k, v in os.environ.items() if k not in SECRETS and k not in ENV_FILE_KEYS and not k.startswith("JARVIS_SHELL")}
+    # SHELL = le shell lancé ; LANG UTF-8 pour les caractères des thèmes (➜, ✗) si le service n'en a pas.
+    return {**env, "TERM": "xterm-256color", "COLORTERM": "truecolor", "SHELL": login_shell(), "LANG": env.get("LANG") or "C.UTF-8"}
 
 
 def _resize(fd: int, cols: int, rows: int) -> None:
@@ -71,12 +73,22 @@ def _resize(fd: int, cols: int, rows: int) -> None:
 LAUNCHER = "import fcntl, os, sys, termios; fcntl.ioctl(0, termios.TIOCSCTTY, 0); os.execvp(sys.argv[1], [sys.argv[1], '-l'])"
 
 
+def login_shell() -> str:
+    """Le shell de connexion de l'utilisateur (/etc/passwd) : zsh avec Oh My Zsh sur la VM, quel que soit l'environnement du
+    service (systemd ne fournit pas toujours $SHELL). JARVIS_SHELL_PROGRAM le remplace (tests)."""
+    try:
+        declared = pwd.getpwuid(os.getuid()).pw_shell
+    except KeyError:
+        declared = ""
+    return os.environ.get("JARVIS_SHELL_PROGRAM") or declared or os.environ.get("SHELL") or "/bin/bash"
+
+
 def spawn(cols: int = 100, rows: int = 30) -> tuple[subprocess.Popen, int]:
     """Lance le shell de connexion dans un pseudo-terminal ; renvoie (processus, descripteur du maître)."""
     master, slave = pty.openpty()
     _resize(master, cols, rows)
     try:
-        proc = subprocess.Popen([sys.executable, "-c", LAUNCHER, os.environ.get("SHELL") or "/bin/bash"],
+        proc = subprocess.Popen([sys.executable, "-c", LAUNCHER, login_shell()],
                                 stdin=slave, stdout=slave, stderr=slave, cwd=os.path.expanduser("~"), env=_environment(),
                                 start_new_session=True, close_fds=True)
     finally:
