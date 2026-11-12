@@ -661,3 +661,71 @@ button:disabled { opacity: .45; box-shadow: none; transform: none; }
 .kb-col { border-radius: var(--radius); border-width: var(--line); }
 .kb-card { border-radius: 12px; padding: 10px 12px; }
 .wn-item { border-radius: 12px; }
+
+/* Détail d'un ticket (retour, action) : panneau latéral et page */
+.drawer { position: fixed; inset: 0; z-index: 60; }
+.drawer-backdrop { position: absolute; inset: 0; background: rgba(0, 18, 53, .32); animation: fade .15s ease; }
+.drawer-panel { position: absolute; top: 0; right: 0; bottom: 0; width: min(640px, 100vw); overflow-y: auto; outline: none;
+  background: var(--bg); border-left: var(--line) solid var(--border); box-shadow: -18px 0 40px -20px rgba(0, 18, 53, .35);
+  padding: 20px 24px 32px; animation: slide-in .2s var(--ease); }
+.drawer-close { position: sticky; top: 0; float: right; z-index: 1; min-height: 32px; width: 32px; padding: 0; }
+html.drawer-open { overflow: hidden; }
+@keyframes slide-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .drawer-panel, .drawer-backdrop { animation: none; } }
+.ticket-kicker { margin: 0 0 4px; font-size: 12.5px; }
+.ticket-title { margin: 0 0 10px; font-size: 21px; line-height: 1.25; padding-right: 40px; }
+.ticket-badges, .ticket-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; }
+.ticket-section { background: var(--surface); border: var(--line) solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-card);
+  padding: 4px 16px 10px; margin: 12px 0; }
+.ticket-section h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 12px 0 8px; }
+.ticket-section .meta-list { margin: 4px 0; }
+.ticket-content { margin: 0; }
+.ticket-content dt { font-size: 12.5px; font-weight: 600; color: var(--muted); margin-top: 10px; }
+.ticket-content dd { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.ticket-text { white-space: pre-wrap; }
+.ticket-run { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 6px 0; }
+.ticket-history { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ticket-history li { display: grid; grid-template-columns: 92px 1fr; gap: 8px; font-size: 13.5px; align-items: baseline; }
+.ticket-history .wn-add { display: block; -webkit-line-clamp: 4; }
+.ticket-when { font-variant-numeric: tabular-nums; font-size: 12.5px; }
+.ticket-page { padding: 16px 22px; }
+.ticket-page .ticket-title { padding-right: 0; }
+a[data-ticket] { color: inherit; }
+a[data-ticket]:hover { color: var(--accent); }
+
+/* Fenêtre de détail centrée (remplace le panneau latéral) et cartes entièrement cliquables */
+.drawer.modal { display: grid; place-items: center; padding: 4vh 16px; }
+.drawer.modal[hidden] { display: none; }
+.drawer.modal .drawer-panel { position: relative; inset: auto; width: min(820px, 100%); max-height: 92vh; border: var(--line) solid var(--border);
+  border-radius: 20px; box-shadow: 0 24px 60px -20px rgba(0, 18, 53, .45); padding: 22px 28px 28px; animation: pop .18s var(--ease); }
+.drawer.modal .drawer-backdrop { background: rgba(0, 18, 53, .4); backdrop-filter: blur(2px); }
+@keyframes pop { from { transform: translateY(8px) scale(.985); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .drawer.modal .drawer-panel { animation: none; } }
+@media (max-width: 700px) { .drawer.modal { padding: 0; } .drawer.modal .drawer-panel { max-height: 100vh; height: 100%; border-radius: 0; } }
+[data-ticket-card] { cursor: pointer; }
+.retour[data-ticket-card]:hover { box-shadow: var(--shadow-lift); } /* le liseré de statut garde sa couleur */
+.retour[data-ticket-card] { transition: box-shadow .18s var(--ease), border-color .18s; }
+tr[data-ticket-card]:hover td { background: color-mix(in srgb, var(--accent-soft) 35%, transparent); }
+
+/* « Lancer un agent » : bouton plein bien visible (liste des retours et fenêtre de détail) ; ouvert, il passe en secondaire */
+.retour details.agent > summary, .ticket details.agent > summary {
+  display: inline-flex; align-items: center; gap: 8px; width: max-content; list-style: none; cursor: pointer;
+  margin: 12px 0 2px; padding: 8px 18px 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 700; color: var(--on-accent);
+  background: linear-gradient(100deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, #8767f9) 100%);
+  border: var(--line) solid transparent; box-shadow: 0 2px 6px -1px color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: transform .15s var(--ease), box-shadow .15s var(--ease), filter .15s; }
+.retour details.agent > summary::-webkit-details-marker, .ticket details.agent > summary::-webkit-details-marker { display: none; }
+.retour details.agent > summary .ic, .ticket details.agent > summary .ic { width: 18px; height: 18px; }
+.retour details.agent > summary::after, .ticket details.agent > summary::after { content: "→"; font-weight: 700; transition: transform .15s var(--ease); }
+.retour details.agent > summary:hover, .ticket details.agent > summary:hover {
+  transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 8px 18px -6px color-mix(in srgb, var(--accent) 60%, transparent); }
+.retour details.agent > summary:hover::after, .ticket details.agent > summary:hover::after { transform: translateX(3px); }
+.retour details.agent > summary:focus-visible, .ticket details.agent > summary:focus-visible { outline: none; box-shadow: var(--ring); }
+.retour details.agent[open] > summary, .ticket details.agent[open] > summary {
+  background: var(--surface); color: var(--text); border-color: var(--border); box-shadow: var(--shadow-card); filter: none; }
+.retour details.agent[open] > summary::after, .ticket details.agent[open] > summary::after { content: "▴"; }
+.retour details.agent[open], .ticket details.agent[open] { background: color-mix(in srgb, var(--accent-soft) 30%, transparent);
+  border-radius: 14px; padding: 2px 12px 12px; margin-top: 8px; }
+.ticket-agent-btn { background: linear-gradient(100deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, #8767f9) 100%); border-color: transparent; }
+.ticket-agent-btn .ic { width: 17px; height: 17px; }

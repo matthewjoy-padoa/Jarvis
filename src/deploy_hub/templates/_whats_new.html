@@ -26,7 +26,7 @@
   <li class="wn-item" data-kind="{{ it.kind }}" data-status="{{ 'yes' if it.status_changes else 'no' }}">
     <div class="wn-head">
       <span class="wn-kind wn-kind-{{ it.kind }}">{{ "Recette" if it.kind == "retour" else "Carte" }}</span>
-      {% if it.link %}<a class="wn-title" href="{{ it.link }}">{{ it.label }}</a>{% else %}<span class="wn-title">{{ it.label }}</span>{% endif %}
+      {% if it.link %}<a class="wn-title" data-ticket href="{{ it.link }}">{{ it.label }}</a>{% else %}<span class="wn-title">{{ it.label }}</span>{% endif %}
       {% if show_client %}<span class="wn-client">{{ it.deployment.client }}</span>{% endif %}
       <span class="wn-time" title="{{ it.when.strftime('%d/%m/%Y %H:%M') }}">{{ it.when.strftime("%H:%M") }}</span>
       {% if it.notion_url %}<a class="wn-notion" href="{{ it.notion_url }}" target="_blank" rel="noopener" title="Ouvrir dans Notion">Notion ↗</a>{% endif %}

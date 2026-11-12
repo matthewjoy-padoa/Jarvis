@@ -42,7 +42,7 @@
       <li>
         <span class="date {{ 'late' if i.date < today }}">{{ i.date.strftime("%d/%m") }}</span>
         <span class="badge">{{ i.kind }}</span>
-        {% if i.url %}<a href="{{ i.url }}"{% if i.url.startswith('http') %} target="_blank" rel="noopener"{% endif %}>{{ i.label }}</a>{% else %}{{ i.label }}{% endif %}
+        {% if i.url %}<a href="{{ i.url }}"{% if i.url.startswith('http') %} target="_blank" rel="noopener"{% elif '/ticket/' in i.url %} data-ticket{% endif %}>{{ i.label }}</a>{% else %}{{ i.label }}{% endif %}
         {% if i.action and i.action.vigilance %}{{ ic.icon("alert", "Point de vigilance", "ic-alert") }}{% endif %}
         <span class="muted">· {{ i.d.client }}</span>
       </li>
@@ -56,7 +56,7 @@
       <ul class="todo" data-limit="5">
         {% for d, a in ko %}
         <li><span class="badge g-ko">{{ a.injection_status }}</span>
-          {% if a.notion_url %}<a href="{{ a.notion_url }}" target="_blank" rel="noopener">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}
+          {% if a.ref %}<a data-ticket href="{{ ticket_url(d.slug, 'action', a.ref) }}">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}
           <span class="muted">· {% for r in a.resources %}<code class="res">{{ r }}</code> {% endfor %}{{ d.client }}</span>
           <a class="btn-link" href="/deploiements/{{ d.slug }}/injections#{{ d.slug }}-{{ a.resources | join('-') or 'sans-ressource' }}">Relancer ↗</a></li>
         {% else %}<li class="muted">Aucune injection KO. Tous les systèmes sont opérationnels.</li>{% endfor %}

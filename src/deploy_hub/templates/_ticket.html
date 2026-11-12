@@ -1,0 +1,85 @@
+{# Détail d'un retour de recette ou d'une carte d'action. Attend : d, kind (retour | action), item, history, runs. #}
+{% import "_icons.html" as ic %}
+{% set is_retour = kind == "retour" %}
+{% set due_late = item.due and item.due < today and item.group != "done" %}
+<article class="ticket" data-group="{{ item.group }}">
+  <header class="ticket-head">
+    <p class="ticket-kicker muted"><span>{{ "Retour de recette" if is_retour else ("Carte d'injection" if item.injection else "Action") }}</span>
+      · <code>{{ item.id if is_retour else item.ref }}</code> · <a href="/deploiements/{{ d.slug }}/{{ 'recette' if is_retour else 'actions' }}">{{ d.client }}</a></p>
+    <h2 class="ticket-title">{% if not is_retour and item.vigilance %}{{ ic.icon("alert", "Point de vigilance", "ic-alert") }} {% endif %}{{ (item.ligne or item.data_type or "Type de données non précisé") if is_retour else item.title }}</h2>
+    <div class="ticket-badges">
+      <span class="badge g-{{ item.group }}">{{ item.status }}</span>
+      {% if not is_retour and item.injection_status %}<span class="badge g-{{ item.injection_group }}" title="Statut intégration - Injections">Injection : {{ item.injection_status }}</span>{% endif %}
+      {% if not is_retour %}{% for t in item.teams %}<span class="team team-{{ t | lower }}">{{ t }}</span>{% endfor %}{% endif %}
+    </div>
+    <div class="ticket-actions">
+      {% if is_retour and item.is_open %}<button type="button" class="ticket-agent-btn" onclick="const a = this.closest('.ticket').querySelector('details.agent'); a.open = true; a.scrollIntoView({behavior: 'smooth', block: 'start'})">{{ ic.icon("bot") }} Lancer un agent</button>{% endif %}
+      {% if item.notion_url %}<a class="btn-link" href="{{ item.notion_url }}" target="_blank" rel="noopener">Ouvrir dans Notion ↗</a>{% endif %}
+      <a class="btn-link" href="{{ ticket_url(d.slug, kind, item.id if is_retour else item.ref) }}" target="_blank" rel="noopener" title="Ouvrir ce ticket dans un nouvel onglet">Nouvel onglet ↗</a>
+    </div>
+  </header>
+
+  <section class="ticket-section">
+    <h3>Informations</h3>
+    <dl class="meta-list">
+      {% if is_retour %}
+      <dt>Type de données</dt><dd>{{ item.data_type or "—" }}</dd>
+      <dt>Type de retour</dt><dd>{{ item.type_retour or "—" }}</dd>
+      <dt>Logiciel</dt><dd>{{ item.software or d.software }}</dd>
+      <dt>Ressource</dt><dd>{% if item.resource %}<code>{{ item.resource }}</code>{% else %}<span class="muted">non identifiée</span>{% endif %}</dd>
+      <dt>Responsable(s)</dt><dd>{% if item.owners %}{{ ic.icon("user") }} {{ item.owners | join(", ") }}{% else %}<span class="muted">personne</span>{% endif %}</dd>
+      <dt>Créé le</dt><dd>{{ item.created.strftime("%d/%m/%Y") if item.created else "—" }}</dd>
+      {% else %}
+      <dt>Équipe(s)</dt><dd>{{ item.teams | join(", ") or "—" }}</dd>
+      <dt>Ressources</dt><dd>{% for res in item.resources %}<code>{{ res }}</code> {% else %}<span class="muted">aucune</span>{% endfor %}
+        {% if item.resources %}<a class="muted" href="/deploiements/{{ d.slug }}/injections">· voir les injections</a>{% endif %}</dd>
+      {% if item.owner %}<dt>Responsable</dt><dd>{{ item.owner }}</dd>{% endif %}
+      <dt>Point de vigilance</dt><dd>{{ "oui" if item.vigilance else "non" }}</dd>
+      <dt>Date clé</dt><dd>{{ "oui" if item.event else "non" }}</dd>
+      {% endif %}
+      <dt>Deadline</dt><dd>{% if item.due %}<span class="{{ 'late' if due_late }}">{{ item.due.strftime("%d/%m/%Y") }}</span>
+        <span class="muted">· {% set days = (item.due - today).days %}{{ "aujourd'hui" if days == 0 else ("dans %d j" % days if days > 0 else "il y a %d j" % -days) }}</span>{% else %}—{% endif %}</dd>
+      {% if d.go_live %}<dt>Déploiement</dt><dd>{{ d.go_live.strftime("%d/%m/%Y") }} <span class="muted">· J{{ '%+d' % (-d.days_left) }}</span></dd>{% endif %}
+    </dl>
+  </section>
+
+  {% if is_retour %}
+  <section class="ticket-section">
+    <h3>Contenu du retour</h3>
+    {% if item.content %}
+    <dl class="ticket-content">{% for label, text in item.content %}<dt>{{ label }}</dt><dd>{{ text }}</dd>{% endfor %}</dl>
+    {% else %}<p class="muted">Aucun contenu dans Notion pour ce retour.</p>{% endif %}
+  </section>
+  <section class="ticket-section">
+    <h3>Agents</h3>
+    {% for run in runs %}
+    <p class="ticket-run"><a href="/agents/{{ run.id }}">Agent #{{ run.id }}</a> <span class="badge g-{{ run.group }}">{{ run.status }}</span>
+      <span class="muted">{{ run.started_at.strftime("%d/%m %H:%M") }} · <code>{{ run.branch }}</code></span>
+      {% if run.pr_url %}<a href="{{ run.pr_url }}" target="_blank" rel="noopener">PR ↗</a>{% endif %}</p>
+    {% else %}<p class="muted">Aucun agent lancé sur ce retour.</p>{% endfor %}
+    {% if item.is_open %}
+    <details class="agent" hx-get="/deploiements/{{ d.slug }}/recette/{{ item.id }}/brief" hx-trigger="toggle once" hx-target="find .agent-body">
+      <summary>{{ ic.icon("bot") }} Lancer un agent</summary>
+      <div class="agent-body"><p class="muted">Jarvis prépare le brief…</p></div>
+    </details>
+    {% endif %}
+  </section>
+  {% elif item.comment %}
+  <section class="ticket-section"><h3>Commentaire</h3><p class="ticket-text">{{ item.comment }}</p></section>
+  {% endif %}
+
+  <section class="ticket-section">
+    <h3>Historique <span class="muted">· 60 derniers jours</span></h3>
+    {% if history %}
+    <ol class="ticket-history">
+      {% for c in history %}
+      <li><span class="muted ticket-when">{{ c.when.strftime("%d/%m %H:%M") }}</span>
+        <span>{% if c.type != "modifie" %}<strong>{{ c.verb | capitalize }}</strong>
+        {% elif c.is_status %}{{ c.field_label | capitalize }} : <span class="badge {{ 'g-' ~ c.group_of(c.before) if c.before }}">{{ c.before or "vide" }}</span> → <span class="badge {{ 'g-' ~ c.group_of(c.after) if c.after }}">{{ c.after or "vide" }}</span>
+        {% elif c.is_text %}{{ c.verb | capitalize }}{% for op, t in c.diff if op == "+" and t.strip() %}<span class="wn-add"><span class="wn-plus">+</span>{{ t.strip() }}</span>{% endfor %}
+        {% else %}{{ c.field_label | capitalize }} : {{ c.before if c.before is not none else "vide" }} → <strong>{{ c.after if c.after is not none else "vide" }}</strong>{% endif %}</span></li>
+      {% endfor %}
+    </ol>
+    {% else %}<p class="muted">Aucun changement noté par la synchro sur la période.</p>{% endif %}
+  </section>
+</article>

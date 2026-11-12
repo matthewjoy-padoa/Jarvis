@@ -93,12 +93,12 @@ def changes_since(d: Deployment, deployments_dir: Path, since: datetime) -> list
         if e["base"] == "recette":
             r = retours.get(url)
             label = r.label if r else "Retour supprimé"
-            link = f"/deploiements/{d.slug}/recette?tous=true#{r.id}" if r else ""
+            link = f"/deploiements/{d.slug}/ticket/retour/{r.id}" if r else ""
             kind = "retour"
         else:
             a = actions.get(url)
             label = a.title if a else "Carte supprimée"
-            link = f"/deploiements/{d.slug}/{'injections' if a and a.injection else 'actions?tous=true'}" if a else ""
+            link = f"/deploiements/{d.slug}/ticket/action/{a.ref}" if a and a.ref else ""
             kind = "carte"
         out.append(Change(when, d, kind, label, link, url, e["type"], e.get("champ", ""), e.get("avant"), e.get("apres")))
     return sorted(out, key=lambda c: c.when, reverse=True)
