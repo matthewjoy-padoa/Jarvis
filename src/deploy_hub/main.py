@@ -10,14 +10,15 @@ from fastapi.templating import Jinja2Templates
 
 from deploy_hub import client_config
 from deploy_hub.config import PROJECT_ROOT, clients_dir, data_dir, load_settings
-from deploy_hub.models import DONE, INJECTION_STATUSES, MILESTONE_LABELS, Deployment, status_group
+from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
+                               kanban_columns, status_group)
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
 from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, retour_prompt
 from deploy_hub.sources import notion_api
 from deploy_hub.sources.external import external_statuses
-from deploy_hub.sources.journal import changes_since
+from deploy_hub.sources.journal import changes_since, group_changes
 from deploy_hub.sources import watchers
 from deploy_hub.sources.notifications import NotificationStore
 from deploy_hub.sources.fiches import FicheSource
@@ -36,6 +37,9 @@ app = FastAPI(title="Jarvis")
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
 templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STATUSES)
+templates.env.globals["kanban_columns"] = kanban_columns
+templates.env.globals["ACTION_STATUSES"] = ACTION_STATUSES
+templates.env.globals["RETOUR_STATUSES"] = RETOUR_STATUSES
 
 # Pages globales (barre du haut) et onglets d'une fiche, calqués sur les blocs du dashboard Notion.
 PAGES = [
@@ -142,7 +146,8 @@ def whats_new(request: Request, depuis: str = "", client: str = ""):
     since = since or datetime.now() - timedelta(days=1)
     deployments = [_get(client)] if client else _deployments(request)
     changes = sorted((c for d in deployments for c in changes_since(d, settings.deployments_dir, since)), key=lambda c: c.when, reverse=True)
-    return templates.TemplateResponse(request, "_whats_new.html", {"changes": changes, "since": since, "show_client": not client})
+    return templates.TemplateResponse(request, "_whats_new.html", {"changes": changes, "days": group_changes(changes), "since": since,
+                                                                    "show_client": not client})
 
 
 @app.get("/clients", response_class=HTMLResponse)
@@ -204,16 +209,17 @@ def injections(request: Request, vue: str = "ressources"):
 
 
 @app.get("/actions", response_class=HTMLResponse)
-def actions(request: Request, tous: bool = False):
+def actions(request: Request, tous: bool = False, vue: str = "tableau"):
     return _render(
-        request, "list.html", "/actions", title="Actions", part="actions", deployments=_deployments(request), show_all=tous
+        request, "list.html", "/actions", title="Actions", part="actions", deployments=_deployments(request), show_all=tous, vue=vue
     )
 
 
 @app.get("/recette", response_class=HTMLResponse)
-def recette(request: Request, tous: bool = False):
+def recette(request: Request, tous: bool = False, vue: str = "liste"):
     return _render(
-        request, "list.html", "/recette", title="Retours de recette", part="recette", deployments=_deployments(request), show_all=tous
+        request, "list.html", "/recette", title="Retours de recette", part="recette", deployments=_deployments(request), show_all=tous,
+        vue=vue,
     )
 
 

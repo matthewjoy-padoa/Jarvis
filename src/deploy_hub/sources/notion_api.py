@@ -18,7 +18,8 @@ from pathlib import Path
 import httpx
 
 from deploy_hub.config import PROJECT_ROOT, data_dir
-from deploy_hub.sync_notion import RECETTE_COLUMNS, RECETTE_CONTENT, SyncError, load_config, publish, summary
+from deploy_hub.sync_notion import (RECETTE_COLUMNS, RECETTE_CONTENT, SyncError, add_users, load_config, publish,
+                                    summary, unknown_users)
 
 API = "https://api.notion.com/v1"
 VERSION = "2025-09-03"
@@ -59,6 +60,7 @@ RECETTE_PROPERTIES = {
     "statut": "Statut",
     "type_donnees": "Type de données",
     "logiciel": "Logiciel",
+    "responsables": "Responsable",
     "deadline": "Deadline",
     "ligne": "Ligne du cahier de recette",
     "type_retour": "Type de retour",
@@ -138,9 +140,11 @@ def value(prop: dict):
         if v and v.get("type") == "array":
             return ", ".join(str(value(x)) for x in v["array"] if value(x) is not None) or None
         return v.get(v.get("type")) if v else None
+    if kind == "people":  # même forme que la synchro SQL ; les noms viennent de data/notion/utilisateurs.json
+        return json.dumps([f"user://{u['id']}" for u in v or []]) if v else None
     if kind == "relation":  # ids des pages liées
         return ",".join(r["id"].replace("-", "") for r in v or []) or None
-    return None  # people, files… : non lus
+    return None  # files… : non lus
 
 
 class NotionClient:
@@ -167,6 +171,20 @@ class NotionClient:
             r.raise_for_status()
             return r.json()
         raise SyncError(f"Notion indisponible sur {path} après 4 essais.")
+
+    def name_users(self, root: Path = PROJECT_ROOT) -> None:
+        """Noms des responsables encore inconnus de l'annuaire (GET /v1/users/<id>). Sans la capacité « informations
+        utilisateur » de l'intégration, Notion refuse : ils restent « Inconnu », sans bloquer la synchro."""
+        names = {}
+        for user_id in unknown_users(root):
+            try:
+                names[user_id] = self._call("GET", f"/v1/users/{user_id}").get("name") or ""
+            except SyncError as e:
+                if "(404)" in str(e):  # compte supprimé : on passe au suivant
+                    continue
+                break  # 403 : l'intégration n'a pas le droit de lire les utilisateurs
+        if names:
+            add_users(names, root)
 
     def schema(self, data_source: str) -> dict[str, dict]:
         """Propriétés d'une base (nom → {id, type}) : structure seulement, aucune ligne."""
@@ -236,6 +254,7 @@ def recette_row(row: dict) -> dict:
         "statut": statut if statut in RECETTE_STATUTS else ("Autre" if statut else None),
         "type_donnees": type_donnees if not type_donnees or len(type_donnees) <= TYPE_MAX else "Autre",
         "logiciel": row.get("logiciel"),
+        "responsables": row.get("responsables"),
         "deadline": row.get("deadline"),
         "cree_le": row.get("cree_le"),
         "modifie": row.get("modifie"),
@@ -279,6 +298,7 @@ def refresh(slug: str, notion: NotionClient, root: Path = PROJECT_ROOT) -> dict:
     data = fetch(config, notion)
     caches = {base: {r["url"]: r for r in data[base]} for base in ("actions", "recette")}
     out = publish(slug, root, config, data["client"], data["regles"], caches)
+    notion.name_users(root)
     state_path = data_dir(root) / "notion" / slug / "etat-synchro.json"
     state_path.write_text(json.dumps({"complet_le": date.today().isoformat(), "source": "api"}), encoding="utf-8")
     result = summary(out["deployment"], out["blocked"], "api", out["changes"])

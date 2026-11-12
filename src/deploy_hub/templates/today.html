@@ -95,6 +95,21 @@
       try { localStorage.setItem(KEY, new Date().toISOString()); } catch (e) {}
       load();
     });
+    // Filtre du bloc : tout, éléments dont le statut a changé, retours de recette, cartes.
+    document.getElementById("whats-new").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-wn-filter]");
+      if (!btn) return;
+      e.preventDefault();
+      const f = btn.dataset.wnFilter;
+      btn.parentElement.querySelectorAll("[data-wn-filter]").forEach((x) => x.classList.toggle("active", x === btn));
+      body.querySelectorAll(".wn-item").forEach((it) => {
+        it.hidden = !!f && !(f === "status" ? it.dataset.status === "yes" : it.dataset.kind === f);
+      });
+      body.querySelectorAll(".wn-list").forEach((ul) => {
+        const day = ul.previousElementSibling;
+        if (day) day.hidden = ![...ul.children].some((li) => !li.hidden);
+      });
+    });
     document.addEventListener("DOMContentLoaded", load);
   })();
 </script>

@@ -65,6 +65,20 @@ RETOUR_STATUSES = {
 GROUP_LABELS = {TODO: "À faire", IN_PROGRESS: "En cours", KO: "KO", DONE: "Terminé"}
 
 
+def kanban_columns(cards: list[tuple], statuses: dict[str, str]) -> list[dict]:
+    """Vue kanban : une colonne par statut présent, (fiche, élément) dedans. Ordre : à faire, en cours, KO, terminé,
+    puis l'ordre des options Notion dans chaque groupe ; un statut hors liste va dans son groupe, en fin."""
+    order = list(GROUP_LABELS)
+    known = list(statuses)
+    columns: dict[str, dict] = {}
+    for d, item in cards:
+        col = columns.setdefault(item.status, {"status": item.status, "group": item.group, "cards": []})
+        col["cards"].append((d, item))
+    rank = lambda c: (order.index(c["group"]) if c["group"] in order else 0,
+                      known.index(c["status"]) if c["status"] in known else len(known), c["status"])
+    return sorted(columns.values(), key=rank)
+
+
 NOTION_PAGE = re.compile(r"^https://(?:app\.notion\.com|www\.notion\.so)/(?:p/)?([0-9a-f]{32})$")
 
 
@@ -140,6 +154,7 @@ class RetourRecette:
     status: str = "À faire"
     data_type: str = ""  # « Type de données » (Visites historiques, AMT…)
     software: str = ""  # « Logiciel »
+    owners: list[str] = field(default_factory=list)  # « Responsable » : noms (uuids Notion dans la fiche, traduits à la lecture)
     resource: str | None = None  # ressource orchestrator, si connue
     due: date | None = None
     created: date | None = None

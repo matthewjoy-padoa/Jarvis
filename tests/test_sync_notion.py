@@ -64,6 +64,14 @@ def test_plan_after_a_full_sync(root):
     assert plan("demo", root)["mode"] == "complet"  # une carte ajoutée ou supprimée
 
 
+def test_new_query_column_forces_a_full_sync(root, monkeypatch):
+    fingerprint(root)
+    sync("demo", root)
+    assert plan("demo", root) == {"mode": "inchangé"}
+    monkeypatch.setattr("deploy_hub.sync_notion.columns_version", lambda: "autre")  # ex. colonne « Responsable » ajoutée
+    assert plan("demo", root) == {"mode": "complet", "raison": "colonnes des requêtes modifiées"}
+
+
 def test_delta_updates_only_changed_rows(root):
     fingerprint(root)
     sync("demo", root)
@@ -185,3 +193,16 @@ def test_recette_content_is_kept_apart_from_versioned_files(root):
 def test_teams_come_from_action_type_prefixes(types, teams):
     from deploy_hub.sync_notion import teams_of
     assert teams_of(types) == teams
+
+
+def test_responsables_are_named_from_the_directory(tmp_path):
+    from deploy_hub.sources.fiches import _names
+    from deploy_hub.sync_notion import add_users, unknown_users, user_ids
+    assert user_ids('["user://a-1", "user://b-2"]') == ["a-1", "b-2"] and user_ids(None) == []
+    cache = tmp_path / "data" / "notion" / "acme" / "cache-recette.json"
+    cache.parent.mkdir(parents=True)
+    cache.write_text(json.dumps({"u": {"url": "u", "responsables": '["user://a-1", "user://b-2"]'}}))
+    assert unknown_users(tmp_path) == ["a-1", "b-2"]
+    add_users({"user://a-1": "Alice"}, tmp_path)
+    assert unknown_users(tmp_path) == ["b-2"]
+    assert _names(["a-1", "b-2"], {"a-1": "Alice"}) == ["Alice", "Inconnu (b-2)"]

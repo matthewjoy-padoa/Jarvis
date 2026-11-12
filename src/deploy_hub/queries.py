@@ -7,6 +7,7 @@ Les modèles ne diffèrent d'un client à l'autre que par :
 `write(slug)` écrit les requêtes prêtes à l'emploi dans data/notion/<slug>/requetes/, où la routine de synchro les lit.
 """
 
+import hashlib
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -34,6 +35,12 @@ def page_id_of(value: str) -> str:
 
 def _quote(value: str) -> str:
     return "'" + str(value).replace("'", "''") + "'"
+
+
+def templates_version() -> str:
+    """Empreinte des modèles de requêtes : change dès qu'une colonne est ajoutée ou retirée."""
+    text = "".join(_template(n) for n in NAMES)
+    return hashlib.sha256(text.encode()).hexdigest()[:12]
 
 
 @lru_cache(maxsize=len(NAMES))

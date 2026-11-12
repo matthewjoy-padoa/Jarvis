@@ -3,7 +3,7 @@
 //   porte data-values="a|b" (plusieurs valeurs : une carte de deux équipes répond aux deux) ; un clic sur un <th> trie,
 //   sauf [data-nosort]. Une cellule peut porter data-sort (ex. date ISO) pour trier sur autre chose que son texte.
 // - Liste de cartes : data-items (sélecteur des cartes) et data-filters="Libellé:attribut,…" (attributs data-* des cartes),
-//   data-sorts="Libellé:attribut,…" pour un menu de tri.
+//   data-sorts="Libellé:attribut,…" pour un menu de tri. Un attribut « a|b » porte plusieurs valeurs (ex. responsables).
 // - Lignes ou cartes avec data-group (todo, in_progress, ko, done) : filtre « Groupe » ajouté automatiquement.
 // - Graphiques : un élément [data-filter-set="clé=valeur;clé=valeur"] applique ces filtres au clic (re-clic : retire) ;
 //   avec [data-filter-href], il ouvre cette page, filtres passés dans l'ancre (#clé=valeur&clé=valeur).
@@ -141,9 +141,10 @@
     const { bar, search, count, reset } = toolbar(block, apply);
     const keys = {};
     const filters = pairs(block.dataset.filters).map(([label, attr]) => {
-      const values = [...new Set(items.map((it) => it.dataset[attr] || ""))].filter(Boolean).sort(compare);
+      const valuesOf = (it) => (it.dataset[attr] || "").split("|"); // « a|b » : la carte répond aux deux valeurs
+      const values = [...new Set(items.flatMap(valuesOf))].filter(Boolean).sort(compare);
       const [wrap, s] = select(label, values.map((v) => [v, v]), apply);
-      return { attr, s, wrap };
+      return { attr, s, wrap, valuesOf };
     }).filter((f) => f.s.options.length > 2);
     filters.forEach((f) => { bar.append(f.wrap); keys[f.attr] = f.s; });
     const group = groupSelect(items, apply);
@@ -169,11 +170,15 @@
       let shown = 0;
       for (const it of items) {
         const ok = (!q || text(it).toLowerCase().includes(q))
-          && filters.every((f) => !f.s.value || it.dataset[f.attr] === f.s.value)
+          && filters.every((f) => !f.s.value || f.valuesOf(it).includes(f.s.value))
           && (!keys.groupe || !keys.groupe.value || it.dataset.group === keys.groupe.value);
         it.hidden = !ok;
         shown += ok;
       }
+      block.querySelectorAll(".kb-col").forEach((col) => { // kanban : nombre de cartes visibles par colonne
+        const n = col.querySelector(".kb-count");
+        if (n) n.textContent = col.querySelectorAll(".kb-card:not([hidden])").length;
+      });
       finish(entry, shown, items.length);
     }
     apply();

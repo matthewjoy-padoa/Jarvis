@@ -467,3 +467,108 @@ button .ic { margin-right: 2px; }
 .log-kind { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding-top: 2px; }
 .log-outil pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
 .log-refus pre, .log-brut pre { color: var(--danger); }
+
+/* Quoi de neuf : une ligne par retour ou carte, regroupées par jour */
+.wn-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin: 4px 0 6px; }
+.wn-summary { margin: 0; }
+.wn-day { font-size: 13px; margin: 16px 0 6px; text-transform: none; }
+.wn-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.wn-item { padding: 10px 12px; border: 2px solid var(--border); border-radius: 12px; background: var(--surface); }
+.wn-item:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+.wn-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.wn-kind { flex: none; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--bg); color: var(--muted); }
+.wn-kind-retour { background: var(--pa-ko); color: var(--text); }
+.wn-kind-carte { background: var(--pa-progress); color: var(--text); }
+.wn-title { font-weight: 600; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+a.wn-title:hover { color: var(--accent); }
+.wn-client { flex: none; font-size: 12px; color: var(--muted); }
+.wn-time { flex: none; margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.wn-notion { flex: none; font-size: 12px; font-weight: 600; }
+.wn-changes { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-top: 6px; padding-left: 2px; font-size: 13px; }
+.wn-change { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.wn-before { opacity: .75; }
+.wn-arrow { color: var(--muted); }
+.wn-pill { font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 999px; background: var(--bg); }
+.wn-new { background: var(--pa-done); }
+.wn-text { flex-basis: 100%; }
+.wn-text summary { margin: 0; color: var(--accent); font-size: 13px; width: max-content; }
+.wn-empty { margin: 8px 0; }
+@media (max-width: 700px) { .wn-head { flex-wrap: wrap; } .wn-title { white-space: normal; } .wn-time { margin-left: 0; } }
+.wn-list > li, .wn-head, .wn-changes { min-width: 0; }  /* titres longs : coupés avec « … » au lieu de déborder */
+.wn-list { grid-template-columns: minmax(0, 1fr); }
+.wn-change .badge { white-space: normal; }
+
+/* Textes modifiés : lignes ajoutées précédées d'un « + » vert, sans surlignage */
+.wn-diff { flex-basis: 100%; }
+.wn-diff-label { font-size: 12px; font-weight: 600; color: var(--muted); }
+.wn-add { margin: 2px 0 0; padding-left: 16px; text-indent: -16px; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.wn-plus, .wn-minus { display: inline-block; width: 16px; text-indent: 0; font-weight: 700; }
+.wn-plus { color: var(--st-done); }
+.wn-minus { color: var(--st-ko); }
+.link-btn { background: none; border: 0; padding: 0; color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }
+
+/* Nom de l'app : dégradé aux couleurs de la charte, graisse forte, reflet discret qui passe */
+.brand-name {
+  font-size: 21px; font-weight: 800; letter-spacing: -.02em; line-height: 1;
+  background: linear-gradient(100deg, #3333eb 0%, #8767f9 38%, #e25ac5 70%, #3333eb 100%);
+  background-size: 220% 100%; background-position: 0% 50%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.brand-dot { width: 7px; height: 7px; border-radius: 50%; background: #5ccb4d; margin-left: 1px; align-self: flex-end; margin-bottom: 5px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #5ccb4d 25%, transparent); }
+:root[data-theme="dark"] .brand-name { background-image: linear-gradient(100deg, #9b9bff 0%, #b8a6ff 38%, #f08ad8 70%, #9b9bff 100%); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .brand-name { background-image: linear-gradient(100deg, #9b9bff 0%, #b8a6ff 38%, #f08ad8 70%, #9b9bff 100%); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .brand-name { animation: jarvis-sheen 9s ease-in-out infinite; }
+  .brand:hover .brand-name { animation-duration: 2.5s; }
+  @keyframes jarvis-sheen { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+  .brand-dot { animation: jarvis-online 2.8s ease-in-out infinite; }
+  @keyframes jarvis-online { 0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, #5ccb4d 25%, transparent); } 50% { box-shadow: 0 0 0 5px color-mix(in srgb, #5ccb4d 0%, transparent); } }
+}
+
+/* Puces clients du menu : contour en dégradé de la charte, nom en gras, client ouvert en plein, J-x en alerte sous 14 jours */
+.nav a.client-chip {
+  --chip-grad: linear-gradient(100deg, #3333eb, #8767f9 55%, #e25ac5);
+  border: 2px solid transparent; padding: 5px 13px 5px 11px; font-weight: 700;
+  background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--chip-grad) border-box;
+  box-shadow: 0 1px 4px rgba(51, 51, 235, .12); transition: transform .15s, box-shadow .15s;
+}
+.nav a.client-chip:hover { border-color: transparent; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(51, 51, 235, .22); }
+.nav a.client-chip .client-name { letter-spacing: -.01em; }
+.nav a.client-chip.active { color: #fff; border-color: transparent; background: var(--chip-grad) padding-box, var(--chip-grad) border-box;
+  box-shadow: 0 4px 14px rgba(135, 103, 249, .35); }
+.nav a.client-chip .dot { width: 10px; height: 10px; }
+.nav a.client-chip.active .dot { box-shadow: 0 0 0 2px rgba(255, 255, 255, .85); }
+.nav a.client-chip .jx.soon { background: var(--pa-ko); color: var(--text); }
+.nav a.client-chip.active .jx { background: rgba(255, 255, 255, .22); color: #fff; }
+
+/* Logo : monogramme J sur carré arrondi en dégradé (même fichier que l'icône d'onglet) */
+.brand-mark { width: 30px; height: 30px; border-radius: 9px; filter: none; box-shadow: 0 2px 8px rgba(135, 103, 249, .35); transition: transform .2s; }
+.brand:hover .brand-mark { transform: rotate(-6deg) scale(1.05); }
+
+/* Vue kanban (actions, retours de recette) : une colonne par statut, défilement horizontal */
+.view-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 280px); gap: 12px; overflow-x: auto;
+  padding: 4px 2px 12px; margin-top: 12px; align-items: start; scroll-snap-type: x proximity; }
+.kb-col { background: color-mix(in srgb, var(--surface) 55%, var(--bg)); border: 1px solid var(--border); border-radius: 14px;
+  padding: 8px; scroll-snap-align: start; border-top: 3px solid var(--border); }
+.kb-col.kb-todo { border-top-color: var(--st-todo); }
+.kb-col.kb-in_progress { border-top-color: var(--st-progress); }
+.kb-col.kb-ko { border-top-color: var(--st-ko); }
+.kb-col.kb-done { border-top-color: var(--st-done); }
+.kb-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 4px 8px; }
+.kb-head .badge { white-space: normal; }
+.kb-count { font-size: 12px; font-variant-numeric: tabular-nums; }
+.kb-cards { display: grid; gap: 8px; max-height: 70vh; overflow-y: auto; }
+.kb-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; box-shadow: var(--shadow); }
+.kb-card:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+.kb-card[hidden] { display: none; }
+.kb-title { margin: 0 0 4px; font-size: 14px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.kb-title a { color: var(--text); }
+.kb-title a:hover { color: var(--accent); }
+.kb-meta { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 12px; }
+.kb-col:not(:has(.kb-card:not([hidden]))) .kb-cards::after { content: "Aucune carte pour ces filtres"; color: var(--muted); font-size: 12px; padding: 4px; }

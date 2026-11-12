@@ -25,13 +25,14 @@ from pathlib import Path
 import yaml
 
 from deploy_hub.config import PROJECT_ROOT, data_dir
+from deploy_hub import queries
 from deploy_hub.queries import ConfigError, page_id_of
 from deploy_hub.models import ACTION_STATUSES, DONE, INJECTION_STATUSES, KO, RETOUR_STATUSES, status_group
 from deploy_hub.sources.notifications import NotificationStore
 
 # Colonnes admises pour la base « Retours Recette » : tout autre champ arrête la synchro.
 # Métadonnées → cache-recette.json et fiche (versionnés) ; contenu → contenu-recette.json (exclu de git, reste sur la machine).
-RECETTE_META = {"url", "statut", "type_donnees", "logiciel", "deadline", "cree_le", "modifie"}
+RECETTE_META = {"url", "statut", "type_donnees", "logiciel", "responsables", "deadline", "cree_le", "modifie"}
 RECETTE_CONTENT = {"ligne", "type_retour", "commentaire_client", "exemple", "analyse", "solutions", "discussion", "echanges"}
 RECETTE_COLUMNS = RECETTE_META | RECETTE_CONTENT
 PAGE_SIZE = 100  # lignes par réponse Notion
@@ -159,12 +160,44 @@ def _action(a: dict) -> dict:
     }
 
 
+def user_ids(value) -> list[str]:
+    """Personnes d'une colonne Notion (« ["user://<uuid>", …] » en SQL, liste avec l'API) → uuids, dans l'ordre."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            value = value.split(",")
+    return [str(v).removeprefix("user://").strip() for v in value or [] if str(v).strip()]
+
+
+def users_path(root: Path = PROJECT_ROOT) -> Path:
+    """Annuaire uuid Notion → nom des responsables de recette (hors git, comme tout data/)."""
+    return data_dir(root) / "notion" / "utilisateurs.json"
+
+
+def unknown_users(root: Path = PROJECT_ROOT) -> list[str]:
+    """Responsables présents dans les caches de recette mais absents de l'annuaire : à faire traduire par la synchro."""
+    known = _load_json(users_path(root), {})
+    seen = {u for cache in (data_dir(root) / "notion").glob("*/cache-recette.json")
+            for row in _load_json(cache, {}).values() for u in user_ids(row.get("responsables"))}
+    return sorted(seen - set(known))
+
+
+def add_users(names: dict[str, str], root: Path = PROJECT_ROOT) -> None:
+    path = users_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    known = _load_json(path, {})
+    known.update({k.removeprefix("user://"): v for k, v in names.items() if v})
+    path.write_text(json.dumps(known, ensure_ascii=False, indent=1, sort_keys=True), encoding="utf-8")
+
+
 def _retour(r: dict) -> dict:
     return {
         "id": _page_id(r["url"])[-6:].upper(),
         "status": r.get("statut") or "À faire",
         "data_type": r.get("type_donnees") or "",
         "software": r.get("logiciel") or "",
+        "owners": user_ids(r.get("responsables")),
         "due": _date(r.get("deadline")),
         "created": _date(r.get("cree_le")),
         "notion_url": r["url"],
@@ -233,6 +266,12 @@ def fingerprint(raw: Path) -> dict | None:
     return result
 
 
+def columns_version() -> str:
+    """Empreinte des modèles de requêtes : une colonne ajoutée ou retirée impose une synchro complète (sinon les lignes
+    déjà en cache n'auraient jamais la nouvelle colonne)."""
+    return queries.templates_version()
+
+
 def plan(slug: str, root: Path = PROJECT_ROOT) -> dict:
     """Ce que la routine doit faire pour ce client : inchangé, delta (avec la date de départ par base) ou complet."""
     raw = data_dir(root) / "notion" / slug
@@ -242,6 +281,8 @@ def plan(slug: str, root: Path = PROJECT_ROOT) -> dict:
     if current is None or state is None or not caches_ok or "empreinte" not in state:  # ex. après un rafraîchissement direct
         return {"mode": "complet"}
     last_full = date.fromisoformat(state["complet_le"])
+    if state.get("colonnes") != columns_version():
+        return {"mode": "complet", "raison": "colonnes des requêtes modifiées"}
     if (date.today() - last_full).days >= FULL_SYNC_DAYS:
         return {"mode": "complet", "raison": f"dernière synchro complète le {last_full.isoformat()}"}
     previous = state["empreinte"]
@@ -400,6 +441,7 @@ def sync(slug: str, root: Path = PROJECT_ROOT) -> dict:
     state = _load_json(raw / "etat-synchro.json", {})
     if all(how == "complet" for _, how in merged.values()):
         state["complet_le"] = date.today().isoformat()
+        state["colonnes"] = columns_version()
     if (current := fingerprint(raw)) is not None:
         state["empreinte"] = current
     if "complet_le" in state:
@@ -412,6 +454,8 @@ if __name__ == "__main__":
     # uv run python -m deploy_hub.sync_notion clients            → slugs des clients configurés
     # uv run python -m deploy_hub.sync_notion requetes <slug>    → écrit ses requêtes SQL, affiche leur dossier
     # uv run python -m deploy_hub.sync_notion verifier <slug>    → {"mode": "inchangé" | "delta" | "complet", ...}
+    # uv run python -m deploy_hub.sync_notion utilisateurs        → uuids des responsables sans nom dans l'annuaire
+    # uv run python -m deploy_hub.sync_notion utilisateurs '{"<uuid>": "<nom>"}'  → ajoute ces noms à l'annuaire
     # uv run python -m deploy_hub.sync_notion <slug>             → fusionne les résultats déposés, écrit la fiche
     from deploy_hub import client_config, queries
     try:
@@ -419,6 +463,10 @@ if __name__ == "__main__":
             print("\n".join(client_config.slugs()))
         elif sys.argv[1] == "requetes":
             print(queries.write(sys.argv[2], load_config(sys.argv[2])))
+        elif sys.argv[1] == "utilisateurs":
+            if len(sys.argv) > 2:
+                add_users(json.loads(sys.argv[2]))
+            print(json.dumps(unknown_users()))
         elif sys.argv[1] == "verifier":
             print(json.dumps(plan(sys.argv[2]), ensure_ascii=False))
         else:

@@ -1,6 +1,7 @@
 {% import "_icons.html" as ic %}
 {# Attend : deployments, show_client, show_all. Notion : « Actions de déploiement » ; par défaut les actives (vigilance, dates clés, échéances à J-7/J+30, en cours). #}
 {% import "_charts.html" as charts with context %}
+{% import "_kanban.html" as kb %}
 {% set ns = namespace(late=0, week=0, vig=0, evt=0) %}
 {% for d in deployments %}{% for a in d.actions if a.group != "done" %}
   {% if a.due and a.due < today %}{% set ns.late = ns.late + 1 %}{% elif a.due and (a.due - today).days <= 7 %}{% set ns.week = ns.week + 1 %}{% endif %}
@@ -8,9 +9,29 @@
 {% endfor %}{% endfor %}
 {{ charts.stats([("En retard", ns.late, "ko"), ("À échéance sous 7 jours", ns.week, "todo"), ("Points de vigilance", ns.vig, "ko"), ("Dates clés à venir", ns.evt, "")]) }}
 {% set base = request.url.path %}
-<div class="segmented" role="group" aria-label="Actions affichées">
-  <a href="{{ base }}" class="{{ 'active' if not show_all }}" title="Vigilance, dates clés, en cours, échéance entre J-7 et J+30">Actives</a><a href="{{ base }}?tous=true" class="{{ 'active' if show_all }}">Toutes</a>
+{% set kanban = vue == "kanban" %}
+{% set q_vue = "&vue=kanban" if kanban else "" %}
+<div class="view-bar">
+  <div class="segmented" role="group" aria-label="Actions affichées">
+    <a href="{{ base }}{{ '?vue=kanban' if kanban }}" class="{{ 'active' if not show_all }}" title="Vigilance, dates clés, en cours, échéance entre J-7 et J+30">Actives</a><a href="{{ base }}?tous=true{{ q_vue }}" class="{{ 'active' if show_all }}">Toutes</a>
+  </div>
+  <div class="segmented" role="group" aria-label="Présentation">
+    <a href="{{ base }}{{ '?tous=true' if show_all }}" class="{{ 'active' if not kanban }}">Tableau</a><a href="{{ base }}?vue=kanban{{ '&tous=true' if show_all }}" class="{{ 'active' if kanban }}">Kanban</a>
+  </div>
 </div>
+{% if kanban %}
+{% set ns_kb = namespace(cards=[]) %}
+{% for d in deployments %}{% for a in (d.actions if show_all else d.active_actions) %}{% set ns_kb.cards = ns_kb.cards + [(d, a)] %}{% endfor %}{% endfor %}
+{% call(d, a) kb.board(kanban_columns(ns_kb.cards, ACTION_STATUSES), "Équipe:equipe,Injection:injection" ~ (",Client:client" if show_client else ""), "Actions par statut") %}
+<article class="kb-card" data-group="{{ a.group }}" data-equipe="{{ a.teams | join('|') if a.teams else 'Sans équipe' }}" data-injection="{{ a.injection_status or 'Sans injection' }}" data-client="{{ d.client }}">
+  <p class="kb-title">{% if a.vigilance %}{{ ic.icon("alert", "Point de vigilance", "ic-alert") }} {% endif %}{% if a.event %}{{ ic.icon("flag", "Date clé", "ic-muted") }} {% endif %}{% if a.notion_url %}<a href="{{ a.notion_url }}" target="_blank" rel="noopener">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}</p>
+  <p class="kb-meta">{% for t in a.teams %}<span class="team team-{{ t | lower }}">{{ t }}</span>{% endfor %}
+    {% if show_client %}<a class="muted" href="/deploiements/{{ d.slug }}/actions?vue=kanban">{{ d.client }}</a>{% endif %}
+    {% if a.due %}<span class="{{ 'late' if a.group != 'done' and a.due < today else 'muted' }}">{{ ic.icon("calendar") }} {{ a.due.strftime("%d/%m") }}</span>{% endif %}</p>
+  {% if a.injection_status %}<p class="kb-meta"><span class="badge g-{{ a.injection_group }}">{{ a.injection_status }}</span></p>{% endif %}
+</article>
+{% endcall %}
+{% else %}
 {% set has_owner = deployments | map(attribute="actions") | sum(start=[]) | selectattr("owner") | list | length > 0 %}
 <table data-filterable>
   <thead><tr>{% if show_client %}<th data-filter>Client</th>{% endif %}<th>Intitulé</th><th data-filter="equipe" data-multi>Équipe</th><th data-filter>Statut</th><th data-filter>Injection</th>{% if has_owner %}<th data-filter>Responsable</th>{% endif %}<th>Deadline</th></tr></thead>
@@ -29,3 +50,4 @@
   {% else %}{% endfor %}{% endfor %}
   </tbody>
 </table>
+{% endif %}

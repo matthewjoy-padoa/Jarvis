@@ -1,0 +1,17 @@
+{# Vue kanban : une colonne par statut (kanban_columns), cartes rendues par l'appelant ({% call(d, item) board(...) %}).
+   filters : « Libellé:attribut,… » des attributs data-* posés sur les cartes, comme les listes de cartes filtrables.
+   Pas de data-sorts : le tri de filters.js déplace les cartes à la racine du bloc et les sortirait de leurs colonnes. #}
+{% macro board(columns, filters, label) -%}
+{% if columns %}
+<div class="kanban" data-filterable data-items=".kb-card" data-filters="{{ filters }}" role="list" aria-label="{{ label }}">
+  {% for col in columns %}
+  <section class="kb-col kb-{{ col.group }}" role="listitem" aria-label="{{ col.status }}">
+    <header class="kb-head"><span class="badge g-{{ col.group }}">{{ col.status }}</span><span class="kb-count muted">{{ col.cards | length }}</span></header>
+    <div class="kb-cards">
+      {% for d, item in col.cards %}{{ caller(d, item) }}{% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
+{% else %}<p class="muted">Rien à afficher.</p>{% endif %}
+{%- endmacro %}
