@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=51">
+  <link rel="stylesheet" href="/static/style.css?v=52">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=4" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
@@ -56,7 +56,6 @@
       <div id="notif-panel" class="notif-panel" hidden></div>
     </div>
     <button type="button" class="theme-toggle icon-btn" id="theme-toggle" title="Changer de thème">Auto</button>
-    {% if mode == "demo" %}<span class="badge warn" title="Les boutons DAG et agent sont simulés : aucune action réelle">Mode démo</span>{% endif %}
   </header>
   <script>
     // Thème : Auto (suit le Mac) → Nuit → Clair → Auto. Retenu dans le navigateur.

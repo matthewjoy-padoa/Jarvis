@@ -59,7 +59,7 @@ def test_index_lists_deployments():
     r = client.get("/clients")
     assert r.status_code == 200
     assert "Client Démo" in r.text and "Client Exemple" in r.text
-    assert "Mode démo" in r.text
+    assert "Mode démo" not in r.text  # badge retiré de la barre du haut (2026-11-12) : la simulation se lit dans État des systèmes
 
 
 @pytest.mark.parametrize(
