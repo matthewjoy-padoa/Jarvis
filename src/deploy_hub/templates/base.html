@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=57">
+  <link rel="stylesheet" href="/static/style.css?v=61">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=4" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
@@ -18,7 +18,8 @@
   <script src="/static/notify.js?v=2" defer></script>
   <script src="/static/drawer.js?v=4" defer></script>
   <script src="/static/palette.js?v=7" defer></script>
-  <script src="/static/console.js?v=3" defer></script>
+  <script src="/static/console.js?v=4" defer></script>
+  <script src="/static/shell.js?v=1" defer></script>
 </head>
 <body>
   {% import "_icons.html" as ic %}
@@ -149,12 +150,24 @@
   <button type="button" class="console-fab" data-console-open aria-label="Console Jarvis" title="Console Jarvis : tape des commandes comme dans un terminal (touche >)">
     {{ ic.icon("terminal") }}<span class="console-fab-label">Console</span><kbd>&gt;</kbd></button>
   {# Console Jarvis : un vrai terminal (console.js) ; les commandes sont lues et exécutées par /console (console.py). #}
-  <section class="term" id="term" hidden aria-label="Console Jarvis" data-commands="{{ console_commands | join(' ') }}">
+  <section class="term" id="term" hidden aria-label="Console Jarvis" data-commands="{{ console_commands | join(' ') }}"
+           {%- if shell_token %} data-shell-token="{{ shell_token }}"{% endif %}>
     <div class="term-bar">
-      <span class="term-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="term-dots">
+        <button type="button" class="term-dot red" data-term-close aria-label="Fermer la console" title="Fermer (Échap)">
+          <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.75 3.75l4.5 4.5M8.25 3.75l-4.5 4.5"/></svg></button>
+        <button type="button" class="term-dot yellow" data-term-minimize aria-label="Réduire la console" title="Réduire">
+          <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.25 6h5.5"/></svg></button>
+        <button type="button" class="term-dot green" data-term-maximize aria-label="Agrandir la console" title="Agrandir">
+          <svg viewBox="0 0 12 12" aria-hidden="true"><path class="v" d="M6 3.25v5.5"/><path d="M3.25 6h5.5"/></svg></button>
+      </span>
+      {% if shell_token %}<span class="term-tabs" role="tablist" aria-label="Console">
+        <button type="button" role="tab" class="term-tab is-active" data-term-tab="jarvis" aria-selected="true">Jarvis</button>
+        <button type="button" role="tab" class="term-tab" data-term-tab="shell" aria-selected="false" title="Shell de la VM : vraies commandes (session fermée au changement de page)">Shell VM</button>
+      </span>{% endif %}
       <span class="term-title">jarvis — <span id="term-client">{{ current.slug if current else "aucun client" }}</span></span>
-      <button type="button" class="term-close" data-term-close aria-label="Fermer la console" title="Fermer (Échap)">✕</button>
     </div>
+    {% if shell_token %}<div class="shell-pane" id="shell-pane" hidden></div>{% endif %}
     <div class="term-screen" id="term-screen">
       <div class="term-out" id="term-out" role="log" aria-live="polite"></div>
       <form class="term-line" id="term-form" autocomplete="off">

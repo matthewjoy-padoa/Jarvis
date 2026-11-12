@@ -181,7 +181,23 @@
   screen.addEventListener("click", (e) => {  // un clic dans l'écran rend la main au clavier, sauf sur un lien ou une sélection
     if (!e.target.closest("a") && !window.getSelection().toString()) input.focus();
   });
-  term.querySelector("[data-term-close]").addEventListener("click", close);
+  // Pastilles à la macOS : rouge ferme, jaune réduit à la barre de titre (un clic sur la barre la rouvre), verte agrandit.
+  const SIZE = "jarvis-console-size";
+  function size(state) {
+    term.classList.toggle("is-minimized", state === "min");
+    term.classList.toggle("is-maximized", state === "max");
+    term.querySelector("[data-term-maximize]").setAttribute("aria-label", state === "max" ? "Remettre la console à sa taille" : "Agrandir la console");
+    store(sessionStorage, SIZE, state || "");
+    if (state !== "min") (document.getElementById("shell-pane")?.hidden === false ? null : input.focus());
+  }
+  const sizeNow = () => term.classList.contains("is-minimized") ? "min" : term.classList.contains("is-maximized") ? "max" : "";
+  term.querySelector("[data-term-close]").addEventListener("click", (e) => { e.stopPropagation(); close(); });
+  term.querySelector("[data-term-minimize]").addEventListener("click", (e) => { e.stopPropagation(); size(sizeNow() === "min" ? "" : "min"); });
+  term.querySelector("[data-term-maximize]").addEventListener("click", (e) => { e.stopPropagation(); size(sizeNow() === "max" ? "" : "max"); });
+  term.querySelector(".term-bar").addEventListener("click", (e) => {  // réduite : un clic sur la barre la rouvre
+    if (sizeNow() === "min" && !e.target.closest("button")) size("");
+  });
+  size(load(sessionStorage, SIZE) || "");
   document.addEventListener("click", (e) => { if (e.target.closest("[data-console-open]")) open(); });
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey && e.key === "`") { e.preventDefault(); term.hidden ? open() : close(); }

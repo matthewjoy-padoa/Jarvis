@@ -5,7 +5,7 @@ import threading
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import FastAPI, Form, HTTPException, Request, WebSocket
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -14,7 +14,7 @@ from deploy_hub import client_config
 from deploy_hub.config import PROJECT_ROOT, clients_dir, data_dir, load_settings
 from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
                                kanban_columns, notion_link, status_group)
-from deploy_hub import console
+from deploy_hub import console, shell
 from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
@@ -118,6 +118,7 @@ def _render(request: Request, template: str, active: str, **context) -> HTMLResp
         {
             "pages": NAV_PAGES,
             "current": _current(request),
+            "shell_token": shell.TOKEN if shell.enabled() else "",  # onglet « Shell » de la console (JARVIS_SHELL=1, VM)
             "cross_pages": CROSS_PAGES,
             "clients": _deployments(request),
             "active": active,
@@ -209,6 +210,12 @@ def console_run(request: Request, ligne: str = Form("")):
     response = JSONResponse({"lines": out.lines, "prompt": f"jarvis:{slug or '~'}", "confirm": out.confirm, "navigate": out.navigate,
                              "ticket": out.ticket, "clear": out.clear, "close": out.close, "history": out.history})
     return _remember(response, out.client) if out.client else response
+
+
+@app.websocket("/terminal/ws")
+async def terminal_ws(websocket: WebSocket):
+    """Shell de la VM dans la console (shell.py) : refusé sans JARVIS_SHELL=1, hors connexion locale, origine ou jeton."""
+    await shell.bridge(websocket)
 
 
 @app.get("/palette/dag/{slug}/{dag_id}", response_class=HTMLResponse)
