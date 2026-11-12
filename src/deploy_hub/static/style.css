@@ -528,20 +528,20 @@ a.wn-title:hover { color: var(--accent); }
 }
 
 /* Puces clients du menu : contour en dégradé de la charte, nom en gras, client ouvert en plein, J-x en alerte sous 14 jours */
-.nav a.client-chip {
+.client-chip.strong {
   --chip-grad: linear-gradient(100deg, #3333eb, #8767f9 55%, #e25ac5);
   border: 2px solid transparent; padding: 5px 13px 5px 11px; font-weight: 700;
   background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--chip-grad) border-box;
   box-shadow: 0 1px 4px rgba(51, 51, 235, .12); transition: transform .15s, box-shadow .15s;
 }
-.nav a.client-chip:hover { border-color: transparent; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(51, 51, 235, .22); }
-.nav a.client-chip .client-name { letter-spacing: -.01em; }
-.nav a.client-chip.active { color: #fff; border-color: transparent; background: var(--chip-grad) padding-box, var(--chip-grad) border-box;
+.client-chip.strong:hover { border-color: transparent; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(51, 51, 235, .22); }
+.client-chip.strong .client-name { letter-spacing: -.01em; }
+.client-chip.strong.active { color: #fff; border-color: transparent; background: var(--chip-grad) padding-box, var(--chip-grad) border-box;
   box-shadow: 0 4px 14px rgba(135, 103, 249, .35); }
-.nav a.client-chip .dot { width: 10px; height: 10px; }
-.nav a.client-chip.active .dot { box-shadow: 0 0 0 2px rgba(255, 255, 255, .85); }
-.nav a.client-chip .jx.soon { background: var(--pa-ko); color: var(--text); }
-.nav a.client-chip.active .jx { background: rgba(255, 255, 255, .22); color: #fff; }
+.client-chip.strong .dot { width: 10px; height: 10px; }
+.client-chip.strong.active .dot { box-shadow: 0 0 0 2px rgba(255, 255, 255, .85); }
+.client-chip.strong .jx.soon { background: var(--pa-ko); color: var(--text); }
+.client-chip.strong.active .jx { background: rgba(255, 255, 255, .22); color: #fff; }
 
 /* Logo : monogramme J sur carré arrondi en dégradé (même fichier que l'icône d'onglet) */
 .brand-mark { width: 30px; height: 30px; border-radius: 9px; filter: none; box-shadow: 0 2px 8px rgba(135, 103, 249, .35); transition: transform .2s; }
@@ -875,3 +875,19 @@ a.blocking-row:hover { background: color-mix(in srgb, var(--accent) 7%, var(--su
 .blocking-more { margin: 6px 10px 0; font-size: 12.5px; }
 /* Arrivée par une ancre (lien « Où ça coince ») : le bloc s'arrête sous la barre et les onglets collés, pas dessous. */
 .res-block { scroll-margin-top: calc(var(--topbar-h, 61px) + 64px); }
+
+/* ============================================================ Client en cours (2026-11-12) : un client à la fois dans la barre,
+   les autres dans le menu du sélecteur. Les styles .client-chip.strong reprennent ceux des anciennes puces du menu. */
+.client-switch { position: relative; flex: none; }
+.client-switch > summary { list-style: none; cursor: pointer; }
+.client-switch > summary::-webkit-details-marker { display: none; }
+.switch-caret { width: 16px; height: 16px; margin-left: -2px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
+.client-switch[open] .switch-caret { transform: rotate(180deg); }
+.client-menu { position: absolute; top: calc(100% + 8px); left: 0; z-index: 40; min-width: 260px; display: flex; flex-direction: column; padding: 6px;
+  background: var(--surface); border: var(--line) solid var(--border); border-radius: 14px; box-shadow: var(--shadow-lift); animation: pop .15s var(--ease); }
+.client-menu a { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 9px; color: var(--text); text-decoration: none; font-size: 14px; }
+.client-menu a:hover { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); color: var(--text); text-decoration: none; }
+.client-menu .jx { margin-left: auto; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--bg); color: var(--muted); }
+.client-menu .jx.soon { background: var(--pa-ko); color: var(--text); }
+.client-menu-label { margin: 8px 10px 2px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.client-menu a.client-menu-all { margin-top: 4px; border-top: var(--line) solid var(--border); border-radius: 0 0 9px 9px; color: var(--muted); }

@@ -44,7 +44,7 @@
         <span class="badge">{{ i.kind }}</span>
         {% if i.url %}<a href="{{ i.url }}"{% if i.url.startswith('http') %} target="_blank" rel="noopener"{% elif '/ticket/' in i.url %} data-ticket{% endif %}>{{ i.label }}</a>{% else %}{{ i.label }}{% endif %}
         {% if i.action and i.action.vigilance %}{{ ic.icon("alert", "Point de vigilance", "ic-alert") }}{% endif %}
-        <span class="muted">· {{ i.d.client }}</span>
+        {% if deployments | length > 1 %}<span class="muted">· {{ i.d.client }}</span>{% endif %}
       </li>
       {% endfor %}
     </ul>
@@ -57,7 +57,7 @@
         {% for d, a in ko %}
         <li><span class="badge g-ko">{{ a.injection_status }}</span>
           {% if a.ref %}<a data-ticket href="{{ ticket_url(d.slug, 'action', a.ref) }}">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}
-          <span class="muted">· {% for r in a.resources %}<code class="res">{{ r }}</code> {% endfor %}{{ d.client }}</span>
+          <span class="muted">· {% for r in a.resources %}<code class="res">{{ r }}</code> {% endfor %}{{ d.client if deployments | length > 1 }}</span>
           <a class="btn-link" href="/deploiements/{{ d.slug }}/injections#{{ d.slug }}-{{ a.resources | join('-') or 'sans-ressource' }}">Relancer ↗</a></li>
         {% else %}<li class="muted">Aucune injection KO. Tous les systèmes sont opérationnels.</li>{% endfor %}
       </ul>
@@ -65,7 +65,7 @@
     <section class="panel">
       <h2>Prochains jalons <span class="muted">· 3 semaines</span></h2>
       <ul class="todo" data-limit="5">
-        {% for i in milestones %}<li><span class="date">{{ i.date.strftime("%d/%m") }}</span> <a href="{{ i.url }}">{{ i.label }}</a> <span class="muted">· {{ i.d.client }} · J{{ '%+d' % -((i.date - today).days) }}</span></li>
+        {% for i in milestones %}<li><span class="date">{{ i.date.strftime("%d/%m") }}</span> <a href="{{ i.url }}">{{ i.label }}</a> <span class="muted">·{% if deployments | length > 1 %} {{ i.d.client }} ·{% endif %} J{{ '%+d' % -((i.date - today).days) }}</span></li>
         {% else %}<li class="muted">Aucun jalon dans les 3 semaines.</li>{% endfor %}
       </ul>
     </section>
@@ -81,7 +81,7 @@
     function load() {
       const since = mode === "visit" ? (get() || new Date(Date.now() - 864e5).toISOString())
                                      : new Date(Date.now() - Number(mode) * 864e5).toISOString();
-      body.setAttribute("hx-get", "/quoi-de-neuf?depuis=" + encodeURIComponent(since));
+      body.setAttribute("hx-get", "/quoi-de-neuf?depuis=" + encodeURIComponent(since){% if current %} + "&client={{ current.slug }}"{% endif %});  // client en cours
       htmx.process(body);
       htmx.trigger(document.body, "load-changes");
     }
