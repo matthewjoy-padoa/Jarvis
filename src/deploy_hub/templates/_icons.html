@@ -38,7 +38,7 @@
 </svg>
 {%- endmacro %}
 
-{# Emoji du client (icône de sa fiche « 👯‍♀️ Clients » dans Notion), décoratif : le nom suit toujours. #}
+{# Emoji du client (icône de son dashboard d'intégration dans Notion), décoratif : le nom suit toujours. #}
 {% macro client_emoji(d) -%}
 {% if d.emoji %}<span class="client-emoji" aria-hidden="true">{{ d.emoji }}</span>{% endif %}
 {%- endmacro %}

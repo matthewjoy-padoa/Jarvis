@@ -290,6 +290,6 @@ def test_the_routine_keeps_the_emoji_of_the_direct_refresh(root):
     """La routine SQL ne voit pas les icônes : l'emoji posé par la synchro directe survit à son passage."""
     path = root / "data" / "deploiements" / "demo.md"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("---\nclient: Demo\nemoji: ⚡\n---\n", encoding="utf-8")
+    path.write_text("---\nclient: Demo\nemoji: 🦖\n---\n", encoding="utf-8")
     sync("demo", root)
-    assert fiche(root).emoji == "⚡"
+    assert fiche(root).emoji == "🦖"

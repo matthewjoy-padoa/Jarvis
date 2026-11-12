@@ -18,6 +18,7 @@ from pathlib import Path
 import httpx
 
 from deploy_hub.config import PROJECT_ROOT, data_dir
+from deploy_hub.queries import ConfigError, page_id_of
 from deploy_hub.sync_notion import (RECETTE_COLUMNS, RECETTE_CONTENT, SyncError, add_users, load_config, publish,
                                     summary, unknown_users, versions)
 
@@ -43,7 +44,6 @@ CLIENT_PROPERTIES = {
     "deploiement": "Date déploiement",
     "deploiement_lot2": "Date déploiement Lot 2",
 }
-CLIENT_CARD = "👯‍♀️ Clients"  # relation vers la fiche du client, qui porte son emoji
 ACTIONS_PROPERTIES = {
     "intitule": "Intitulé",
     "statut": "Statut",
@@ -245,18 +245,14 @@ class NotionClient:
                 row[by_id[prop["id"]]] = value(prop)
         return row
 
-    def client_emoji(self, page_id: str) -> str:
-        """Emoji de la fiche « 👯‍♀️ Clients » liée à la page de déploiement (celles de déploiement ont toutes 🚀).
-        Seules la relation et l'icône sont lues ; "" sans fiche liée, sans emoji ou si la base n'est pas partagée."""
+    def page_emoji(self, url: str) -> str:
+        """Emoji d'une page (ici le dashboard d'intégration du client) : seule l'icône est lue.
+        "" sans adresse, sans emoji ou si la page n'est pas partagée avec l'intégration."""
         try:
-            linked = self.page(page_id, CLIENTS_DS, {"fiche": CLIENT_CARD}).get("fiche")
-            if not linked:
-                return ""
-            icon = self._call("GET", f"/pages/{_uuid(linked.split(',')[0])}", params=[("filter_properties[]", "title")]).get("icon") or {}
-        except SyncError:
+            icon = self._call("GET", f"/pages/{_uuid(page_id_of(url))}", params=[("filter_properties[]", "title")]).get("icon") or {}
+        except (ConfigError, SyncError):
             return ""
         return icon.get("emoji", "") if icon.get("type") == "emoji" else ""
-
 
 def recette_row(row: dict) -> dict:
     """Ligne de recette réduite aux colonnes autorisées, statut et type ramenés à « Autre » si hors liste."""
@@ -282,7 +278,7 @@ def fetch(config: dict, notion: NotionClient) -> dict:
     """Lit dans Notion tout ce dont la fiche du client a besoin."""
     page_id = config["page_id"]
     client = notion.page(page_id, CLIENTS_DS, CLIENT_PROPERTIES)
-    client["emoji"] = notion.client_emoji(page_id)
+    client["emoji"] = notion.page_emoji(config.get("notion_url") or "")
     actions = notion.query(ACTIONS_DS, ACTIONS_PROPERTIES, notion.filter_on(ACTIONS_DS, "Client", page_id))
     names = {r["url"].rsplit("/", 1)[-1]: r["nom"] for r in notion.query(RESOURCES_DS, {"nom": "Integration name"}, None) if r.get("nom")}
     for a in actions:  # mêmes règles que les colonnes « injection » et « ressources » de actions-*.sql
