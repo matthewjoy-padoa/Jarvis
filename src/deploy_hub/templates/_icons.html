@@ -25,6 +25,19 @@
 <svg class="ic {{ cls }}" viewBox="0 0 24 24"{% if label %} role="img" aria-label="{{ label }}"><title>{{ label }}</title>{% else %} aria-hidden="true">{% endif %}{{ PATHS.get(name, "") | safe }}</svg>
 {%- endmacro %}
 
+{# Logo Jarvis « Anneaux » dans la page : ses anneaux tournent (style.css), contrairement à favicon.svg chargé en image. #}
+{% macro jarvis_mark(size=30) -%}
+<svg class="brand-mark" viewBox="0 0 64 64" width="{{ size }}" height="{{ size }}" aria-hidden="true">
+  <defs><radialGradient id="jarvis-core" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffffff"/><stop offset=".35" stop-color="#5ce1ff"/><stop offset="1" stop-color="#5ce1ff" stop-opacity="0"/></radialGradient></defs>
+  <circle cx="32" cy="32" r="31" fill="#001235"/>
+  <circle class="ring-outer" cx="32" cy="32" r="26" fill="none" stroke="#5ce1ff" stroke-width="2.6" stroke-dasharray="18 6 4 6" stroke-linecap="round" opacity=".9"/>
+  <circle class="ring-inner" cx="32" cy="32" r="19.5" fill="none" stroke="#3333eb" stroke-width="3.2" stroke-dasharray="30 8"/>
+  <circle cx="32" cy="32" r="13.5" fill="none" stroke="#5ce1ff" stroke-width="1.2" opacity=".55"/>
+  <circle cx="32" cy="32" r="10" fill="url(#jarvis-core)"/>
+  <circle class="core" cx="32" cy="32" r="4.2" fill="#fff"/>
+</svg>
+{%- endmacro %}
+
 {# Compte à rebours jusqu'au déploiement (J-12), en alerte sous 14 jours ; rien une fois la date passée. #}
 {% macro countdown(d) -%}
 {% if d.go_live and d.days_left >= 0 %}<span class="jx {{ 'soon' if d.days_left < 14 }}">J-{{ d.days_left }}</span>{% endif %}

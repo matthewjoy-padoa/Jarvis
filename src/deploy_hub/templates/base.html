@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Jarvis{% endblock %}</title>
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=2">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=3">
   <meta name="theme-color" content="#001235">
   <script>try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=61">
+  <link rel="stylesheet" href="/static/style.css?v=65">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=4" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
@@ -26,7 +26,7 @@
   {% set cross = cross_pages | map(attribute=0) | list %}
   <header class="topbar">
     <a href="/" class="brand" aria-label="Jarvis, accueil" title="Just A Rather Very Intelligent System">
-      <img class="brand-mark" src="/static/favicon.svg?v=2" alt="" width="30" height="30">
+      {{ ic.jarvis_mark() }}
       <span class="brand-name">Jarvis</span><span class="brand-dot" aria-hidden="true"></span></a>
     {% set icons = {
       "/": '<path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1h-5v-6h-5v6h-5a1 1 0 0 1-1-1z"/>',
