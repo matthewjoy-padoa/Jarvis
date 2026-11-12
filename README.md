@@ -120,6 +120,23 @@ Bon à savoir :
 - **Suivi** : `systemctl --user status jarvis` et `journalctl --user -u jarvis -f`.
 - **Mise à jour** : `git pull && uv sync && systemctl --user restart jarvis`.
 
+### Shell de la VM dans la console (`JARVIS_SHELL=1`)
+La console (bouton en bas à droite, touche `>`) a alors un onglet **Shell VM** : un vrai terminal (xterm.js) relié au shell de l'utilisateur du service, sur la VM. Couleurs, Ctrl+C, programmes interactifs (`htop`, `vim`, `less`) fonctionnent.
+- **Désactivé par défaut.** Pour l'activer sur la VM, et seulement là : ajouter `Environment=JARVIS_SHELL=1` au complément du service (étape 3 ci-dessus), puis `systemctl --user restart jarvis`.
+- **Garde-fous** (`src/deploy_hub/shell.py`) : connexion locale seulement (le service écoute sur `127.0.0.1`, joint par transfert de port) ; la page doit venir de Jarvis (origine vérifiée : un autre site ouvert dans le navigateur ne peut pas s'y connecter) ; jeton tiré à chaque démarrage de Jarvis, glissé dans la page. Les secrets de Jarvis (`NOTION_TOKEN`, `AIRFLOW_*`) ne sont pas dans l'environnement du shell.
+- **Session** : elle vit tant que la page est ouverte ; changer de page ou fermer l'onglet la termine. Pour garder un travail long, lance `tmux` sur la VM et rattache-toi.
+- xterm.js est chargé depuis `cdn.jsdelivr.net` à la première ouverture de l'onglet.
+- **Shell et thème** : c'est le shell de connexion de l'utilisateur (`/etc/passwd`) qui s'ouvre, avec sa configuration. Pour retrouver Oh My Zsh comme sur le Mac (thème `robbyrussell`, plugin `git`), sur la VM :
+  ```bash
+  sudo apt install -y zsh git
+  # installe Oh My Zsh avec son installateur officiel (https://ohmyz.sh), puis dans ~/.zshrc :
+  #   ZSH_THEME="robbyrussell"
+  #   plugins=(git)
+  chsh -s "$(command -v zsh)"          # zsh devient le shell de connexion
+  systemctl --user restart jarvis      # les nouvelles sessions s'ouvrent dans zsh
+  ```
+  La palette du terminal est accordée à `robbyrussell`. Pour un thème à glyphes (agnoster, powerlevel10k), installe une police Nerd Font sur ton poste (`MesloLGS NF`, `JetBrainsMono Nerd Font` ou `Hack Nerd Font`) : le terminal la prend en premier.
+
 ## Données et confidentialité
 
 - **Rien de ce qui vient de Notion n'est versionné** : `data/` (fiches, caches, journal des changements, notifications) et `config/` sont exclus de git.
