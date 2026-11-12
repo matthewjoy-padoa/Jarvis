@@ -1,10 +1,17 @@
 """Palette de commandes (⌘K) : compréhension de la requête, classement, surlignage, et la route /palette."""
+import dataclasses
+import json
 from datetime import date
 
+import pytest
 from fastapi.testclient import TestClient
 
+from deploy_hub import main
 from deploy_hub.config import PROJECT_ROOT
 from deploy_hub.main import CROSS_PAGES, DEPLOYMENT_TABS, PAGES, app, ticket_url
+from deploy_hub.models import Deployment
+from deploy_hub.sources import dags as dag_catalogue
+from deploy_hub.sources.airflow import AirflowSource
 from deploy_hub.search import Index, fold, parse, segments
 from deploy_hub.sources.fiches import FicheSource
 
@@ -72,7 +79,7 @@ def test_owner_status_and_command_prefixes():
     assert "Préparer la recette 2" in titles(ix.search("@Inté ouvert"))
     theme = ix.search(">thème")
     assert theme.chips == ["Commandes"] and [h.item.action for _, _, hits in theme.groups for h in hits] == ["theme"]
-    assert len(titles(ix.search(">"))) == 6
+    assert len(titles(ix.search(">"))) == 10  # 6 commandes simples + 4 verbes de console
     assert parse("@cdp #valider retard", ix.deployments).chips == ["@cdp", "#valider", "En retard"]
 
 
@@ -141,3 +148,96 @@ def test_palette_route_escapes_the_query():
 def test_every_page_carries_the_palette():
     home = client.get("/").text
     assert 'id="palette"' in home and "/static/palette.js" in home and "data-palette-open" in home
+
+
+# ============================================================ Console : >dag, >agent, >rafraichir, >aide
+CATALOGUE = {"clients": {"demo-uegar": {"logiciel": "uegar", "dags": {
+    "demo-uegar-etl_group-medical": {"type": "etl_group", "groupe": "medical", "ressources": ["visit_histo", "vaccine_injection"]},
+    "demo-uegar-etl-visit_histo": {"type": "etl", "ressources": ["visit_histo"]},
+    "demo-uegar-etl-firm": {"type": "etl", "ressources": ["firm"]},
+}}}}
+
+
+@pytest.fixture
+def catalogue(tmp_path, monkeypatch):
+    path = tmp_path / "catalogue.json"
+    path.write_text(json.dumps(CATALOGUE))
+    monkeypatch.setattr(dag_catalogue, "CATALOGUE", path)
+
+
+@pytest.fixture
+def console(catalogue) -> Index:
+    deployments = [dataclasses.replace(d, orchestrator=["demo-uegar"]) if d.slug == "client-demo" else d
+                   for d in FicheSource(PROJECT_ROOT / "demo" / "deploiements").list_deployments()]
+    return Index(deployments, (), TODAY, PAGES + CROSS_PAGES, DEPLOYMENT_TABS, ticket_url)
+
+
+def test_console_verbs_are_listed_and_fill_the_field(console):
+    listed = [h.item for _, _, hits in console.search(">").groups for h in hits]
+    assert {(i.title, i.fill) for i in listed[:4]} == {(">dag", ">dag "), (">agent", ">agent "), (">rafraichir", ">rafraichir "), (">aide", ">aide ")}
+    assert all(i.fill for i in listed[:4]) and not any(i.fill for i in listed[4:])  # les verbes en tête
+    assert [h.item.title for _, _, hits in console.search(">da").groups for h in hits][0] == ">dag"  # en cours de frappe
+    assert len(titles(console.search(">aide"))) == 4 and console.search(">help").verb == "aide"
+
+
+def test_dag_command_lists_the_client_dags_for_a_resource(console):
+    r = console.search(">dag démo visit")
+    assert r.verb == "dag" and r.chips == ["Commandes", "DAGs à lancer", "Client Démo"]
+    hits = [h.item for _, _, hits in r.groups for h in hits]
+    assert [i.ref for i in hits] == ["demo-uegar-etl-visit_histo", "demo-uegar-etl_group-medical"]  # la ressource seule, puis son groupe
+    assert all(i.action == "run" for i in hits) and hits[0].url == "/palette/dag/client-demo/demo-uegar-etl-visit_histo"
+    assert len(titles(console.search(">dag démo"))) == 3
+    nothing = console.search(">dag exemple")  # client sans clé orchestrator
+    assert nothing.verb == "dag" and nothing.groups == []
+    assert console.search("visit_histo").verb == "" and not any(h.item.kind == "dag" for _, _, hits in console.search("visit").groups for h in hits)
+
+
+def test_agent_command_offers_open_retours_and_unfolds_the_agent_block(console):
+    r = console.search(">agent R-03")
+    first = r.groups[0][2][0]
+    assert first.item.ref == "R-03" and first.item.ticket and first.item.url == ticket_url("client-demo", "retour", "R-03") + "?agent=1"
+    assert all(not h.item.done and h.item.kind == "retour" for _, _, hits in console.search(">agent").groups for h in hits)
+    assert console.search("R-03").groups[0][2][0].item.url == ticket_url("client-demo", "retour", "R-03")  # hors console : le ticket seul
+
+
+def test_ticket_opened_for_an_agent_comes_with_the_agent_block_unfolded():
+    url = ticket_url("client-demo", "retour", "R-03")
+    plain = client.get(url, headers={"HX-Request": "true"}).text
+    assert 'hx-trigger="toggle once"' in plain and "autofocus" not in plain
+    agent = client.get(url + "?agent=1", headers={"HX-Request": "true"}).text
+    assert 'open hx-trigger="load"' in agent and "<summary autofocus>" in agent
+
+
+def test_refresh_command_targets_one_client_or_all(console):
+    one = [h.item for _, _, hits in console.search(">rafraichir démo").groups for h in hits]
+    assert [(i.title, i.url, i.action) for i in one] == [("Rafraîchir Client Démo", "/actions/rafraichir/client-demo", "post")]
+    assert "Rafraîchir tous les clients" in titles(console.search(">rafraîchir"))
+
+
+@pytest.fixture
+def acme(catalogue, monkeypatch):
+    d = Deployment(slug="acme", client="Acme", software="Uegar", orchestrator=["demo-uegar"])
+    monkeypatch.setattr(main.fiches, "get_deployment", lambda slug: d if slug == "acme" else None)
+    monkeypatch.setattr(main.fiches, "list_deployments", lambda: [d])
+    monkeypatch.setattr(main, "airflow", AirflowSource(""))
+    return TestClient(main.app)
+
+
+def test_dag_launch_form_reuses_the_injection_route_without_prod(acme):
+    form = acme.get("/palette/dag/acme/demo-uegar-etl-firm")
+    assert form.status_code == 200
+    html = form.text
+    assert 'hx-post="/actions/injection/acme"' in html and "data-dag-form" in html and 'value="demo-uegar-etl-firm"' in html
+    assert all(f'<option value="{e}">' in html for e in ("integration", "snap", "recette")) and '"prod"' not in html
+    assert acme.get("/palette/dag/acme/inconnu").status_code == 404
+    listed = acme.get("/palette", params={"q": ">dag acme firm"}).text
+    assert 'hx-get="/palette/dag/acme/demo-uegar-etl-firm" hx-target="#palette-results"' in listed
+    refresh = acme.get("/palette", params={"q": ">rafraichir acme"}).text
+    assert 'hx-post="/actions/rafraichir/acme"' in refresh and 'hx-confirm="Jarvis : Rafraîchir Acme ?"' in refresh
+    launched = acme.post("/actions/injection/acme", data={"dag_id": "demo-uegar-etl-firm", "padoa_env": "snap", "card": "Console Jarvis"})
+    assert "Simulation : demo-uegar-etl-firm sur snap" in launched.text
+
+
+def test_every_page_carries_the_console_button():
+    home = client.get("/").text
+    assert 'data-palette-open=">"' in home and 'class="palette-prompt"' in home and 'data-pal-fill-input=">dag "' in home

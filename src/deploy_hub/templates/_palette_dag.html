@@ -1,0 +1,19 @@
+{# Lancement d'un DAG depuis la console (>dag) : même envoi (/actions/injection) et même confirmation (dag.js) que l'onglet Injections.
+   Attend : d (Deployment), c (dags.DagChoice), envs (stacks proposées, jamais la prod). #}
+{% import "_icons.html" as ic %}
+<div class="pal-run">
+  <button type="button" class="secondary pal-back" data-pal-back>← Résultats</button>
+  <p class="pal-run-title"><span class="pal-icon k-dag">{{ ic.icon("play") }}</span><span><strong>{{ c.label }}</strong><br>
+    <span class="muted">{{ d.client }} · <code>{{ c.dag_id }}</code></span></span></p>
+  <div class="pal-run-body">
+    <p><span class="muted">Ressources</span> {% for r in c.resources %}<code class="res">{{ r }}</code> {% endfor %}</p>
+    <form class="dag-form pal-run-form" hx-post="/actions/injection/{{ d.slug }}" hx-target="next .dag-out" data-dag-form data-pal-log="{{ c.dag_id }}">
+      <input type="hidden" name="dag_id" value="{{ c.dag_id }}">
+      <input type="hidden" name="card" value="Console Jarvis">
+      <label>Stack <select name="padoa_env" aria-label="Stack cible">{% for e in envs %}<option value="{{ e }}">{{ e }}</option>{% endfor %}</select></label>
+      <button type="submit" autofocus>{{ ic.icon("play") }} Lancer</button>
+    </form>
+    <div class="dag-out" aria-live="polite"></div>
+    <p class="muted pal-run-help">Entrée lance (Jarvis demande confirmation) · Échap ferme · la prod n'est jamais proposée ici.</p>
+  </div>
+</div>

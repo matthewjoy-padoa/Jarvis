@@ -156,6 +156,16 @@ def palette(request: Request, q: str = ""):
     return templates.TemplateResponse(request, "_palette.html", {"r": _search_index(_deployments(request)).search(q), "today": date.today()})
 
 
+@app.get("/palette/dag/{slug}/{dag_id}", response_class=HTMLResponse)
+def palette_dag(request: Request, slug: str, dag_id: str):
+    """Formulaire de lancement ouvert par la commande « >dag » : stack de test au choix, confirmation par dag.js, envoi à /actions/injection."""
+    d = _get(slug)
+    choice = next((c for c in dag_catalogue.dags_for(d.orchestrator) if c.dag_id == dag_id), None)
+    if choice is None:
+        raise HTTPException(404, f"{dag_id} n'est pas un DAG de {d.client} dans le catalogue")
+    return templates.TemplateResponse(request, "_palette_dag.html", {"d": d, "c": choice, "envs": [e for e in PADOA_ENVS if e != "prod"]})
+
+
 @app.get("/quoi-de-neuf", response_class=HTMLResponse)
 def whats_new(request: Request, depuis: str = "", client: str = ""):
     """Changements notés par la synchro depuis une date (par défaut 24 h), un client ou tous."""
@@ -350,9 +360,10 @@ templates.env.globals["ticket_url"] = ticket_url
 
 
 @app.get("/deploiements/{slug}/ticket/{kind}/{ref}", response_class=HTMLResponse)
-def ticket(request: Request, slug: str, kind: str, ref: str):
+def ticket(request: Request, slug: str, kind: str, ref: str, agent: bool = False):
     """Tout ce qu'on sait d'un retour ou d'une carte d'action : fiche, contenu, agents, historique.
-    Panneau latéral quand la page l'appelle (htmx), page entière sinon (lien ouvert dans un nouvel onglet)."""
+    Panneau latéral quand la page l'appelle (htmx), page entière sinon (lien ouvert dans un nouvel onglet).
+    agent=1 (commande « >agent » de la palette) : le bloc « Lancer un agent » arrive déplié, brief chargé, et prend le focus."""
     if kind not in TICKET_KINDS:
         raise HTTPException(404, f"Type inconnu : {kind}")
     d = _get(slug)
@@ -362,7 +373,7 @@ def ticket(request: Request, slug: str, kind: str, ref: str):
         raise HTTPException(404, f"{'Retour' if kind == 'retour' else 'Carte'} {ref} introuvable chez {d.client}")
     history = [c for c in changes_since(d, settings.deployments_dir, datetime.min) if c.notion_url == notion_link(item.notion_url)]
     runs = [r for r in claude.runs if r.slug == slug and r.subject == f"retour {ref.upper()}"] if kind == "retour" else []
-    context = {"d": d, "kind": kind, "item": item, "history": history, "runs": runs, "today": date.today()}
+    context = {"d": d, "kind": kind, "item": item, "history": history, "runs": runs, "today": date.today(), "open_agent": agent}
     if request.headers.get("HX-Request"):
         return templates.TemplateResponse(request, "_ticket.html", context)
     return _render(request, "ticket.html", f"/deploiements/{slug}", **context)

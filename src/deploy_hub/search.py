@@ -7,21 +7,28 @@ La requête mélange du texte et des mots que Jarvis comprend :
   @marie    un responsable        #bloqué    un statut        >thème    une commande
 Le reste est du texte : chaque mot doit se retrouver dans l'élément, sans tenir compte des accents ni de la casse.
 Les pages et les commandes, elles, se cherchent par leur nom tel qu'il est tapé (« recette » trouve la page Recette).
+
+Console : « > » suivi d'un verbe lance une action, toujours confirmée dans le navigateur avant de partir :
+  >dag presoa visit_histo    les DAGs d'injection du client qui traitent la ressource → formulaire de lancement
+  >agent R-03                les retours ouverts → leur fenêtre, bloc « Lancer un agent » déplié
+  >rafraichir presoa         relire le dashboard Notion du client
+  >aide                      toutes les commandes
 """
 
 import difflib
 import re
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 from functools import cached_property
 
 from deploy_hub.models import DONE, KO, Deployment
+from deploy_hub.sources import dags as dag_catalogue
 
 NAV = ("client", "page", "commande")  # cherchés par leur nom
 DATA = ("retour", "action", "injection", "regle", "agent")  # cherchés par leur contenu et filtrés par les mots compris
 KIND_LABELS = {"client": "Clients", "page": "Pages", "commande": "Commandes", "retour": "Retours de recette", "action": "Actions",
-               "injection": "Injections", "regle": "Règles", "agent": "Agents"}
+               "injection": "Injections", "regle": "Règles", "agent": "Agents", "dag": "DAGs"}
 KIND_WORDS = {"retour": "retour", "retours": "retour", "recette": "retour", "action": "action", "actions": "action", "carte": "action",
               "cartes": "action", "injection": "injection", "injections": "injection", "regle": "regle", "regles": "regle",
               "agent": "agent", "agents": "agent", "client": "client", "clients": "client"}
@@ -80,8 +87,9 @@ class Item:
     late: bool = False
     vigilance: bool = False
     ticket: bool = False  # s'ouvre dans la fenêtre de détail
-    external: bool = False  # lien Notion : nouvel onglet
-    action: str = ""  # commande exécutée dans le navigateur (thème)
+    action: str = ""  # theme : bascule le thème · run : formulaire chargé dans la palette · post : appel confirmé (htmx)
+    fill: str = ""  # texte mis dans le champ au choix de l'élément (verbes de console)
+    syntax: str = ""  # arguments d'une commande, affichés sans être cherchés
     content: tuple[tuple[str, str], ...] = ()  # (libellé, texte) : cherchés en dernier, montrés en extrait
 
     def __post_init__(self):
@@ -97,6 +105,16 @@ class Item:
     @property
     def done(self) -> bool:
         return self.group == DONE
+
+    @property
+    def external(self) -> bool:
+        """Lien hors de Jarvis (carte Notion sans identifiant) : s'ouvre dans un nouvel onglet."""
+        return self.url.startswith("https://")
+
+    def match(self, tokens: list[str]) -> int | None:
+        """Somme des poids des mots, ou None si l'un d'eux manque : tous les mots doivent se retrouver dans l'élément."""
+        scores = [self.score(t) for t in tokens]
+        return None if 0 in scores else sum(scores)
 
     def score(self, token: str) -> int:
         """Poids d'un mot dans l'élément : identifiant > titre > ligne secondaire > textes longs. 0 : absent."""
@@ -165,6 +183,7 @@ class Results:
     card: Deployment | None = None  # un seul client reconnu : sa carte en tête
     card_late: int = 0
     corrected: str = ""  # requête corrigée quand la requête tapée ne trouvait rien (« visti » → « visit »)
+    verb: str = ""  # commande de console reconnue (dag, agent, rafraichir, aide)
 
     @property
     def total(self) -> int:
@@ -193,7 +212,7 @@ def parse(query: str, deployments: list[Deployment]) -> Query:
         elif token.startswith("#") and len(token) > 1:
             q.status = token[1:]
             q.chips.append(token)
-        elif not q.commands and (found := _client_matches(token, deployments)):
+        elif (not q.commands or q.words) and (found := _client_matches(token, deployments)):  # console : après le verbe
             q.clients += [d for d in found if d not in q.clients]
             q.chips += [d.client for d in found]
         else:
@@ -246,7 +265,7 @@ def _action_items(d: Deployment, today: date, ticket_url) -> list[Item]:
             badge=a.injection_status if injection else a.status, group=a.injection_group if injection else a.group,
             ref=a.ref, slug=d.slug, owners=(a.owner,) if a.owner else (), due=a.due,
             late=bool(a.due and a.due < today and a.group != DONE), vigilance=a.vigilance,
-            ticket=bool(a.ref), external=not a.ref and bool(a.notion_url),
+            ticket=bool(a.ref),
             content=(("Commentaire", a.comment),) if a.comment else ()))
     return out
 
@@ -267,6 +286,16 @@ COMMANDS = [
     ("État des systèmes", "/sources", ""),
 ]
 
+# Commandes de console à arguments. Choisies dans la liste, elles remplissent le champ ; le reste se tape.
+VERBS = {
+    "dag": ("<client> <ressource>", "Lancer un DAG d'injection sur une stack de test, après confirmation"),
+    "agent": ("<retour>", "Lancer un agent Claude sur un retour de recette ouvert"),
+    "rafraichir": ("<client>", "Relire tout de suite le dashboard Notion d'un client"),
+    "aide": ("", "Toutes les commandes de la console"),
+}
+VERB_ALIASES = {"dags": "dag", "agents": "agent", "refresh": "rafraichir", "help": "aide", "?": "aide"}
+VERB_LABELS = {"dag": "DAGs à lancer", "agent": "Lancer un agent sur", "rafraichir": "Rafraîchir depuis Notion", "aide": "Commandes de la console"}
+
 
 class Index:
     """Tout ce que la palette sait trouver, préparé une fois (textes sans accents) tant que les fiches ne changent pas."""
@@ -281,6 +310,18 @@ class Index:
                                 sub=" · ".join(p for p in (d.client, g.resource_table, g.type) if p)) for g in d.regles]
         self.items += [Item("agent", f"Agent #{r.id} · {r.subject}", f"/agents/{r.id}", sub=f"{r.client} · {r.branch}",
                             badge=r.status, group=r.group, ref=str(r.id), slug=r.slug) for r in runs]
+        # Console : les verbes se trouvent aussi en tapant « >da… » ; leurs cibles ne sortent qu'avec le verbe.
+        self.verbs = [Item("commande", f">{verb}", "#", sub=about, fill=f">{verb} ", syntax=args) for verb, (args, about) in VERBS.items()]
+        self.items += self.verbs
+        self.dags = [Item("dag", c.label, f"/palette/dag/{d.slug}/{c.dag_id}", sub=f"{d.client} · {c.dag_id}", slug=d.slug,
+                          ref=c.dag_id, action="run", content=(("Ressources", " ".join(c.resources)),))
+                     for d in deployments for c in dag_catalogue.dags_for(d.orchestrator)]
+        # ?agent=1 : la fenêtre du ticket s'ouvre avec le bloc « Lancer un agent » déplié et son brief chargé.
+        self.agent_targets = [replace(i, url=i.url + "?agent=1") for i in self.items if i.kind == "retour" and not i.done]
+        self.refresh = [Item("commande", f"Rafraîchir {d.client}", f"/actions/rafraichir/{d.slug}", slug=d.slug, action="post",
+                             sub="Relit son dashboard Notion, puis recharge la page") for d in deployments]
+        self.refresh.append(Item("commande", "Rafraîchir tous les clients", "/actions/rafraichir", action="post",
+                                 sub="Relit chaque dashboard Notion, puis recharge la page"))
 
     @cached_property
     def vocabulary(self) -> list[str]:
@@ -302,8 +343,8 @@ class Index:
                 tokens = q.words
             else:
                 return None
-            scores = [item.score(t) for t in tokens]
-            return None if 0 in scores else sum(scores) + 5
+            score = item.match(tokens)
+            return None if score is None else score + 5 + (1 if item.fill else 0)  # les verbes de console d'abord
         if q.commands or (q.kinds and item.kind not in q.kinds):
             return None
         if not (q.text or q.filtered) and not item.late:  # un client seul : ce qui est en retard chez lui
@@ -314,10 +355,8 @@ class Index:
             return None
         if q.status and q.status not in item.f_badge:
             return None
-        scores = [item.score(t) for t in q.text]
-        if 0 in scores:
-            return None
-        return sum(scores) + (3 if item.group != DONE else 0) + (2 if item.late else 0)
+        score = item.match(q.text)
+        return None if score is None else score + (0 if item.done else 3) + (2 if item.late else 0)
 
     def _find(self, q: Query) -> list[tuple[int, Item]]:
         slugs = {d.slug for d in q.clients}
@@ -349,8 +388,20 @@ class Index:
     def _hit(item: Item, score: int, tokens: list[str]) -> Hit:
         return Hit(item, score, segments(item.title, tokens), segments(item.sub, tokens), item.snippet(tokens))
 
+    def _verb(self, verb: str, q: Query, query: str) -> Results:
+        """Commande de console : ses cibles (DAGs, retours ouverts, clients), filtrées par les clients et les mots qui suivent."""
+        slugs, text = {d.slug for d in q.clients}, q.words[1:]
+        pool = {"aide": self.verbs, "dag": self.dags, "rafraichir": self.refresh, "agent": self.agent_targets}[verb]
+        found = [(score, i) for i in pool if (not slugs or i.slug in slugs) and (score := i.match(text)) is not None]
+        found.sort(key=lambda f: -f[0])  # à score égal, l'ordre du catalogue : DAG de la ressource avant celui du groupe
+        chips = list(dict.fromkeys(["Commandes", VERB_LABELS[verb]] + [d.client for d in q.clients]))
+        groups = [(VERB_LABELS[verb], len(found), [self._hit(i, s, text) for s, i in found[:SOLO_SIZE]])] if found else []
+        return Results(query.strip(), chips=chips, groups=groups, verb=verb)
+
     def search(self, query: str) -> Results:
         q = parse(query, self.deployments)
+        if q.commands and q.words and (verb := VERB_ALIASES.get(q.words[0], q.words[0])) in VERBS:
+            return self._verb(verb, q, query)
         if not (q.words or q.clients or q.owner or q.status or q.commands):
             return self.suggestions()
         results = Results(query.strip(), chips=q.chips)

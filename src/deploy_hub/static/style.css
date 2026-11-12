@@ -737,8 +737,9 @@ kbd { display: inline-block; min-width: 20px; padding: 1px 6px; border: 1px soli
 button.pal-open { flex: none; gap: 8px; padding: 6px 10px 6px 12px; color: var(--muted); font-weight: 500; }
 button.pal-open:hover:not(:disabled) { color: var(--text); }
 button.pal-open .ic { width: 16px; height: 16px; margin: 0; }
-/* Le libellé et le raccourci ne s'affichent que si la barre a la place : les clients passent d'abord. */
-@media (max-width: 1440px) { .pal-open-label, .pal-open kbd { display: none; } button.pal-open { padding: 6px 12px; } }
+/* Sous 1440 px, la barre garde ses icônes (loupe, console, thème) : les puces clients passent d'abord. */
+@media (max-width: 1440px) { .pal-open-label, .pal-open kbd, .theme-label { display: none; } button.pal-open { padding: 6px 12px; } }
+.pal-buttons { display: flex; gap: 4px; flex: none; }
 
 html.palette-open { overflow: hidden; }
 .palette { position: fixed; inset: 0; z-index: 70; display: flex; justify-content: center; align-items: flex-start; padding: 11vh 16px 16px; }
@@ -746,8 +747,7 @@ html.palette-open { overflow: hidden; }
 .palette-backdrop { position: absolute; inset: 0; background: rgba(0, 18, 53, .42); backdrop-filter: blur(3px); animation: fade .15s ease; }
 .palette-panel { position: relative; display: flex; flex-direction: column; width: min(700px, 100%); max-height: min(640px, 76vh);
   background: var(--surface); border: var(--line) solid var(--border); border-radius: 18px; overflow: hidden;
-  box-shadow: 0 30px 70px -20px rgba(0, 18, 53, .5), 0 6px 18px rgba(0, 18, 53, .12); animation: pal-in .18s var(--ease); }
-@keyframes pal-in { from { opacity: 0; transform: translateY(-8px) scale(.985); } to { opacity: 1; transform: none; } }
+  box-shadow: 0 30px 70px -20px rgba(0, 18, 53, .5), 0 6px 18px rgba(0, 18, 53, .12); animation: pop .18s var(--ease); }
 
 .palette-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: var(--line) solid var(--border); }
 .palette-head .ic { width: 20px; height: 20px; color: var(--accent); }
@@ -775,7 +775,7 @@ html.palette-open { overflow: hidden; }
 .pal-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--bg); color: var(--text); font-size: 15px; }
 .pal-icon .ic { width: 16px; height: 16px; }
 .pal-icon.k-retour { background: var(--pa-ko); } .pal-icon.k-action { background: var(--pa-todo); }
-.pal-icon.k-injection, .pal-icon.k-agent { background: var(--pa-progress); } .pal-icon.k-regle, .pal-icon.k-client { background: var(--pa-done); }
+.pal-icon.k-injection, .pal-icon.k-agent, .pal-icon.k-dag { background: var(--pa-progress); } .pal-icon.k-regle, .pal-icon.k-client { background: var(--pa-done); }
 .pal-main { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
 .pal-title { font-size: 14px; font-weight: 600; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pal-title .muted { font-size: 12px; font-weight: 500; }
@@ -793,14 +793,12 @@ html.palette-open { overflow: hidden; }
 .pal-card-head .muted { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pal-card .jx { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--surface); }
 .pal-card .jx.soon { background: var(--pa-ko); }
-.pal-card .progress { display: block; height: 6px; margin: 10px 0 8px; overflow: hidden; background: var(--border); border-radius: 3px; }
-.pal-card .progress > span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.pal-card .progress { margin: 10px 0 8px; }
 .pal-stats { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 12.5px; color: var(--muted); }
 .pal-stats strong { color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; }
 .pal-stats .bad strong { color: var(--danger); }
 
-.pal-empty { padding: 34px 20px 38px; text-align: center; }
-.pal-empty p { margin: 0 0 6px; }
+.palette .empty-state p { margin: 0 0 6px; }
 
 .palette-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 9px 14px;
   border-top: var(--line) solid var(--border); background: var(--bg); font-size: 12px; color: var(--muted); }
@@ -814,3 +812,34 @@ button.pal-hint, button.pal-hint:hover:not(:disabled) { min-height: 0; padding: 
 button.pal-hint:hover:not(:disabled) { border-style: solid; border-color: var(--accent); color: var(--accent); }
 @media (max-width: 640px) { .palette { padding: 0; } .palette-panel { width: 100%; max-height: 100vh; height: 100%; border-radius: 0; border: 0; } .palette-keys { display: none; } .pal-side { max-width: 120px; } }
 @media (prefers-reduced-motion: reduce) { .palette-panel, .palette-backdrop { animation: none; } }
+
+/* ============================================================ Console Jarvis (palette en mode « > », 2026-11-12)
+   Bouton >_ de la barre, invite « jarvis › », police à chasse fixe ; formulaire de lancement d'un DAG et journal des lancements. */
+.palette { --mono: ui-monospace, SFMono-Regular, Menlo, monospace; }
+button.pal-console-open .ic { width: 17px; height: 17px; }
+.palette-prompt { display: none; font: 600 15px/1 var(--mono); color: var(--accent); white-space: nowrap; }
+.palette.is-console .palette-head > .ic { display: none; }
+.palette.is-console .palette-prompt { display: inline; }
+.palette.is-console .palette-head input { font-family: var(--mono); font-size: 16px; }
+.palette.is-console .palette-panel { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.palette-hints.console, .palette.is-console .palette-hints:not(.console) { display: none; }
+.palette.is-console .palette-hints.console { display: flex; }
+.palette-hints.console .pal-hint { font-family: var(--mono); }
+.pal-syntax { font: 500 12px var(--mono); color: var(--muted); }
+
+.pal-run { padding: 6px 10px 10px; }
+.pal-back { min-height: 0; padding: 3px 10px; font-size: 12px; margin-bottom: 10px; }
+.pal-run-title { display: flex; align-items: flex-start; gap: 12px; margin: 0 0 8px; line-height: 1.4; }
+.pal-run-title .pal-icon { flex: none; }
+.pal-run-body { padding-left: 42px; font-size: 12.5px; }  /* aligné sur le titre, après l'icône */
+.pal-run-body > p { margin: 0 0 12px; }
+.pal-run-form { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 10px; }
+.pal-run-form label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.palette-out .result { margin: 8px 18px 0; }
+.palette-out:empty { display: none; }
+
+.pal-log { display: grid; grid-template-columns: 42px auto minmax(0, 1fr); gap: 10px; align-items: baseline; margin: 0; padding: 5px 10px;
+  font-size: 12.5px; border-left: 3px solid var(--ok); }
+.pal-log.ko { border-left-color: var(--danger); }
+.pal-log-at { color: var(--muted); font-variant-numeric: tabular-nums; }
+.pal-log span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }

@@ -10,14 +10,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=46">
+  <link rel="stylesheet" href="/static/style.css?v=49">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=4" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
   <script src="/static/limit.js?v=1" defer></script>
   <script src="/static/notify.js?v=2" defer></script>
-  <script src="/static/drawer.js?v=3" defer></script>
-  <script src="/static/palette.js?v=2" defer></script>
+  <script src="/static/drawer.js?v=4" defer></script>
+  <script src="/static/palette.js?v=6" defer></script>
 </head>
 <body>
   {% import "_icons.html" as ic %}
@@ -44,12 +44,15 @@
         {% for d in clients %}
         <a href="/deploiements/{{ d.slug }}" class="client-chip h-{{ d.health_level }} {{ 'active' if active == '/deploiements/' ~ d.slug }}"
            title="{{ d.client }} · {{ d.progress }} % intégré{% if d.go_live %} · déploiement le {{ d.go_live.strftime('%d/%m/%Y') }}{% endif %}">
-          <span class="dot" aria-hidden="true"></span><span class="client-name">{{ d.client }}</span>{% if d.go_live and d.days_left >= 0 %}<span class="jx {{ 'soon' if d.days_left < 14 }}">J-{{ d.days_left }}</span>{% endif %}</a>
+          <span class="dot" aria-hidden="true"></span><span class="client-name">{{ d.client }}</span>{{ ic.countdown(d) }}</a>
         {% endfor %}
       </div>
       {% endif %}
     </nav>
+    <div class="pal-buttons">
     <button type="button" class="secondary pal-open" data-palette-open aria-label="Rechercher dans Jarvis" title="Demander à Jarvis">{{ ic.icon("search") }}<span class="pal-open-label">Rechercher</span><kbd data-palette-key>⌘K</kbd></button>
+    <button type="button" class="secondary icon-btn pal-console-open" data-palette-open=">" aria-label="Console Jarvis" title="Console : lancer un DAG, un agent, rafraîchir un client… (touche >)">{{ ic.icon("terminal") }}</button>
+    </div>
     <div class="bell-wrap">
       <button type="button" class="bell secondary icon-btn" aria-label="Notifications" aria-haspopup="true" aria-expanded="false"
               hx-get="/notifications/panneau" hx-target="#notif-panel" hx-trigger="click">{{ ic.icon("bell") }}<span id="bell-count" hx-target="this" hx-get="/notifications/compte" hx-trigger="load, every 60s, notifs-changed from:body" hx-swap="innerHTML"></span></button>
@@ -69,7 +72,11 @@
         dark: svg('<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'),
         light: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/>'),
       };
-      const show = () => { const t = root.dataset.theme || ""; button.innerHTML = `${icons[t]} ${labels[t]}`; };
+      const show = () => {  // le libellé se cache quand la barre manque de place (style.css) : il reste dans l'infobulle
+        const t = root.dataset.theme || "";
+        button.innerHTML = `${icons[t]} <span class="theme-label">${labels[t]}</span>`;
+        button.title = `Thème : ${labels[t]} (cliquer pour changer)`;
+      };
       button.addEventListener("click", () => {
         const next = order[(order.indexOf(root.dataset.theme || "") + 1) % order.length];
         if (next) root.dataset.theme = next; else delete root.dataset.theme;
@@ -101,18 +108,22 @@
     <div class="palette-backdrop" data-palette-close></div>
     <div class="palette-panel" role="dialog" aria-modal="true" aria-label="Demander à Jarvis">
       <div class="palette-head">
-        {{ ic.icon("search") }}
+        {{ ic.icon("search") }}<span class="palette-prompt" aria-hidden="true">jarvis ›</span>
         <input id="palette-input" name="q" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
                placeholder="Demander à Jarvis : un client, un retour, « retard », @responsable…" aria-label="Rechercher dans Jarvis"
                role="combobox" aria-expanded="true" aria-controls="palette-results" aria-autocomplete="list"
                hx-get="/palette" hx-target="#palette-results" hx-trigger="input changed delay:80ms, palette-load" hx-sync="this:replace">
         <kbd>esc</kbd>
       </div>
+      <div class="palette-out" id="palette-out" aria-live="polite"></div>
       <div class="palette-results" id="palette-results" role="listbox" aria-label="Résultats"></div>
       <div class="palette-foot">
         <span class="palette-keys"><kbd>↑</kbd><kbd>↓</kbd> naviguer <kbd>↵</kbd> ouvrir <kbd data-palette-key="enter">⌘↵</kbd> nouvel onglet</span>
         <span class="palette-hints" aria-label="Mots compris">
           {% for word in ("retard", "ko", "aujourd'hui", "@", "#", ">") %}<button type="button" class="pal-hint" data-pal-fill="{{ word }}">{{ {"@": "@responsable", "#": "#statut", ">": ">commande"}.get(word, word) }}</button>{% endfor %}
+        </span>
+        <span class="palette-hints console" aria-label="Commandes de la console">
+          {% for verb in ("dag", "agent", "rafraichir", "aide") %}<button type="button" class="pal-hint" data-pal-fill-input=">{{ verb }} ">&gt;{{ verb }}</button>{% endfor %}
         </span>
       </div>
     </div>
