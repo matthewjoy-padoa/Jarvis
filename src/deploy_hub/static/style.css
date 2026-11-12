@@ -372,7 +372,7 @@ code.res, code.req { border-radius: 6px; border-width: 1px; }
 
 /* Jarvis : ligne de bilan, cloche qui pulse quand il y a de l'urgent */
 .jarvis-line { margin: 2px 0 0; font-size: 15px; color: var(--text); }
-.brand-mark { width: 30px; height: 30px; flex: none; filter: drop-shadow(0 0 5px rgba(92, 225, 255, .45)); }
+.brand-mark { width: 30px; height: 30px; flex: none; }
 @media (prefers-reduced-motion: no-preference) {
   .bell-count.urgent { animation: jarvis-pulse 2s ease-in-out infinite; }
   @keyframes jarvis-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(217, 63, 86, .55); } 50% { box-shadow: 0 0 0 6px rgba(217, 63, 86, 0); } }
@@ -550,7 +550,7 @@ a.wn-title:hover { color: var(--accent); }
 .client-chip.strong.active .jx { background: rgba(255, 255, 255, .22); color: #fff; }
 
 /* Logo : monogramme J sur carré arrondi en dégradé (même fichier que l'icône d'onglet) */
-.brand-mark { width: 30px; height: 30px; border-radius: 9px; filter: none; box-shadow: 0 2px 8px rgba(15, 163, 207, .35); transition: transform .2s; }
+.brand-mark { transition: transform .2s; }  /* logo rond : ni ombre ni halo derrière lui */
 .brand:hover .brand-mark { transform: rotate(-6deg) scale(1.05); }
 
 /* Vue kanban (actions, retours de recette) : une colonne par statut, défilement horizontal */
