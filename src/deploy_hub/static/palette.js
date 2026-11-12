@@ -161,7 +161,7 @@
     const field = e.target.closest && e.target.closest("input, textarea, select, [contenteditable]");
     if (field || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === "/") { e.preventDefault(); open(); }
-    else if (e.key === ">") { e.preventDefault(); open(">"); }
+    else if (e.key === ">") { e.preventDefault(); window.jarvisConsole ? window.jarvisConsole.open() : open(">"); }  // la vraie console
   }, true);
   document.addEventListener("click", (e) => {
     const button = e.target.closest("[data-palette-open]");
