@@ -14,7 +14,7 @@
 {% if r.card %}
 {% set d = r.card %}
 <a class="pal-card" data-pal-item data-pal-kind="client" data-pal-title="{{ d.client }}" role="option" href="/deploiements/{{ d.slug }}">
-  <span class="pal-card-head">{{ ic.health(d) }}<strong>{{ d.client }}</strong><span class="muted">{{ d.software }} · {{ d.health_label }}</span>
+  <span class="pal-card-head">{{ ic.health(d) }}<strong>{{ ic.client_emoji(d) }}{{ d.client }}</strong><span class="muted">{{ d.software }} · {{ d.health_label }}</span>
     {{ ic.countdown(d) }}</span>
   <div class="progress" aria-hidden="true"><div style="width: {{ d.progress }}%"></div></div>
   <span class="pal-stats">

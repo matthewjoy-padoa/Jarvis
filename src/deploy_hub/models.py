@@ -257,6 +257,7 @@ class Deployment:
     client: str
     software: str
     status: str = "en cours"
+    emoji: str = ""  # icône de la fiche « 👯‍♀️ Clients » dans Notion
     orchestrator: list[str] = field(default_factory=list)  # clés client de l'orchestrator (configuration du client)
     notion_url: str = ""
     synced_at: str = ""

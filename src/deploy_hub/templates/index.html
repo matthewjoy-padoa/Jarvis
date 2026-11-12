@@ -26,7 +26,7 @@
 <div class="grid">
   {% for d in deployments %}
   <div class="card card-linked">
-    <div class="card-head"><a class="card-link" href="/deploiements/{{ d.slug }}/synthese"><strong>{{ ic.health(d) }} {{ d.client }}</strong></a><span class="badge">{{ d.software }}</span></div>
+    <div class="card-head"><a class="card-link" href="/deploiements/{{ d.slug }}/synthese"><strong>{{ ic.health(d) }} {{ ic.client_emoji(d) }}{{ d.client }}</strong></a><span class="badge">{{ d.software }}</span></div>
     {{ charts.segbar("", d.injection_groups, thin=true) }}
     <p class="muted">{{ d.progress }} % intégré{% if d.expected_progress is not none %} · attendu {{ d.expected_progress }} %{% endif %}</p>
     <p class="muted">{{ d.open_retours | length }} retour(s) ouvert(s) · {{ d.vigilance | length }} point(s) de vigilance</p>

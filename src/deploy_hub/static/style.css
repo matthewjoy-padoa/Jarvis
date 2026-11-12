@@ -958,3 +958,6 @@ html.term-open:has(.term.is-minimized) main { padding-bottom: 48px; }
 @media (max-width: 640px) {
   .client-menu { position: fixed; top: calc(var(--topbar-h, 61px) + 4px); left: 12px; right: 12px; min-width: 0; }  /* pleine largeur, jamais hors écran */
 }
+
+/* Emoji du client (icône Notion) devant son nom */
+.client-emoji { margin-right: .3em; font-style: normal; line-height: 1; }

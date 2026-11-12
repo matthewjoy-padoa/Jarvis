@@ -38,6 +38,11 @@
 </svg>
 {%- endmacro %}
 
+{# Emoji du client (icône de sa fiche « 👯‍♀️ Clients » dans Notion), décoratif : le nom suit toujours. #}
+{% macro client_emoji(d) -%}
+{% if d.emoji %}<span class="client-emoji" aria-hidden="true">{{ d.emoji }}</span>{% endif %}
+{%- endmacro %}
+
 {# Compte à rebours jusqu'au déploiement (J-12), en alerte sous 14 jours ; rien une fois la date passée. #}
 {% macro countdown(d) -%}
 {% if d.go_live and d.days_left >= 0 %}<span class="jx {{ 'soon' if d.days_left < 14 }}">J-{{ d.days_left }}</span>{% endif %}

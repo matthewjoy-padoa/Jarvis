@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=67">
+  <link rel="stylesheet" href="/static/style.css?v=68">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=4" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
@@ -39,7 +39,7 @@
     <details class="client-switch" data-client-switch>
       <summary class="client-chip strong h-{{ current.health_level }} {{ 'active' if active == '/deploiements/' ~ current.slug }}"
                title="Client en cours : {{ current.client }} · {{ current.progress }} % intégré{% if current.go_live %} · déploiement le {{ current.go_live.strftime('%d/%m/%Y') }}{% endif %}">
-        <span class="dot" aria-hidden="true"></span><span class="client-name">{{ current.client }}</span>{{ ic.countdown(current) }}
+        <span class="dot" aria-hidden="true"></span>{{ ic.client_emoji(current) }}<span class="client-name">{{ current.client }}</span>{{ ic.countdown(current) }}
         <svg class="switch-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></summary>
       <div class="client-menu" role="menu">
         <a role="menuitem" href="/deploiements/{{ current.slug }}/synthese">Ouvrir la fiche de {{ current.client }}</a>
@@ -47,7 +47,7 @@
         <p class="client-menu-label">Changer de client</p>
         {% for d in clients if d.slug != current.slug %}
         <a role="menuitem" class="client-menu-item" href="/client/{{ d.slug }}?vers={{ request.url.path | urlencode }}">
-          <span class="health h-{{ d.health_level }}" aria-hidden="true"></span>{{ d.client }}{{ ic.countdown(d) }}</a>
+          <span class="health h-{{ d.health_level }}" aria-hidden="true"></span>{{ ic.client_emoji(d) }}{{ d.client }}{{ ic.countdown(d) }}</a>
         {% endfor %}
         {% endif %}
         <a role="menuitem" class="client-menu-all" href="/clients">Tous les clients et réglages</a>

@@ -14,6 +14,8 @@ from deploy_hub.sync_notion import SyncError, plan_client
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGE = "0123456789abcdef0123456789abcdef"
+CARD = "c" * 32  # fiche du client dans « 👯‍♀️ Clients »
+CARD_UUID = f"{CARD[:8]}-{CARD[8:12]}-{CARD[12:16]}-{CARD[16:20]}-{CARD[20:]}"
 
 
 def prop(pid, kind, v):
@@ -24,7 +26,7 @@ SCHEMAS = {
     notion_api.CLIENTS_DS: {"Nom": ("t", "title"), "Date de Kick-off": ("k", "date"), "Date réception des données": ("r", "date"),
                             "Date recette 1": ("r1", "date"), "Date recette 2": ("r2", "date"), "Date recette 3": ("r3", "date"),
                             "Date du Freeze": ("f", "date"), "Date formation": ("fo", "date"), "Date déploiement": ("d", "date"),
-                            "Date déploiement Lot 2": ("d2", "date")},
+                            "Date déploiement Lot 2": ("d2", "date"), notion_api.CLIENT_CARD: ("cf", "relation")},
     notion_api.ACTIONS_DS: {"Intitulé": ("ti", "title"), "Statut": ("st", "status"), "Statut intégration - Injections": ("si", "select"),
                             "Deadline": ("dl", "date"), "Point de vigilance": ("pv", "checkbox"), "Événement": ("ev", "checkbox"),
                             "Client": ("cl", "relation"), "Actions à mener (manuel)": ("am", "multi_select"),
@@ -79,6 +81,7 @@ class FakeNotion:
     def __init__(self, n_actions=150):
         self.requests: list[httpx.Request] = []
         self.actions = actions_pages(n_actions)
+        self.card_icon = {"type": "emoji", "emoji": "⚡"}
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
@@ -86,8 +89,11 @@ class FakeNotion:
         if m := re.fullmatch(r"/data_sources/([0-9a-f-]+)", path):
             props = {name: {"id": i, "type": t, "name": name} for name, (i, t) in SCHEMAS[m.group(1)].items()}
             return httpx.Response(200, json={"properties": props})
+        if path == f"/pages/{CARD_UUID}":  # fiche « 👯‍♀️ Clients » liée : seule l'icône compte
+            return httpx.Response(200, json={"id": CARD, "icon": self.card_icon, "properties": {}})
         if path.startswith("/pages/"):
-            return httpx.Response(200, json={"id": PAGE, "properties": {
+            return httpx.Response(200, json={"id": PAGE, "icon": {"type": "emoji", "emoji": "🚀"}, "properties": {
+                notion_api.CLIENT_CARD: prop("cf", "relation", [{"id": CARD_UUID}]),
                 "Nom": prop("t", "title", [{"plain_text": "Acme"}]), "Date de Kick-off": prop("k", "date", {"start": "2026-04-16"}),
                 "Date déploiement": prop("d", "date", {"start": "2026-11-17"}), "Date du Freeze": prop("f", "date", None)}})
         if m := re.fullmatch(r"/data_sources/([0-9a-f-]+)/query", path):
@@ -123,6 +129,27 @@ def test_refresh_writes_the_fiche_from_notion(root):
     assert d.injection_counts == {"KO": 1, "A faire": 99}
     assert {a.title: a.resources for a in d.actions}["Carte 0"] == ["firm"] and {a.title: a.resources for a in d.actions}["Carte 1"] == ["visit_histo"]
     assert len(d.vigilance) == 1 and str(d.go_live) == "2026-11-17"
+
+
+@pytest.mark.parametrize(("icon", "emoji"), [
+    ({"type": "emoji", "emoji": "⚡"}, "⚡"),                                   # emoji de la fiche client, pas le 🚀 du déploiement
+    (None, ""),                                                                # fiche sans icône
+    ({"type": "external", "external": {"url": "https://exemple.test/logo.png"}}, ""),  # image : pas un emoji
+])
+def test_the_client_emoji_comes_from_the_linked_client_card(root, icon, emoji):
+    fake = FakeNotion()
+    fake.card_icon = icon
+    refresh("acme", client_for(fake), root)
+    assert parse_deployment(root / "data" / "deploiements" / "acme.md").emoji == emoji
+    card = [r for r in fake.requests if r.url.path.endswith(CARD_UUID)]
+    assert card and all(r.url.params.get_list("filter_properties[]") == ["title"] for r in card)  # aucune propriété de la fiche lue
+
+
+def test_an_unshared_client_base_leaves_no_emoji_but_the_sync_goes_on(root):
+    def unshared(request):
+        return httpx.Response(404, json={}) if request.url.path.endswith(CARD_UUID) else FakeNotion()(request)
+    assert refresh("acme", client_for(unshared), root)["cartes"] == 150
+    assert parse_deployment(root / "data" / "deploiements" / "acme.md").emoji == ""
 
 
 def test_recette_asks_only_the_listed_properties(root):
