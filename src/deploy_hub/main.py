@@ -14,6 +14,7 @@ from deploy_hub import client_config
 from deploy_hub.config import PROJECT_ROOT, clients_dir, data_dir, load_settings
 from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
                                kanban_columns, notion_link, status_group)
+from deploy_hub import console
 from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
@@ -53,6 +54,7 @@ templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STAT
 templates.env.globals["kanban_columns"] = kanban_columns
 templates.env.globals["ACTION_STATUSES"] = ACTION_STATUSES
 templates.env.globals["RETOUR_STATUSES"] = RETOUR_STATUSES
+templates.env.globals["console_commands"] = list(console.COMMANDS)  # complétion par Tab dans la console
 
 # Pages globales et onglets d'une fiche, calqués sur les blocs du dashboard Notion.
 # On travaille sur un client à la fois : la barre du haut montre le client en cours (sélecteur) et NAV_PAGES ;
@@ -193,6 +195,20 @@ def _search_index(deployments: list[Deployment]) -> Index:
 def palette(request: Request, q: str = ""):
     """Résultats de la palette de commandes (⌘K) : pages, clients, retours, cartes, règles et agents qui répondent à q."""
     return templates.TemplateResponse(request, "_palette.html", {"r": _search_index(_deployments(request)).search(q), "today": date.today()})
+
+
+@app.post("/console")
+def console_run(request: Request, ligne: str = Form("")):
+    """Une ligne de la console : texte de terminal sur le client en cours ; une action passe par une confirmation (o/N)
+    puis par sa route existante, appelée par le navigateur."""
+    deployments = _deployments(request)
+    ctx = console.Context(_current(request), deployments, date.today(), _search_index(deployments).search, _deadlines,
+                          dag_catalogue.dags_for, dag_watch.watches, tuple(e for e in PADOA_ENVS if e != "prod"), ticket_url, DEPLOYMENT_TABS)
+    out = console.run(ligne, ctx)
+    slug = out.client or (ctx.current.slug if ctx.current else "")
+    response = JSONResponse({"lines": out.lines, "prompt": f"jarvis:{slug or '~'}", "confirm": out.confirm, "navigate": out.navigate,
+                             "ticket": out.ticket, "clear": out.clear, "close": out.close, "history": out.history})
+    return _remember(response, out.client) if out.client else response
 
 
 @app.get("/palette/dag/{slug}/{dag_id}", response_class=HTMLResponse)

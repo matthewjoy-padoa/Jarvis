@@ -10,14 +10,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=55">
+  <link rel="stylesheet" href="/static/style.css?v=57">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=4" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
   <script src="/static/limit.js?v=1" defer></script>
   <script src="/static/notify.js?v=2" defer></script>
   <script src="/static/drawer.js?v=4" defer></script>
-  <script src="/static/palette.js?v=6" defer></script>
+  <script src="/static/palette.js?v=7" defer></script>
+  <script src="/static/console.js?v=3" defer></script>
 </head>
 <body>
   {% import "_icons.html" as ic %}
@@ -145,8 +146,23 @@
     </div>
   </div>
   {# Console (>dag, >agent…) : bouton flottant en bas à droite, comme un bouton de discussion ; la touche « > » fait pareil. #}
-  <button type="button" class="console-fab" data-palette-open=">" aria-label="Console Jarvis" title="Console : lancer un DAG, un agent, rafraîchir un client… (touche >)">
+  <button type="button" class="console-fab" data-console-open aria-label="Console Jarvis" title="Console Jarvis : tape des commandes comme dans un terminal (touche >)">
     {{ ic.icon("terminal") }}<span class="console-fab-label">Console</span><kbd>&gt;</kbd></button>
+  {# Console Jarvis : un vrai terminal (console.js) ; les commandes sont lues et exécutées par /console (console.py). #}
+  <section class="term" id="term" hidden aria-label="Console Jarvis" data-commands="{{ console_commands | join(' ') }}">
+    <div class="term-bar">
+      <span class="term-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="term-title">jarvis — <span id="term-client">{{ current.slug if current else "aucun client" }}</span></span>
+      <button type="button" class="term-close" data-term-close aria-label="Fermer la console" title="Fermer (Échap)">✕</button>
+    </div>
+    <div class="term-screen" id="term-screen">
+      <div class="term-out" id="term-out" role="log" aria-live="polite"></div>
+      <form class="term-line" id="term-form" autocomplete="off">
+        <label class="term-prompt" for="term-input"><span id="term-prompt">jarvis:{{ current.slug if current else "~" }}</span> $</label>
+        <input id="term-input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off">
+      </form>
+    </div>
+  </section>
   <footer class="footer muted">Jarvis · <em>Just A Rather Very Intelligent System</em>, au service de l'équipe Integration · <a href="/sources">État des systèmes</a></footer>
 </body>
 </html>

@@ -240,4 +240,5 @@ def test_dag_launch_form_reuses_the_injection_route_without_prod(acme):
 
 def test_every_page_carries_the_console_button():
     home = client.get("/").text
-    assert 'data-palette-open=">"' in home and 'class="palette-prompt"' in home and 'data-pal-fill-input=">dag "' in home
+    assert 'class="palette-prompt"' in home and 'data-pal-fill-input=">dag "' in home  # mode « > » de la palette, toujours là
+    assert 'data-console-open' in home and 'id="term"' in home and "/static/console.js" in home  # le bouton ouvre la vraie console
