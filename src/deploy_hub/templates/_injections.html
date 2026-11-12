@@ -48,7 +48,10 @@
       <td class="actions">
         {% set out = "out-" ~ d.slug ~ "-" ~ r.name %}
         {% if r.dag_id %}
-        <button hx-post="/actions/dag/{{ r.dag_id }}" hx-target="#{{ out }}" hx-confirm="Déclencher {{ r.dag_id }} ?">Lancer le DAG</button>
+        <form class="dag-form" hx-post="/actions/dag/{{ r.dag_id }}" hx-target="#{{ out }}" data-dag-form>
+          <input type="hidden" name="dag_id" value="{{ r.dag_id }}">
+          <select name="padoa_env" aria-label="Stack cible">{% for e in padoa_envs %}<option value="{{ e }}">{{ e }}</option>{% endfor %}</select>
+          <button type="submit">Lancer le DAG</button></form>
         {% endif %}
         <button class="secondary" hx-post="/actions/claude/{{ d.slug }}/{{ r.name }}" hx-target="#{{ out }}" hx-confirm="Lancer Claude sur {{ r.name }} ?">Lancer Claude</button>
         <div id="{{ out }}"></div>

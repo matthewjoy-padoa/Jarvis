@@ -148,8 +148,8 @@ def test_agent_refused_on_closed_or_unknown_retour():
 
 
 def test_dag_and_resource_actions_are_simulated():
-    r = client.post("/actions/dag/demo_client_firm")
-    assert r.status_code == 200 and "Simulation" in r.text and "demo_client_firm sur integration" in r.text
+    r = client.post("/actions/dag/demo_client_firm", data={"padoa_env": "snap"})  # la stack est toujours choisie
+    assert r.status_code == 200 and "Simulation" in r.text and "demo_client_firm sur snap" in r.text
     r = client.post("/actions/claude/client-demo/visit_histo")
     assert r.status_code == 200 and "branche client-demo-visit_histo" in r.text
 

@@ -361,7 +361,7 @@ def deployment_tab(request: Request, slug: str, tab: str, tous: bool = False, vu
     )
 
 
-def _launch(dag_id: str, padoa_env: str = "integration", d: Deployment | None = None, card: str = "") -> ActionResult:
+def _launch(dag_id: str, padoa_env: str, d: Deployment | None = None, card: str = "") -> ActionResult:
     """Lance le DAG ; si le lancement est réel, air.py suit le run (relances, notifications, rapport)."""
     result = airflow.trigger_dag(dag_id, padoa_env, d.client if d else "", card)
     if result.ok and result.run_id:
@@ -374,9 +374,9 @@ def _launch(dag_id: str, padoa_env: str = "integration", d: Deployment | None = 
 
 
 @app.post("/actions/dag/{dag_id}", response_class=HTMLResponse)
-def trigger_dag(request: Request, dag_id: str):
-    """DAG d'une ressource de la fiche."""
-    return _result(request, _launch(dag_id))
+def trigger_dag(request: Request, dag_id: str, padoa_env: str = Form(...)):
+    """DAG d'une ressource de la fiche, sur la stack choisie : jamais de stack par défaut (Airflow prendrait la sienne)."""
+    return _result(request, _launch(dag_id, padoa_env))
 
 
 @app.post("/actions/injection/{slug}", response_class=HTMLResponse)
