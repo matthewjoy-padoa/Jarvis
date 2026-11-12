@@ -43,13 +43,13 @@ def catalogue(path: Path | None = None) -> dict:
     return _load(str(path), path.stat().st_mtime) if path.is_file() else {"clients": {}}
 
 
-def dags_for(customers: list[str], resources: list[str], path: Path | None = None) -> list[DagChoice]:
-    """DAGs des clients orchestrator donnés qui traitent au moins une des ressources de la carte."""
-    wanted = set(resources)
+def dags_for(customers: list[str], resources: list[str] | None = None, path: Path | None = None) -> list[DagChoice]:
+    """DAGs des clients orchestrator donnés qui traitent au moins une des ressources de la carte.
+    Sans liste de ressources (None) : tous leurs DAGs, pour la commande « >dag » de la palette."""
     choices = []
     for customer in customers:
-        for dag_id, dag in (catalogue(path)["clients"].get(customer) or {}).get("dags", {}).items():
-            hit = tuple(r for r in dag["ressources"] if r in wanted)
+        for dag_id, dag in ((catalogue(path)["clients"].get(customer) or {}).get("dags") or {}).items():
+            hit = tuple(dag["ressources"]) if resources is None else tuple(r for r in dag["ressources"] if r in resources)
             if hit:
                 choices.append(DagChoice(dag_id, customer, dag["type"], dag.get("groupe", ""), hit))
     return sorted(choices, key=lambda c: (TYPE_ORDER.get(c.type, 9), c.customer, c.dag_id))

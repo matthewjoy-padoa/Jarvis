@@ -1,0 +1,70 @@
+{# Résultats de la palette de commandes (⌘K). Attend : r (search.Results), today. #}
+{% import "_icons.html" as ic %}
+{% set ICONS = {"client": "building", "page": "arrow", "commande": "command", "retour": "flask", "action": "flag",
+                "injection": "play", "regle": "check", "agent": "bot", "dag": "play"} %}
+{% macro hl(parts) %}{% for text, found in parts %}{% if found %}<mark>{{ text }}</mark>{% else %}{{ text }}{% endif %}{% endfor %}{% endmacro %}
+
+{% if r.chips %}
+<p class="pal-chips"><span class="pal-chips-label">Jarvis a compris</span>{% for chip in r.chips %}<span class="pal-chip">{{ chip }}</span>{% endfor %}</p>
+{% endif %}
+{% if r.corrected %}
+<p class="pal-note">Rien pour « {{ r.query }} ». Résultats pour <strong>{{ r.corrected }}</strong> :</p>
+{% endif %}
+
+{% if r.card %}
+{% set d = r.card %}
+<a class="pal-card" data-pal-item data-pal-kind="client" data-pal-title="{{ d.client }}" role="option" href="/deploiements/{{ d.slug }}">
+  <span class="pal-card-head">{{ ic.health(d) }}<strong>{{ d.client }}</strong><span class="muted">{{ d.software }} · {{ d.health_label }}</span>
+    {{ ic.countdown(d) }}</span>
+  <div class="progress" aria-hidden="true"><div style="width: {{ d.progress }}%"></div></div>
+  <span class="pal-stats">
+    <span><strong>{{ d.progress }} %</strong> intégré</span>
+    <span><strong>{{ d.open_retours | length }}</strong> retour(s) ouvert(s)</span>
+    <span class="{{ 'bad' if d.injection_groups.get('ko') }}"><strong>{{ d.injection_groups.get("ko", 0) }}</strong> injection(s) KO</span>
+    <span class="{{ 'bad' if r.card_late }}"><strong>{{ r.card_late }}</strong> en retard</span>
+  </span>
+</a>
+{% endif %}
+
+{% for label, total, hits in r.groups %}
+<section class="pal-group" aria-label="{{ label }}">
+  <h3 class="pal-group-title">{{ label }}<span>{{ total }}</span></h3>
+  {% for h in hits %}
+  {% set i = h.item %}
+  <a class="pal-item" data-pal-item data-pal-kind="{{ i.kind }}" data-pal-title="{{ i.title }}" role="option" href="{{ i.url }}"
+     {%- if i.ticket %} data-ticket{% endif %}{% if i.external %} target="_blank" rel="noopener"{% endif %}{% if i.fill %} data-pal-fill-input="{{ i.fill }}"{% endif %}
+     {%- if i.action == "theme" %} data-pal-action="theme"
+     {%- elif i.action == "run" %} hx-get="{{ i.url }}" hx-target="#palette-results"
+     {%- elif i.action == "post" %} hx-post="{{ i.url }}" hx-target="#palette-out" hx-confirm="Jarvis : {{ i.title }} ?" data-pal-log="{{ i.title }}"{% endif %}>
+    <span class="pal-icon k-{{ i.kind }}">{{ ic.icon(ICONS[i.kind]) }}</span>
+    <span class="pal-main">
+      <span class="pal-title">{{ hl(h.title) }}{% if i.syntax %} <span class="pal-syntax">{{ i.syntax }}</span>{% endif %}{% if i.external %} <span class="muted">Notion ↗</span>{% endif %}</span>
+      {% if i.sub %}<span class="pal-sub">{{ hl(h.sub) }}</span>{% endif %}
+      {% if h.snippet %}<span class="pal-snippet"><span class="pal-snippet-label">{{ h.snippet[0] }}</span> {{ hl(h.snippet[1]) }}</span>{% endif %}
+    </span>
+    <span class="pal-side">
+      {% if i.badge %}<span class="badge {{ 'g-' ~ i.group if i.group }}">{{ i.badge }}</span>{% endif %}
+      {% if i.late %}<span class="pal-due late">en retard · {{ i.due.strftime("%d/%m") }}</span>
+      {% elif i.due == today %}<span class="pal-due today">aujourd'hui</span>
+      {% elif i.due and not i.done %}<span class="pal-due">{{ i.due.strftime("%d/%m") }}</span>{% endif %}
+    </span>
+  </a>
+  {% endfor %}
+  {% if total > hits | length %}<p class="pal-more">+ {{ total - hits | length }} autre(s) : {{ "ajoute un mot pour préciser" if r.query else "tape « retard » ou « aujourd'hui » pour tout voir" }}</p>{% endif %}
+</section>
+{% endfor %}
+
+{% if r.card and not r.groups %}<p class="pal-note">Rien d'autre chez {{ r.card.client }} pour cette recherche.</p>{% endif %}
+{% if r.verb and not r.groups %}
+<div class="empty-state">
+  <p><strong>Rien à lancer pour « {{ r.query }} »</strong></p>
+  <p class="muted">{% if r.verb == "dag" %}Aucun DAG du catalogue ne répond : vérifie le client (ses clés orchestrator) et le nom de la ressource ou du groupe.
+  {%- elif r.verb == "agent" %}Aucun retour ouvert ne répond : tape son identifiant ou un mot de son titre.
+  {%- else %}Aucun client ne répond à ce nom.{% endif %} <code>&gt;aide</code> liste les commandes.</p>
+</div>
+{% elif not r.groups and not r.card %}
+<div class="empty-state">
+  <p><strong>Rien trouvé pour « {{ r.query }} »</strong></p>
+  <p class="muted">Essaie un nom de client, l'identifiant d'un retour, ou un mot compris : <code>retard</code>, <code>ko</code>, <code>@responsable</code>, <code>#statut</code>, <code>&gt;commande</code>.</p>
+</div>
+{% endif %}

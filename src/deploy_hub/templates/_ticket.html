@@ -58,8 +58,9 @@
       {% if run.pr_url %}<a href="{{ run.pr_url }}" target="_blank" rel="noopener">PR ↗</a>{% endif %}</p>
     {% else %}<p class="muted">Aucun agent lancé sur ce retour.</p>{% endfor %}
     {% if item.is_open %}
-    <details class="agent" hx-get="/deploiements/{{ d.slug }}/recette/{{ item.id }}/brief" hx-trigger="toggle once" hx-target="find .agent-body">
-      <summary>{{ ic.icon("bot") }} Lancer un agent</summary>
+    <details class="agent" hx-get="/deploiements/{{ d.slug }}/recette/{{ item.id }}/brief" hx-target="find .agent-body"
+             {%- if open_agent %} open hx-trigger="load"{% else %} hx-trigger="toggle once"{% endif %}>
+      <summary{% if open_agent %} autofocus{% endif %}>{{ ic.icon("bot") }} Lancer un agent</summary>
       <div class="agent-body"><p class="muted">Jarvis prépare le brief…</p></div>
     </details>
     {% endif %}

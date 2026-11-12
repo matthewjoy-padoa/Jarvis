@@ -21,7 +21,9 @@
     body.innerHTML = '<p class="muted">Chargement…</p>';
     drawer.hidden = false;
     document.documentElement.classList.add("drawer-open");
-    htmx.ajax("GET", url, { target: body, swap: "innerHTML" }).then(() => drawer.querySelector(".drawer-panel").focus());
+    // Le focus va à l'élément [autofocus] du ticket s'il y en a un (bloc agent demandé par la palette), sinon au panneau.
+    htmx.ajax("GET", url, { target: body, swap: "innerHTML" })
+      .then(() => (body.querySelector("[autofocus]") || drawer.querySelector(".drawer-panel")).focus());
   }
   function close() {
     if (!drawer || drawer.hidden) return;
