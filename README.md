@@ -48,7 +48,7 @@ Deux façons, au choix ou ensemble :
 | Rythme | Toutes les 2 h en semaine, ou à la demande | À chaque clic |
 | Mise en place | [`docs/routine-synchro.md`](docs/routine-synchro.md) | Section ci-dessous |
 
-La synchro est incrémentale : un client inchangé est sauté, seules les lignes modifiées sont relues, et une synchro complète a lieu tous les 7 jours ou quand des lignes sont ajoutées ou supprimées.
+La synchro est incrémentale et calculée par Jarvis : une seule requête d'empreinte pour tous les clients, puis seulement les lignes modifiées (ajouts compris), une liste compacte d'identifiants quand des lignes disparaissent, et une relecture complète des actions tous les 7 jours (leurs ressources viennent des cartes Bible). Détail dans [`docs/routine-synchro.md`](docs/routine-synchro.md).
 
 ### Jeton Notion (bouton « Rafraîchir »)
 1. Sur https://www.notion.so/profile/integrations, créer une intégration **interne**, capacité « Lire le contenu » seulement (la création peut demander un admin du workspace).

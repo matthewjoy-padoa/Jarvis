@@ -10,7 +10,7 @@ import pytest
 from deploy_hub.sources import notion_api
 from deploy_hub.sources.notion_api import NotionClient, refresh
 from deploy_hub.sources.fiches import parse_deployment
-from deploy_hub.sync_notion import SyncError, plan
+from deploy_hub.sync_notion import SyncError, plan_client
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGE = "0123456789abcdef0123456789abcdef"
@@ -151,12 +151,14 @@ def test_recette_content_goes_to_the_local_file_only(root):
     assert (root / "data" / "recette-pages.txt").read_text().split() == ["a" * 32, "b" * 32]
 
 
-def test_routine_after_a_direct_refresh_does_a_full_pass(root):
+def test_routine_after_a_direct_refresh_reads_only_what_changed(root):
     refresh("acme", client_for(FakeNotion()), root)
     raw = root / "data" / "notion" / "acme"
-    for base in ("actions", "recette"):
-        (raw / f"empreinte_{base}.json").write_text(json.dumps({"results": [{"n": 1, "modifie": "x"}]}))
-    assert plan("acme", root)["mode"] == "complet"
+    cache = json.loads((raw / "cache-actions.json").read_text())
+    n = len(cache)
+    last = max(r["modifie"] for r in cache.values() if r.get("modifie"))
+    p = plan_client("acme", {"actions": f"{n}|{last}", "recette": "0|"}, root)
+    assert ("actions", "actions", []) not in p["requetes"]  # colonnes et date de relecture notées par le rafraîchissement
 
 
 def test_missing_property_or_access_stops_before_writing(root):

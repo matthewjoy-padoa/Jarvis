@@ -1,18 +1,20 @@
-"""Synchro Notion → fiche de déploiement, incrémentale.
+"""Synchro Notion → fiche de déploiement, incrémentale et au plus juste.
 
-La routine « deploy-hub-sync » exécute les requêtes SQL de sync/requetes/ avec le connecteur Notion
-et dépose chaque résultat brut dans data/notion/<slug>/. Ce module tient un cache par base
-(cache-actions.json, cache-recette.json), en fait la fiche data/deploiements/<slug>.md lue par l'app,
-et met à jour la liste des pages de recette bloquées par le hook.
+La routine « deploy-hub-sync » exécute avec le connecteur Notion les requêtes que ce module lui donne et dépose
+chaque résultat brut dans data/notion/<slug>/. Le module tient un cache par base (cache-actions.json,
+cache-recette.json + contenu-recette.json), en fait la fiche data/deploiements/<slug>.md lue par l'app.
 
-    uv run python -m deploy_hub.sync_notion verifier <slug>   # {"mode": "inchangé" | "delta" | "complet", ...}
-    uv run python -m deploy_hub.sync_notion <slug>            # fusionne les résultats, écrit la fiche
+    uv run python -m deploy_hub.sync_notion preparer    # requêtes de chaque client + empreinte de tous les clients
+    uv run python -m deploy_hub.sync_notion plan        # d'après l'empreinte : les seules requêtes à exécuter
+    uv run python -m deploy_hub.sync_notion fusionner   # fusionne les résultats, écrit les fiches
 
-Mode, à partir des empreintes (nombre de lignes, dernière modification) des bases Actions et Recette :
-- inchangé : empreintes identiques à la dernière synchro ;
-- delta : seules les dates ont bougé → requêtes `deltas` avec ? = date de la dernière modification connue ;
-- complet : pas de cache, nombre de lignes différent (ajout ou suppression), ou dernière synchro complète
-  il y a plus de FULL_SYNC_DAYS jours.
+Ce que le plan demande, base par base (la routine recopie chaque résultat : moins de lignes, moins de temps) :
+- rien si l'empreinte (nombre de lignes, dernière modification ; signature des règles et de la fiche) n'a pas bougé ;
+- delta : les seules lignes modifiées depuis la dernière modification connue du cache (ajouts compris) ;
+- ids : la liste compacte des identifiants (une ligne) quand des lignes ont disparu, pour les retirer du cache ;
+- recette sans textes (recette-meta) quand une colonne de métadonnées est ajoutée : les textes restent ceux du cache ;
+- complet : pas de cache, colonnes des actions modifiées, ou actions relues entièrement il y a plus de FULL_SYNC_DAYS
+  jours (leurs ressources et types viennent des cartes Bible, dont les changements ne datent pas la carte).
 """
 
 import json
@@ -57,6 +59,8 @@ def _rows(path: Path) -> list[dict]:
     rows, last = [], []
     for page in pages:
         data = json.loads(page.read_text(encoding="utf-8"))
+        if isinstance(data, list) and data and isinstance(data[0], dict) and data[0].get("type") == "text":
+            data = json.loads(data[0]["text"])  # réponse d'outil copiée telle quelle depuis son fichier, enveloppée
         last = data["results"] if isinstance(data, dict) else data
         rows += last
     # Avec un « LIMIT » dans la requête, Notion répond has_more: false même s'il reste des lignes :
@@ -117,18 +121,37 @@ def write_caches(raw: Path, caches: dict[str, dict]) -> None:
 
 
 def merge_base(raw: Path, base: str) -> tuple[dict[str, dict], str]:
-    """Cache de la base après ce passage, et ce qui a été appliqué : « complet », « delta » ou « cache »."""
+    """Cache de la base après ce passage, et ce qui a été appliqué : complet, meta, delta, meta+delta ou cache."""
     cache = _load_cache(raw, base)
-    full, delta = raw / f"{base}.json", raw / f"{base}_delta.json"
+    full, meta, delta = raw / f"{base}.json", raw / f"{base}_meta.json", raw / f"{base}_delta.json"
     check = _check_recette if base == "recette" else (lambda rows: rows)
     if full.is_file():
         return {r["url"]: r for r in check(_rows(full))}, "complet"
     if cache is None:
         raise SyncError(f"{base} : ni résultat complet ni cache, lance une synchro complète.")
+    how = []
+    if meta.is_file():  # toutes les lignes sans les textes : les textes restent ceux du cache
+        cache = {r["url"]: {**cache.get(r["url"], {}), **r} for r in check(_rows(meta))}
+        how.append("meta")
     if delta.is_file():
         cache.update({r["url"]: r for r in check(_rows(delta))})
-        return cache, "delta"
-    return cache, "cache"
+        how.append("delta")
+    return cache, "+".join(how) or "cache"
+
+
+def drop_missing(raw: Path, caches: dict[str, dict]) -> dict[str, int]:
+    """Retire du cache les lignes absentes de ids.json (16 derniers caractères de l'id) ; nombre retiré par base."""
+    if not (raw / "ids.json").is_file():
+        return {}
+    row = _rows(raw / "ids.json")[0]
+    removed = {}
+    for base, cache in caches.items():
+        keep = set(filter(None, (row.get(base) or "").split(",")))
+        gone = [u for u in cache if _page_id(u)[-16:] not in keep]
+        for u in gone:
+            del cache[u]
+        removed[base] = len(gone)
+    return removed
 
 
 # Équipe = préfixe du type d'action (« INTE Injection » → INTE). Ordre d'affichage, puis libellé.
@@ -254,52 +277,160 @@ def update_blocklist(retours: list[dict], blocklist: Path) -> int:
     return len(known)
 
 
-def fingerprint(raw: Path) -> dict | None:
-    """Empreinte du passage en cours ({base: {n, modifie}}), ou None si les requêtes d'empreinte n'ont pas été déposées."""
-    files = {base: raw / f"empreinte_{base}.json" for base in BASES}
-    if not all(f.is_file() for f in files.values()):
+RESULTS = ("client", "regles", "actions", "actions_delta", "recette", "recette_meta", "recette_delta", "ids")
+EMPREINTES = "empreintes"  # data/notion/empreintes.sql et .json : tous les clients en une requête
+
+
+def versions() -> dict[str, str]:
+    """Version des colonnes demandées, par base : une colonne ajoutée impose de relire la base concernée."""
+    return {"actions": queries.templates_version("actions", "actions-delta"),
+            "recette": queries.templates_version("recette-meta"),
+            "contenu": ",".join(sorted(RECETTE_CONTENT))}
+
+
+def _stamp(value) -> datetime | None:
+    """Date de dernière modification Notion, au format SQL (« 2026-11-10 16:40:18Z ») ou API (ISO)."""
+    if not value:
         return None
-    result = {}
-    for base, f in files.items():
-        row = _rows(f)[0]
-        result[base] = {"n": int(row["n"]), "modifie": row.get("modifie")}
-    return result
+    return datetime.fromisoformat(str(value).replace("Z", "+00:00").replace(" ", "T"))
 
 
-def columns_version() -> str:
-    """Empreinte des modèles de requêtes : une colonne ajoutée ou retirée impose une synchro complète (sinon les lignes
-    déjà en cache n'auraient jamais la nouvelle colonne)."""
-    return queries.templates_version()
+def _sql_time(value: datetime) -> str:
+    return value.strftime("%Y-%m-%d %H:%M:%SZ")
 
 
-def plan(slug: str, root: Path = PROJECT_ROOT) -> dict:
-    """Ce que la routine doit faire pour ce client : inchangé, delta (avec la date de départ par base) ou complet."""
+def _signature(value) -> tuple[int, str]:
+    n, _, rest = str(value or "").partition("|")
+    return int(n or 0), rest
+
+
+def _state(raw: Path) -> dict:
+    state = _load_json(raw / "etat-synchro.json", {})
+    if state and not isinstance(state.get("colonnes"), dict):  # état d'avant le 2026-11-10 (sans version par base).
+        # Seuls les modèles de la recette ont changé depuis (colonne « Responsable ») : actions et textes restent valables.
+        state["colonnes"] = {"actions": versions()["actions"], "contenu": versions()["contenu"]}
+    return state
+
+
+def plan_client(slug: str, row: dict, root: Path = PROJECT_ROOT) -> dict:
+    """Requêtes à exécuter pour un client d'après sa ligne d'empreinte : [(requête, sortie, params)] et raisons."""
     raw = data_dir(root) / "notion" / slug
-    current = fingerprint(raw)
-    state = _load_json(raw / "etat-synchro.json", None)
-    caches_ok = all((raw / f"cache-{b}.json").is_file() for b in BASES)
-    if current is None or state is None or not caches_ok or "empreinte" not in state:  # ex. après un rafraîchissement direct
-        return {"mode": "complet"}
-    last_full = date.fromisoformat(state["complet_le"])
-    if state.get("colonnes") != columns_version():
-        return {"mode": "complet", "raison": "colonnes des requêtes modifiées"}
-    if (date.today() - last_full).days >= FULL_SYNC_DAYS:
-        return {"mode": "complet", "raison": f"dernière synchro complète le {last_full.isoformat()}"}
-    previous = state["empreinte"]
-    if any(current[b]["n"] != previous[b]["n"] for b in BASES):
-        return {"mode": "complet", "raison": "nombre de lignes changé"}
-    since = {f"{b}_depuis": previous[b]["modifie"] for b in BASES if current[b]["modifie"] != previous[b]["modifie"]}
-    return {"mode": "delta", **since} if since else {"mode": "inchangé"}
-
-
-def _consume(raw: Path) -> None:
-    """Retire les résultats bruts déjà fusionnés dans le cache, pour que le passage suivant reparte propre."""
+    state, v = _state(raw), versions()
+    cols, todo, why = state.get("colonnes") or {}, [], {}
+    ids = bool(state.get("ids_requis"))
     for base in BASES:
-        for name in (base, f"{base}_delta"):
-            head = raw / f"{name}.json"
-            if head.is_file():
-                for page in _pages(head):
-                    page.unlink()
+        cache = _load_json(raw / f"cache-{base}.json", None)
+        n, last = _signature(row.get(base))
+        last_full = state.get("complet_le")
+        if cache is None:
+            reason = "pas de cache"
+        elif base in (state.get("complet_requis") or []):
+            reason = "lignes manquantes au passage précédent"
+        elif base == "actions" and cols.get("actions") != v["actions"]:
+            reason = "colonnes modifiées"
+        elif base == "actions" and (not last_full or (date.today() - date.fromisoformat(last_full)).days >= FULL_SYNC_DAYS):
+            reason = f"relecture complète périodique (dernière : {last_full or 'jamais'})"
+        elif base == "recette" and cols.get("contenu") != v["contenu"]:
+            reason = "colonnes de texte modifiées"
+        else:
+            reason = None
+        if reason:
+            todo.append((base, base, []))
+            why[base] = f"complet : {reason}"
+            continue
+        if base == "recette" and cols.get("recette") != v["recette"]:
+            todo.append(("recette-meta", "recette_meta", []))
+            why[base] = "métadonnées relues (colonnes modifiées), textes gardés"
+        known = [t for r in cache.values() if (t := _stamp(r.get("modifie")))]
+        since = max(known) if known else None
+        current = _stamp(last)
+        if current and (since is None or current > since):
+            todo.append((f"{base}-delta", f"{base}_delta", [_sql_time(since) if since else "1970-01-01 00:00:00Z"]))
+            why[base] = (why.get(base, "") + " + " if base in why else "") + f"delta depuis {_sql_time(since) if since else 'le début'}"
+        if n < len(cache):
+            ids = True
+            why[base] = (why.get(base, "") + " + " if base in why else "") + f"{len(cache) - n} ligne(s) disparue(s)"
+    if ids:
+        todo.append(("ids", "ids", []))
+    signatures = state.get("signatures") or {}
+    if todo or row.get("fiche") != signatures.get("fiche") or not (raw / "client.json").is_file():
+        todo.insert(0, ("client", "client", []))
+    if row.get("regles") != signatures.get("regles") or not (raw / "regles.json").is_file():
+        todo.insert(1, ("regles", "regles", []))
+        why["regles"] = "règles modifiées"
+    if todo == [("client", "client", [])] and row.get("fiche") != signatures.get("fiche"):
+        why["fiche"] = "dates de la fiche modifiées"
+    return {"requetes": todo, "raisons": why}
+
+
+def _clean(raw: Path, names) -> None:
+    """Retire les résultats bruts (et leurs pages) avant un passage, ou une fois fusionnés."""
+    for name in names:
+        head = raw / f"{name}.json"
+        for page in ([head] if head.is_file() else []) + sorted(raw.glob(f"{name}-*.json")):
+            page.unlink()
+
+
+def prepare(root: Path = PROJECT_ROOT) -> dict:
+    """Écrit les requêtes de chaque client et l'empreinte de tous les clients (une seule requête pour la routine)."""
+    from deploy_hub import client_config
+    configs = [asdict(c) for c in client_config.all_configs(root)]
+    for config in configs:
+        queries.write(config["slug"], config, root)
+    folder = data_dir(root) / "notion"
+    folder.mkdir(parents=True, exist_ok=True)
+    sql = folder / f"{EMPREINTES}.sql"
+    sql.write_text(queries.empreintes(configs), encoding="utf-8")
+    _clean(folder, [EMPREINTES])
+    return _query(sql, folder / f"{EMPREINTES}.json", [])
+
+
+def _query(sql: Path, out: Path, params: list) -> dict:
+    return {"sql": str(sql), "sortie": str(out), "params": params,
+            "sources": sorted(set(re.findall(r"collection://[0-9a-f-]+", sql.read_text(encoding="utf-8")))) if sql.is_file() else []}
+
+
+def plan_all(root: Path = PROJECT_ROOT) -> dict:
+    """Plan de tous les clients d'après data/notion/empreintes.json : requêtes à exécuter, clients inchangés."""
+    from deploy_hub import client_config
+    folder = data_dir(root) / "notion"
+    rows = {r.get("cle"): r for r in _rows(folder / f"{EMPREINTES}.json")}
+    out = {"requetes": [], "inchanges": [], "raisons": {}, "erreurs": {}}
+    for slug in client_config.slugs(root):
+        raw = folder / slug
+        if slug not in rows:
+            out["erreurs"][slug] = "absent de l'empreinte : relance « preparer »"
+            continue
+        if not rows[slug].get("fiche"):  # aucune page « Clients en déploiement » à cet id : rien ne sert de lire le reste
+            out["erreurs"][slug] = "fiche Notion introuvable : vérifie le page_id du client (Clients → Configurer)"
+            continue
+        p = plan_client(slug, rows[slug], root)
+        raw.mkdir(parents=True, exist_ok=True)
+        _clean(raw, RESULTS[2:] + ("plan",))
+        if not p["requetes"]:
+            out["inchanges"].append(slug)
+            continue
+        _clean(raw, [name for _, name, _ in p["requetes"]])
+        (raw / "plan.json").write_text(json.dumps({"sorties": [name for _, name, _ in p["requetes"]], "empreinte": rows[slug]},
+                                                  ensure_ascii=False), encoding="utf-8")
+        out["requetes"] += [{"client": slug, **_query(raw / "requetes" / f"{q}.sql", raw / f"{name}.json", params)}
+                            for q, name, params in p["requetes"]]
+        out["raisons"][slug] = p["raisons"]
+    return out
+
+
+def merge_all(root: Path = PROJECT_ROOT) -> dict:
+    """Fusionne les clients qui ont un plan ; un client en échec n'empêche pas les autres."""
+    from deploy_hub import client_config
+    results = {}
+    for slug in client_config.slugs(root):
+        if not (data_dir(root) / "notion" / slug / "plan.json").is_file():
+            continue
+        try:
+            results[slug] = sync(slug, root)
+        except (SyncError, ConfigError, OSError, KeyError, ValueError) as e:
+            results[slug] = {"erreur": str(e)}
+    return results
 
 
 def load_config(slug: str, root: Path = PROJECT_ROOT) -> dict:
@@ -428,49 +559,79 @@ def summary(deployment: dict, blocked: int, mode, changes: int = 0) -> dict:
 
 
 def sync(slug: str, root: Path = PROJECT_ROOT) -> dict:
-    """Passage de la routine : fusionne les résultats SQL déposés dans data/notion/<slug>/."""
+    """Passage de la routine : fusionne les résultats SQL déposés dans data/notion/<slug>/ selon plan.json."""
     config = load_config(slug, root)
     raw = data_dir(root) / "notion" / slug
+    planned = _load_json(raw / "plan.json", None)
+    if planned:
+        missing = [n for n in planned["sorties"] if not (raw / f"{n}.json").is_file()]
+        if missing:
+            raise SyncError(f"Résultat manquant : {', '.join(n + '.json' for n in missing)}")
     merged = {base: merge_base(raw, base) for base in BASES}
     caches = {base: cache for base, (cache, _) in merged.items()}
+    removed = drop_missing(raw, caches)
     client = _rows(raw / "client.json")
     if len(client) != 1:
-        raise SyncError(f"client.json : 1 ligne attendue, {len(client)} reçues")
+        raise SyncError(f"client.json : 1 ligne attendue, {len(client)} reçues (page_id du client à vérifier)")
     out = publish(slug, root, config, client[0], _rows(raw / "regles.json"), caches)
 
-    state = _load_json(raw / "etat-synchro.json", {})
-    if all(how == "complet" for _, how in merged.values()):
-        state["complet_le"] = date.today().isoformat()
-        state["colonnes"] = columns_version()
-    if (current := fingerprint(raw)) is not None:
-        state["empreinte"] = current
-    if "complet_le" in state:
-        (raw / "etat-synchro.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
-    _consume(raw)
-    return summary(out["deployment"], out["blocked"], {base: how for base, (_, how) in merged.items()}, out["changes"])
+    state, v = _state(raw), versions()
+    cols = state.setdefault("colonnes", {})
+    for base, (_, how) in merged.items():
+        if how == "complet":
+            cols.update({"actions": v["actions"]} if base == "actions" else {"recette": v["recette"], "contenu": v["contenu"]})
+            if base == "actions":
+                state["complet_le"] = date.today().isoformat()
+        elif "meta" in how:
+            cols["recette"] = v["recette"]
+    state.pop("ids_requis", None)
+    state.pop("complet_requis", None)
+    if planned:
+        row = planned["empreinte"]
+        state["signatures"] = {"regles": row.get("regles"), "fiche": row.get("fiche")}
+        for base in BASES:  # le cache doit compter autant de lignes que Notion ; sinon on vérifie au prochain passage
+            n, _ = _signature(row.get(base))
+            if len(caches[base]) > n:
+                state["ids_requis"] = True
+            elif len(caches[base]) < n:
+                state.setdefault("complet_requis", []).append(base)
+    (raw / "etat-synchro.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+    _clean(raw, RESULTS[2:] + ("plan",))
+    result = summary(out["deployment"], out["blocked"], {base: how for base, (_, how) in merged.items()}, out["changes"])
+    if any(removed.values()):
+        result["retirees"] = removed
+    return result
 
 
 if __name__ == "__main__":
-    # uv run python -m deploy_hub.sync_notion clients            → slugs des clients configurés
-    # uv run python -m deploy_hub.sync_notion requetes <slug>    → écrit ses requêtes SQL, affiche leur dossier
-    # uv run python -m deploy_hub.sync_notion verifier <slug>    → {"mode": "inchangé" | "delta" | "complet", ...}
-    # uv run python -m deploy_hub.sync_notion utilisateurs        → uuids des responsables sans nom dans l'annuaire
+    # uv run python -m deploy_hub.sync_notion preparer        → écrit les requêtes ; affiche la requête d'empreinte à exécuter
+    # uv run python -m deploy_hub.sync_notion plan            → d'après l'empreinte : les seules requêtes à exécuter
+    # uv run python -m deploy_hub.sync_notion fusionner       → fusionne les résultats déposés, écrit les fiches
+    # uv run python -m deploy_hub.sync_notion utilisateurs     → uuids des responsables sans nom dans l'annuaire
     # uv run python -m deploy_hub.sync_notion utilisateurs '{"<uuid>": "<nom>"}'  → ajoute ces noms à l'annuaire
-    # uv run python -m deploy_hub.sync_notion <slug>             → fusionne les résultats déposés, écrit la fiche
-    from deploy_hub import client_config, queries
+    # uv run python -m deploy_hub.sync_notion clients | requetes <slug> | <slug>   → outils unitaires
+    from deploy_hub import client_config
+    show = lambda value: print(json.dumps(value, ensure_ascii=False))
     try:
-        if sys.argv[1] == "clients":
+        command = sys.argv[1]
+        if command == "preparer":
+            show(prepare())
+        elif command == "plan":
+            show(plan_all())
+        elif command == "fusionner":
+            results = merge_all()
+            show(results)
+            sys.exit(1 if any("erreur" in r for r in results.values()) else 0)
+        elif command == "clients":
             print("\n".join(client_config.slugs()))
-        elif sys.argv[1] == "requetes":
+        elif command == "requetes":
             print(queries.write(sys.argv[2], load_config(sys.argv[2])))
-        elif sys.argv[1] == "utilisateurs":
+        elif command == "utilisateurs":
             if len(sys.argv) > 2:
                 add_users(json.loads(sys.argv[2]))
-            print(json.dumps(unknown_users()))
-        elif sys.argv[1] == "verifier":
-            print(json.dumps(plan(sys.argv[2]), ensure_ascii=False))
+            show(unknown_users())
         else:
-            print(json.dumps(sync(sys.argv[1]), ensure_ascii=False))
+            show(sync(command))
     except (SyncError, ConfigError, OSError, KeyError, ValueError, IndexError) as e:
         print(f"ÉCHEC synchro : {e}", file=sys.stderr)
         sys.exit(1)

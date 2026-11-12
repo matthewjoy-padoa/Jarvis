@@ -7,7 +7,7 @@ import pytest
 
 import deploy_hub.sync_notion as module
 from deploy_hub.sources.fiches import parse_deployment
-from deploy_hub.sync_notion import SyncError, plan, sync
+from deploy_hub.sync_notion import SyncError, plan_all, sync
 
 FIXTURES = Path(__file__).parent / "fixtures" / "notion" / "demo"
 
@@ -32,13 +32,31 @@ def write(path: Path, rows: list[dict]) -> None:
     path.write_text(json.dumps({"results": rows, "has_more": False}))
 
 
-def fingerprint(root: Path, actions=(4, "2027-04-01 10:00:00Z"), recette=(1, "2027-03-31 09:00:00Z")) -> None:
-    write(raw(root) / "empreinte_actions.json", [{"n": actions[0], "modifie": actions[1]}])
-    write(raw(root) / "empreinte_recette.json", [{"n": recette[0], "modifie": recette[1]}])
+def fingerprint(root: Path, actions=(4, "2027-04-01 10:00:00Z"), recette=(1, "2027-03-31 09:00:00Z"), regles="1|40", fiche="Démo|2027-06-01") -> dict:
+    """Écrit la réponse de la requête d'empreinte (une ligne par client), puis renvoie le plan."""
+    (root / "data" / "notion").mkdir(parents=True, exist_ok=True)
+    write(root / "data" / "notion" / "empreintes.json", [{"cle": "demo", "actions": f"{actions[0]}|{actions[1]}",
+                                                          "recette": f"{recette[0]}|{recette[1]}", "regles": regles, "fiche": fiche}])
+    return plan_all(root)
+
+
+def asked(p: dict) -> list[str]:
+    """Sorties demandées par le plan, avec les paramètres des deltas."""
+    return [Path(q["sortie"]).stem + (f"?{q['params'][0]}" if q["params"] else "") for q in p["requetes"]]
+
+
+def deposit(root: Path, *names: str) -> None:
+    for name in names:
+        shutil.copy(FIXTURES / f"{name}.json", raw(root) / f"{name}.json")
+
+
+def first_sync(root: Path) -> None:
+    fingerprint(root)
+    deposit(root, "client", "regles", "actions", "recette")
+    sync("demo", root)
 
 
 def test_full_sync_writes_a_fiche_with_every_card(root):
-    fingerprint(root)
     summary = sync("demo", root)
     assert summary["mode"] == {"actions": "complet", "recette": "complet"}
     assert (summary["cartes"], summary["retours"], summary["regles"]) == (4, 1, 1)
@@ -53,51 +71,77 @@ def test_full_sync_writes_a_fiche_with_every_card(root):
     assert (raw(root) / "cache-actions.json").exists()
 
 
-def test_plan_after_a_full_sync(root):
-    fingerprint(root)
-    assert plan("demo", root) == {"mode": "complet"}  # jamais synchronisé
+def test_plan_asks_only_what_changed(root):
+    assert asked(fingerprint(root)) == ["client", "regles", "actions", "recette"]  # jamais synchronisé : tout
+    deposit(root, "client", "regles", "actions", "recette")
     sync("demo", root)
-    assert plan("demo", root) == {"mode": "inchangé"}
-    fingerprint(root, actions=(4, "2027-04-02 08:00:00Z"))
-    assert plan("demo", root) == {"mode": "delta", "actions_depuis": "2027-04-01 10:00:00Z"}
-    fingerprint(root, actions=(5, "2027-04-02 08:00:00Z"))
-    assert plan("demo", root)["mode"] == "complet"  # une carte ajoutée ou supprimée
-
-
-def test_new_query_column_forces_a_full_sync(root, monkeypatch):
-    fingerprint(root)
-    sync("demo", root)
-    assert plan("demo", root) == {"mode": "inchangé"}
-    monkeypatch.setattr("deploy_hub.sync_notion.columns_version", lambda: "autre")  # ex. colonne « Responsable » ajoutée
-    assert plan("demo", root) == {"mode": "complet", "raison": "colonnes des requêtes modifiées"}
+    assert fingerprint(root)["inchanges"] == ["demo"]  # rien n'a bougé : aucune requête
+    assert asked(fingerprint(root, actions=(4, "2027-04-02 08:00:00Z"))) == ["client", "actions_delta?2027-04-01 10:00:00Z"]
+    # une carte ajoutée : delta seulement (elle est datée après la dernière modification connue), plus de synchro complète
+    assert asked(fingerprint(root, actions=(5, "2027-04-02 08:00:00Z"))) == ["client", "actions_delta?2027-04-01 10:00:00Z"]
+    # une carte supprimée : la liste compacte des identifiants suffit
+    assert asked(fingerprint(root, actions=(3, "2027-04-01 10:00:00Z"))) == ["client", "ids"]
+    assert asked(fingerprint(root, fiche="Démo|2027-07-01")) == ["client"]
+    assert asked(fingerprint(root, regles="2|80")) == ["client", "regles"]
 
 
 def test_delta_updates_only_changed_rows(root):
-    fingerprint(root)
-    sync("demo", root)
+    first_sync(root)
+    fingerprint(root, actions=(4, "2027-04-02 08:00:00Z"))
     write(raw(root) / "actions_delta.json", [{
         "url": "https://app.notion.com/p/00000000000000000000000000000a04", "intitule": "COPIL #9", "statut": "En cours",
         "statut_injection": "Validé", "deadline": None, "vigilance": "__NO__", "evenement": "__NO__", "modifie": "2027-04-02 08:00:00Z"}])
-    fingerprint(root, actions=(4, "2027-04-02 08:00:00Z"))
+    deposit(root, "client")
     summary = sync("demo", root)
     assert summary["mode"] == {"actions": "delta", "recette": "cache"} and summary["cartes"] == 4
     d = fiche(root)
     assert next(a for a in d.actions if a.title == "COPIL #9").injection_status == "Validé"
     assert d.progress == 50
-    assert plan("demo", root) == {"mode": "inchangé"}
+    assert fingerprint(root, actions=(4, "2027-04-02 08:00:00Z"))["inchanges"] == ["demo"]
     assert not (raw(root) / "actions_delta.json").exists()
 
 
-def test_delta_without_cache_is_refused(root):
-    for base in ("actions", "recette"):
-        (raw(root) / f"{base}.json").rename(raw(root) / f"{base}_delta.json")
-    with pytest.raises(SyncError, match="ni résultat complet ni cache"):
+def test_deleted_rows_leave_the_cache_through_the_id_list(root):
+    first_sync(root)
+    fingerprint(root, actions=(3, "2027-04-01 10:00:00Z"))
+    write(raw(root) / "ids.json", [{"actions": "0000000000000a01,0000000000000a02,0000000000000a03", "recette": "0000000000abc123"}])
+    deposit(root, "client")
+    summary = sync("demo", root)
+    assert summary["cartes"] == 3 and summary["retirees"] == {"actions": 1, "recette": 0}
+    assert fingerprint(root, actions=(3, "2027-04-01 10:00:00Z"))["inchanges"] == ["demo"]
+
+
+def test_missing_result_is_refused(root):
+    first_sync(root)
+    fingerprint(root, actions=(4, "2027-04-02 08:00:00Z"))
+    with pytest.raises(SyncError, match="actions_delta.json"):
         sync("demo", root)
 
 
-def test_full_sync_again_after_a_week(root, monkeypatch):
-    fingerprint(root)
-    sync("demo", root)
+def test_new_recette_column_rereads_metadata_but_keeps_texts(root, monkeypatch):
+    first_sync(root)
+    texts = json.loads((raw(root) / "contenu-recette.json").read_text())
+    versions = module.versions()
+    monkeypatch.setattr(module, "versions", lambda: {**versions, "recette": "autre"})  # ex. colonne « Responsable »
+    assert asked(fingerprint(root)) == ["client", "recette_meta"]
+    meta = {k: v for k, v in json.loads((FIXTURES / "recette.json").read_text())["results"][0].items() if k in module.RECETTE_META}
+    write(raw(root) / "recette_meta.json", [{**meta, "responsables": '["user://u-1"]'}])
+    deposit(root, "client")
+    assert sync("demo", root)["mode"]["recette"] == "meta"
+    assert json.loads((raw(root) / "contenu-recette.json").read_text()) == texts  # textes gardés sans les relire
+    assert "u-1" in json.loads((raw(root) / "cache-recette.json").read_text())[meta["url"]]["responsables"]
+    assert fingerprint(root)["inchanges"] == ["demo"]
+
+
+def test_new_action_column_rereads_only_actions(root, monkeypatch):
+    first_sync(root)
+    versions = module.versions()
+    monkeypatch.setattr(module, "versions", lambda: {**versions, "actions": "autre"})
+    assert asked(fingerprint(root)) == ["client", "actions"]
+
+
+def test_actions_are_read_in_full_once_a_week_and_recette_never(root, monkeypatch):
+    first_sync(root)
 
     class NextWeek(date):
         @classmethod
@@ -105,7 +149,30 @@ def test_full_sync_again_after_a_week(root, monkeypatch):
             return date.fromordinal(date.today().toordinal() + 7)
 
     monkeypatch.setattr(module, "date", NextWeek)
-    assert plan("demo", root)["mode"] == "complet"
+    assert asked(fingerprint(root)) == ["client", "actions"]
+
+
+def test_state_from_before_the_per_base_versions_does_not_reread_everything(root):
+    first_sync(root)
+    state = json.loads((raw(root) / "etat-synchro.json").read_text())
+    for old in ("ancienne-version-globale", None):
+        state["colonnes"] = old
+        (raw(root) / "etat-synchro.json").write_text(json.dumps({k: v for k, v in state.items() if v is not None}))
+        assert asked(fingerprint(root)) == ["client", "recette_meta"]  # seule la recette a changé de colonnes
+
+
+def test_fusionner_reports_each_client(root):
+    first_sync(root)
+    fingerprint(root, actions=(4, "2027-04-02 08:00:00Z"))
+    results = module.merge_all(root)
+    assert "Résultat manquant" in results["demo"]["erreur"]
+
+
+def test_delta_without_cache_is_refused(root):
+    for base in ("actions", "recette"):
+        (raw(root) / f"{base}.json").rename(raw(root) / f"{base}_delta.json")
+    with pytest.raises(SyncError, match="ni résultat complet ni cache"):
+        sync("demo", root)
 
 
 def test_sync_adds_recette_pages_to_the_hook_blocklist_without_removing_any(root):
@@ -206,3 +273,14 @@ def test_responsables_are_named_from_the_directory(tmp_path):
     add_users({"user://a-1": "Alice"}, tmp_path)
     assert unknown_users(tmp_path) == ["b-2"]
     assert _names(["a-1", "b-2"], {"a-1": "Alice"}) == ["Alice", "Inconnu (b-2)"]
+
+
+def test_a_copied_tool_result_file_is_read_as_is(root):
+    rows = json.loads((FIXTURES / "regles.json").read_text())
+    (raw(root) / "regles.json").write_text(json.dumps([{"type": "text", "text": json.dumps(rows)}]))
+    assert module._rows(raw(root) / "regles.json") == rows["results"]
+
+
+def test_unknown_notion_page_is_reported_before_any_query(root):
+    p = fingerprint(root, fiche=None)
+    assert p["requetes"] == [] and "page_id" in p["erreurs"]["demo"]

@@ -2,7 +2,8 @@
 
 Les modèles ne diffèrent d'un client à l'autre que par :
 - {{page_id}} : id de la fiche du client dans « Clients en déploiement » (clé page_id de sa config) ;
-- {{ou_clients_recette}} : retours de recette ajoutés par leur champ « Client » (clé recette_clients, facultative).
+- {{ou_clients_recette}} : retours de recette ajoutés par leur champ « Client » (clé recette_clients, facultative) ;
+- {{slug}} : identifiant du client dans Jarvis (empreinte.sql, assemblée pour tous les clients par `empreintes`).
 
 `write(slug)` écrit les requêtes prêtes à l'emploi dans data/notion/<slug>/requetes/, où la routine de synchro les lit.
 """
@@ -16,7 +17,7 @@ from deploy_hub.config import PROJECT_ROOT, data_dir
 
 TEMPLATES = PROJECT_ROOT / "sync" / "requetes"
 # nom du fichier généré → rôle dans la synchro (voir docs/routine-synchro.md)
-NAMES = ("client", "actions", "actions-delta", "empreinte-actions", "recette", "recette-delta", "empreinte-recette", "regles")
+NAMES = ("client", "actions", "actions-delta", "recette", "recette-meta", "recette-delta", "regles", "ids", "empreinte")
 # Un id Notion : 32 caractères hexadécimaux, avec ou sans tirets (format UUID), qui ne touche aucun autre caractère hexa.
 PAGE_ID = re.compile(r"(?<![0-9a-f])([0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12})(?![0-9a-f])")
 
@@ -37,9 +38,9 @@ def _quote(value: str) -> str:
     return "'" + str(value).replace("'", "''") + "'"
 
 
-def templates_version() -> str:
-    """Empreinte des modèles de requêtes : change dès qu'une colonne est ajoutée ou retirée."""
-    text = "".join(_template(n) for n in NAMES)
+def templates_version(*names: str) -> str:
+    """Empreinte de modèles de requêtes (tous par défaut) : change dès qu'une colonne est ajoutée ou retirée."""
+    text = "".join(_template(n) for n in names or NAMES)
     return hashlib.sha256(text.encode()).hexdigest()[:12]
 
 
@@ -54,8 +55,15 @@ def render(config: dict) -> dict[str, str]:
     ou = f"\n   OR \"Client\" IN ({', '.join(_quote(c) for c in extra)})" if extra else ""
     return {
         name: _template(name).replace("{{page_id}}", page_id).replace("{{ou_clients_recette}}", ou)
+              .replace("{{slug}}", str(config.get("slug", "")).replace("'", ""))
         for name in NAMES
     }
+
+
+def empreintes(configs: list[dict]) -> str:
+    """Empreinte de tous les clients en une seule requête (une ligne par client) : la routine ne fait qu'un appel
+    pour savoir quels clients et quelles bases ont changé."""
+    return "\nUNION ALL\n".join(render(c)["empreinte"].strip() for c in configs)
 
 
 def queries_dir(slug: str, root: Path = PROJECT_ROOT) -> Path:

@@ -19,7 +19,7 @@ import httpx
 
 from deploy_hub.config import PROJECT_ROOT, data_dir
 from deploy_hub.sync_notion import (RECETTE_COLUMNS, RECETTE_CONTENT, SyncError, add_users, load_config, publish,
-                                    summary, unknown_users)
+                                    summary, unknown_users, versions)
 
 API = "https://api.notion.com/v1"
 VERSION = "2025-09-03"
@@ -300,7 +300,7 @@ def refresh(slug: str, notion: NotionClient, root: Path = PROJECT_ROOT) -> dict:
     out = publish(slug, root, config, data["client"], data["regles"], caches)
     notion.name_users(root)
     state_path = data_dir(root) / "notion" / slug / "etat-synchro.json"
-    state_path.write_text(json.dumps({"complet_le": date.today().isoformat(), "source": "api"}), encoding="utf-8")
+    state_path.write_text(json.dumps({"complet_le": date.today().isoformat(), "source": "api", "colonnes": versions()}), encoding="utf-8")
     result = summary(out["deployment"], out["blocked"], "api", out["changes"])
     result["secondes"] = round(time.monotonic() - started, 1)
     return result

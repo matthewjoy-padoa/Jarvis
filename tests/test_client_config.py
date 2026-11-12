@@ -106,3 +106,10 @@ def test_retire_confirmation_survives_an_apostrophe(app):
 def test_page_id_of_a_titled_notion_url():
     from deploy_hub.sync_notion import _page_id
     assert _page_id("https://www.notion.so/Retour-Acme-" + PAGE) == PAGE and _page_id("https://example.com") == ""
+
+
+def test_two_clients_cannot_share_a_notion_page(tmp_path):
+    from deploy_hub.client_config import ClientConfig, save
+    save(ClientConfig(slug="acme", client="Acme", page_id="a" * 32), tmp_path, new=True)
+    with pytest.raises(ConfigError, match="déjà celle du client « Acme »"):
+        save(ClientConfig(slug="acme2", client="Acme bis", page_id="a" * 32), tmp_path, new=True)

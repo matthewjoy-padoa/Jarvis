@@ -138,6 +138,9 @@ def save(config: ClientConfig, root: Path = PROJECT_ROOT, new: bool = False) -> 
     path = folder / f"{config.slug}.yaml"
     if new and path.exists():
         raise ConfigError(f"Un client « {config.slug} » existe déjà : choisis un autre identifiant ou modifie-le.")
+    twin = next((c for c in all_configs(root) if c.slug != config.slug and c.page_id and c.page_id == config.page_id), None)
+    if twin:  # deux clients sur la même fiche Notion : l'un des deux affiche les données de l'autre
+        raise ConfigError(f"Cette fiche Notion est déjà celle du client « {twin.client} » ({twin.slug}).")
     extra = {}
     if path.is_file():  # clés ajoutées à la main : conservées (les commentaires, eux, ne le sont pas)
         extra = {k: v for k, v in (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).items() if k not in FIELDS}
