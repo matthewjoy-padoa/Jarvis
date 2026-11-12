@@ -7,6 +7,7 @@ et « Retours Recette » ; les groupes (à faire / en cours / KO / terminé) ser
 import re
 from dataclasses import dataclass, field
 from datetime import date
+from urllib.parse import quote
 
 TODO, IN_PROGRESS, KO, DONE = "todo", "in_progress", "ko", "done"
 
@@ -308,6 +309,24 @@ class Deployment:
                 "worst": worst,
             })
         return sorted(out, key=lambda b: (not b["resources"], b["worst"], b["label"]))
+
+    @property
+    def blocking_points(self) -> list[dict]:
+        """« Où ça coince » : blocs d'injection (cartes regroupées par ressources liées, comme l'onglet Injections) et types de
+        retours de recette qui ont au moins un KO, les plus de KO d'abord, puis le plus d'éléments ouverts.
+        Un KO d'injection et un KO de recette pèsent pareil. Chaque point mène à sa liste (bloc ou filtre « type »)."""
+        points = [{"kind": "injection", "label": b["label"], "resources": b["resources"], "counts": b["counts"], "total": len(b["cards"]),
+                   "href": f"/deploiements/{self.slug}/injections#{self.slug}-{b['id']}"} for b in self.injection_blocks]
+        by_type: dict[str, list[str]] = {}
+        for r in self.retours:
+            by_type.setdefault(r.data_type, []).append(r.group)
+        recette = f"/deploiements/{self.slug}/recette"
+        points += [{"kind": "retour", "label": t or "Type non précisé", "resources": [], "counts": group_counts(groups), "total": len(groups),
+                    "href": f"{recette}#type={quote(t)}" if t else recette}  # sans type : pas de filtre qui viderait la liste
+                   for t, groups in by_type.items()]
+        for p in points:
+            p["open"] = p["total"] - p["counts"][DONE]
+        return sorted((p for p in points if p["counts"][KO]), key=lambda p: (-p["counts"][KO], -p["open"], p["label"]))
 
     @property
     def ced_cards(self) -> list[Action]:

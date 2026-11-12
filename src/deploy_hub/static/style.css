@@ -858,3 +858,20 @@ html.palette-open .console-fab, html.drawer-open .console-fab { display: none; }
 
 /* ============================================================ Suivi des runs (air.py, 2026-11-12) : journal et rapport bruts */
 pre.watch-scroll { max-height: 480px; overflow: auto; }  /* sur le style .agent-summary des comptes rendus d'agent */
+
+/* ============================================================ Synthèse : « Où ça coince » (2026-11-12), 5 points avec le plus de KO */
+.blocking h2 { margin-bottom: 6px; }
+.blocking h2 .muted { font-size: 13px; font-weight: 400; }
+a.blocking-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 9px 10px;
+  border-top: var(--line) solid var(--border); border-radius: 10px; color: var(--text); text-decoration: none; }
+a.blocking-row:hover { background: color-mix(in srgb, var(--accent) 7%, var(--surface)); color: var(--text); text-decoration: none; }
+.blocking-rank { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--bg); font-size: 12px; font-weight: 700; color: var(--muted); }
+.blocking-main { display: flex; flex-direction: column; min-width: 0; gap: 2px; font-size: 13px; }
+.blocking-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.blocking-kind { margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; vertical-align: 1px; }
+.blocking-kind.k-injection { background: var(--pa-progress); } .blocking-kind.k-retour { background: var(--pa-ko); }
+.blocking-counts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.blocking-none { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; color: var(--ok); }
+.blocking-more { margin: 6px 10px 0; font-size: 12.5px; }
+/* Arrivée par une ancre (lien « Où ça coince ») : le bloc s'arrête sous la barre et les onglets collés, pas dessous. */
+.res-block { scroll-margin-top: calc(var(--topbar-h, 61px) + 64px); }
