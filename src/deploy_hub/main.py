@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI, Form, HTTPException, Request, WebSocket
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -394,6 +394,19 @@ def sources(request: Request):
 @app.get("/deploiements/{slug}")
 def deployment_root(slug: str):
     return RedirectResponse(f"/deploiements/{slug}/synthese")
+
+
+ICON_NAME = re.compile(r"icone\.(png|jpg|gif|webp)")
+
+
+@app.get("/icones/{slug}")
+def client_icon(slug: str):
+    """Image d'icône du client (dashboard d'intégration Notion), téléchargée par la synchro dans data/notion/<slug>/."""
+    d = fiches.get_deployment(slug)
+    path = fiches.deployments_dir.parent / "notion" / slug / (d.icone if d else "")
+    if not d or not ICON_NAME.fullmatch(d.icone) or not path.is_file():
+        raise HTTPException(404)
+    return FileResponse(path, headers={"Cache-Control": "max-age=300", "X-Content-Type-Options": "nosniff"})
 
 
 @app.get("/client/{slug}")

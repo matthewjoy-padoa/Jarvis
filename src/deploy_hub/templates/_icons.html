@@ -38,9 +38,9 @@
 </svg>
 {%- endmacro %}
 
-{# Emoji du client (icône de son dashboard d'intégration dans Notion), décoratif : le nom suit toujours. #}
+{# Icône du client (emoji ou image de son dashboard d'intégration dans Notion), décorative : le nom suit toujours. #}
 {% macro client_emoji(d) -%}
-{% if d.emoji %}<span class="client-emoji" aria-hidden="true">{{ d.emoji }}</span>{% endif %}
+{% if d.icone %}<img class="client-emoji client-icon" src="/icones/{{ d.slug }}" alt="" width="16" height="16">{% elif d.emoji %}<span class="client-emoji" aria-hidden="true">{{ d.emoji }}</span>{% endif %}
 {%- endmacro %}
 
 {# Compte à rebours jusqu'au déploiement (J-12), en alerte sous 14 jours ; rien une fois la date passée. #}

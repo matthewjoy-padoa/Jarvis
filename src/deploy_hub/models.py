@@ -258,6 +258,7 @@ class Deployment:
     software: str
     status: str = "en cours"
     emoji: str = ""  # icône du dashboard d'intégration dans Notion
+    icone: str = ""  # ou son image, téléchargée dans data/notion/<slug>/ (servie par /icones/<slug>)
     orchestrator: list[str] = field(default_factory=list)  # clés client de l'orchestrator (configuration du client)
     notion_url: str = ""
     synced_at: str = ""

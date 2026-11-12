@@ -248,6 +248,7 @@ def build_deployment(config: dict, client: dict, regles_rows: list[dict], caches
     return {
         "client": config["client"],
         "emoji": client.get("emoji") or "",
+        "icone": client.get("icone") or "",  # image de l'icône, dans data/notion/<slug>/
         "software": config.get("software", "?"),
         "status": config.get("status", "en cours"),
         "notion_url": config.get("notion_url", ""),
@@ -260,13 +261,14 @@ def build_deployment(config: dict, client: dict, regles_rows: list[dict], caches
     }
 
 
-def _fiche_emoji(fiche: Path) -> str:
-    """Emoji de la fiche déjà écrite ; "" si elle manque ou est illisible (décoratif : ne bloque jamais la synchro)."""
+def _fiche_icon(fiche: Path) -> dict:
+    """Emoji et image de la fiche déjà écrite ; vides si elle manque ou est illisible (décoratif : ne bloque jamais la synchro)."""
     from deploy_hub.sources.fiches import _split_frontmatter
     try:
-        return str(_split_frontmatter(fiche.read_text(encoding="utf-8")).get("emoji") or "")
+        data = _split_frontmatter(fiche.read_text(encoding="utf-8"))
     except (OSError, ValueError, yaml.YAMLError):
-        return ""
+        data = {}
+    return {k: str(data.get(k) or "") for k in ("emoji", "icone")}
 
 
 def write_fiche(deployment: dict, out: Path) -> None:
@@ -547,8 +549,8 @@ def publish(slug: str, root: Path, config: dict, client: dict, regles_rows: list
     when = datetime.now().isoformat(timespec="seconds")
     events = [e for base in BASES for e in diff_caches(_load_cache(raw, base), caches[base], base, when)]
     fiche = data_dir(root) / "deploiements" / f"{slug}.md"
-    if "emoji" not in client:  # la routine SQL ne voit pas les icônes : on garde celui de la synchro directe
-        client = {**client, "emoji": _fiche_emoji(fiche)}
+    if "emoji" not in client:  # la routine SQL ne voit pas les icônes : on garde celle de la synchro directe
+        client = {**client, **_fiche_icon(fiche)}
     deployment = build_deployment(config, client, regles_rows, caches)
     blocked = update_blocklist(deployment["retours"], data_dir(root) / "recette-pages.txt")
     write_fiche(deployment, fiche)
