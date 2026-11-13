@@ -1,11 +1,11 @@
-# Service systemd utilisateur : cp deploy/jarvis.service ~/.config/systemd/user/ && systemctl --user enable --now jarvis
+# Service systemd utilisateur, installé depuis le dossier de Jarvis (voir README, « Faire tourner Jarvis sur une VM »).
+# Le dossier de Jarvis (WorkingDirectory) et les réglages de la machine vont dans le complément jarvis.service.d/vm.conf.
 # Pour qu'il tourne sans session ouverte : loginctl enable-linger $USER
 [Unit]
 Description=Jarvis (tableau de bord des déploiements)
 After=network-online.target
 
 [Service]
-WorkingDirectory=%h/Dev/Apps/Jarvis
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=%h/.local/bin/uv run --frozen uvicorn deploy_hub.main:app --host 127.0.0.1 --port 8765
 Restart=on-failure
