@@ -1042,3 +1042,39 @@ a.stat-link:hover .stat-go, a.stat-link:focus-visible .stat-go { opacity: 1; }
 .jarvis-line a.count-link:hover { color: var(--accent); }
 .list-title a, .panel h2 a { color: inherit; text-decoration: none; }
 .list-title a:hover, .panel h2 a:hover { color: var(--accent); }
+
+/* Deadlines : choix du client, liste ou calendrier du mois (lundi en premier) */
+.deadline-client { margin: 0; }
+.deadline-bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.cal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.cal-head h2 { margin: 0; min-width: 9em; text-align: center; }
+.cal-head .cal-today { margin-left: auto; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal-dow { font-size: 12px; color: var(--muted); text-align: center; padding: 2px 0; }
+.cal-day { min-height: 92px; border: 1px solid var(--border); border-radius: 8px; padding: 4px; display: flex; flex-direction: column; gap: 3px; min-width: 0; background: var(--surface); }
+.cal-day.weekend { background: transparent; }
+.cal-day.other { opacity: .45; }
+.cal-day.today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.cal-num { font-size: 12px; font-weight: 600; color: var(--muted); }
+.cal-day.today .cal-num { color: var(--accent); }
+.cal-item { font-size: 12px; line-height: 1.3; padding: 2px 6px; border-radius: 6px; border-left: 3px solid var(--border); background: var(--bg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-item a { color: inherit; }
+.cal-item a:hover { color: var(--accent); }
+.cal-client { display: block; font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+.kind-action { border-left-color: var(--st-todo); }
+.kind-retour { border-left-color: var(--st-progress, var(--accent)); }
+.kind-jalon { border-left-color: var(--st-done); font-weight: 600; }
+.cal-item.late { border-left-color: var(--st-ko); }
+.cal-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 10px; font-size: 12px; }
+.cal-key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: -6px; border-left: 3px solid var(--border); }
+.cal-key.kind-action { background: var(--st-todo); } .cal-key.kind-retour { background: var(--st-progress, var(--accent)); }
+.cal-key.kind-jalon { background: var(--st-done); } .cal-key.late { background: var(--st-ko); }
+@media (max-width: 700px) { .cal-day { min-height: 56px; } .cal-item { font-size: 0; padding: 0; height: 6px; } .cal-client { display: none; } }
+/* Choix du client des Deadlines : même pastille que les boutons de période et de vue */
+.deadline-bar { align-items: center; }
+.deadline-bar .deadline-client { order: 2; margin-left: auto; }
+.deadline-bar .segmented:last-child { order: 3; }
+.deadline-client-pick { display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px 2px 12px; border: 1px solid var(--border); border-radius: 99px; background: var(--surface); font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
+.deadline-client-pick select { font: inherit; font-weight: 600; color: var(--text); border: 0; background: transparent; padding: 3px 4px; cursor: pointer; }
+.deadline-client-pick:focus-within { border-color: var(--accent); }
+.deadline-client-pick select:focus { outline: none; }

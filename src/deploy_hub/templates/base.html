@@ -10,9 +10,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=86">
+  <link rel="stylesheet" href="/static/style.css?v=88">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
-  <script src="/static/filters.js?v=4" defer></script>
+  <script src="/static/filters.js?v=6" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
   <script src="/static/limit.js?v=1" defer></script>
   <script src="/static/notify.js?v=2" defer></script>
@@ -21,7 +21,7 @@
   <script src="/static/console.js?v=4" defer></script>
   <script src="/static/shell.js?v=2" defer></script>
 </head>
-<body>
+<body{% if current %} data-current-client="{{ current.client }}"{% endif %}>
   {% import "_icons.html" as ic %}
   {% set cross = cross_pages | map(attribute=0) | list %}
   <header class="topbar">
@@ -47,7 +47,7 @@
         {% if clients | length > 1 %}
         <p class="client-menu-label">Changer de client</p>
         {% for d in clients if d.slug != current.slug %}
-        <a role="menuitem" class="client-menu-item" href="/client/{{ d.slug }}?vers={{ request.url.path | urlencode }}">
+        <a role="menuitem" class="client-menu-item" href="/client/{{ d.slug }}?vers={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode }}">
           <span class="health h-{{ d.health_level }}" aria-hidden="true"></span>{{ ic.client_emoji(d) }}{{ d.client }}{{ ic.countdown(d) }}</a>
         {% endfor %}
         {% endif %}

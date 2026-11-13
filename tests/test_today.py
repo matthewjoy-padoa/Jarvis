@@ -207,3 +207,24 @@ def test_deadlines_filtered_by_period_link_each_ticket(app):
     assert 'data-ticket>Retour 0001AB' in today and "Préparer le COPIL" not in today
     assert "Déploiement" not in app.get("/deadlines?periode=semaine").text.split("<tbody>")[1]  # jalons exclus, comme à l'accueil
     assert "Préparer le COPIL" in app.get("/deadlines?periode=nimporte").text  # période inconnue : tout
+
+
+def test_deadlines_calendar_and_client_choice(app, acme):
+    d, _ = acme
+    other = Deployment(slug="globex", client="Globex", software="Pulse",
+                       actions=[Action(title="Livrer le mapping", status="À faire", due=date.today())])
+    import deploy_hub.main as m
+    m.fiches.list_deployments = lambda: [d, other]
+    html = app.get("/deadlines?vue=calendrier").text
+    month = date.today().strftime("%Y-%m")
+    assert 'class="cal-grid"' in html and "Préparer le COPIL" in html and "Livrer le mapping" not in html  # client en cours
+    assert 'data-ticket>Retour 0001AB' in html  # chaque échéance ouvre son ticket
+    assert "vue=calendrier" in html and f"mois={month}" in html
+    everyone = app.get("/deadlines?vue=calendrier&client=tous").text
+    assert "Livrer le mapping" in everyone and 'class="muted cal-client">Globex' in everyone
+    only_globex = app.get("/deadlines?client=globex").text
+    assert "Livrer le mapping" in only_globex and "Préparer le COPIL" not in only_globex
+    assert '<option value="globex" selected>' in only_globex
+    nav = app.get(f"/deadlines?vue=calendrier&client=globex&mois={month}").text
+    assert "client=globex" in nav.split('aria-label="Mois suivant"')[0].rsplit("<a", 1)[1]  # navigation : client gardé
+    assert app.get("/deadlines?vue=calendrier&mois=nimporte").status_code == 200  # mois illisible : mois en cours

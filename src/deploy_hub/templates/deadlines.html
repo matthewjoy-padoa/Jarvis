@@ -1,16 +1,31 @@
 {% extends "base.html" %}
 {% block title %}Deadlines · Jarvis{% endblock %}
 {% block content %}
+{# Lien vers cette page en gardant client, période, vue et mois ; « over » remplace certains paramètres. #}
+{% set state = {"client": selected, "periode": periode, "vue": "calendrier" if vue == "calendrier" else "", "mois": month.strftime("%Y-%m") if vue == "calendrier" else ""} %}
+{% macro link(over={}) -%}
+/deadlines?{{ dict(state, **over) | dictsort | selectattr(1) | list | urlencode }}
+{%- endmacro %}
+{% set months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"] %}
 <div class="page-head">
-  <h1>Deadlines{% if not all_clients and current %} <span class="muted">· {{ current.client }}</span>{% endif %}{% if periode %} <span class="muted">· {{ periods[periode] }}</span>{% endif %}</h1>
-  {% set p = "&periode=" ~ periode if periode else "" %}
-  {% if all_clients %}{% if current %}<a class="btn-link" href="/deadlines{{ '?periode=' ~ periode if periode }}">Seulement {{ current.client }}</a>{% endif %}
-  {% else %}<a class="btn-link" href="/deadlines?tous=true{{ p }}">Tous les clients</a>{% endif %}
+  <h1>Deadlines{% if not all_clients %} <span class="muted">· {{ (clients | selectattr("slug", "equalto", selected) | first).client }}</span>{% endif %}{% if periode %} <span class="muted">· {{ periods[periode] }}</span>{% endif %}</h1>
 </div>
-<div class="segmented" role="group" aria-label="Période">
-  {% set t = "tous=true" if all_clients and current else "" %}
-  <a href="/deadlines{{ '?' ~ t if t }}"{% if not periode %} class="active"{% endif %}>Toutes</a>
-  {%- for key, label in periods.items() %}<a href="/deadlines?periode={{ key }}{{ '&' ~ t if t }}"{% if periode == key %} class="active"{% endif %}>{{ label }}</a>{% endfor %}
+<div class="deadline-bar">
+  <form method="get" action="/deadlines" class="deadline-client">
+    {% for k, v in state | dictsort if k != "client" and v %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <label class="deadline-client-pick"><span>Client</span><select name="client" onchange="this.form.submit()">
+      <option value="tous"{% if all_clients %} selected{% endif %}>Tous les clients</option>
+      {% for d in clients %}<option value="{{ d.slug }}"{% if d.slug == selected %} selected{% endif %}>{{ d.client }}</option>{% endfor %}
+    </select></label>
+    <noscript><button type="submit" class="secondary">Afficher</button></noscript>
+  </form>
+  <div class="segmented" role="group" aria-label="Période">
+    <a href="{{ link({'periode': ''}) }}"{% if not periode %} class="active"{% endif %}>Toutes</a>
+    {%- for key, label in periods.items() %}<a href="{{ link({'periode': key}) }}"{% if periode == key %} class="active"{% endif %}>{{ label }}</a>{% endfor %}
+  </div>
+  <div class="segmented" role="group" aria-label="Vue">
+    <a href="{{ link({'vue': '', 'mois': ''}) }}"{% if vue == "liste" %} class="active"{% endif %}>Liste</a><a href="{{ link({'vue': 'calendrier', 'mois': month.strftime('%Y-%m')}) }}"{% if vue == "calendrier" %} class="active"{% endif %}>Calendrier</a>
+  </div>
 </div>
 {% import "_charts.html" as charts with context %}
 {% set ns = namespace(late=0, week=0, month=0) %}
@@ -18,8 +33,38 @@
   {% if days < 0 and i.kind != "Jalon" %}{% set ns.late = ns.late + 1 %}{% elif 0 <= days <= 7 %}{% set ns.week = ns.week + 1 %}{% elif 7 < days <= 30 %}{% set ns.month = ns.month + 1 %}{% endif %}
 {% endfor %}
 {{ charts.stats([("En retard (actions et retours)", ns.late, "ko"), ("Dans les 7 jours", ns.week, "todo"), ("Entre 8 et 30 jours", ns.month, "")]) }}
+
+{% macro item_link(i) -%}
+{% if i.url %}<a href="{{ i.url }}"{% if i.url.startswith('http') %} target="_blank" rel="noopener"{% elif '/ticket/' in i.url %} data-ticket{% endif %}>{{ i.label }}</a>{% else %}{{ i.label }}{% endif %}
+{%- endmacro %}
+
+{% if vue == "calendrier" %}
+<section class="panel cal">
+  <div class="cal-head">
+    <a class="btn-link" href="{{ link({'mois': prev_month.strftime('%Y-%m')}) }}" aria-label="Mois précédent">←</a>
+    <h2>{{ months[month.month - 1] | capitalize }} {{ month.year }}</h2>
+    <a class="btn-link" href="{{ link({'mois': next_month.strftime('%Y-%m')}) }}" aria-label="Mois suivant">→</a>
+    {% if month != today.replace(day=1) %}<a class="btn-link cal-today" href="{{ link({'mois': today.strftime('%Y-%m')}) }}">Aujourd'hui</a>{% endif %}
+  </div>
+  <div class="cal-grid" role="table" aria-label="Échéances de {{ months[month.month - 1] }} {{ month.year }}">
+    {% for name in ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."] %}<div class="cal-dow" role="columnheader">{{ name }}</div>{% endfor %}
+    {% for week in weeks %}{% for day in week %}
+    {% set found = by_day.get(day, []) %}
+    <div class="cal-day{{ ' other' if day.month != month.month }}{{ ' today' if day == today }}{{ ' weekend' if day.weekday() >= 5 }}{{ ' has' if found }}" role="cell">
+      <span class="cal-num">{{ day.day }}</span>
+      {% for i in found %}
+      <div class="cal-item kind-{{ i.kind | lower }}{{ ' late' if i.date < today and i.kind != 'Jalon' }}" title="{{ i.kind }} · {{ i.label }}{% if all_clients %} · {{ i.d.client }}{% endif %}">
+        {{ item_link(i) }}{% if all_clients %}<span class="muted cal-client">{{ i.d.client }}</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}{% endfor %}
+  </div>
+  <p class="muted cal-legend"><span class="cal-key kind-action"></span>Action <span class="cal-key kind-retour"></span>Retour <span class="cal-key kind-jalon"></span>Jalon <span class="cal-key late"></span>En retard</p>
+</section>
+{% else %}
 <table data-filterable>
-  <thead><tr><th>Date</th><th data-nosort>Dans</th><th data-filter>Type</th><th>Quoi</th><th data-filter>Client</th></tr></thead>
+  <thead><tr><th>Date</th><th data-nosort>Dans</th><th data-filter>Type</th><th>Quoi</th><th{% if all_clients %} data-filter{% endif %}>Client</th></tr></thead>
   <tbody>
   {% for i in items %}
     {% set days = (i.date - today).days %}
@@ -27,7 +72,7 @@
       <td data-sort="{{ i.date.isoformat() }}">{{ i.date.strftime("%d/%m/%Y") }}</td>
       <td><span class="badge {{ 'danger' if 0 <= days < 7 }}">J{{ '%+d' % (-days) }}</span></td>
       <td><span class="badge">{{ i.kind }}</span></td>
-      <td>{% if i.url %}<a href="{{ i.url }}"{% if i.url.startswith('http') %} target="_blank" rel="noopener"{% elif '/ticket/' in i.url %} data-ticket{% endif %}>{{ i.label }}</a>{% else %}{{ i.label }}{% endif %}</td>
+      <td>{{ item_link(i) }}</td>
       <td><a href="/deploiements/{{ i.d.slug }}/synthese">{{ i.d.client }}</a></td>
     </tr>
   {% else %}
@@ -35,4 +80,5 @@
   {% endfor %}
   </tbody>
 </table>
+{% endif %}
 {% endblock %}

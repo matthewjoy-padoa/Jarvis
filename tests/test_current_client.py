@@ -28,7 +28,8 @@ def test_opening_a_fiche_makes_it_the_current_client():
     ("/", "/"),
     ("/deadlines", "/deadlines"),
     ("https://ailleurs.example/", "/deploiements/client-exemple/synthese"),  # jamais de redirection hors de Jarvis
-    ("/agents", "/deploiements/client-exemple/synthese"),
+    ("/agents", "/agents"),  # page globale : ses filtres suivent le client du menu
+    ("/sources", "/deploiements/client-exemple/synthese"),
 ])
 def test_switching_client_keeps_the_page(vers, target):
     r = fresh().get("/client/client-exemple", params={"vers": vers}, follow_redirects=False)
@@ -52,3 +53,19 @@ def test_whats_new_on_home_is_scoped_to_the_current_client():
     c = fresh()
     c.get("/client/client-exemple")
     assert "client=client-exemple" in c.get("/").text
+
+
+
+def test_switching_client_keeps_the_options_of_a_global_page():
+    def target(vers):
+        return fresh().get("/client/client-exemple", params={"vers": vers}, follow_redirects=False).headers["location"]
+    assert target("/deadlines?client=client-demo&vue=calendrier&mois=2026-12") == "/deadlines?vue=calendrier&mois=2026-12"  # le menu gagne
+    assert target("/actions?tous=true&vue=kanban") == "/actions?tous=true&vue=kanban"  # ici tous=true : actions terminées comprises
+
+
+def test_the_menu_client_is_given_to_the_filters():
+    c = fresh()
+    c.get("/deploiements/client-exemple/actions")
+    html = c.get("/recette?tous=true").text
+    assert '<body data-current-client="Client Exemple">' in html
+    assert "/client/client-demo?vers=/recette%3Ftous%3Dtrue" in html  # le menu garde la page et ses options
