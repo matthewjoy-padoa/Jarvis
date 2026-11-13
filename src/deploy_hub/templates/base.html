@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=91">
+  <link rel="stylesheet" href="/static/style.css?v=92">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=6" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
@@ -202,5 +202,31 @@
     </div>
   </section>
   <footer class="footer muted">Jarvis · <em>Just A Rather Very Intelligent System</em>, au service de l'équipe Integration · <a href="/sources">État des systèmes</a></footer>
+  {# Raccourcis du client en cours (Drive, Notion, stacks), sur le côté de chaque page : colonne fixe sur grand écran,
+     onglet « Liens » au bord gauche sinon. Liens ouverts dans le navigateur : Jarvis ne lit jamais leur contenu. #}
+  {% if current %}
+  <aside class="quick-rail" id="quick-rail" aria-label="Raccourcis de {{ current.client }}">
+    <button type="button" class="quick-rail-tab" aria-controls="quick-rail" aria-expanded="false" title="Raccourcis de {{ current.client }}">Liens</button>
+    <div class="quick-rail-panel">
+      <p class="quick-rail-title">Raccourcis <span class="muted">· {{ current.client }}</span></p>
+      <p class="quick-rail-label">Google Drive</p>
+      {% for l in current.drive %}<a class="quick-link" href="{{ l.url }}" target="_blank" rel="noopener noreferrer" title="{{ l.label }} : s'ouvre avec ton compte Google"><span class="quick-env drive">Drive</span><span class="quick-name">{{ l.label }}</span> ↗</a>
+      {% else %}<a class="quick-link quick-add" href="/clients/{{ current.slug }}/configuration">+ Ajouter les liens Drive</a>{% endfor %}
+      {% if current.notion_url or current.stacks %}<p class="quick-rail-label">Notion et stacks</p>{% endif %}
+      {% if current.notion_url %}<a class="quick-link" href="{{ current.notion_url }}" target="_blank" rel="noopener" title="Dashboard intégration dans Notion"><span class="quick-env">Notion</span><span class="quick-name">Dashboard</span> ↗</a>{% endif %}
+      {% for st in current.stacks %}<a class="quick-link" href="{{ st.url }}" target="_blank" rel="noopener" title="{{ st.url }}"><span class="quick-env">{{ st.env or "Stack" }}</span><span class="quick-name">{{ st.label }}</span> ↗</a>{% endfor %}
+      <a class="quick-config muted" href="/clients/{{ current.slug }}/configuration">Modifier les liens</a>
+    </div>
+  </aside>
+  <script>
+    (function () {  // petit écran : l'onglet « Liens » ouvre le panneau ; Échap ou un clic ailleurs le ferme
+      const rail = document.getElementById("quick-rail"), tab = rail.querySelector(".quick-rail-tab");
+      const set = (open) => { rail.classList.toggle("open", open); tab.setAttribute("aria-expanded", open); };
+      tab.addEventListener("click", () => set(!rail.classList.contains("open")));
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") set(false); });
+      document.addEventListener("click", (e) => { if (!rail.contains(e.target)) set(false); });
+    })();
+  </script>
+  {% endif %}
 </body>
 </html>

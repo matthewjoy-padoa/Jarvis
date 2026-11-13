@@ -82,3 +82,12 @@ def test_the_current_client_fiche_is_one_click_away():
     assert 'href="/client/client-demo?vers=/deploiements/client-demo/synthese"' in bar
     r = c.get("/client/client-demo?vers=/deploiements/client-demo/synthese", follow_redirects=False)
     assert r.headers["location"] == "/deploiements/client-demo/synthese" and r.cookies.get(CLIENT_COOKIE) == "client-demo"
+
+
+def test_the_side_shortcuts_follow_the_current_client():
+    c = fresh()
+    c.get("/deploiements/client-exemple/actions")
+    html = c.get("/deadlines").text
+    rail = html.split('<aside class="quick-rail"', 1)[1].split("</aside>", 1)[0]
+    assert 'aria-label="Raccourcis de Client Exemple"' in rail and "Google Drive" in rail
+    assert 'href="/clients/client-exemple/configuration">+ Ajouter les liens Drive' in rail  # pas encore de lien Drive
