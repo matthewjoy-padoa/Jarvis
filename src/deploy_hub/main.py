@@ -25,6 +25,7 @@ from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
 from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, retour_prompt
+from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_watch import DagWatcher
 from deploy_hub.sources import connections, flow_digger, notion_api
 from deploy_hub.sources.external import external_statuses
@@ -46,6 +47,10 @@ claude = ClaudeRunner.from_env(settings.orchestrator_dir, live, notifications, d
 # Suivi des runs lancés (air.py d'Arthur) ; les suivis en cours au démarrage reprennent si Airflow est configuré.
 dag_watch = DagWatcher(data_dir() / "airflow", notifications, {"AIRFLOW_URL": airflow.base_url, "AIRFLOW_USER": airflow.user,
                                                                "AIRFLOW_PASSWORD": airflow.password} if airflow.live else None)
+# Enchaînements de DAG : le suivant part quand le suivi du précédent finit vert. Passe par le dag_watch du moment.
+dag_chains = ChainRunner(data_dir() / "airflow" / "chaines.json",
+                         lambda dag_id, padoa_env, slug, card: _launch_watched(dag_id, padoa_env, fiches.get_deployment(slug), card), notifications)
+dag_watch.on_end = dag_chains.watch_ended
 personal = PersonalStore(data_dir() / "perso.json")  # épingles, notes et rappels : à moi seul, jamais dans Notion
 _refresh_lock = threading.Lock()  # un seul rafraîchissement Notion à la fois
 
@@ -65,6 +70,7 @@ async def lifespan(_app):
         asyncio.to_thread(connections.notion_status, notion_api.load_token(), secret_problem("NOTION_TOKEN")))
     for line in connections.lines(*checks):
         log.info(line)
+    await asyncio.to_thread(dag_chains.reconcile, lambda watch_id: dag_watch.get(watch_id))
     yield
     dag_watch.shutdown()  # à l'arrêt (rechargement compris) : coupe les air.py, que le Jarvis suivant reprendra
 
@@ -443,7 +449,7 @@ def deadlines(request: Request, tous: bool = False, client: str = "", periode: s
 
 @app.get("/agents", response_class=HTMLResponse)
 def agents(request: Request):
-    return _render(request, "agents.html", "/agents", runs=claude.runs, dag_runs=airflow.runs, watches=dag_watch.watches, live=claude.live)
+    return _render(request, "agents.html", "/agents", runs=claude.runs, dag_runs=airflow.runs, watches=dag_watch.watches, chains=dag_chains.chains, live=claude.live)
 
 
 def _run_or_404(run_id: int):
@@ -677,15 +683,21 @@ def deployment_tab(request: Request, slug: str, tab: str, tous: bool = False, vu
 
 
 def _launch(dag_id: str, padoa_env: str, d: Deployment | None = None, card: str = "") -> ActionResult:
-    """Lance le DAG ; si le lancement est réel, air.py suit le run (relances, notifications, rapport)."""
+    return _launch_watched(dag_id, padoa_env, d, card)[0]
+
+
+def _launch_watched(dag_id: str, padoa_env: str, d: Deployment | None = None, card: str = ""):
+    """Lance le DAG ; si le lancement est réel, air.py suit le run (relances, notifications, rapport).
+    Renvoie le résultat et le suivi (None si rien n'est suivi : échec ou simulation)."""
     result = airflow.trigger_dag(dag_id, padoa_env, d.client if d else "", card)
+    w = None
     if result.ok and result.run_id:
         customers = d.orchestrator if d else []
         customer = next((c.customer for c in dag_catalogue.dags_for(customers) if c.dag_id == dag_id), "") or \
             next((c["customer"] for c in dag_catalogue.ced_for(customers) if c["dag_id"] == dag_id), "")  # client du catalogue
         w = dag_watch.start(d.slug if d else "", d.client if d else "", customer, dag_id, result.run_id, padoa_env, card)
         result.message += f" · suivi #{w.id} lancé (relances automatiques, rapport à la fin) : Agents → Suivis de DAG"
-    return result
+    return result, w
 
 
 @app.post("/actions/dag/{dag_id}", response_class=HTMLResponse)
@@ -703,6 +715,36 @@ def trigger_injection(request: Request, slug: str, dag_id: str = Form(...), pado
     if padoa_env == "prod" and "prod" in PADOA_ENVS and request.headers.get("HX-Prompt", "").strip() != CONFIRM_PROD:
         return _result(request, ActionResult(False, f"Lancement en prod annulé : tape {CONFIRM_PROD} pour confirmer.", simulated=False))
     return _result(request, _launch(dag_id, padoa_env, d, card))
+
+
+@app.post("/actions/chaine/{slug}", response_class=HTMLResponse)
+def chain_start(request: Request, slug: str, padoa_env: str = Form(...), dag_id: list[str] = Form([]), ordre: str = Form("")):
+    """Enchaînement : les DAG cochés, dans l'ordre des clics (« ordre »), sinon dans celui de la liste. Jamais en prod."""
+    d = _get(slug)
+    wanted = [x for x in ordre.split(",") if x]
+    dag_ids = wanted if sorted(wanted) == sorted(set(dag_id)) else list(dict.fromkeys(dag_id))
+    problem = ("Coche au moins deux DAG à enchaîner." if len(dag_ids) < 2
+               else f"Pas plus de {MAX_STEPS} DAG par enchaînement." if len(dag_ids) > MAX_STEPS
+               else "Un enchaînement ne part jamais en prod." if padoa_env == "prod"
+               else f"Stack inconnue : {padoa_env}" if padoa_env not in PADOA_ENVS
+               else next((f"{x} n'est pas un DAG de {d.client} dans le catalogue." for x in dag_ids if not dag_catalogue.known_dag(d.orchestrator, x)), ""))
+    if problem:
+        return _result(request, ActionResult(False, problem, simulated=False))
+    chain = dag_chains.start(d.slug, d.client, padoa_env, dag_ids)
+    first = chain.steps[0]
+    if chain.group == "ko":
+        return _result(request, ActionResult(False, f"Enchaînement #{chain.id} {chain.status} · {first.dag_id} : {first.message}", simulated=False))
+    how = "simulé de bout en bout (Airflow non configuré)" if chain.simulated else f"lancé sur {padoa_env} : chaque DAG part quand le précédent finit vert"
+    return _result(request, ActionResult(True, f"Enchaînement #{chain.id} {how} · {' → '.join(dag_ids)} · à suivre dans Agents → Enchaînements",
+                                         simulated=chain.simulated))
+
+
+@app.post("/agents/chaines/{chain_id}/arreter")
+def chain_stop(chain_id: int):
+    if not dag_chains.get(chain_id):
+        raise HTTPException(404, f"Enchaînement #{chain_id} inconnu")
+    dag_chains.stop(chain_id)
+    return RedirectResponse("/agents#chaines", status_code=303)
 
 
 @app.post("/actions/claude/{slug}/{resource}", response_class=HTMLResponse)

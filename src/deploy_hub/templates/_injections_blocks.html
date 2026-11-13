@@ -12,6 +12,24 @@
 </div>
 {% for d in deployments %}
 {% if show_client and d.injection_blocks %}<h2>{{ d.client }}</h2>{% endif %}
+{% set all_dags = dags_for(d.orchestrator) %}
+{% if all_dags | length > 1 %}
+<details class="panel chain-box">
+  <summary>Enchaîner plusieurs DAG{% if show_client %} de {{ d.client }}{% endif %} <span class="muted">· le suivant ne part que si le précédent finit vert</span></summary>
+  <form class="chain-form" hx-post="/actions/chaine/{{ d.slug }}" hx-target="next .dag-out" data-chain-form>
+    <input type="hidden" name="ordre" value="">
+    <p class="muted">Coche les DAG dans l'ordre où ils doivent passer.</p>
+    <ul class="chain-pick">
+      {% for c in all_dags %}<li><label title="{{ c.dag_id }}"><input type="checkbox" name="dag_id" value="{{ c.dag_id }}"> <span class="chain-rank"></span>{{ c.label }}</label></li>{% endfor %}
+    </ul>
+    <div class="dag-form">
+      <select name="padoa_env" aria-label="Stack cible">{% for e in padoa_envs if e != "prod" %}<option value="{{ e }}">{{ e }}</option>{% endfor %}</select>
+      <button type="submit">Lancer la chaîne</button>
+    </div>
+  </form>
+  <div class="dag-out"></div>
+</details>
+{% endif %}
 <div class="res-blocks">
 {% for b in d.injection_blocks %}
   {% set choices = dags_for(d.orchestrator, b.resources) %}
@@ -67,6 +85,21 @@
 {% endif %}
 {% endfor %}
 <script>
+  // Enchaînement : l'ordre des clics devient l'ordre de passage (numéro devant chaque DAG coché, champ « ordre »).
+  document.querySelectorAll("[data-chain-form]").forEach((form) => {
+    const picked = [];
+    form.addEventListener("change", (e) => {
+      if (e.target.name !== "dag_id") return;
+      const at = picked.indexOf(e.target.value);
+      if (e.target.checked && at < 0) picked.push(e.target.value);
+      if (!e.target.checked && at >= 0) picked.splice(at, 1);
+      form.querySelectorAll("input[name=dag_id]").forEach((box) => {
+        const n = picked.indexOf(box.value);
+        box.parentElement.querySelector(".chain-rank").textContent = n < 0 ? "" : `${n + 1}. `;
+      });
+      form.elements.ordre.value = picked.join(",");
+    });
+  });
   // Blocs de ressources : recherche, filtre par état, tout déplier ; un lien #<client>-<ressource> ouvre le bloc.
   (function () {
     const bar = document.querySelector("[data-blocks-toolbar]"), blocks = [...document.querySelectorAll(".res-block")];

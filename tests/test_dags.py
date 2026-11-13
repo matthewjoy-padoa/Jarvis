@@ -54,7 +54,7 @@ def app(catalogue, monkeypatch):
 def test_injection_tab_offers_the_card_dags_and_the_stacks(app):
     html = app.get("/deploiements/acme/injections").text
     assert '<option value="acme-uegar-etl-firm"' in html and '<option value="acme-uegar-etl_group-firm_base"' in html
-    assert "acme-uegar-etl-vaccine" not in html  # pas une ressource de la carte
+    assert '<option value="acme-uegar-etl-vaccine"' not in html  # pas une ressource de la carte (proposé seulement à l'enchaînement)
     for env in ("integration", "snap", "recette"):
         assert f'<option value="{env}">' in html
 
