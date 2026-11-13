@@ -5,7 +5,7 @@ import os
 import re
 from contextlib import asynccontextmanager
 import threading
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -592,14 +592,21 @@ async def settings_op_signout(request: Request):
     return _settings_page(request, message="Déconnecté de 1Password. Les secrets déjà lus restent en mémoire jusqu'au prochain changement ou redémarrage.")
 
 
+# Pages globales qui restent ouvertes quand on change de client dans le menu : leur client par défaut est celui du menu.
+CLIENT_FILTERED_PAGES = ("/", "/deadlines", "/actions", "/recette", "/injections", "/agents", "/notifications")
+
+
 @app.get("/client/{slug}")
 def switch_client(slug: str, vers: str = "/"):
     """Change de client en cours en restant sur la même page : même onglet de fiche, ou même page globale."""
     _get(slug)
-    if m := re.match(r"^/deploiements/[^/]+(/[a-z]+)?$", vers):
+    path, _, query = vers.partition("?")
+    if m := re.match(r"^/deploiements/[^/]+(/[a-z]+)?$", path):
         target = f"/deploiements/{slug}{m[1] or '/synthese'}"
-    elif vers in ("/", "/deadlines"):
-        target = vers
+    elif path in CLIENT_FILTERED_PAGES:  # pages globales : leurs filtres suivent le client en cours
+        dropped = ("client", "tous") if path == "/deadlines" else ("client",)  # tous=true : tous les clients sur Deadlines seulement
+        kept = urlencode([(k, v) for k, v in parse_qsl(query) if k not in dropped])
+        target = path + (f"?{kept}" if kept else "")
     else:
         target = f"/deploiements/{slug}/synthese"
     return _remember(RedirectResponse(target, status_code=303), slug)
