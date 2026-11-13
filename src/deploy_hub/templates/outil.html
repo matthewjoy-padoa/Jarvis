@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{{ tool }} · Jarvis{% endblock %}
+{% block content %}
+<h1>{{ tool }}</h1>
+<p class="tool-error" role="alert">{{ ic.icon("alert") }} {{ error }}</p>
+<p class="muted">Rien n'a été lancé. Corrige ce point puis reclique sur le bouton {{ tool }} de la barre.</p>
+{% endblock %}

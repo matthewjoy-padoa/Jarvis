@@ -2,6 +2,7 @@ import os
 import re
 from contextlib import asynccontextmanager
 import threading
+from urllib.parse import urlsplit
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -21,7 +22,7 @@ from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
 from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, retour_prompt
 from deploy_hub.sources.dag_watch import DagWatcher
-from deploy_hub.sources import notion_api
+from deploy_hub.sources import flow_digger, notion_api
 from deploy_hub.sources.external import external_statuses
 from deploy_hub.sources.journal import changes_since, group_changes
 from deploy_hub.sources import watchers
@@ -407,6 +408,29 @@ def client_icon(slug: str):
     if not d or not ICON_NAME.fullmatch(d.icone) or not path.is_file():
         raise HTTPException(404)
     return FileResponse(path, headers={"Cache-Control": "max-age=300", "X-Content-Type-Options": "nosniff"})
+
+
+def _from_jarvis(request: Request) -> bool:
+    """Requête envoyée par une page de Jarvis (même origine) : un autre site ne peut pas déclencher un lancement."""
+    origin = request.headers.get("origin") or request.headers.get("referer") or ""
+    return bool(origin) and urlsplit(origin).netloc == request.headers.get("host", "")
+
+
+@app.get("/outils/flow-digger")
+def flow_digger_reloaded():
+    """Onglet rechargé : rien n'est lancé par un GET, retour à l'accueil."""
+    return RedirectResponse("/", status_code=303)
+
+
+@app.post("/outils/flow-digger")
+def open_flow_digger(request: Request):
+    """Démarre Flow Digger sur la VM s'il ne tourne pas, puis y emmène (bouton de la barre, ouvert dans un nouvel onglet)."""
+    if not _from_jarvis(request):
+        raise HTTPException(403, "Lancement refusé : la demande ne vient pas de Jarvis.")
+    launch = flow_digger.start()
+    if launch.url:
+        return RedirectResponse(launch.url, status_code=303)
+    return _render(request, "outil.html", "", tool="Flow Digger", error=launch.error)
 
 
 @app.get("/client/{slug}")
