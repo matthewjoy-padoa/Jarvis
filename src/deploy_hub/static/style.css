@@ -1070,3 +1070,11 @@ a.stat-link:hover .stat-go, a.stat-link:focus-visible .stat-go { opacity: 1; }
 .cal-key.kind-action { background: var(--st-todo); } .cal-key.kind-retour { background: var(--st-progress, var(--accent)); }
 .cal-key.kind-jalon { background: var(--st-done); } .cal-key.late { background: var(--st-ko); }
 @media (max-width: 700px) { .cal-day { min-height: 56px; } .cal-item { font-size: 0; padding: 0; height: 6px; } .cal-client { display: none; } }
+/* Choix du client des Deadlines : même pastille que les boutons de période et de vue */
+.deadline-bar { align-items: center; }
+.deadline-bar .deadline-client { order: 2; margin-left: auto; }
+.deadline-bar .segmented:last-child { order: 3; }
+.deadline-client-pick { display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px 2px 12px; border: 1px solid var(--border); border-radius: 99px; background: var(--surface); font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
+.deadline-client-pick select { font: inherit; font-weight: 600; color: var(--text); border: 0; background: transparent; padding: 3px 4px; cursor: pointer; }
+.deadline-client-pick:focus-within { border-color: var(--accent); }
+.deadline-client-pick select:focus { outline: none; }

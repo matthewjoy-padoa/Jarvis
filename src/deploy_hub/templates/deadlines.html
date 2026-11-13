@@ -9,16 +9,16 @@
 {% set months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"] %}
 <div class="page-head">
   <h1>Deadlines{% if not all_clients %} <span class="muted">· {{ (clients | selectattr("slug", "equalto", selected) | first).client }}</span>{% endif %}{% if periode %} <span class="muted">· {{ periods[periode] }}</span>{% endif %}</h1>
+</div>
+<div class="deadline-bar">
   <form method="get" action="/deadlines" class="deadline-client">
     {% for k, v in state | dictsort if k != "client" and v %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
-    <label class="filter"><select name="client" aria-label="Client" onchange="this.form.submit()">
+    <label class="deadline-client-pick"><span>Client</span><select name="client" onchange="this.form.submit()">
       <option value="tous"{% if all_clients %} selected{% endif %}>Tous les clients</option>
       {% for d in clients %}<option value="{{ d.slug }}"{% if d.slug == selected %} selected{% endif %}>{{ d.client }}</option>{% endfor %}
     </select></label>
     <noscript><button type="submit" class="secondary">Afficher</button></noscript>
   </form>
-</div>
-<div class="deadline-bar">
   <div class="segmented" role="group" aria-label="Période">
     <a href="{{ link({'periode': ''}) }}"{% if not periode %} class="active"{% endif %}>Toutes</a>
     {%- for key, label in periods.items() %}<a href="{{ link({'periode': key}) }}"{% if periode == key %} class="active"{% endif %}>{{ label }}</a>{% endfor %}
@@ -64,7 +64,7 @@
 </section>
 {% else %}
 <table data-filterable>
-  <thead><tr><th>Date</th><th data-nosort>Dans</th><th data-filter>Type</th><th>Quoi</th><th data-filter>Client</th></tr></thead>
+  <thead><tr><th>Date</th><th data-nosort>Dans</th><th data-filter>Type</th><th>Quoi</th><th{% if all_clients %} data-filter{% endif %}>Client</th></tr></thead>
   <tbody>
   {% for i in items %}
     {% set days = (i.date - today).days %}
