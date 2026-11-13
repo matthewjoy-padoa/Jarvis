@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 import re
 from contextlib import asynccontextmanager
@@ -22,7 +24,7 @@ from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
 from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, retour_prompt
 from deploy_hub.sources.dag_watch import DagWatcher
-from deploy_hub.sources import flow_digger, notion_api
+from deploy_hub.sources import connections, flow_digger, notion_api
 from deploy_hub.sources.external import external_statuses
 from deploy_hub.sources.journal import changes_since, group_changes
 from deploy_hub.sources import watchers
@@ -43,8 +45,22 @@ dag_watch = DagWatcher(data_dir() / "airflow", notifications, {"AIRFLOW_URL": ai
                                                                "AIRFLOW_PASSWORD": airflow.password} if airflow.live else None)
 _refresh_lock = threading.Lock()  # un seul rafraîchissement Notion à la fois
 
+log = logging.getLogger("uvicorn.error")  # mêmes lignes que celles de uvicorn
+
+
+def _airflow_problem() -> str:
+    """Raison pour laquelle les identifiants Airflow (op://) n'ont pas pu être lus ; "" sinon."""
+    return " ; ".join(f"{n} : {e}" for n in ("AIRFLOW_USER", "AIRFLOW_PASSWORD") if (e := secret_problem(n)))
+
+
 @asynccontextmanager
 async def lifespan(_app):
+    # Au lancement : Airflow et Notion sont-ils vraiment joignables ? (une lecture chacun, dans le terminal de Jarvis)
+    checks = await asyncio.gather(
+        asyncio.to_thread(connections.airflow_status, airflow, _airflow_problem()),
+        asyncio.to_thread(connections.notion_status, notion_api.load_token(), secret_problem("NOTION_TOKEN")))
+    for line in connections.lines(*checks):
+        log.info(line)
     yield
     dag_watch.shutdown()  # à l'arrêt (rechargement compris) : coupe les air.py, que le Jarvis suivant reprendra
 
@@ -392,7 +408,7 @@ def dag_watch_stop(watch_id: int):
 def sources(request: Request):
     return _render(request, "sources.html", "/sources", externals=external_statuses(notion_api.load_token() is not None,
                                                                          secret_problem("NOTION_TOKEN")), settings=settings,
-                   airflow_problem=" ; ".join(f"{n} : {e}" for n in ("AIRFLOW_USER", "AIRFLOW_PASSWORD") if (e := secret_problem(n))))
+                   airflow_problem=_airflow_problem())
 
 
 @app.get("/deploiements/{slug}")
