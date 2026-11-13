@@ -1,4 +1,4 @@
-# Service systemd utilisateur, installé depuis le dossier de Jarvis (voir README, « Faire tourner Jarvis sur une VM »).
+# Service systemd utilisateur, installé depuis le dossier de Jarvis (voir docs/vm.md).
 # Le dossier de Jarvis (WorkingDirectory) et les réglages de la machine vont dans le complément jarvis.service.d/vm.conf.
 # Pour qu'il tourne sans session ouverte : loginctl enable-linger $USER
 [Unit]
