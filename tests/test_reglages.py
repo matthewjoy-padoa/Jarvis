@@ -145,3 +145,39 @@ def test_a_value_also_set_outside_env_is_flagged(env, monkeypatch):
     assert "définie hors .env" in TestClient(main.app).get("/reglages").text
     r = TestClient(main.app).post("/reglages", data={"AIRFLOW_BASE_URL": "http://localhost:8888"}, headers=SAME)
     assert "AIRFLOW_BASE_URL est aussi défini hors .env" in r.text
+
+
+def test_claude_settings_are_in_the_page_and_applied_to_the_next_agents(env):
+    page = TestClient(main.app).get("/reglages").text
+    assert "Agents Claude" in page and 'name="JARVIS_AGENT_MODEL"' in page and '<select name="JARVIS_AGENT_PERMISSION_MODE">' in page
+    form = {"JARVIS_AGENT_MODEL": "opus", "JARVIS_AGENT_MAX": "3", "JARVIS_AGENT_TIMEOUT_MIN": "30", "JARVIS_AGENT_PERMISSION_MODE": "plan"}
+    r = TestClient(main.app).post("/reglages", data=form, headers=SAME)
+    assert "Enregistré dans .env" in r.text
+    claude = main.claude
+    try:
+        assert (claude.model, claude.max_running, claude.timeout, claude.permission_mode) == ("opus", 3, 1800, "plan")
+        TestClient(main.app).post("/reglages", data={k: "" for k in form}, headers=SAME)  # vidés : valeurs par défaut
+        assert (claude.model, claude.max_running, claude.timeout, claude.permission_mode) == ("", 2, 5400, "acceptEdits")
+    finally:
+        for key in form:
+            os.environ.pop(key, None)
+        claude.reconfigure()
+
+
+@pytest.mark.parametrize(("key", "value", "why"), [
+    ("JARVIS_AGENT_MAX", "deux", "nombre entier positif"),
+    ("JARVIS_AGENT_TIMEOUT_MIN", "0", "nombre entier positif"),
+    ("JARVIS_AGENT_PERMISSION_MODE", "bypassPermissions", "acceptEdits ou plan ou default"),
+    ("JARVIS_MODE", "prod", "demo ou live"),
+])
+def test_invalid_claude_settings_write_nothing(env, key, value, why):
+    before = env.read_text()
+    r = TestClient(main.app).post("/reglages", data={key: value}, headers=SAME)
+    assert why in r.text and env.read_text() == before
+
+
+def test_the_mode_waits_for_a_restart(env):
+    r = TestClient(main.app).post("/reglages", data={"JARVIS_MODE": "live"}, headers=SAME)
+    assert "Au prochain démarrage de Jarvis : Mode" in r.text
+    assert not main.claude.live  # pas de vrais agents sans redémarrage
+    os.environ.pop("JARVIS_MODE", None)

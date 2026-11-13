@@ -1032,3 +1032,6 @@ button.pal-open.search-wide { flex: 1 1 220px; max-width: 460px; min-width: 0; j
 }
 @media (max-width: 1100px) { .search-wide kbd { display: none; } }  /* la loupe seule : les onglets gardent leur place */
 @media (max-width: 700px) { .topbar { --bar-h: 36px; gap: 8px; padding-left: 12px; padding-right: 12px; } .topbar .brand-name { font-size: 18px; } }
+
+/* Réglages : une section par sujet (connexions, agents Claude) */
+.settings-form h2.settings-section { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }

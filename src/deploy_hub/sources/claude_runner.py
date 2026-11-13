@@ -6,6 +6,7 @@ la sortie stream-json va dans data/agents/<id>.jsonl, l'historique dans data/age
 Sans --bare, l'agent charge comme une session normale ~/.claude/CLAUDE.md, ses hooks et le CLAUDE.md du dépôt.
 """
 
+import inspect
 import json
 import os
 import re
@@ -170,8 +171,8 @@ class ClaudeRunner:
         self._stopped: set[int] = set()
         self.runs: list[AgentRun] = self._load()
 
-    @classmethod
-    def from_env(cls, orchestrator_dir: Path, live: bool, notifications, state_dir: Path) -> "ClaudeRunner":
+    @staticmethod
+    def _env_options() -> dict:
         """Réglages JARVIS_AGENT_*, CLAUDE_BIN, JARVIS_WORKTREES_DIR : seules les variables renseignées remplacent
         les valeurs par défaut de __init__."""
         env = os.environ.get
@@ -185,7 +186,24 @@ class ClaudeRunner:
             "max_running": env("JARVIS_AGENT_MAX") and int(env("JARVIS_AGENT_MAX")),
             "model": env("JARVIS_AGENT_MODEL"),
         }
-        return cls(orchestrator_dir, state_dir, live, notifications, **{k: v for k, v in kw.items() if v})
+        return {k: v for k, v in kw.items() if v}
+
+    @classmethod
+    def from_env(cls, orchestrator_dir: Path, live: bool, notifications, state_dir: Path) -> "ClaudeRunner":
+        return cls(orchestrator_dir, state_dir, live, notifications, **cls._env_options())
+
+    def reconfigure(self) -> None:
+        """Réglages relus (page Réglages) : appliqués aux prochains agents ; historique et agents en cours gardés.
+        Une variable vidée reprend la valeur par défaut de __init__."""
+        defaults = {k: v.default for k, v in inspect.signature(ClaudeRunner.__init__).parameters.items()}
+        options = {**{k: defaults[k] for k in ("claude_bin", "add_dirs", "allowed_tools", "permission_mode", "timeout_min",
+                                               "max_running", "model")}, **self._env_options()}
+        with self._lock:
+            self.worktrees_dir = options.get("worktrees_dir") or self.orchestrator_dir / ".claude" / "worktrees" / "jarvis"
+            self.timeout = options.pop("timeout_min") * 60
+            options.pop("worktrees_dir", None)
+            for key, value in options.items():
+                setattr(self, key, value)
 
     # --- historique -------------------------------------------------------------------------------------------
     def _load(self) -> list[AgentRun]:

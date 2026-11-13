@@ -7,6 +7,7 @@
 """
 
 import os
+import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,9 +19,14 @@ from deploy_hub.config import ENV_FILE_KEYS, OP_PREFIX, PROCESS_KEYS, PROJECT_RO
 class Field:
     key: str
     label: str
-    kind: str        # url, secret ou path
+    kind: str        # url, secret, path, bin (programme), int, choice ou text
     help: str
     live: bool = True  # False : pris en compte au prochain démarrage de Jarvis
+    section: str = "Connexions et dossiers"
+    choices: tuple[str, ...] = ()  # kind « choice » : valeurs permises ("" = défaut)
+
+
+CLAUDE = "Agents Claude"
 
 
 FIELDS = (
@@ -30,6 +36,19 @@ FIELDS = (
     Field("NOTION_TOKEN", "Jeton Notion", "secret", "Facultatif : bouton « Rafraîchir depuis Notion ». Référence 1Password conseillée"),
     Field("ORCHESTRATOR_DIR", "Dossier de integration-orchestrator", "path", "Pour les agents Claude", live=False),
     Field("FLOW_DIGGER_DIR", "Dossier de Flow Digger", "path", "Vide : cherché aux emplacements habituels"),
+    Field("JARVIS_MODE", "Mode", "choice", "demo : agents simulés ; live : vrais agents (claude -p)", live=False, section=CLAUDE,
+          choices=("", "demo", "live")),
+    Field("CLAUDE_BIN", "Programme claude", "bin", "Vide : « claude » dans le PATH", section=CLAUDE),
+    Field("JARVIS_AGENT_MODEL", "Modèle", "text", "Vide : modèle par défaut de Claude Code (ex. opus, sonnet)", section=CLAUDE),
+    Field("JARVIS_AGENT_PERMISSION_MODE", "Mode de permission", "choice",
+          "acceptEdits : modifie les fichiers sans demander ; plan : lecture seule ; default : refuse ce qui n'est pas autorisé",
+          section=CLAUDE, choices=("", "acceptEdits", "plan", "default")),
+    Field("JARVIS_AGENT_MAX", "Agents simultanés au plus", "int", "Vide : 2", section=CLAUDE),
+    Field("JARVIS_AGENT_TIMEOUT_MIN", "Durée maximale d'un agent (min)", "int", "Vide : 90 ; au-delà, l'agent est interrompu", section=CLAUDE),
+    Field("JARVIS_AGENT_ADD_DIRS", "Dossiers lisibles en plus", "text", "Séparés par « : » (ex. ~/Documents/Claude_vault)", section=CLAUDE),
+    Field("JARVIS_AGENT_ALLOWED_TOOLS", "Outils autorisés", "text", "Vide : liste par défaut (lire, modifier, uv run, git, gh pr create) ; sinon séparés par « ; »",
+          section=CLAUDE),
+    Field("JARVIS_WORKTREES_DIR", "Dossier des worktrees", "path", "Vide : <dossier de l'orchestrator>/.claude/worktrees/jarvis", section=CLAUDE),
 )
 BY_KEY = {f.key: f for f in FIELDS}
 
@@ -63,8 +82,17 @@ def view(file: Path | None = None) -> list[dict]:
         out.append({"field": f, "value": "" if clear_secret else value, "stored_clear": bool(clear_secret),
                     "reference": is_reference(value), "empty": not value,
                     "overridden": f.key in PROCESS_KEYS,  # fixée hors .env (vm.conf…) : elle gagnera au redémarrage
-                    "path_ok": Path(value).expanduser().is_dir() if f.kind == "path" and value else None})
+                    "path_ok": _found(f, value)})
     return out
+
+
+def _found(field: Field, value: str) -> bool | None:
+    """Dossier ou programme : trouvé ou non (None : rien à vérifier)."""
+    if field.kind == "path" and value:
+        return Path(value).expanduser().is_dir()
+    if field.kind == "bin":
+        return shutil.which(str(Path(value).expanduser()) if value else "claude") is not None
+    return None
 
 
 def _clean(field: Field, value: str) -> str:
@@ -75,6 +103,10 @@ def _clean(field: Field, value: str) -> str:
         raise EnvError(f"{field.label} : « #» précédé d'une espace serait lu comme un commentaire")
     if field.kind == "url" and value and not value.startswith(("http://", "https://")):
         raise EnvError(f"{field.label} : commence par http:// ou https://")
+    if field.kind == "int" and value and not (value.isdigit() and int(value) > 0):
+        raise EnvError(f"{field.label} : un nombre entier positif")
+    if field.kind == "choice" and value not in field.choices + ("",):
+        raise EnvError(f"{field.label} : {' ou '.join(c for c in field.choices if c)}")
     if field.kind == "secret" and value.startswith("op:") and not is_reference(value):
         raise EnvError(f"{field.label} : une référence 1Password commence par op://")
     return value
