@@ -3,5 +3,13 @@
 {% block content %}
 <h1>{{ tool }}</h1>
 <p class="tool-error" role="alert">{{ ic.icon("alert") }} {{ error }}</p>
+{% if can_force %}
+<p class="muted">Tu peux corriger le dépôt (par exemple <code>git status</code> puis <code>git pull</code> dans un terminal) et recliquer sur {{ tool }}, ou lancer la version déjà présente sur la machine.</p>
+<form method="post" action="{{ action }}">
+  <input type="hidden" name="forcer" value="1">
+  <button type="submit" class="secondary">Lancer quand même la version actuelle</button>
+</form>
+{% else %}
 <p class="muted">Rien n'a été lancé. Corrige ce point puis reclique sur le bouton {{ tool }} de la barre.</p>
+{% endif %}
 {% endblock %}
