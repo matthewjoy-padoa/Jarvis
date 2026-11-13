@@ -993,3 +993,25 @@ a.settings-link .ic { width: 16px; height: 16px; margin: 0; }
 .settings-intro code, .settings-form code { overflow-wrap: anywhere; }
 .settings-form .form-actions { flex-wrap: wrap; }
 .settings-form .form-actions button { max-width: 100%; white-space: normal; }
+
+/* Barre, disposition A : navigation à sa taille, recherche qui prend la place libre, puis Flow Digger | trois icônes rondes */
+.topbar .nav { flex: 0 1 auto; }
+button.pal-open.search-wide { flex: 1 1 220px; max-width: 460px; min-width: 0; justify-content: flex-start; gap: 10px; padding: 7px 8px 7px 14px; overflow: hidden; }
+.search-wide .pal-open-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; font-weight: 400; }
+.search-wide kbd { margin-left: auto; }
+.bar-sep { flex: none; width: 1px; height: 24px; background: var(--border); margin: 0 2px; }
+.bar-icon, button.bar-icon, a.bar-icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; border-radius: 999px; }
+.bar-icon .ic { width: 18px; height: 18px; margin: 0; vertical-align: 0; }
+.theme-toggle.bar-icon .theme-label { display: none; }
+@media (max-width: 1440px) { .search-wide .pal-open-label, .search-wide kbd { display: inline; } button.pal-open.search-wide { padding: 7px 8px 7px 14px; } }
+@media (max-width: 1100px) { .search-wide .pal-open-label { display: none; } button.pal-open.search-wide { flex: 0 0 auto; padding: 7px 12px; } }
+@media (max-width: 640px) { .bar-sep { display: none; } }
+/* Tout aligné sur une même hauteur : pastille du client, onglets, recherche, Flow Digger, icônes */
+.topbar { --bar-h: 40px; align-items: center; }
+.topbar .client-chip, .topbar .nav-group, button.pal-open.search-wide, .tool-launch button, .bar-icon, button.bar-icon, a.bar-icon {
+  height: var(--bar-h); box-sizing: border-box; }
+.topbar .client-chip { padding-top: 0; padding-bottom: 0; }
+.topbar .nav-group { align-items: center; }
+.topbar .nav a.nav-item { height: calc(var(--bar-h) - 8px); padding-top: 0; padding-bottom: 0; }
+.bar-icon, button.bar-icon, a.bar-icon { width: var(--bar-h); }
+.tool-launch button, button.pal-open.search-wide { display: inline-flex; align-items: center; padding-top: 0; padding-bottom: 0; }
