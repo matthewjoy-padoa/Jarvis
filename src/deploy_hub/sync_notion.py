@@ -619,6 +619,8 @@ def sync(slug: str, root: Path = PROJECT_ROOT) -> dict:
 
 
 if __name__ == "__main__":
+    from deploy_hub.config import ensure_private_dirs
+    ensure_private_dirs()
     # uv run python -m deploy_hub.sync_notion preparer        → écrit les requêtes ; affiche la requête d'empreinte à exécuter
     # uv run python -m deploy_hub.sync_notion plan            → d'après l'empreinte : les seules requêtes à exécuter
     # uv run python -m deploy_hub.sync_notion fusionner       → fusionne les résultats déposés, écrit les fiches

@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from deploy_hub import client_config
-from deploy_hub.config import PROJECT_ROOT, clients_dir, data_dir, load_settings
+from deploy_hub.config import PROJECT_ROOT, clients_dir, data_dir, ensure_private_dirs, load_settings, secret_problem
 from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
                                kanban_columns, notion_link, status_group)
 from deploy_hub import console, shell
@@ -31,6 +31,7 @@ from deploy_hub.sources.fiches import FicheSource
 
 HERE = Path(__file__).parent
 
+ensure_private_dirs()  # données et configuration des clients jamais dans un dossier que git pourrait pousser
 settings = load_settings()
 live = settings.mode == "live"
 fiches = FicheSource(settings.deployments_dir, clients_dir())
@@ -389,7 +390,8 @@ def dag_watch_stop(watch_id: int):
 
 @app.get("/sources", response_class=HTMLResponse)
 def sources(request: Request):
-    return _render(request, "sources.html", "/sources", externals=external_statuses(notion_api.load_token() is not None), settings=settings)
+    return _render(request, "sources.html", "/sources", externals=external_statuses(notion_api.load_token() is not None,
+                                                                         secret_problem("NOTION_TOKEN")), settings=settings)
 
 
 @app.get("/deploiements/{slug}")
