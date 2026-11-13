@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=94">
+  <link rel="stylesheet" href="/static/style.css?v=98">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=6" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
@@ -19,6 +19,7 @@
   <script src="/static/drawer.js?v=4" defer></script>
   <script src="/static/palette.js?v=7" defer></script>
   <script src="/static/console.js?v=4" defer></script>
+  <script src="/static/notes.js?v=1" defer></script>
   <script src="/static/shell.js?v=2" defer></script>
 </head>
 <body{% if current %} data-current-client="{{ current.client }}"{% endif %}>
@@ -174,6 +175,16 @@
   {# Console (>dag, >agent…) : bouton flottant en bas à droite, comme un bouton de discussion ; la touche « > » fait pareil. #}
   <button type="button" class="console-fab" data-console-open aria-label="Console Jarvis" title="Console Jarvis : tape des commandes comme dans un terminal (touche >)">
     {{ ic.icon("terminal") }}<span class="console-fab-label">Console</span><kbd>&gt;</kbd></button>
+  {# Notes : bouton flottant au-dessus de celui de la console ; ouvre un bloc-notes (client en cours et notes générales),
+     chargé à l'ouverture par /perso/notes. Touche « n » hors d'un champ. Logique : notes.js. #}
+  <button type="button" class="console-fab notes-fab" data-notes-open aria-label="Mes notes" aria-expanded="false" aria-controls="notes"
+          title="Mes notes : bloc-notes perso, jamais envoyé dans Notion (touche n)">
+    {{ ic.icon("note") }}<span class="console-fab-label">Notes</span><kbd>n</kbd></button>
+  <section class="notes" id="notes" hidden aria-label="Mes notes">
+    <div class="notes-bar">{{ ic.icon("note") }}<strong>Mes notes</strong><span class="muted">pour moi seulement</span>
+      <button type="button" class="notes-close" data-notes-close aria-label="Fermer les notes" title="Fermer (Échap)">×</button></div>
+    <div class="notes-body" id="notes-body" hx-get="/perso/notes" hx-trigger="notes-open"></div>
+  </section>
   {# Console Jarvis : un vrai terminal (console.js) ; les commandes sont lues et exécutées par /console (console.py). #}
   <section class="term" id="term" hidden aria-label="Console Jarvis" data-commands="{{ console_commands | join(' ') }}"
            {%- if shell_token %} data-shell-token="{{ shell_token }}"{% endif %}>

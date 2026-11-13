@@ -1,0 +1,19 @@
+{# Rappels de l'accueil : ceux du client en cours et les rappels libres. Attend : reminders, remind_slug, today. #}
+{% import "_icons.html" as ic %}
+<section class="panel" id="reminders">
+  <h2>{{ ic.icon("bell") }} Rappels</h2>
+  <ul class="todo">
+    {% for r in reminders %}
+    <li><span class="date {{ 'late' if r.due <= today }}">{{ r.due.strftime("%d/%m") }}</span>
+      {% if r.kind %}<a data-ticket href="{{ ticket_url(r.slug, r.kind, r.ref) }}">{{ r.label }}</a>{% else %}<span>{{ r.label }}</span>{% endif %}
+      <button type="button" class="secondary remind-done" hx-post="/perso/rappel/{{ r.id }}/fait" hx-target="closest li" hx-swap="outerHTML">Fait</button></li>
+    {% else %}<li class="muted">Aucun rappel. Sur un ticket : « Me le rappeler ».</li>{% endfor %}
+  </ul>
+  <form class="remind-form" hx-post="/perso/rappel" hx-target="#reminders" hx-swap="outerHTML">
+    <input type="hidden" name="slug" value="{{ remind_slug }}">
+    <input type="text" name="label" placeholder="Me rappeler de…" maxlength="200" required aria-label="Ce qu'il faut me rappeler">
+    <select name="quand" aria-label="Quand"><option value="demain">Demain</option><option value="lundi">Lundi</option><option value="semaine">Dans une semaine</option></select>
+    <button type="submit" class="secondary">Ajouter</button>
+  </form>
+  {% if remind_error %}<p class="result ko">{{ remind_error }}</p>{% endif %}
+</section>

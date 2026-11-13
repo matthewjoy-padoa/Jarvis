@@ -19,18 +19,22 @@ from deploy_hub import client_config
 from deploy_hub.config import PROCESS_KEYS, PROJECT_ROOT, clients_dir, data_dir, ensure_private_dirs, forget_secrets, load_settings, secret_problem
 from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
                                kanban_columns, notion_link, status_group)
-from deploy_hub import console, env_file, onepassword, shell
+from deploy_hub import brief, console, env_file, onepassword, shell
 from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
-from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, retour_prompt
+from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, duration_text, retour_prompt, usage
+from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_watch import DagWatcher
 from deploy_hub.sources import connections, flow_digger, notion_api
 from deploy_hub.sources.external import external_statuses
 from deploy_hub.sources.journal import changes_since, group_changes
 from deploy_hub.sources import watchers
 from deploy_hub.sources.notifications import NotificationStore
+from deploy_hub.sources.personal import PersonalStore, remind_date
+from deploy_hub.sources.pulls import PullRequests
+from deploy_hub.sources import review as agent_review
 from deploy_hub.sources.fiches import FicheSource
 
 HERE = Path(__file__).parent
@@ -42,9 +46,15 @@ fiches = FicheSource(settings.deployments_dir, clients_dir())
 airflow = AirflowSource.from_env()
 notifications = NotificationStore(Path(os.getenv("DEPLOY_HUB_NOTIFICATIONS") or settings.deployments_dir.parent / "notifications.json"))
 claude = ClaudeRunner.from_env(settings.orchestrator_dir, live, notifications, data_dir() / "agents")
+pulls = PullRequests(settings.orchestrator_dir)  # PR ouvertes de l'orchestrator (gh), gardées cinq minutes
 # Suivi des runs lancés (air.py d'Arthur) ; les suivis en cours au démarrage reprennent si Airflow est configuré.
 dag_watch = DagWatcher(data_dir() / "airflow", notifications, {"AIRFLOW_URL": airflow.base_url, "AIRFLOW_USER": airflow.user,
                                                                "AIRFLOW_PASSWORD": airflow.password} if airflow.live else None)
+# Enchaînements de DAG : le suivant part quand le suivi du précédent finit vert. Passe par le dag_watch du moment.
+dag_chains = ChainRunner(data_dir() / "airflow" / "chaines.json",
+                         lambda dag_id, padoa_env, slug, card: _launch_watched(dag_id, padoa_env, fiches.get_deployment(slug), card), notifications)
+dag_watch.on_end = dag_chains.watch_ended
+personal = PersonalStore(data_dir() / "perso.json")  # épingles, notes et rappels : à moi seul, jamais dans Notion
 _refresh_lock = threading.Lock()  # un seul rafraîchissement Notion à la fois
 
 log = logging.getLogger("uvicorn.error")  # mêmes lignes que celles de uvicorn
@@ -63,6 +73,7 @@ async def lifespan(_app):
         asyncio.to_thread(connections.notion_status, notion_api.load_token(), secret_problem("NOTION_TOKEN")))
     for line in connections.lines(*checks):
         log.info(line)
+    await asyncio.to_thread(dag_chains.reconcile, lambda watch_id: dag_watch.get(watch_id))
     yield
     dag_watch.shutdown()  # à l'arrêt (rechargement compris) : coupe les air.py, que le Jarvis suivant reprendra
 
@@ -70,6 +81,7 @@ async def lifespan(_app):
 app = FastAPI(title="Jarvis", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
+templates.env.filters["duree"] = duration_text
 templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STATUSES)
 templates.env.globals["kanban_columns"] = kanban_columns
 templates.env.globals["ACTION_STATUSES"] = ACTION_STATUSES
@@ -98,6 +110,7 @@ DEPLOYMENT_TABS = [
     ("injections", "Injections"),
     ("actions", "Actions"),
     ("recette", "Recette"),
+    ("pr", "PR"),
     ("regles", "Règles"),
     ("accompagnement", "Accompagnement"),
 ]
@@ -224,6 +237,8 @@ def today_page(request: Request):
         links=links,
         ko_url=ko_url,
         milestones=[i for i in items if i["kind"] == "Jalon" and today <= i["date"] <= today + timedelta(days=21)],
+        pins=_pinned(current) if current else [],
+        **_reminders_context(current.slug if current else ""),
     )
 
 
@@ -439,7 +454,8 @@ def deadlines(request: Request, tous: bool = False, client: str = "", periode: s
 
 @app.get("/agents", response_class=HTMLResponse)
 def agents(request: Request):
-    return _render(request, "agents.html", "/agents", runs=claude.runs, dag_runs=airflow.runs, watches=dag_watch.watches, live=claude.live)
+    return _render(request, "agents.html", "/agents", runs=claude.runs, dag_runs=airflow.runs, watches=dag_watch.watches, chains=dag_chains.chains, live=claude.live,
+                   usage=usage(claude.runs))
 
 
 def _run_or_404(run_id: int):
@@ -449,17 +465,23 @@ def _run_or_404(run_id: int):
     return run
 
 
+def _agent_context(run) -> dict:
+    """Journal de l'agent, et sa relecture guidée dès qu'il a fini (un agent simulé n'a rien à relire)."""
+    path = claude.log_path(run)
+    return {"run": run, "log": claude.log(run), "review": None if run.running or run.simulated else agent_review.build(run, path)}
+
+
 @app.get("/agents/{run_id}", response_class=HTMLResponse)
 def agent_detail(request: Request, run_id: int):
     run = _run_or_404(run_id)
-    return _render(request, "agent.html", "/agents", run=run, log=claude.log(run))
+    return _render(request, "agent.html", "/agents", **_agent_context(run))
 
 
 @app.get("/agents/{run_id}/journal", response_class=HTMLResponse)
 def agent_journal(request: Request, run_id: int):
     """Rafraîchi toutes les 5 s par la page de l'agent tant qu'il travaille."""
     run = _run_or_404(run_id)
-    return templates.TemplateResponse(request, "_agent_log.html", {"run": run, "log": claude.log(run)})
+    return templates.TemplateResponse(request, "_agent_log.html", _agent_context(run))
 
 
 @app.post("/agents/{run_id}/arreter")
@@ -633,7 +655,7 @@ async def settings_op_signout(request: Request):
 
 
 # Pages globales qui restent ouvertes quand on change de client dans le menu : leur client par défaut est celui du menu.
-CLIENT_FILTERED_PAGES = ("/", "/deadlines", "/actions", "/recette", "/injections", "/agents", "/notifications")
+CLIENT_FILTERED_PAGES = ("/", "/brief", "/deadlines", "/actions", "/recette", "/injections", "/agents", "/notifications")
 
 
 @app.get("/client/{slug}")
@@ -650,6 +672,14 @@ def switch_client(slug: str, vers: str = "/"):
     else:
         target = f"/deploiements/{slug}/synthese"
     return _remember(RedirectResponse(target, status_code=303), slug)
+
+
+@app.get("/deploiements/{slug}/pr/liste", response_class=HTMLResponse)
+def deployment_pulls(request: Request, slug: str, frais: bool = False):
+    """PR ouvertes de l'orchestrator qui concernent ce client ; chargé par l'onglet PR (GitHub peut mettre quelques secondes)."""
+    d = _get(slug)
+    prs, error = pulls.for_client(d.slug, d.orchestrator, d.software, {r.pr_url for r in claude.runs if r.slug == slug and r.pr_url}, frais)
+    return templates.TemplateResponse(request, "_pr_list.html", {"d": d, "prs": prs, "error": error, "today": date.today(), "read_at": pulls.read_at})
 
 
 @app.get("/deploiements/{slug}/{tab}", response_class=HTMLResponse)
@@ -673,15 +703,21 @@ def deployment_tab(request: Request, slug: str, tab: str, tous: bool = False, vu
 
 
 def _launch(dag_id: str, padoa_env: str, d: Deployment | None = None, card: str = "") -> ActionResult:
-    """Lance le DAG ; si le lancement est réel, air.py suit le run (relances, notifications, rapport)."""
+    return _launch_watched(dag_id, padoa_env, d, card)[0]
+
+
+def _launch_watched(dag_id: str, padoa_env: str, d: Deployment | None = None, card: str = ""):
+    """Lance le DAG ; si le lancement est réel, air.py suit le run (relances, notifications, rapport).
+    Renvoie le résultat et le suivi (None si rien n'est suivi : échec ou simulation)."""
     result = airflow.trigger_dag(dag_id, padoa_env, d.client if d else "", card)
+    w = None
     if result.ok and result.run_id:
         customers = d.orchestrator if d else []
         customer = next((c.customer for c in dag_catalogue.dags_for(customers) if c.dag_id == dag_id), "") or \
             next((c["customer"] for c in dag_catalogue.ced_for(customers) if c["dag_id"] == dag_id), "")  # client du catalogue
         w = dag_watch.start(d.slug if d else "", d.client if d else "", customer, dag_id, result.run_id, padoa_env, card)
         result.message += f" · suivi #{w.id} lancé (relances automatiques, rapport à la fin) : Agents → Suivis de DAG"
-    return result
+    return result, w
 
 
 @app.post("/actions/dag/{dag_id}", response_class=HTMLResponse)
@@ -699,6 +735,36 @@ def trigger_injection(request: Request, slug: str, dag_id: str = Form(...), pado
     if padoa_env == "prod" and "prod" in PADOA_ENVS and request.headers.get("HX-Prompt", "").strip() != CONFIRM_PROD:
         return _result(request, ActionResult(False, f"Lancement en prod annulé : tape {CONFIRM_PROD} pour confirmer.", simulated=False))
     return _result(request, _launch(dag_id, padoa_env, d, card))
+
+
+@app.post("/actions/chaine/{slug}", response_class=HTMLResponse)
+def chain_start(request: Request, slug: str, padoa_env: str = Form(...), dag_id: list[str] = Form([]), ordre: str = Form("")):
+    """Enchaînement : les DAG cochés, dans l'ordre des clics (« ordre »), sinon dans celui de la liste. Jamais en prod."""
+    d = _get(slug)
+    wanted = [x for x in ordre.split(",") if x]
+    dag_ids = wanted if sorted(wanted) == sorted(set(dag_id)) else list(dict.fromkeys(dag_id))
+    problem = ("Coche au moins deux DAG à enchaîner." if len(dag_ids) < 2
+               else f"Pas plus de {MAX_STEPS} DAG par enchaînement." if len(dag_ids) > MAX_STEPS
+               else "Un enchaînement ne part jamais en prod." if padoa_env == "prod"
+               else f"Stack inconnue : {padoa_env}" if padoa_env not in PADOA_ENVS
+               else next((f"{x} n'est pas un DAG de {d.client} dans le catalogue." for x in dag_ids if not dag_catalogue.known_dag(d.orchestrator, x)), ""))
+    if problem:
+        return _result(request, ActionResult(False, problem, simulated=False))
+    chain = dag_chains.start(d.slug, d.client, padoa_env, dag_ids)
+    first = chain.steps[0]
+    if chain.group == "ko":
+        return _result(request, ActionResult(False, f"Enchaînement #{chain.id} {chain.status} · {first.dag_id} : {first.message}", simulated=False))
+    how = "simulé de bout en bout (Airflow non configuré)" if chain.simulated else f"lancé sur {padoa_env} : chaque DAG part quand le précédent finit vert"
+    return _result(request, ActionResult(True, f"Enchaînement #{chain.id} {how} · {' → '.join(dag_ids)} · à suivre dans Agents → Enchaînements",
+                                         simulated=chain.simulated))
+
+
+@app.post("/agents/chaines/{chain_id}/arreter")
+def chain_stop(chain_id: int):
+    if not dag_chains.get(chain_id):
+        raise HTTPException(404, f"Enchaînement #{chain_id} inconnu")
+    dag_chains.stop(chain_id)
+    return RedirectResponse("/agents#chaines", status_code=303)
 
 
 @app.post("/actions/claude/{slug}/{resource}", response_class=HTMLResponse)
@@ -722,6 +788,27 @@ def ticket_url(slug: str, kind: str, ref: str) -> str:
 
 
 templates.env.globals["ticket_url"] = ticket_url
+templates.env.globals["perso"] = personal
+
+
+def _find_ticket(d: Deployment, kind: str, ref: str):
+    items = d.retours if kind == "retour" else d.actions
+    return next((i for i in items if (i.id if kind == "retour" else i.ref) == ref.upper()), None)
+
+
+def _ticket_item(slug: str, kind: str, ref: str):
+    """(fiche, retour ou carte) ; 404 si le type, le client ou le ticket est inconnu."""
+    if kind not in TICKET_KINDS:
+        raise HTTPException(404, f"Type inconnu : {kind}")
+    d = _get(slug)
+    item = _find_ticket(d, kind, ref)
+    if item is None:
+        raise HTTPException(404, f"{'Retour' if kind == 'retour' else 'Carte'} {ref} introuvable chez {d.client}")
+    return d, item
+
+
+def _ticket_label(kind: str, item) -> str:
+    return item.label if kind == "retour" else item.title
 
 
 @app.get("/deploiements/{slug}/ticket/{kind}/{ref}", response_class=HTMLResponse)
@@ -729,13 +816,7 @@ def ticket(request: Request, slug: str, kind: str, ref: str, agent: bool = False
     """Tout ce qu'on sait d'un retour ou d'une carte d'action : fiche, contenu, agents, historique.
     Panneau latéral quand la page l'appelle (htmx), page entière sinon (lien ouvert dans un nouvel onglet).
     agent=1 (commande « >agent » de la palette) : le bloc « Lancer un agent » arrive déplié, brief chargé, et prend le focus."""
-    if kind not in TICKET_KINDS:
-        raise HTTPException(404, f"Type inconnu : {kind}")
-    d = _get(slug)
-    items = d.retours if kind == "retour" else d.actions
-    item = next((i for i in items if (i.id if kind == "retour" else i.ref) == ref.upper()), None)
-    if item is None:
-        raise HTTPException(404, f"{'Retour' if kind == 'retour' else 'Carte'} {ref} introuvable chez {d.client}")
+    d, item = _ticket_item(slug, kind, ref)
     history = [c for c in changes_since(d, settings.deployments_dir, datetime.min) if c.notion_url == notion_link(item.notion_url)]
     runs = [r for r in claude.runs if r.slug == slug and r.subject == f"retour {ref.upper()}"] if kind == "retour" else []
     context = {"d": d, "kind": kind, "item": item, "history": history, "runs": runs, "today": date.today(), "open_agent": agent}
@@ -804,6 +885,87 @@ def refresh_one(request: Request, slug: str):
     return response
 
 
+# ============================================================ Perso : brief, épingles, notes, rappels
+def _pinned(d: Deployment) -> list[dict]:
+    """Tickets épinglés du client ; « item » vaut None quand le ticket a disparu de la fiche (reste à désépingler)."""
+    return [{**p, "item": (item := _find_ticket(d, p["kind"], p["ref"])), "label": _ticket_label(p["kind"], item) if item else p["ref"]}
+            for p in personal.pins(d.slug)]
+
+
+def _reminders_context(slug: str, error: str = "") -> dict:
+    return {"reminders": personal.reminders(slug or None), "remind_slug": slug, "remind_error": error, "today": date.today()}
+
+
+@app.get("/brief", response_class=HTMLResponse)
+def brief_page(request: Request, tous: bool = False):
+    """Brief du matin : le résumé de l'accueil en texte à copier (client en cours, ou tous les clients)."""
+    current = _current(request)
+    deployments = [current] if current and not tous else sorted(_deployments(request), key=_closest_go_live)
+    today = date.today()
+    return _render(request, "brief.html", "/", all_clients=tous or not current,
+                   text=brief.build(deployments, _deadlines(deployments), personal.due(today), today, _in_period))
+
+
+@app.post("/perso/epingle/{slug}/{kind}/{ref}", response_class=HTMLResponse)
+def pin_toggle(request: Request, slug: str, kind: str, ref: str):
+    d, _item = _ticket_item(slug, kind, ref)
+    pinned = personal.toggle_pin(slug, kind, ref.upper())
+    return templates.TemplateResponse(request, "_pin_button.html", {"d": d, "kind": kind, "ref": ref.upper(), "pinned": pinned})
+
+
+@app.get("/perso/notes", response_class=HTMLResponse)
+def notes_panel(request: Request):
+    """Contenu du bloc-notes flottant (bouton « Notes ») : notes du client en cours et notes générales."""
+    return templates.TemplateResponse(request, "_notes_panel.html", {"current": _current(request)})
+
+
+@app.post("/perso/note", response_class=HTMLResponse)
+def general_note_save(request: Request, texte: str = Form("")):
+    """Notes générales (sans client) : rangées sous la clé vide de data/perso.json."""
+    personal.set_note("", texte)
+    return _result(request, ActionResult(True, f"Enregistré à {datetime.now():%H:%M}", simulated=False))
+
+
+@app.post("/perso/note/{slug}", response_class=HTMLResponse)
+def note_save(request: Request, slug: str, texte: str = Form("")):
+    _get(slug)
+    personal.set_note(slug, texte)
+    return _result(request, ActionResult(True, f"Enregistré à {datetime.now():%H:%M}", simulated=False))
+
+
+@app.post("/perso/rappel", response_class=HTMLResponse)
+def reminder_add(request: Request, quand: str = Form(""), jour: str = Form(""), slug: str = Form(""), kind: str = Form(""),
+                 ref: str = Form(""), label: str = Form("")):
+    """Rappel sur un ticket (kind et ref : le libellé est celui du ticket) ou rappel libre de l'accueil (label)."""
+    d = item = None
+    if kind:
+        d, item = _ticket_item(slug, kind, ref)
+        ref, label = ref.upper(), _ticket_label(kind, item)
+    elif slug:
+        _get(slug)
+    due = remind_date(quand, jour)
+    error = "Choisis une date à venir." if due is None else "" if label.strip() else "Écris ce qu'il faut te rappeler."
+    if not error:
+        personal.add_reminder(due, label, slug, kind, ref)
+    if kind:
+        return templates.TemplateResponse(request, "_ticket_remind.html", {"d": d, "kind": kind, "ref": ref, "today": date.today(), "remind_error": error})
+    return templates.TemplateResponse(request, "_reminders.html", _reminders_context(slug, error))
+
+
+@app.post("/perso/rappel/{reminder_id}/fait", response_class=HTMLResponse)
+def reminder_done(reminder_id: int):
+    personal.remove_reminder(reminder_id)
+    return HTMLResponse("")
+
+
+def _reminder_notes(deployments: list[Deployment], today: date) -> list[dict]:
+    """Rappels arrivés à échéance : une notification chacun, qui mène au ticket (ou à l'accueil pour un rappel libre)."""
+    names = {d.slug: d.client for d in deployments}
+    return [{"key": f"rappel:{r.id}:{r.due.isoformat()}", "kind": "rappel", "level": "info", "title": f"Rappel : {r.label}",
+             "detail": names.get(r.slug, ""), "link": ticket_url(r.slug, r.kind, r.ref) if r.kind else "/", "client": names.get(r.slug, "")}
+            for r in personal.due(today)]
+
+
 # ============================================================ Notifications
 def _deadline_notes() -> None:
     """Veilles (sources/watchers.py) : échéance du jour, synchro en retard, santé qui se dégrade, jalon proche."""
@@ -816,6 +978,7 @@ def _deadline_notes() -> None:
         + watchers.sync_late_notes(deployments, now)
         + health
         + watchers.milestone_notes(deployments, now.date())
+        + _reminder_notes(deployments, now.date())
     )
     if seen != state.get("sante"):
         notifications.save_state({**state, "sante": seen})

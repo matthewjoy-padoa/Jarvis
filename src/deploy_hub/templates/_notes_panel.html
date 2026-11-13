@@ -1,0 +1,14 @@
+{# Contenu du bloc-notes flottant (bouton « Notes »). Attend : current (client en cours ou None). Les notes du client sont
+   les mêmes que « Mes notes » de sa fiche ; tout est gardé dans data/perso.json, jamais envoyé dans Notion. #}
+{% if current %}
+<label class="notes-field">{{ current.client }}
+  <textarea name="texte" rows="7" maxlength="20000" placeholder="Contacts, décisions, pièges…"
+            hx-post="/perso/note/{{ current.slug }}" hx-trigger="keyup changed delay:800ms, change" hx-target="next .note-out" hx-swap="innerHTML">{{ perso.note(current.slug) }}</textarea>
+</label>
+<div class="note-out" role="status"></div>
+{% endif %}
+<label class="notes-field">Général <span class="muted">· tous clients</span>
+  <textarea name="texte" rows="{{ 5 if current else 10 }}" maxlength="20000" placeholder="À faire, à ne pas oublier…"
+            hx-post="/perso/note" hx-trigger="keyup changed delay:800ms, change" hx-target="next .note-out" hx-swap="innerHTML">{{ perso.note("") }}</textarea>
+</label>
+<div class="note-out" role="status"></div>
