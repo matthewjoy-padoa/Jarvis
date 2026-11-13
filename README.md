@@ -34,6 +34,10 @@ L'onglet Injections propose les DAGs de l'orchestrator qui traitent chaque resso
 - Après chaque lancement réel, [`air.py`](src/deploy_hub/air.py) (le script d'Arthur) suit le run : il relance les échecs passagers (3 fois au plus), envoie ses alertes en notifications et fait un rapport (**Agents → Suivis de DAG**). Il lit les logs des tâches qu'il suit ; ce qu'il écrit reste dans `data/airflow/`.
 - Catalogue des DAGs : `sync/dags/catalogue.json`, à régénérer quand `dags/config_deployment.py` change ([`sync/dags/generer_catalogue.py`](sync/dags/generer_catalogue.py)).
 
+## Flow Digger
+
+Le bouton **Flow Digger ↗** de la barre ouvre [integration-flow-digger](https://github.com/padoa/integration-flow-digger) dans sa propre fenêtre, et le démarre d'abord sur la VM s'il ne tourne pas (`uv run main.py --start --no-browser`). Son installation (outils, 1Password, Google Drive, configs client) se fait une fois, selon son README.
+
 ## Lancer des agents Claude
 
 Sur un retour de recette, « Lancer un agent » envoie le brief à Claude Code (`JARVIS_MODE=live`) :
@@ -63,6 +67,9 @@ Tous facultatifs, voir [`.env.example`](.env.example) :
 | `NOTION_TOKEN` | Bouton « Rafraîchir depuis Notion » |
 | `AIRFLOW_BASE_URL`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD` | Lancement réel des DAGs |
 | `ORCHESTRATOR_DIR`, `JARVIS_MODE`, `CLAUDE_BIN`, `JARVIS_AGENT_*` | Agents Claude |
+| `FLOW_DIGGER_DIR`, `FLOW_DIGGER_PORT`, `FLOW_DIGGER_URL` | Bouton Flow Digger (dossier, port 4004, adresse si le transfert de port en change) |
+
+**Secrets** (`NOTION_TOKEN`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD`) : de préférence une référence 1Password `op://<coffre>/<élément>/<champ>` (« Copy Secret Reference »), lue par `op read` au démarrage et gardée en mémoire seulement ; connecte-toi d'abord (app 1Password, ou `eval $(op signin)` dans le terminal qui lance Jarvis). `.env` est ramené à `600`, et Jarvis refuse de démarrer si ses données ou sa configuration sont dans un dépôt git sans y être ignorées.
 
 ## Développement
 
