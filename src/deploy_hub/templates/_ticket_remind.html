@@ -1,0 +1,18 @@
+{# Rappels d'un ticket : ceux posés, et « Me le rappeler ». Attend : d, kind, ref, today. #}
+{% import "_icons.html" as ic %}
+<div class="remind">
+  {% for r in perso.reminders_for(d.slug, kind, ref) %}
+  <span class="badge remind-set">{{ ic.icon("bell") }} Rappel le {{ r.due.strftime("%d/%m") }}
+    <button type="button" class="remind-drop" hx-post="/perso/rappel/{{ r.id }}/fait" hx-target="closest .remind-set" hx-swap="outerHTML" aria-label="Retirer ce rappel" title="Retirer ce rappel">×</button></span>
+  {% endfor %}
+  <form class="remind-form" hx-post="/perso/rappel" hx-target="closest .remind" hx-swap="outerHTML">
+    <input type="hidden" name="slug" value="{{ d.slug }}"><input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="ref" value="{{ ref }}">
+    <span class="muted">{{ ic.icon("bell") }} Me le rappeler</span>
+    <button type="submit" class="secondary" name="quand" value="demain">Demain</button>
+    <button type="submit" class="secondary" name="quand" value="lundi">Lundi</button>
+    <button type="submit" class="secondary" name="quand" value="semaine">Dans une semaine</button>
+    <input type="date" name="jour" min="{{ today.isoformat() }}" aria-label="Autre date">
+    <button type="submit" class="secondary" name="quand" value="date">Ce jour-là</button>
+  </form>
+  {% if remind_error %}<p class="result ko">{{ remind_error }}</p>{% endif %}
+</div>

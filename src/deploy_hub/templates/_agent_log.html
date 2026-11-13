@@ -1,11 +1,39 @@
 <div id="agent-log"{% if run.running %} hx-get="/agents/{{ run.id }}/journal" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
   <p><span class="badge g-{{ run.group }}">{{ run.status }}{{ " (simulé)" if run.simulated }}</span>
     {% if run.pr_url %} · <a href="{{ run.pr_url }}" target="_blank" rel="noopener">Pull request ↗</a>{% endif %}
-    {% if run.cost_usd is not none %} <span class="muted">· coût estimé {{ '%.2f' % run.cost_usd }} $</span>{% endif %}</p>
+    {% if run.cost_usd is not none %} <span class="muted">· coût estimé {{ '%.2f' % run.cost_usd }} $</span>{% endif %}
+    <span class="muted">· {{ "depuis" if run.running else "durée" }} {{ run.duration | duree }}{% if run.num_turns %} · {{ run.num_turns }} tours{% endif %}</span></p>
   {% if run.running and not run.simulated %}
   <form method="post" action="/agents/{{ run.id }}/arreter" onsubmit="return confirm('Arrêter l\'agent #{{ run.id }} ?')"><button type="submit" class="secondary">Arrêter l'agent</button></form>
   {% endif %}
   {% if run.summary %}<section class="panel"><h2>Compte rendu</h2><pre class="agent-summary">{{ run.summary }}</pre></section>{% endif %}
+  {% if review %}
+  <section class="panel review" id="relecture">
+    <h2>Relecture guidée</h2>
+    <ul class="review-checks">
+      {% for level, text in review.checks %}<li class="review-{{ level }}">{{ text }}</li>{% endfor %}
+    </ul>
+    <h3>Ce qui a changé</h3>
+    {% if review.files %}
+    <table class="review-files">
+      <tbody>{% for path, added, removed in review.files %}<tr><td><code>{{ path }}</code></td><td class="muted">{% if review.from_git %}+{{ added }} −{{ removed }}{% endif %}</td></tr>{% endfor %}</tbody>
+    </table>
+    <p class="muted">{{ "Diff de la branche par rapport à origin/main, dans le worktree." if review.from_git else "Worktree absent : fichiers relevés dans le journal de l'agent." }}</p>
+    {% else %}<p class="muted">Rien.</p>{% endif %}
+    <h3>Tests lancés</h3>
+    {% if review.tests %}
+    <ul class="review-tests">
+      {% for t in review.tests %}<li><span class="badge g-{{ 'done' if t.passed else 'ko' }}">{{ "passé" if t.passed else "échec ou refusé" }}</span> <code>{{ t.command }}</code>{% if t.outcome %} <span class="muted">· {{ t.outcome }}</span>{% endif %}</li>{% endfor %}
+    </ul>
+    {% else %}<p class="muted">Aucun.</p>{% endif %}
+    {% if review.refused %}
+    <h3>Ce que l'agent n'a pas pu faire</h3>
+    <ul class="review-tests">
+      {% for call, why in review.refused %}<li><code>{{ call }}</code>{% if why %}<br><span class="muted">{{ why }}</span>{% endif %}</li>{% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+  {% endif %}
   <section class="panel">
     <h2>Journal{% if run.running %} <span class="muted">· mis à jour toutes les 5 s</span>{% endif %}</h2>
     {% if log %}

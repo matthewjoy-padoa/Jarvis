@@ -15,7 +15,8 @@ import subprocess
 import threading
 import unicodedata
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from statistics import median
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from deploy_hub.config import child_environment
@@ -39,6 +40,12 @@ class AgentRun:
     pr_url: str = ""
     cost_usd: float | None = None
     summary: str = ""  # dernier message de l'agent (son compte rendu) ou cause de l'échec
+    num_turns: int | None = None
+    category: str = ""  # type de ticket (type de données du retour, ou ressource) : sert au bilan par type
+
+    @property
+    def duration(self) -> timedelta:
+        return (self.ended_at or datetime.now()) - self.started_at
 
     @property
     def group(self) -> str:
@@ -63,6 +70,38 @@ DEFAULT_TOOLS = ("Bash(uv run *)", "Bash(uv sync *)", "Bash(ls *)", "Bash(cat *)
                  "Bash(git status *)", "Bash(git diff *)", "Bash(git log *)", "Bash(git show *)", "Bash(git ls-files *)",
                  "Bash(git grep *)", "Bash(git blame *)", "Bash(git add *)", "Bash(git commit *)", "Bash(git push *)",
                  "Bash(gh pr create *)", "Bash(gh pr view *)")
+
+
+def duration_text(d: timedelta | None) -> str:
+    """« 45 s », « 12 min », « 1 h 05 »."""
+    if d is None:
+        return ""
+    seconds = max(int(d.total_seconds()), 0)
+    if seconds < 60:
+        return f"{seconds} s"
+    return f"{seconds // 60} min" if seconds < 3600 else f"{seconds // 3600} h {seconds % 3600 // 60:02d}"
+
+
+UNSORTED = "non précisé"
+
+
+def usage(runs: list[AgentRun]) -> dict | None:
+    """Bilan des agents réels terminés (ni simulés ni en cours) : total, et une ligne par type de ticket, le plus coûteux d'abord."""
+    ended = [r for r in runs if not r.simulated and not r.running and r.ended_at]
+    if not ended:
+        return None
+
+    def line(label: str, group: list[AgentRun]) -> dict:
+        costs = [r.cost_usd for r in group if r.cost_usd is not None]
+        return {"label": label, "count": len(group), "prs": sum(bool(r.pr_url) for r in group),
+                "time": sum((r.duration for r in group), timedelta()), "median": median(r.duration for r in group),
+                "cost": sum(costs) if costs else None, "mean_cost": sum(costs) / len(costs) if costs else None}
+
+    groups: dict[str, list[AgentRun]] = {}
+    for r in ended:
+        groups.setdefault(r.category or UNSORTED, []).append(r)
+    rows = sorted((line(label, group) for label, group in groups.items()), key=lambda row: (-(row["cost"] or 0), -row["count"], row["label"]))
+    return {"total": line("Tous", ended), "rows": rows}
 
 
 def agent_branch(*parts: str) -> str:
@@ -253,14 +292,14 @@ class ClaudeRunner:
             cmd += ["--add-dir", str(d)]
         return cmd + ["--allowedTools", *self.allowed_tools]  # en dernier : l'option prend tous les arguments qui suivent
 
-    def _launch(self, d: Deployment, subject: str, branch: str, prompt: str) -> ActionResult:
+    def _launch(self, d: Deployment, subject: str, branch: str, prompt: str, category: str = "") -> ActionResult:
         with self._lock:
             if any(r.running and r.branch == branch for r in self.runs):
                 return ActionResult(False, f"Un agent travaille déjà sur la branche {branch} : attends sa fin ou arrête-le (Agents).", not self.live)
             if self.live and sum(r.running for r in self.runs) >= self.max_running:
                 return ActionResult(False, f"Déjà {self.max_running} agent(s) en cours : attends qu'un se termine.", False)
             run = AgentRun(max((r.id for r in self.runs), default=0) + 1, d.slug, d.client, subject, branch, prompt,
-                           datetime.now(), "préparation", simulated=not self.live)
+                           datetime.now(), "préparation", simulated=not self.live, category=category)
             self.runs.insert(0, run)
         if not self.live:
             self.finished(run, "terminé")
@@ -325,6 +364,7 @@ class ClaudeRunner:
         text = log.read_text(encoding="utf-8", errors="replace")  # lu une fois : résultat final et lien de la PR
         result = next((e for e in reversed(list(_events(text))) if e.get("type") == "result"), {})
         run.cost_usd = result.get("total_cost_usd")
+        run.num_turns = result.get("num_turns")
         run.summary = (result.get("result") or "").strip()
         run.pr_url = find_pr(text)
         if run.id in self._stopped:
@@ -370,11 +410,12 @@ class ClaudeRunner:
 
     def launch(self, d: Deployment, resource: str) -> ActionResult:
         prompt = f"Ressource {resource} du client {d.client} (logiciel {d.software}) : lis la fiche de déploiement, code, teste, ouvre la PR."
-        return self._launch(d, resource, agent_branch(d.slug, resource), prompt)
+        return self._launch(d, resource, agent_branch(d.slug, resource), prompt, resource)
 
     def launch_retour(self, d: Deployment, r: RetourRecette, description: str = "", prompt: str = "") -> ActionResult:
         """prompt : le brief relu (et éventuellement modifié) par la personne qui lance l'agent ; sinon il est construit ici."""
-        return self._launch(d, f"retour {r.id}", agent_branch("fix", d.slug, r.id), prompt.strip() or retour_prompt(d, r, description))
+        return self._launch(d, f"retour {r.id}", agent_branch("fix", d.slug, r.id), prompt.strip() or retour_prompt(d, r, description),
+                            r.data_type or r.resource or "")
 
 
 def _events(text: str):
