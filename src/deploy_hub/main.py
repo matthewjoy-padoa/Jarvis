@@ -14,10 +14,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from deploy_hub import client_config
-from deploy_hub.config import PROJECT_ROOT, clients_dir, data_dir, ensure_private_dirs, load_settings, secret_problem
+from deploy_hub.config import PROCESS_KEYS, PROJECT_ROOT, clients_dir, data_dir, ensure_private_dirs, forget_secrets, load_settings, secret_problem
 from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
                                kanban_columns, notion_link, status_group)
-from deploy_hub import console, shell
+from deploy_hub import console, env_file, onepassword, shell
 from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
@@ -450,6 +450,86 @@ def open_flow_digger(request: Request):
     if launch.url:
         return RedirectResponse(launch.url, status_code=303)
     return _render(request, "outil.html", "", tool="Flow Digger", error=launch.error)
+
+
+# ---- Réglages : .env, connexions et 1Password depuis l'app -------------------------------------------------------
+
+def _reload_connections() -> None:
+    """Après un changement de réglages ou une connexion à 1Password : secrets relus, Airflow reconstruit (historique gardé)."""
+    global airflow
+    forget_secrets()
+    fresh = AirflowSource.from_env()
+    fresh.runs = airflow.runs
+    airflow = fresh
+    dag_watch.airflow_env = {"AIRFLOW_URL": fresh.base_url, "AIRFLOW_USER": fresh.user, "AIRFLOW_PASSWORD": fresh.password} if fresh.live else {}
+
+
+def _guard_settings(request: Request) -> None:
+    """Réglages et mot de passe 1Password : seulement en local, et depuis une page de Jarvis."""
+    if not request.client or request.client.host not in shell.LOCAL_HOSTS:
+        raise HTTPException(403, "Réglages : connexions locales seulement (transfert de port).")
+    if not _from_jarvis(request):
+        raise HTTPException(403, "Réglages : la demande ne vient pas de Jarvis.")
+
+
+def _settings_page(request: Request, message: str = "", error: str = "", op_error: str = "") -> HTMLResponse:
+    op = onepassword.status()
+    return _render(request, "reglages.html", "/reglages", fields=env_file.view(), env_path=env_file.path(), op=op,
+                   message=message, error=error, op_error=op_error or op.get("error", ""))
+
+
+@app.get("/reglages", response_class=HTMLResponse)
+def settings_page(request: Request):
+    return _settings_page(request)
+
+
+@app.post("/reglages", response_class=HTMLResponse)
+async def settings_save(request: Request):
+    _guard_settings(request)
+    form = await request.form()
+    values = {f.key: str(form.get(f.key, "")) for f in env_file.FIELDS if f.key in form}
+    clear = {f.key for f in env_file.FIELDS if form.get(f"effacer_{f.key}")}
+    process_keys_before = set(PROCESS_KEYS)
+    try:
+        changed = env_file.update(values, clear)
+    except env_file.EnvError as e:
+        return _settings_page(request, error=str(e))
+    if not changed:
+        return _settings_page(request, message="Rien n'a changé.")
+    await asyncio.to_thread(_reload_connections)
+    overridden = [k for k in changed if k in process_keys_before]
+    later = [env_file.BY_KEY[k].label for k in changed if not env_file.BY_KEY[k].live]
+    note = f" Au prochain démarrage de Jarvis : {', '.join(later)}." if later else ""
+    if overridden:
+        note += f" Attention : {', '.join(overridden)} est aussi défini hors .env (vm.conf…), cette valeur-là reviendra au redémarrage."
+    return _settings_page(request, message=f"Enregistré dans .env : {', '.join(changed)}.{note} Lance « Tester » pour vérifier.")
+
+
+@app.post("/reglages/tester", response_class=HTMLResponse)
+async def settings_test(request: Request):
+    _guard_settings(request)
+    checks = await asyncio.gather(
+        asyncio.to_thread(connections.airflow_status, airflow, _airflow_problem()),
+        asyncio.to_thread(connections.notion_status, notion_api.load_token(), secret_problem("NOTION_TOKEN")))
+    return templates.TemplateResponse(request, "_reglages_tests.html", {"checks": zip(("Airflow", "Notion"), checks)})
+
+
+@app.post("/reglages/1password/connexion", response_class=HTMLResponse)
+async def settings_op_signin(request: Request, password: str = Form("")):
+    _guard_settings(request)
+    status = await asyncio.to_thread(onepassword.signin, password)
+    del password  # jamais gardé ni journalisé
+    if status.get("signed_in"):
+        await asyncio.to_thread(_reload_connections)
+        return _settings_page(request, message="Connecté à 1Password : les références op:// sont relues. Lance « Tester ».")
+    return _settings_page(request, op_error=status.get("error") or "Connexion refusée.")
+
+
+@app.post("/reglages/1password/deconnexion", response_class=HTMLResponse)
+async def settings_op_signout(request: Request):
+    _guard_settings(request)
+    await asyncio.to_thread(onepassword.signout)
+    return _settings_page(request, message="Déconnecté de 1Password. Les secrets déjà lus restent en mémoire jusqu'au prochain changement ou redémarrage.")
 
 
 @app.get("/client/{slug}")

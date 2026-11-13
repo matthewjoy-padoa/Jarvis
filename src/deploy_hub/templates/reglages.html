@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Réglages · Jarvis{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Réglages</h1>
+  <a href="/sources" class="btn-link">État des systèmes →</a>
+</div>
+<p class="muted settings-intro">Enregistrés dans <code>{{ env_path }}</code> (hors git, droits 600). Pour les secrets, mets plutôt une référence 1Password <code>op://&lt;coffre&gt;/&lt;élément&gt;/&lt;champ&gt;</code> (dans l'app 1Password, sur le champ : ⌄ → Copy Secret Reference) : Jarvis la lit en mémoire, rien n'est écrit en clair.</p>
+{% if message %}<p class="result ok settings-flash" role="status">{{ message }}</p>{% endif %}
+{% if error %}<p class="result ko settings-flash" role="alert">{{ error }}</p>{% endif %}
+
+<section class="panel">
+  <div class="panel-head"><h2>1Password</h2>
+    {% if op.signed_in %}<span class="badge g-done">connecté{% if op.email %} · {{ op.email }}{% endif %}</span>
+    {% elif not op.installed %}<span class="badge">op absent</span>
+    {% else %}<span class="badge g-ko">non connecté</span>{% endif %}
+  </div>
+  {% if op.signed_in %}
+    <p class="muted">Les références op:// sont lisibles{% if op.url %} ({{ op.url }}){% endif %}. La session de 1Password s'arrête après 30 min sans activité : les secrets déjà lus restent en mémoire.</p>
+    <form method="post" action="/reglages/1password/deconnexion"><button type="submit" class="secondary">Se déconnecter</button></form>
+  {% elif op.installed and op.accounts %}
+    <form method="post" action="/reglages/1password/connexion" class="settings-signin">
+      <label class="field">Mot de passe 1Password{% if op.accounts[0].email %} de {{ op.accounts[0].email }}{% endif %}
+        <input type="password" name="password" autocomplete="current-password" required>
+        <small class="muted">Passé à <code>op signin</code> puis oublié : jamais écrit ni journalisé. La session reste dans Jarvis, sans aller aux agents ni au shell.</small></label>
+      <button type="submit">Se connecter</button>
+    </form>
+  {% endif %}
+  {% if op_error %}<p class="result ko">{{ op_error }}</p>{% endif %}
+  {% if op.installed and not op.accounts and not op.signed_in %}
+    <p class="muted">Une seule fois par machine, dans un terminal (ta Secret Key est demandée, Jarvis ne la voit pas) :<br><code>op account add --address &lt;adresse du site 1Password&gt; --email &lt;ton e-mail&gt;</code>, puis recharge cette page.</p>
+  {% endif %}
+</section>
+
+<form class="panel settings-form" method="post" action="/reglages" autocomplete="off">
+  <h2>Connexions et dossiers</h2>
+  {% for f in fields %}{% set fd = f.field %}
+  <label class="field">{{ fd.label }}
+    {% if fd.kind == "secret" and f.stored_clear %}<span class="badge g-ko" title="Valeur enregistrée en clair dans .env">en clair</span>{% elif f.reference %}<span class="badge g-done">1Password</span>{% endif %}
+    {% if f.overridden %}<span class="badge g-ko" title="Aussi définie dans l'environnement du processus (vm.conf…) : c'est cette valeur-là qui gagnera au prochain démarrage">définie hors .env</span>{% endif %}
+    {% if not fd.live %}<span class="badge" title="Pris en compte au prochain démarrage de Jarvis">au redémarrage</span>{% endif %}
+    {% if f.path_ok is sameas true %}<span class="badge g-done">trouvé</span>{% elif f.path_ok is sameas false %}<span class="badge g-ko">introuvable</span>{% endif %}
+    <input name="{{ fd.key }}" value="{{ f.value }}" spellcheck="false"
+           {% if fd.kind == "secret" and f.stored_clear %}placeholder="•••••• enregistré, laisse vide pour le garder"{% elif fd.kind == "secret" %}placeholder="op://…"{% endif %}>
+    <small class="muted">{{ fd.help }}{% if fd.kind == "secret" and not f.empty %} · <span class="settings-clear"><input type="checkbox" name="effacer_{{ fd.key }}" aria-label="Effacer {{ fd.label }}"> effacer</span>{% endif %}</small>
+  </label>
+  {% endfor %}
+  <div class="form-actions">
+    <button type="submit">Enregistrer et appliquer</button>
+    <button type="button" class="secondary" hx-post="/reglages/tester" hx-target="#settings-tests" hx-indicator="#settings-tests" hx-disabled-elt="this">{{ ic.icon("check") }} Tester les connexions</button>
+  </div>
+  <div id="settings-tests" class="settings-tests" aria-live="polite"><span class="refresh-wait muted">Jarvis interroge Airflow et Notion…</span></div>
+</form>
+{% endblock %}

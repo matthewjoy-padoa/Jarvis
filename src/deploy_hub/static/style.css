@@ -972,3 +972,22 @@ img.client-icon { width: 1em; height: 1em; object-fit: contain; vertical-align: 
 @media (max-width: 1440px) { .tool-launch-label { display: none; } }
 .tool-error { display: flex; gap: 8px; align-items: flex-start; color: var(--st-ko); }
 .tool-error .ic { flex: none; width: 18px; height: 18px; margin-top: 2px; }
+
+/* Page Réglages : .env, connexions, 1Password */
+.settings-form .field, .settings-signin .field { margin-bottom: 12px; }
+.settings-form .field .badge { align-self: flex-start; margin-left: 4px; font-weight: 500; }
+.settings-form .field { flex-direction: column; }
+.settings-signin { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.settings-signin .field { flex: 1 1 260px; margin-bottom: 0; }
+.settings-clear { display: inline-flex; gap: 4px; align-items: center; margin-left: 4px; }
+.settings-clear input { width: auto; margin: 0; }
+.settings-tests .refresh-wait { display: none; }
+.settings-tests.htmx-request .refresh-wait { display: inline; }
+.settings-results { list-style: none; padding: 0; margin: 8px 0; }
+.settings-results .dot { margin-right: 6px; }
+.settings-flash { font-size: 14px; }
+/* Lien Réglages de la barre : même gabarit que les boutons ronds voisins */
+a.settings-link { display: inline-flex; flex: none; align-items: center; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--muted); padding: 6px 12px; }
+a.settings-link:hover, a.settings-link.active { border-color: var(--accent); color: var(--text); }
+a.settings-link .ic { width: 16px; height: 16px; margin: 0; }
+.settings-intro code, .settings-form code { overflow-wrap: anywhere; }
