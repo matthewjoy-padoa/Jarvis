@@ -1090,14 +1090,14 @@ a.stat-link:hover .stat-go, a.stat-link:focus-visible .stat-go { opacity: 1; }
 /* Barre resserrée (901–1180 px) : onglets inactifs en icône seule, l'onglet actif garde son libellé */
 @media (min-width: 901px) and (max-width: 1180px) { .nav-item:not(.active) > span { display: none; } .nav-item:not(.active) { padding-left: 10px; padding-right: 10px; } }
 
-/* Raccourcis du client en cours sur le côté : colonne fixe dès 1560 px (place libre à gauche de main, 1100 px),
-   sinon onglet « Liens » au bord gauche qui ouvre le même panneau. */
-.quick-rail { position: fixed; left: 0; top: calc(var(--topbar-h, 61px) + 120px); z-index: 45; }
-.quick-rail-tab { writing-mode: vertical-rl; transform: rotate(180deg); padding: 12px 7px; border-radius: 0 10px 10px 0; font-size: 13px; font-weight: 600;
-  border: 1px solid var(--border); border-left: 0; background: var(--surface); color: var(--text); box-shadow: var(--shadow); cursor: pointer; }
+/* Raccourcis du client en cours, à droite : colonne fixe dès 1620 px (place libre à droite de main, 1100 px),
+   sinon onglet « Liens » au bord droit qui ouvre le même panneau. */
+.quick-rail { position: fixed; right: 0; top: calc(var(--topbar-h, 61px) + 120px); z-index: 45; }
+.quick-rail-tab { writing-mode: vertical-rl; padding: 12px 7px; border-radius: 10px 0 0 10px; font-size: 13px; font-weight: 600;
+  border: 1px solid var(--border); border-right: 0; background: var(--surface); color: var(--text); box-shadow: var(--shadow); cursor: pointer; }
 .quick-rail-tab:hover { color: var(--accent); }
-.quick-rail-panel { display: none; position: absolute; left: 0; top: 0; width: 230px; max-height: calc(100vh - var(--topbar-h, 61px) - 140px); overflow-y: auto;
-  flex-direction: column; gap: 4px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-left: 0; border-radius: 0 12px 12px 0; box-shadow: var(--shadow); }
+.quick-rail-panel { display: none; position: absolute; right: 0; top: 0; width: 230px; max-height: calc(100vh - var(--topbar-h, 61px) - 140px); overflow-y: auto;
+  flex-direction: column; gap: 4px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-right: 0; border-radius: 12px 0 0 12px; box-shadow: var(--shadow); }
 .quick-rail.open .quick-rail-panel { display: flex; }
 .quick-rail.open .quick-rail-tab { visibility: hidden; }
 .quick-rail-title { margin: 0 0 4px; font-weight: 700; font-size: 14px; }
@@ -1109,10 +1109,10 @@ a.stat-link:hover .stat-go, a.stat-link:focus-visible .stat-go { opacity: 1; }
 .quick-env.drive { background: color-mix(in srgb, var(--st-done) 15%, var(--surface)); color: var(--st-done); }
 .quick-add { color: var(--muted); border: 1px dashed var(--border); justify-content: center; }
 .quick-config { margin-top: 8px; font-size: 12px; text-align: center; }
-@media (min-width: 1560px) {
-  .quick-rail { left: max(12px, calc((100vw - 1100px) / 2 - 250px)); top: calc(var(--topbar-h, 61px) + 24px); }
+@media (min-width: 1620px) {
+  .quick-rail { right: max(16px, calc((100% - 1100px) / 2 - 256px)); top: calc(var(--topbar-h, 61px) + 24px); }
   .quick-rail-tab { display: none; }
-  .quick-rail-panel { display: flex; position: static; border-left: 1px solid var(--border); border-radius: 12px; max-height: calc(100vh - var(--topbar-h, 61px) - 48px); }
+  .quick-rail-panel { display: flex; position: static; border-right: 1px solid var(--border); border-radius: 12px; max-height: calc(100vh - var(--topbar-h, 61px) - 48px); }
 }
 @media (max-width: 640px) { .quick-rail { top: auto; bottom: 96px; } .quick-rail-panel { top: auto; bottom: 0; } }
 @media print { .quick-rail { display: none; } }

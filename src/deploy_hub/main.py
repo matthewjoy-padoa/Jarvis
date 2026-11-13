@@ -1,5 +1,6 @@
 import asyncio
 import calendar
+import dataclasses
 import logging
 import os
 import re
@@ -319,6 +320,43 @@ def _config_or_fiche(slug: str):
 def client_edit(request: Request, slug: str):
     cfg, notice = _config_or_fiche(slug)
     return _client_form(request, cfg, notice, new=False)
+
+
+def _local_path(value: str, default: str) -> str:
+    """Page de retour : seulement un chemin de Jarvis (jamais une adresse externe ni « //hôte »)."""
+    return value if value.startswith("/") and not value.startswith("//") else default
+
+
+def _links_page(request: Request, cfg, vers: str, error: str = "", form: dict | None = None) -> HTMLResponse:
+    return _render(request, "client_links.html", "/clients", cfg=cfg, vers=vers, error=error, form=form or {})
+
+
+@app.get("/clients/{slug}/liens", response_class=HTMLResponse)
+def client_links(request: Request, slug: str, vers: str = ""):
+    """Seulement les liens du client (Drive, dashboard Notion, stacks) : ce qu'on ajoute le plus souvent."""
+    cfg = client_config.load(slug)
+    if cfg is None:  # pas encore de configuration : il faut d'abord sa fiche Notion
+        return RedirectResponse(f"/clients/{slug}/configuration", status_code=303)
+    return _links_page(request, cfg, _local_path(vers, f"/deploiements/{slug}/synthese"))
+
+
+@app.post("/clients/{slug}/liens", response_class=HTMLResponse)
+async def client_links_save(request: Request, slug: str):
+    cfg = client_config.load(slug)
+    if cfg is None:
+        raise HTTPException(404, f"Client sans configuration : {slug}")
+    form = dict(await request.form())
+    vers = _local_path(str(form.get("vers") or ""), f"/deploiements/{slug}/synthese")
+    try:
+        dashboard = str(form.get("notion_url") or "").strip()
+        if dashboard and not dashboard.startswith(("http://", "https://")):
+            raise client_config.ConfigError("Le lien du dashboard Notion doit être une adresse https://")
+        updated = dataclasses.replace(cfg, notion_url=dashboard, drive=client_config.parse_drive(str(form.get("drive") or "")),
+                                      stacks=client_config.parse_stacks(str(form.get("stacks") or "")))
+        client_config.save(updated)
+    except client_config.ConfigError as e:
+        return _links_page(request, cfg, vers, str(e), form)
+    return RedirectResponse(vers, status_code=303)
 
 
 @app.post("/clients/enregistrer", response_class=HTMLResponse)

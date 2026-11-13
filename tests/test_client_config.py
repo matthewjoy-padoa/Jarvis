@@ -151,4 +151,26 @@ def test_the_form_has_a_drive_field(app):
 def test_without_drive_links_the_fiche_offers_to_add_them():
     from deploy_hub.models import Deployment
     html = main.templates.get_template("_stacks.html").render(d=Deployment(slug="acme", client="Acme", software="Pulse"))
-    assert '<a class="muted" href="/clients/acme/configuration" title="Ajouter les liens Google Drive du client">+ Drive</a>' in html
+    assert '<a class="muted" href="/clients/acme/liens" title="Ajouter les liens Google Drive du client">+ Drive</a>' in html
+
+
+def test_the_links_page_only_changes_the_links(app):
+    app.post("/clients/enregistrer", data={"client": "Acme", "page_id": PAGE, "software": "Pulse", "orchestrator": "acme-pulse"})
+    page = app.get("/clients/acme/liens?vers=/deadlines").text
+    assert "Liens de Acme" in page and 'name="drive"' in page and 'name="stacks"' in page
+    assert 'name="page_id"' not in page and 'name="orchestrator"' not in page  # rien d'autre que les liens
+    r = app.post("/clients/acme/liens", data={"drive": f"Dossier | {DRIVE}", "stacks": "prod | Production | https://acme.padoa.fr",
+                                              "notion_url": "", "vers": "/deadlines"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/deadlines"  # retour à la page d'où l'on vient
+    cfg = client_config.load("acme")
+    assert cfg.drive == [{"label": "Dossier", "url": DRIVE}] and cfg.stacks[0]["label"] == "Production"
+    assert (cfg.software, cfg.orchestrator, cfg.page_id) == ("Pulse", ["acme-pulse"], PAGE)  # le reste est intact
+
+
+def test_the_links_page_refuses_bad_links_and_foreign_returns(app):
+    app.post("/clients/enregistrer", data={"client": "Acme", "page_id": PAGE})
+    bad = app.post("/clients/acme/liens", data={"drive": "https://ailleurs.example/x"})
+    assert "drive.google.com" in bad.text and client_config.load("acme").drive == []
+    r = app.post("/clients/acme/liens", data={"drive": "", "vers": "//site-hostile.example/"}, follow_redirects=False)
+    assert r.headers["location"] == "/deploiements/acme/synthese"  # jamais de redirection hors de Jarvis
+    assert app.get("/clients/inconnu/liens", follow_redirects=False).headers["location"] == "/clients/inconnu/configuration"

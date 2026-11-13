@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Liens de {{ cfg.client }} · Jarvis{% endblock %}
+{% block content %}
+{# Seulement les liens du client : Google Drive, dashboard Notion, stacks. Le reste de la configuration n'est pas touché. #}
+{% macro val(name, default) -%}{{ form[name] if name in form else default }}{%- endmacro %}
+<div class="page-head">
+  <h1>Liens de {{ cfg.client }}</h1>
+  <a href="{{ vers }}" class="btn-link">← Retour</a>
+</div>
+<p class="muted">Ils s'affichent dans les raccourcis à droite de chaque page et en haut de la fiche. Jarvis ne fait que les ouvrir dans ton navigateur : il ne lit jamais leur contenu.</p>
+{% if error %}<p class="result ko">{{ error }}</p>{% endif %}
+<form class="panel client-form" method="post" action="/clients/{{ cfg.slug }}/liens">
+  <input type="hidden" name="vers" value="{{ vers }}">
+  <label class="field">Google Drive
+    <textarea name="drive" rows="4" placeholder="un par ligne : libellé | adresse&#10;Dossier client | https://drive.google.com/drive/folders/…">{{ val('drive', cfg.drive_text) }}</textarea>
+    <small class="muted">Adresses https://drive.google.com/… ou https://docs.google.com/… ; s'ouvrent avec ton compte Google.</small></label>
+  <label class="field">Dashboard intégration (Notion)
+    <input name="notion_url" type="url" value="{{ val('notion_url', cfg.notion_url) }}" placeholder="https://app.notion.com/p/…"></label>
+  <label class="field">Stacks Padoa
+    <textarea name="stacks" rows="3" placeholder="une par ligne : env | libellé | adresse&#10;prod | Production | https://…">{{ val('stacks', cfg.stacks_text) }}</textarea></label>
+  <div class="form-actions">
+    <button type="submit">Enregistrer</button>
+    <a class="btn-link" href="/clients/{{ cfg.slug }}/configuration">Toute la configuration du client</a>
+  </div>
+</form>
+{% endblock %}
