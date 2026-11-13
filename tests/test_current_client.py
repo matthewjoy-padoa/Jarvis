@@ -88,6 +88,6 @@ def test_the_side_shortcuts_follow_the_current_client():
     c = fresh()
     c.get("/deploiements/client-exemple/actions")
     html = c.get("/deadlines").text
-    rail = html.split('<aside class="quick-rail"', 1)[1].split("</aside>", 1)[0]
-    assert 'aria-label="Raccourcis de Client Exemple"' in rail and "Google Drive" in rail
-    assert 'href="/clients/client-exemple/liens?vers=/deadlines">+ Ajouter un lien Drive' in rail  # page des liens, puis retour ici
+    dock = html.split('<nav class="dock"', 1)[1].split("</nav>", 1)[0]
+    assert 'aria-label="Raccourcis de Client Exemple"' in dock
+    assert 'href="/clients/client-exemple/liens?vers=/deadlines"' in dock and 'data-tip="Ajouter un lien Drive"' in dock  # pas encore de lien

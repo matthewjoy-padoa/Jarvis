@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=93">
+  <link rel="stylesheet" href="/static/style.css?v=94">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=6" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
@@ -202,31 +202,27 @@
     </div>
   </section>
   <footer class="footer muted">Jarvis · <em>Just A Rather Very Intelligent System</em>, au service de l'équipe Integration · <a href="/sources">État des systèmes</a></footer>
-  {# Raccourcis du client en cours (Drive, Notion, stacks), sur le côté de chaque page : colonne fixe sur grand écran,
-     onglet « Liens » au bord droit sinon. Liens ouverts dans le navigateur : Jarvis ne lit jamais leur contenu. #}
+  {# Raccourcis du client en cours : dock de boutons ronds au bord droit, nom du lien en bulle au survol.
+     Liens ouverts dans le navigateur : Jarvis ne lit jamais leur contenu. #}
   {% if current %}
-  <aside class="quick-rail" id="quick-rail" aria-label="Raccourcis de {{ current.client }}">
-    <button type="button" class="quick-rail-tab" aria-controls="quick-rail" aria-expanded="false" title="Raccourcis de {{ current.client }}">Liens</button>
-    <div class="quick-rail-panel">
-      <p class="quick-rail-title">Raccourcis <span class="muted">· {{ current.client }}</span></p>
-      <p class="quick-rail-label">Google Drive</p>
-      {% for l in current.drive %}<a class="quick-link" href="{{ l.url }}" target="_blank" rel="noopener noreferrer" title="{{ l.label }} : s'ouvre avec ton compte Google"><span class="quick-env drive">Drive</span><span class="quick-name">{{ l.label }}</span> ↗</a>
-      {% else %}<a class="quick-link quick-add" href="/clients/{{ current.slug }}/liens?vers={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode }}">+ Ajouter un lien Drive</a>{% endfor %}
-      {% if current.notion_url or current.stacks %}<p class="quick-rail-label">Notion et stacks</p>{% endif %}
-      {% if current.notion_url %}<a class="quick-link" href="{{ current.notion_url }}" target="_blank" rel="noopener" title="Dashboard intégration dans Notion"><span class="quick-env">Notion</span><span class="quick-name">Dashboard</span> ↗</a>{% endif %}
-      {% for st in current.stacks %}<a class="quick-link" href="{{ st.url }}" target="_blank" rel="noopener" title="{{ st.url }}"><span class="quick-env">{{ st.env or "Stack" }}</span><span class="quick-name">{{ st.label }}</span> ↗</a>{% endfor %}
-      <a class="quick-config muted" href="/clients/{{ current.slug }}/liens?vers={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode }}">+ Ajouter ou modifier les liens</a>
-    </div>
-  </aside>
-  <script>
-    (function () {  // petit écran : l'onglet « Liens » ouvre le panneau ; Échap ou un clic ailleurs le ferme
-      const rail = document.getElementById("quick-rail"), tab = rail.querySelector(".quick-rail-tab");
-      const set = (open) => { rail.classList.toggle("open", open); tab.setAttribute("aria-expanded", open); };
-      tab.addEventListener("click", () => set(!rail.classList.contains("open")));
-      document.addEventListener("keydown", (e) => { if (e.key === "Escape") set(false); });
-      document.addEventListener("click", (e) => { if (!rail.contains(e.target)) set(false); });
-    })();
-  </script>
+  {% set here = (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode %}
+  {% macro dock_icon(kind) -%}
+  <svg viewBox="0 0 24 24" aria-hidden="true">{% if kind == "folder" %}<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>
+  {%- elif kind == "sheet" %}<rect x="4.5" y="3.5" width="15" height="17" rx="2"/><path d="M4.5 9.5h15M4.5 15h15M10 9.5v11"/>
+  {%- elif kind == "doc" %}<path d="M6.5 3.5h7l4 4v11a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z"/><path d="M13.5 3.5v4h4M8.5 12.5h7M8.5 16h5"/>
+  {%- elif kind == "notion" %}<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 16V8l6 8V8"/>
+  {%- elif kind == "stack" %}<rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M3.5 9h17M6.5 7h.01M8.5 7h.01"/>
+  {%- else %}<path d="M12 6v12M6 12h12"/>{% endif %}</svg>
+  {%- endmacro %}
+  <nav class="dock" aria-label="Raccourcis de {{ current.client }}">
+    {% for l in current.drive %}
+    {% set kind = "folder" if "/folders/" in l.url else ("sheet" if "/spreadsheets/" in l.url else "doc") %}
+    <a class="dock-btn dock-drive" href="{{ l.url }}" target="_blank" rel="noopener noreferrer" data-tip="Drive · {{ l.label }} ↗" aria-label="Drive : {{ l.label }} (nouvel onglet)">{{ dock_icon(kind) }}</a>
+    {% endfor %}
+    {% if current.notion_url %}<a class="dock-btn" href="{{ current.notion_url }}" target="_blank" rel="noopener" data-tip="Notion · Dashboard ↗" aria-label="Dashboard Notion (nouvel onglet)">{{ dock_icon("notion") }}</a>{% endif %}
+    {% for st in current.stacks %}<a class="dock-btn" href="{{ st.url }}" target="_blank" rel="noopener" data-tip="{{ (st.env ~ ' · ') if st.env }}{{ st.label }} ↗" aria-label="Stack {{ st.label }} (nouvel onglet)">{{ dock_icon("stack") }}</a>{% endfor %}
+    <a class="dock-btn dock-add" href="/clients/{{ current.slug }}/liens?vers={{ here }}" data-tip="{{ 'Ajouter un lien Drive' if not current.drive else 'Ajouter ou modifier les liens' }}" aria-label="Ajouter ou modifier les liens de {{ current.client }}">{{ dock_icon("add") }}</a>
+  </nav>
   {% endif %}
 </body>
 </html>
