@@ -183,3 +183,27 @@ def test_lists_open_tickets_in_the_drawer(app):
         html = app.get(path).text
         assert 'data-ticket href="/deploiements/acme/ticket/' in html, path
         assert path == "/" or "data-ticket-card" in html, path  # toute la carte ou la ligne est cliquable
+
+
+def test_home_counters_lead_to_the_counted_tickets(app, acme):
+    html = app.get("/").text
+    # un seul retour aujourd'hui : la tuile ouvre directement son ticket dans le panneau
+    assert 'class="stat stat-todo stat-link" href="/deploiements/acme/ticket/retour/0001AB" data-ticket' in html
+    # le seul retard n'a pas de ticket (pas de lien Notion) : la tuile ouvre la liste filtrée
+    assert 'class="stat stat-ko stat-link" href="/deadlines?periode=retard"' in html
+    assert 'class="count-link" href="/deadlines?periode=retard"' in html  # la phrase de Jarvis aussi
+    assert 'href="/deploiements/acme/ticket/action/' in html.split("Injections KO")[0]  # une seule injection KO : son ticket
+    assert 'href="/deploiements/acme/injections?vue=liste#groupe=ko"' in html  # titre du bloc KO : la liste filtrée
+    assert 'href="/deadlines?periode=semaine"' not in html  # rien dans les 7 jours : rien à ouvrir
+    d, _ = acme
+    d.actions.append(Action(title="Relancer le client", status="À faire", due=date.today(), notion_url="https://app.notion.com/" + "d" * 32))
+    assert 'class="stat stat-todo stat-link" href="/deadlines?periode=aujourdhui"' in app.get("/").text  # deux : la liste
+
+
+def test_deadlines_filtered_by_period_link_each_ticket(app):
+    late = app.get("/deadlines?periode=retard").text
+    assert "Préparer le COPIL" in late and "Retour 0001AB" not in late and "· En retard" in late
+    today = app.get("/deadlines?periode=aujourdhui").text
+    assert 'data-ticket>Retour 0001AB' in today and "Préparer le COPIL" not in today
+    assert "Déploiement" not in app.get("/deadlines?periode=semaine").text.split("<tbody>")[1]  # jalons exclus, comme à l'accueil
+    assert "Préparer le COPIL" in app.get("/deadlines?periode=nimporte").text  # période inconnue : tout
