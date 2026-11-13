@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=70">
+  <link rel="stylesheet" href="/static/style.css?v=71">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=4" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
@@ -62,9 +62,9 @@
         {% endfor %}
       </div>
     </nav>
-    {# Flow Digger (padoa/integration-flow-digger) : lancé sur la VM au besoin, ouvert dans un nouvel onglet. #}
-    <form method="post" action="/outils/flow-digger" target="_blank" class="tool-launch">
-      <button type="submit" class="secondary" title="Ouvrir Flow Digger (le démarre sur la VM s'il ne tourne pas)">{{ ic.icon("shovel") }}<span class="tool-launch-label">Flow Digger</span></button>
+    {# Flow Digger (padoa/integration-flow-digger) : lancé sur la VM au besoin, ouvert dans sa propre fenêtre (réutilisée). #}
+    <form method="post" action="/outils/flow-digger" target="flow-digger" class="tool-launch" data-own-window>
+      <button type="submit" class="secondary" title="Ouvrir Flow Digger dans une autre fenêtre (le démarre sur la VM s'il ne tourne pas)">{{ ic.icon("shovel") }}<span class="tool-launch-label">Flow Digger</span><span class="tool-launch-ext" aria-hidden="true">↗</span></button>
     </form>
     <button type="button" class="secondary pal-open" data-palette-open aria-label="Rechercher dans Jarvis" title="Demander à Jarvis">{{ ic.icon("search") }}<span class="pal-open-label">Rechercher</span><kbd data-palette-key>⌘K</kbd></button>
     <div class="bell-wrap">
@@ -101,6 +101,12 @@
   </script>
   <main>{% block content %}{% endblock %}</main>
   <script>
+    // Outils externes (Flow Digger) : une fenêtre à part, nommée, réutilisée au clic suivant ; le formulaire s'y envoie.
+    // Fenêtres bloquées : le formulaire ouvre alors un onglet du même nom.
+    document.querySelectorAll("form[data-own-window]").forEach((form) => form.addEventListener("submit", () => {
+      const win = window.open("", form.target, "popup,width=1440,height=900");
+      if (win) { win.opener = null; win.focus(); }  // la page ouverte ne peut pas piloter Jarvis
+    }));
     // Sélecteur du client en cours : se ferme au clic ailleurs et à Échap.
     (function () {
       const menu = document.querySelector("[data-client-switch]");

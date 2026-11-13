@@ -93,8 +93,10 @@ def test_the_url_can_follow_another_forwarded_port(repo, monkeypatch):
     assert flow_digger.url() == "http://localhost:4005"
 
 
-def test_the_button_is_in_the_bar():
-    assert 'action="/outils/flow-digger"' in TestClient(app).get("/").text
+def test_the_button_is_in_the_bar_and_opens_its_own_window():
+    page = TestClient(app).get("/").text
+    assert 'action="/outils/flow-digger" target="flow-digger"' in page and "data-own-window" in page
+    assert 'class="tool-launch-ext" aria-hidden="true">↗<' in page
 
 
 def test_another_site_cannot_start_it(monkeypatch):
