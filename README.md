@@ -93,16 +93,16 @@ Utile pour que les agents travaillent sans ton poste : Jarvis tourne en service 
 
 1. **Cloner et installer**, sur la VM :
    ```bash
-   cd ~/Dev && gh repo clone <organisation>/Jarvis && cd Jarvis && uv sync
+   mkdir -p ~/Dev/Apps && cd ~/Dev/Apps && gh repo clone <organisation>/Jarvis && cd Jarvis && uv sync
    ```
 2. **Copier ta configuration et tes données**, depuis ton poste (l'historique des agents reste propre à chaque machine) :
    ```bash
-   rsync -a --exclude agents/ config data <vm>:Dev/Jarvis/
+   rsync -a --exclude agents/ config data <vm>:Dev/Apps/Jarvis/
    ```
 3. **Installer le service**, sur la VM. Les réglages non secrets vont dans un complément du service :
    ```bash
-   mkdir -p ~/.config/systemd/user/jarvis.service.d && cp ~/Dev/Jarvis/deploy/jarvis.service ~/.config/systemd/user/
-   printf '[Service]\nEnvironment=JARVIS_MODE=live\nEnvironment=ORCHESTRATOR_DIR=%%h/Dev/integration-orchestrator\nEnvironment=CLAUDE_BIN=%%h/Dev/Jarvis/deploy/claude-vscode.sh\nEnvironment=JARVIS_AGENT_ADD_DIRS=%%h/Documents/Claude_vault\nEnvironment=AIRFLOW_BASE_URL=http://localhost:8888\n' > ~/.config/systemd/user/jarvis.service.d/vm.conf
+   mkdir -p ~/.config/systemd/user/jarvis.service.d && cp ~/Dev/Apps/Jarvis/deploy/jarvis.service ~/.config/systemd/user/
+   printf '[Service]\nEnvironment=JARVIS_MODE=live\nEnvironment=ORCHESTRATOR_DIR=%%h/Dev/integration-orchestrator\nEnvironment=CLAUDE_BIN=%%h/Dev/Apps/Jarvis/deploy/claude-vscode.sh\nEnvironment=JARVIS_AGENT_ADD_DIRS=%%h/Documents/Claude_vault\nEnvironment=AIRFLOW_BASE_URL=http://localhost:8888\n' > ~/.config/systemd/user/jarvis.service.d/vm.conf
    systemctl --user daemon-reload && systemctl --user enable --now jarvis
    ```
    Adapte les chemins et l'adresse d'Airflow à ta VM. `JARVIS_AGENT_ADD_DIRS` est facultatif : c'est le dossier de notes que l'agent peut lire en plus de son worktree.
@@ -110,7 +110,7 @@ Utile pour que les agents travaillent sans ton poste : Jarvis tourne en service 
    ```bash
    loginctl enable-linger $USER
    ```
-5. **Secrets** : mets `AIRFLOW_USER`, `AIRFLOW_PASSWORD` et, si besoin, `NOTION_TOKEN` dans `~/Dev/Jarvis/.env`, puis `systemctl --user restart jarvis`.
+5. **Secrets** : mets `AIRFLOW_USER`, `AIRFLOW_PASSWORD` et, si besoin, `NOTION_TOKEN` dans `~/Dev/Apps/Jarvis/.env`, puis `systemctl --user restart jarvis`.
 6. **Ouvrir Jarvis depuis ton poste** : transfert du port 8765, par l'onglet Ports de VS Code (Remote-SSH) ou `ssh -L 8765:localhost:8765 <vm>`, puis http://localhost:8765.
 
 Bon à savoir :
