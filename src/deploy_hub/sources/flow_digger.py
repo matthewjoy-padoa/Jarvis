@@ -16,7 +16,8 @@ from pathlib import Path
 from deploy_hub.config import ENV_FILE_KEYS, data_dir
 from deploy_hub.sources.claude_runner import SECRETS
 
-CANDIDATES = ("~/flow-digger", "~/Dev/integration-flow-digger", "~/integration-flow-digger", "~/Dev/flow-digger")
+CANDIDATES = ("~/Dev/Apps/integration-flow-digger", "~/Dev/Apps/flow-digger", "~/flow-digger", "~/Dev/integration-flow-digger",
+              "~/integration-flow-digger", "~/Dev/flow-digger")
 DEFAULT_PORT = 4004  # port par défaut de « main.py --start »
 _starting = threading.Lock()  # deux clics rapprochés : le second attend le premier au lieu de lancer un second serveur
 
