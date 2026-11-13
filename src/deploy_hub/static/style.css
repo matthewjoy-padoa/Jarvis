@@ -962,3 +962,12 @@ html.term-open:has(.term.is-minimized) main { padding-bottom: 48px; }
 /* Icône du client (emoji ou image du dashboard Notion) devant son nom */
 .client-emoji { margin-right: .3em; font-style: normal; line-height: 1; }
 img.client-icon { width: 1em; height: 1em; object-fit: contain; vertical-align: -0.125em; border-radius: 3px; }
+
+/* Bouton Flow Digger de la barre (formulaire POST ouvert dans un nouvel onglet), même gabarit que la recherche */
+.tool-launch { display: flex; flex: none; margin: 0; }
+.tool-launch button { gap: 8px; padding: 6px 12px; color: var(--muted); font-weight: 500; }
+.tool-launch button:hover:not(:disabled) { color: var(--text); }
+.tool-launch .ic { width: 16px; height: 16px; margin: 0; }
+@media (max-width: 1440px) { .tool-launch-label { display: none; } }
+.tool-error { display: flex; gap: 8px; align-items: flex-start; color: var(--st-ko); }
+.tool-error .ic { flex: none; width: 18px; height: 18px; margin-top: 2px; }

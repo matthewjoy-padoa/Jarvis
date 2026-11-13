@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=69">
+  <link rel="stylesheet" href="/static/style.css?v=70">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=4" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
@@ -62,6 +62,10 @@
         {% endfor %}
       </div>
     </nav>
+    {# Flow Digger (padoa/integration-flow-digger) : lancé sur la VM au besoin, ouvert dans un nouvel onglet. #}
+    <form method="post" action="/outils/flow-digger" target="_blank" class="tool-launch">
+      <button type="submit" class="secondary" title="Ouvrir Flow Digger (le démarre sur la VM s'il ne tourne pas)">{{ ic.icon("shovel") }}<span class="tool-launch-label">Flow Digger</span></button>
+    </form>
     <button type="button" class="secondary pal-open" data-palette-open aria-label="Rechercher dans Jarvis" title="Demander à Jarvis">{{ ic.icon("search") }}<span class="pal-open-label">Rechercher</span><kbd data-palette-key>⌘K</kbd></button>
     <div class="bell-wrap">
       <button type="button" class="bell secondary icon-btn" aria-label="Notifications" aria-haspopup="true" aria-expanded="false"
