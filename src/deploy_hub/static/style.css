@@ -995,7 +995,7 @@ a.settings-link .ic { width: 16px; height: 16px; margin: 0; }
 .settings-form .form-actions button { max-width: 100%; white-space: normal; }
 
 /* Barre, disposition A : navigation à sa taille, recherche qui prend la place libre, puis Flow Digger | trois icônes rondes */
-.topbar .nav { flex: 0 1 auto; }
+@media (min-width: 901px) { .topbar .nav { flex: 0 1 auto; } }  /* sous 900 px, les onglets gardent leur ligne à eux (flex-basis 100 %) */
 button.pal-open.search-wide { flex: 1 1 220px; max-width: 460px; min-width: 0; justify-content: flex-start; gap: 10px; padding: 7px 8px 7px 14px; overflow: hidden; }
 .search-wide .pal-open-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; font-weight: 400; }
 .search-wide kbd { margin-left: auto; }
@@ -1021,6 +1021,14 @@ button.pal-open.search-wide { flex: 1 1 220px; max-width: 460px; min-width: 0; j
 /* Sélecteur du client : pas d'espace de ligne sous la pastille, elle se centre comme le reste de la barre */
 .topbar .client-switch { display: flex; align-items: center; }
 .topbar .client-switch > summary.client-chip { display: flex; margin: 0; }  /* annule « details summary { margin-top: 8px } » (ligne 101) */
-/* Écran large : la recherche plafonne à 460 px ; l'espace restant se partage autour d'elle (centrée), les boutons restent au bord droit */
-button.pal-open.search-wide { margin-left: auto; }
-.topbar .tool-launch { margin-left: auto; }
+/* Recherche au centre de la barre : trois colonnes (gauche | recherche | droite), les deux côtés de même largeur.
+   Sous 1100 px, les deux groupes sont transparents (display: contents) : la barre garde ses règles flex habituelles. */
+.bar-left, .bar-right { display: contents; }
+@media (min-width: 1101px) {
+  .topbar { display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(220px, 460px) minmax(max-content, 1fr); column-gap: 16px; }
+  .bar-left, .bar-right { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .bar-right { justify-content: flex-end; }
+  button.pal-open.search-wide { max-width: none; width: 100%; }
+}
+@media (max-width: 1100px) { .search-wide kbd { display: none; } }  /* la loupe seule : les onglets gardent leur place */
+@media (max-width: 700px) { .topbar { --bar-h: 36px; gap: 8px; padding-left: 12px; padding-right: 12px; } .topbar .brand-name { font-size: 18px; } }
