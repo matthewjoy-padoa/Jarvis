@@ -442,14 +442,16 @@ def flow_digger_reloaded():
 
 
 @app.post("/outils/flow-digger")
-def open_flow_digger(request: Request):
-    """Démarre Flow Digger sur la VM s'il ne tourne pas, puis y emmène (bouton de la barre, ouvert dans un nouvel onglet)."""
+def open_flow_digger(request: Request, forcer: str = Form("")):
+    """Démarre Flow Digger sur la VM s'il ne tourne pas (après un git pull de son dépôt), puis y emmène.
+    forcer=1 (bouton de la page d'échec) : lance la version actuelle sans tenter le pull."""
     if not _from_jarvis(request):
         raise HTTPException(403, "Lancement refusé : la demande ne vient pas de Jarvis.")
-    launch = flow_digger.start()
+    launch = flow_digger.start(force=forcer == "1")
     if launch.url:
         return RedirectResponse(launch.url, status_code=303)
-    return _render(request, "outil.html", "", tool="Flow Digger", error=launch.error)
+    return _render(request, "outil.html", "", tool="Flow Digger", error=launch.error, can_force=launch.can_force,
+                   action="/outils/flow-digger")
 
 
 @app.get("/client/{slug}")
