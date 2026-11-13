@@ -515,9 +515,11 @@ def open_flow_digger(request: Request, forcer: str = Form("")):
 # ---- Réglages : .env, connexions et 1Password depuis l'app -------------------------------------------------------
 
 def _reload_connections() -> None:
-    """Après un changement de réglages ou une connexion à 1Password : secrets relus, Airflow reconstruit (historique gardé)."""
+    """Après un changement de réglages ou une connexion à 1Password : secrets relus, Airflow reconstruit (historique gardé),
+    réglages des agents Claude appliqués aux prochains lancements."""
     global airflow
     forget_secrets()
+    claude.reconfigure()
     fresh = AirflowSource.from_env()
     fresh.runs = airflow.runs
     airflow = fresh

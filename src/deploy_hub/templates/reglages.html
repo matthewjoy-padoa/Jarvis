@@ -33,17 +33,24 @@
 </section>
 
 <form class="panel settings-form" method="post" action="/reglages" autocomplete="off">
-  <h2>Connexions et dossiers</h2>
-  {% for f in fields %}{% set fd = f.field %}
+  {% for section in fields | map(attribute="field.section") | unique %}
+  {% set items = fields | selectattr("field.section", "equalto", section) %}
+  <h2{% if not loop.first %} class="settings-section"{% endif %}>{{ section }}</h2>
+  {% for f in items %}{% set fd = f.field %}
   <label class="field">{{ fd.label }}
     {% if fd.kind == "secret" and f.stored_clear %}<span class="badge g-ko" title="Valeur enregistrée en clair dans .env">en clair</span>{% elif f.reference %}<span class="badge g-done">1Password</span>{% endif %}
     {% if f.overridden %}<span class="badge g-ko" title="Aussi définie dans l'environnement du processus (vm.conf…) : c'est cette valeur-là qui gagnera au prochain démarrage">définie hors .env</span>{% endif %}
     {% if not fd.live %}<span class="badge" title="Pris en compte au prochain démarrage de Jarvis">au redémarrage</span>{% endif %}
     {% if f.path_ok is sameas true %}<span class="badge g-done">trouvé</span>{% elif f.path_ok is sameas false %}<span class="badge g-ko">introuvable</span>{% endif %}
-    <input name="{{ fd.key }}" value="{{ f.value }}" spellcheck="false"
+    {% if fd.kind == "choice" %}
+    <select name="{{ fd.key }}">{% for c in fd.choices %}<option value="{{ c }}"{% if c == f.value %} selected{% endif %}>{{ c or "par défaut" }}</option>{% endfor %}</select>
+    {% else %}
+    <input name="{{ fd.key }}" value="{{ f.value }}" spellcheck="false"{% if fd.kind == "int" %} inputmode="numeric"{% endif %}
            {% if fd.kind == "secret" and f.stored_clear %}placeholder="•••••• enregistré, laisse vide pour le garder"{% elif fd.kind == "secret" %}placeholder="op://…"{% endif %}>
+    {% endif %}
     <small class="muted">{{ fd.help }}{% if fd.kind == "secret" and not f.empty %} · <span class="settings-clear"><input type="checkbox" name="effacer_{{ fd.key }}" aria-label="Effacer {{ fd.label }}"> effacer</span>{% endif %}</small>
   </label>
+  {% endfor %}
   {% endfor %}
   <div class="form-actions">
     <button type="submit">Enregistrer et appliquer</button>
