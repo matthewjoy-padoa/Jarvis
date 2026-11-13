@@ -1,4 +1,5 @@
 import asyncio
+import calendar
 import logging
 import os
 import re
@@ -361,16 +362,41 @@ def recette(request: Request, tous: bool = False, vue: str = "liste"):
     )
 
 
+def _month(value: str, today: date) -> date:
+    """Premier jour du mois demandé (AAAA-MM), sinon du mois en cours."""
+    try:
+        year, month = (int(x) for x in value.split("-"))
+        return date(year, month, 1)
+    except ValueError:
+        return today.replace(day=1)
+
+
 @app.get("/deadlines", response_class=HTMLResponse)
-def deadlines(request: Request, tous: bool = False, periode: str = ""):
-    """Échéances du client en cours ; tous=true : tous les clients ; periode : retard, aujourdhui ou semaine (compteurs de l'accueil)."""
+def deadlines(request: Request, tous: bool = False, client: str = "", periode: str = "", vue: str = "liste", mois: str = ""):
+    """Échéances en liste ou en calendrier. client : un slug, ou « tous » (tous=true : idem) ; vide = client en cours.
+    periode : retard, aujourdhui ou semaine (compteurs de l'accueil) ; mois (AAAA-MM) : mois affiché par le calendrier."""
     current = _current(request)
-    deployments = _deployments(request) if tous or not current else [current]
+    everyone = _deployments(request)
+    chosen = next((d for d in everyone if d.slug == client), None) if client and client != "tous" else None
+    if chosen is None and (tous or client == "tous" or not current):
+        deployments, selected = everyone, "tous"
+    else:
+        deployments, selected = [chosen or current], (chosen or current).slug
     items = _deadlines(deployments)
+    today = date.today()
     if periode in PERIODS:
-        items = [i for i in items if _in_period(i, periode, date.today())]
-    return _render(request, "deadlines.html", "/deadlines", items=items, all_clients=tous or not current,
-                   periode=periode if periode in PERIODS else "", periods=PERIODS)
+        items = [i for i in items if _in_period(i, periode, today)]
+    vue = "calendrier" if vue == "calendrier" else "liste"
+    first = _month(mois, today)
+    by_day: dict[date, list] = {}
+    for i in items:
+        by_day.setdefault(i["date"], []).append(i)
+    weeks = calendar.Calendar(firstweekday=0).monthdatescalendar(first.year, first.month)
+    prev_month = (first - timedelta(days=1)).replace(day=1)
+    next_month = (first + timedelta(days=32)).replace(day=1)
+    return _render(request, "deadlines.html", "/deadlines", items=items, all_clients=selected == "tous", selected=selected,
+                   clients=sorted(everyone, key=lambda d: d.client.lower()), periode=periode if periode in PERIODS else "",
+                   periods=PERIODS, vue=vue, month=first, weeks=weeks, by_day=by_day, prev_month=prev_month, next_month=next_month)
 
 
 @app.get("/agents", response_class=HTMLResponse)
