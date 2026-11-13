@@ -24,9 +24,11 @@ class Field:
     live: bool = True  # False : pris en compte au prochain démarrage de Jarvis
     section: str = "Connexions et dossiers"
     choices: tuple[str, ...] = ()  # kind « choice » : valeurs permises ("" = défaut)
+    minimum: int = 1  # kind « int » : plus petite valeur permise
 
 
 CLAUDE = "Agents Claude"
+DAGS = "Suivi des DAG"
 
 
 FIELDS = (
@@ -49,6 +51,9 @@ FIELDS = (
     Field("JARVIS_AGENT_ALLOWED_TOOLS", "Outils autorisés", "text", "Vide : liste par défaut (lire, modifier, uv run, git, gh pr create) ; sinon séparés par « ; »",
           section=CLAUDE),
     Field("JARVIS_WORKTREES_DIR", "Dossier des worktrees", "path", "Vide : <dossier de l'orchestrator>/.claude/worktrees/jarvis", section=CLAUDE),
+    Field("JARVIS_DAG_MAX_CLEARS", "Relances automatiques au plus", "int",
+          "Vide : 3. Tâches en échec relancées (clear) par le suivi avant d'abandonner ; 0 : aucune relance", section=DAGS, minimum=0),
+    Field("JARVIS_DAG_INTERVAL_S", "Intervalle entre deux vérifications (s)", "int", "Vide : 60", section=DAGS, minimum=10),
 )
 BY_KEY = {f.key: f for f in FIELDS}
 
@@ -103,8 +108,8 @@ def _clean(field: Field, value: str) -> str:
         raise EnvError(f"{field.label} : « #» précédé d'une espace serait lu comme un commentaire")
     if field.kind == "url" and value and not value.startswith(("http://", "https://")):
         raise EnvError(f"{field.label} : commence par http:// ou https://")
-    if field.kind == "int" and value and not (value.isdigit() and int(value) > 0):
-        raise EnvError(f"{field.label} : un nombre entier positif")
+    if field.kind == "int" and value and not (value.isdigit() and int(value) >= field.minimum):
+        raise EnvError(f"{field.label} : un nombre entier, {field.minimum} au moins")
     if field.kind == "choice" and value not in field.choices + ("",):
         raise EnvError(f"{field.label} : {' ou '.join(c for c in field.choices if c)}")
     if field.kind == "secret" and value.startswith("op:") and not is_reference(value):

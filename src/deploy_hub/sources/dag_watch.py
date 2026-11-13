@@ -27,6 +27,17 @@ EXIT_STATUS = {0: "vert", 1: "en échec ou incomplet", 2: "Airflow injoignable"}
 NOTIF = "[notif] "  # préfixe des lignes JSON imprimées par air.notify sous Jarvis (AIR_NOTIFY=print)
 
 
+def watch_options() -> list[str]:
+    """Réglages du suivi (page Réglages), relus à chaque lancement : JARVIS_DAG_MAX_CLEARS (relances automatiques,
+    0 = aucune) et JARVIS_DAG_INTERVAL_S (secondes entre deux vérifications). Vides : valeurs par défaut d'air.py."""
+    options = []
+    for key, flag in (("JARVIS_DAG_MAX_CLEARS", "--max-clears"), ("JARVIS_DAG_INTERVAL_S", "--interval")):
+        value = os.getenv(key, "").strip()
+        if value.isdigit():
+            options += [flag, value]
+    return options
+
+
 @dataclass
 class DagWatch:
     id: int
@@ -128,7 +139,7 @@ class DagWatcher:
 
     def _spawn(self, w: DagWatch) -> None:
         env = {**os.environ, **self.airflow_env, "AIR_STATE_DIR": str(self.state_dir), "AIR_NOTIFY": "print", "PYTHONUNBUFFERED": "1"}
-        cmd = [*self.command, "watch", w.dag_id, w.run_id, "--client", w.customer]
+        cmd = [*self.command, "watch", w.dag_id, w.run_id, "--client", w.customer, *watch_options()]
         threading.Thread(target=self._work, args=(w, cmd, env), name=f"suivi-{w.id}", daemon=True).start()
 
     def _work(self, w: DagWatch, cmd: list[str], env: dict[str, str]) -> None:
