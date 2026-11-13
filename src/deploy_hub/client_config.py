@@ -43,11 +43,17 @@ class ClientConfig:
     recette_clients: list[str] = field(default_factory=list)
     orchestrator: list[str] = field(default_factory=list)
     stacks: list[dict] = field(default_factory=list)
+    drive: list[dict] = field(default_factory=list)  # liens Google Drive du client : ouverts par l'utilisateur, jamais lus par Jarvis
 
     @property
     def stacks_text(self) -> str:
         """Stacks au format du formulaire : une par ligne, « env | libellé | adresse »."""
         return "\n".join(" | ".join(filter(None, [s.get("env", ""), s.get("label", ""), s.get("url", "")])) for s in self.stacks)
+
+    @property
+    def drive_text(self) -> str:
+        """Liens Drive au format du formulaire : un par ligne, « libellé | adresse »."""
+        return "\n".join(f"{l['label']} | {l['url']}" for l in self.drive)
 
     def to_yaml(self) -> str:
         return HEADER + yaml.safe_dump(asdict(self), allow_unicode=True, sort_keys=False)
@@ -70,6 +76,8 @@ def _normalize(slug: str, data: dict) -> ClientConfig:
         notion_url=str(data.get("notion_url") or ""), recette_clients=_list(data.get("recette_clients")),
         orchestrator=_list(data.get("orchestrator")),
         stacks=[dict(s) for s in data.get("stacks") or [] if isinstance(s, dict) and s.get("url")],
+        drive=[{"label": str(l.get("label") or "Drive"), "url": str(l["url"])} for l in data.get("drive") or []
+               if isinstance(l, dict) and _is_drive(str(l.get("url") or ""))],
     )
 
 
@@ -95,6 +103,28 @@ def parse_stacks(text: str) -> list[dict]:
     return stacks
 
 
+DRIVE_HOSTS = ("drive.google.com", "docs.google.com")
+
+
+def _is_drive(url: str) -> bool:
+    return any(url.startswith(f"https://{host}/") for host in DRIVE_HOSTS)
+
+
+def parse_drive(text: str) -> list[dict]:
+    """Un lien par ligne : « libellé | adresse » ou l'adresse seule. Seulement drive.google.com et docs.google.com :
+    Jarvis n'en fait que des liens à ouvrir dans le navigateur, il ne lit jamais le contenu."""
+    links = []
+    for line in (text or "").splitlines():
+        parts = [p.strip() for p in line.split("|") if p.strip()]
+        if not parts:
+            continue
+        url = parts[-1]
+        if not _is_drive(url):
+            raise ConfigError(f"Lien Drive « {line.strip()} » : adresse https://drive.google.com/… ou https://docs.google.com/… attendue")
+        links.append({"label": parts[0] if len(parts) >= 2 else "Drive", "url": url})
+    return links
+
+
 def from_form(form: dict, existing_slug: str | None = None) -> ClientConfig:
     name = (form.get("client") or "").strip()
     if not name:
@@ -115,6 +145,7 @@ def from_form(form: dict, existing_slug: str | None = None) -> ClientConfig:
         recette_clients=_list(form.get("recette_clients")),
         orchestrator=_list(form.get("orchestrator")),
         stacks=parse_stacks(form.get("stacks") or ""),
+        drive=parse_drive(form.get("drive") or ""),
     )
 
 

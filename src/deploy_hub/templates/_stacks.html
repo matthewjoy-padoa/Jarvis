@@ -1,4 +1,4 @@
-{# Liens rapides du client, en haut à droite de la fiche sur chaque onglet : Notion, puis stacks Padoa (configuration du client). #}
+{# Liens rapides du client, en haut à droite de la fiche sur chaque onglet : Notion, stacks Padoa, puis Google Drive (configuration du client). #}
 <div class="stacks" aria-label="Liens rapides">
   {% if d.notion_url %}<a href="{{ d.notion_url }}" target="_blank" rel="noopener" title="Dashboard intégration dans Notion"><span class="env">Notion</span>Dashboard ↗</a>{% endif %}
   {% for s in d.stacks %}
@@ -6,5 +6,6 @@
   {% else %}
   <a class="muted" href="/clients/{{ d.slug }}/configuration" title="Ajouter les stacks du client">+ Stacks</a>
   {% endfor %}
+  {% for l in d.drive %}<a href="{{ l.url }}" target="_blank" rel="noopener noreferrer" title="Google Drive : s'ouvre avec ton compte"><span class="env">Drive</span>{{ l.label }} ↗</a>{% endfor %}
   {% for l in d.links %}<a href="{{ l.url }}" target="_blank" rel="noopener">{{ l.label }} ↗</a>{% endfor %}
 </div>

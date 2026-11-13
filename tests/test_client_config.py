@@ -113,3 +113,36 @@ def test_two_clients_cannot_share_a_notion_page(tmp_path):
     save(ClientConfig(slug="acme", client="Acme", page_id="a" * 32), tmp_path, new=True)
     with pytest.raises(ConfigError, match="déjà celle du client « Acme »"):
         save(ClientConfig(slug="acme2", client="Acme bis", page_id="a" * 32), tmp_path, new=True)
+
+
+DRIVE = "https://drive.google.com/drive/folders/ID-FACTICE-DE-TEST"  # adresse inventée : aucun vrai lien Drive dans les tests
+DOC = "https://docs.google.com/spreadsheets/d/ID-FACTICE-DE-TEST/edit"
+
+
+def test_drive_links_are_read_from_the_form_and_kept_in_the_yaml(tmp_path):
+    cfg = from_form({"client": "Acme", "page_id": PAGE, "drive": f"Dossier client | {DRIVE}\n{DOC}"})
+    assert cfg.drive == [{"label": "Dossier client", "url": DRIVE}, {"label": "Drive", "url": DOC}]
+    client_config.save(cfg, tmp_path, new=True)
+    again = client_config.load("acme", tmp_path)
+    assert again.drive == cfg.drive and again.drive_text == f"Dossier client | {DRIVE}\nDrive | {DOC}"
+
+
+@pytest.mark.parametrize("line", ["Dossier | http://drive.google.com/x", "Dossier | https://evil.example/drive.google.com/x",
+                                  "https://drive.google.com.evil.example/x"])
+def test_only_google_drive_addresses_are_accepted(line):
+    with pytest.raises(ConfigError, match="drive.google.com"):
+        from_form({"client": "Acme", "page_id": PAGE, "drive": line})
+
+
+def test_drive_links_are_shown_as_links_and_never_given_to_agents():
+    from deploy_hub.models import Deployment, Link, RetourRecette
+    from deploy_hub.sources.claude_runner import retour_prompt
+    d = Deployment(slug="acme", client="Acme", software="Pulse", drive=[Link("Dossier client", DRIVE)])
+    html = main.templates.get_template("_stacks.html").render(d=d)
+    assert f'href="{DRIVE}" target="_blank" rel="noopener noreferrer"' in html and "Dossier client ↗" in html
+    assert DRIVE not in retour_prompt(d, RetourRecette(id="0001AB", data_type="Adhérents", status="À faire"))
+
+
+def test_the_form_has_a_drive_field(app):
+    page = app.get("/clients/nouveau").text
+    assert 'name="drive"' in page and "ne lit jamais leur contenu" in page
