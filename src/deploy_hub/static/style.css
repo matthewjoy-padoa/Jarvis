@@ -991,3 +991,5 @@ a.settings-link { display: inline-flex; flex: none; align-items: center; border-
 a.settings-link:hover, a.settings-link.active { border-color: var(--accent); color: var(--text); }
 a.settings-link .ic { width: 16px; height: 16px; margin: 0; }
 .settings-intro code, .settings-form code { overflow-wrap: anywhere; }
+.settings-form .form-actions { flex-wrap: wrap; }
+.settings-form .form-actions button { max-width: 100%; white-space: normal; }
