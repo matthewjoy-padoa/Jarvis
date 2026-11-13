@@ -146,3 +146,9 @@ def test_drive_links_are_shown_as_links_and_never_given_to_agents():
 def test_the_form_has_a_drive_field(app):
     page = app.get("/clients/nouveau").text
     assert 'name="drive"' in page and "ne lit jamais leur contenu" in page
+
+
+def test_without_drive_links_the_fiche_offers_to_add_them():
+    from deploy_hub.models import Deployment
+    html = main.templates.get_template("_stacks.html").render(d=Deployment(slug="acme", client="Acme", software="Pulse"))
+    assert '<a class="muted" href="/clients/acme/configuration" title="Ajouter les liens Google Drive du client">+ Drive</a>' in html
