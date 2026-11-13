@@ -176,24 +176,52 @@ def _result(request: Request, result: ActionResult) -> HTMLResponse:
     return templates.TemplateResponse(request, "_action_result.html", {"result": result})
 
 
+PERIODS = {"retard": "En retard", "aujourdhui": "À échéance aujourd'hui", "semaine": "Dans les 7 jours"}
+
+
+def _in_period(item: dict, periode: str, today: date) -> bool:
+    """Périodes de l'accueil (jalons exclus) : mêmes règles pour ses compteurs et pour la liste qu'ils ouvrent."""
+    if item["kind"] == "Jalon":
+        return False
+    return {"retard": item["date"] < today, "aujourdhui": item["date"] == today,
+            "semaine": today < item["date"] <= today + timedelta(days=7)}[periode]
+
+
+def _tile_link(items: list, list_url: str, ticket_of=lambda i: i.get("url")) -> dict | None:
+    """Où mène un compteur : le ticket lui-même s'il n'y en a qu'un (ouvert dans le panneau), sinon la liste filtrée."""
+    if not items:
+        return None
+    url = ticket_of(items[0]) if len(items) == 1 else None
+    if url and "/ticket/" in url:
+        return {"href": url, "ticket": True}
+    return {"href": list_url, "ticket": False}
+
+
 @app.get("/", response_class=HTMLResponse)
 def today_page(request: Request):
     """Ce qui demande de l'attention aujourd'hui chez le client en cours : retards, échéances, KO, jalons, « Quoi de neuf »."""
     current = _current(request)
     deployments = [current] if current else []
     today = date.today()
-    items = [i for i in _deadlines(deployments) if i["kind"] != "Jalon"]
+    items = _deadlines(deployments)
+    by_period = {p: [i for i in items if _in_period(i, p, today)] for p in PERIODS}
+    ko = [(d, a) for d in deployments for a in d.injection_cards if a.injection_group == "ko"]
+    ko_url = f"/deploiements/{current.slug}/injections?vue=liste#groupe=ko" if current else ""
+    links = {p: _tile_link(found, f"/deadlines?periode={p}") for p, found in by_period.items()}
+    links["ko"] = _tile_link(ko, ko_url, lambda da: ticket_url(da[0].slug, "action", da[1].ref) if da[1].ref else None)
     return _render(
         request,
         "today.html",
         "/",
         now=datetime.now(),
         deployments=deployments,
-        late=[i for i in items if i["date"] < today],
-        due_today=[i for i in items if i["date"] == today],
-        due_week=[i for i in items if today < i["date"] <= today + timedelta(days=7)],
-        ko=[(d, a) for d in deployments for a in d.injection_cards if a.injection_group == "ko"],
-        milestones=[i for i in _deadlines(deployments) if i["kind"] == "Jalon" and today <= i["date"] <= today + timedelta(days=21)],
+        late=by_period["retard"],
+        due_today=by_period["aujourdhui"],
+        due_week=by_period["semaine"],
+        ko=ko,
+        links=links,
+        ko_url=ko_url,
+        milestones=[i for i in items if i["kind"] == "Jalon" and today <= i["date"] <= today + timedelta(days=21)],
     )
 
 
@@ -334,11 +362,15 @@ def recette(request: Request, tous: bool = False, vue: str = "liste"):
 
 
 @app.get("/deadlines", response_class=HTMLResponse)
-def deadlines(request: Request, tous: bool = False):
-    """Échéances du client en cours ; tous=true : tous les clients."""
+def deadlines(request: Request, tous: bool = False, periode: str = ""):
+    """Échéances du client en cours ; tous=true : tous les clients ; periode : retard, aujourdhui ou semaine (compteurs de l'accueil)."""
     current = _current(request)
     deployments = _deployments(request) if tous or not current else [current]
-    return _render(request, "deadlines.html", "/deadlines", items=_deadlines(deployments), all_clients=tous or not current)
+    items = _deadlines(deployments)
+    if periode in PERIODS:
+        items = [i for i in items if _in_period(i, periode, date.today())]
+    return _render(request, "deadlines.html", "/deadlines", items=items, all_clients=tous or not current,
+                   periode=periode if periode in PERIODS else "", periods=PERIODS)
 
 
 @app.get("/agents", response_class=HTMLResponse)

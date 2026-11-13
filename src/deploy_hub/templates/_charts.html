@@ -78,11 +78,16 @@
 {% endif %}
 {% endmacro %}
 
-{# Chiffres clés : une valeur et son libellé, avec un ton facultatif (ko pour une alerte). #}
+{# Compteurs. Chaque élément : (libellé, valeur, ton) ou (libellé, valeur, ton, lien) ; lien = {"href", "ticket"} ou None.
+   Avec un lien, la tuile mène aux éléments comptés (ticket : ouvert dans le panneau, voir static/drawer.js). #}
 {% macro stats(items) %}
 <div class="stats">
-  {% for label, value, tone in items %}
-  <div class="stat{{ ' stat-' ~ tone if tone and value }}"><strong>{{ value }}</strong><span>{{ label }}</span></div>
+  {% for item in items %}
+  {% set label, value, tone = item[0], item[1], item[2] %}
+  {% set link = item[3] if item | length > 3 else None %}
+  {% set cls = "stat" ~ (" stat-" ~ tone if tone and value else "") %}
+  {% if link %}<a class="{{ cls }} stat-link" href="{{ link.href }}"{% if link.ticket %} data-ticket{% endif %} title="Voir {{ 'le ticket' if link.ticket else 'les éléments' }}"><strong>{{ value }}</strong><span>{{ label }} <span class="stat-go" aria-hidden="true">→</span></span></a>
+  {% else %}<div class="{{ cls }}"><strong>{{ value }}</strong><span>{{ label }}</span></div>{% endif %}
   {% endfor %}
 </div>
 {% endmacro %}
