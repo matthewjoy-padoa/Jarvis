@@ -13,8 +13,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from deploy_hub.config import ENV_FILE_KEYS, data_dir
-from deploy_hub.sources.claude_runner import SECRETS
+from deploy_hub.config import child_environment, data_dir
 
 CANDIDATES = ("~/Dev/Apps/integration-flow-digger", "~/Dev/Apps/flow-digger", "~/flow-digger", "~/Dev/integration-flow-digger",
               "~/integration-flow-digger", "~/Dev/flow-digger")
@@ -57,7 +56,7 @@ def command(repo: Path) -> list[str]:
 
 def _environment() -> dict[str, str]:
     """Environnement de Jarvis sans ses secrets ni ses réglages (.env) : Flow Digger a les siens (1Password, Google)."""
-    return {k: v for k, v in os.environ.items() if k not in SECRETS and k not in ENV_FILE_KEYS}
+    return child_environment()
 
 
 def start(wait: float = 20) -> Launch:
