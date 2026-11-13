@@ -6,6 +6,9 @@
   {% else %}
   <a class="muted" href="/clients/{{ d.slug }}/configuration" title="Ajouter les stacks du client">+ Stacks</a>
   {% endfor %}
-  {% for l in d.drive %}<a href="{{ l.url }}" target="_blank" rel="noopener noreferrer" title="Google Drive : s'ouvre avec ton compte"><span class="env">Drive</span>{{ l.label }} ↗</a>{% endfor %}
+  {% for l in d.drive %}<a href="{{ l.url }}" target="_blank" rel="noopener noreferrer" title="Google Drive : s'ouvre avec ton compte"><span class="env">Drive</span>{{ l.label }} ↗</a>
+  {% else %}
+  <a class="muted" href="/clients/{{ d.slug }}/configuration" title="Ajouter les liens Google Drive du client">+ Drive</a>
+  {% endfor %}
   {% for l in d.links %}<a href="{{ l.url }}" target="_blank" rel="noopener">{{ l.label }} ↗</a>{% endfor %}
 </div>
