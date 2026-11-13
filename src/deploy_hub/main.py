@@ -1,10 +1,11 @@
 import asyncio
+import calendar
 import logging
 import os
 import re
 from contextlib import asynccontextmanager
 import threading
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -176,24 +177,52 @@ def _result(request: Request, result: ActionResult) -> HTMLResponse:
     return templates.TemplateResponse(request, "_action_result.html", {"result": result})
 
 
+PERIODS = {"retard": "En retard", "aujourdhui": "À échéance aujourd'hui", "semaine": "Dans les 7 jours"}
+
+
+def _in_period(item: dict, periode: str, today: date) -> bool:
+    """Périodes de l'accueil (jalons exclus) : mêmes règles pour ses compteurs et pour la liste qu'ils ouvrent."""
+    if item["kind"] == "Jalon":
+        return False
+    return {"retard": item["date"] < today, "aujourdhui": item["date"] == today,
+            "semaine": today < item["date"] <= today + timedelta(days=7)}[periode]
+
+
+def _tile_link(items: list, list_url: str, ticket_of=lambda i: i.get("url")) -> dict | None:
+    """Où mène un compteur : le ticket lui-même s'il n'y en a qu'un (ouvert dans le panneau), sinon la liste filtrée."""
+    if not items:
+        return None
+    url = ticket_of(items[0]) if len(items) == 1 else None
+    if url and "/ticket/" in url:
+        return {"href": url, "ticket": True}
+    return {"href": list_url, "ticket": False}
+
+
 @app.get("/", response_class=HTMLResponse)
 def today_page(request: Request):
     """Ce qui demande de l'attention aujourd'hui chez le client en cours : retards, échéances, KO, jalons, « Quoi de neuf »."""
     current = _current(request)
     deployments = [current] if current else []
     today = date.today()
-    items = [i for i in _deadlines(deployments) if i["kind"] != "Jalon"]
+    items = _deadlines(deployments)
+    by_period = {p: [i for i in items if _in_period(i, p, today)] for p in PERIODS}
+    ko = [(d, a) for d in deployments for a in d.injection_cards if a.injection_group == "ko"]
+    ko_url = f"/deploiements/{current.slug}/injections?vue=liste#groupe=ko" if current else ""
+    links = {p: _tile_link(found, f"/deadlines?periode={p}") for p, found in by_period.items()}
+    links["ko"] = _tile_link(ko, ko_url, lambda da: ticket_url(da[0].slug, "action", da[1].ref) if da[1].ref else None)
     return _render(
         request,
         "today.html",
         "/",
         now=datetime.now(),
         deployments=deployments,
-        late=[i for i in items if i["date"] < today],
-        due_today=[i for i in items if i["date"] == today],
-        due_week=[i for i in items if today < i["date"] <= today + timedelta(days=7)],
-        ko=[(d, a) for d in deployments for a in d.injection_cards if a.injection_group == "ko"],
-        milestones=[i for i in _deadlines(deployments) if i["kind"] == "Jalon" and today <= i["date"] <= today + timedelta(days=21)],
+        late=by_period["retard"],
+        due_today=by_period["aujourdhui"],
+        due_week=by_period["semaine"],
+        ko=ko,
+        links=links,
+        ko_url=ko_url,
+        milestones=[i for i in items if i["kind"] == "Jalon" and today <= i["date"] <= today + timedelta(days=21)],
     )
 
 
@@ -333,12 +362,41 @@ def recette(request: Request, tous: bool = False, vue: str = "liste"):
     )
 
 
+def _month(value: str, today: date) -> date:
+    """Premier jour du mois demandé (AAAA-MM), sinon du mois en cours."""
+    try:
+        year, month = (int(x) for x in value.split("-"))
+        return date(year, month, 1)
+    except ValueError:
+        return today.replace(day=1)
+
+
 @app.get("/deadlines", response_class=HTMLResponse)
-def deadlines(request: Request, tous: bool = False):
-    """Échéances du client en cours ; tous=true : tous les clients."""
+def deadlines(request: Request, tous: bool = False, client: str = "", periode: str = "", vue: str = "liste", mois: str = ""):
+    """Échéances en liste ou en calendrier. client : un slug, ou « tous » (tous=true : idem) ; vide = client en cours.
+    periode : retard, aujourdhui ou semaine (compteurs de l'accueil) ; mois (AAAA-MM) : mois affiché par le calendrier."""
     current = _current(request)
-    deployments = _deployments(request) if tous or not current else [current]
-    return _render(request, "deadlines.html", "/deadlines", items=_deadlines(deployments), all_clients=tous or not current)
+    everyone = _deployments(request)
+    chosen = next((d for d in everyone if d.slug == client), None) if client and client != "tous" else None
+    if chosen is None and (tous or client == "tous" or not current):
+        deployments, selected = everyone, "tous"
+    else:
+        deployments, selected = [chosen or current], (chosen or current).slug
+    items = _deadlines(deployments)
+    today = date.today()
+    if periode in PERIODS:
+        items = [i for i in items if _in_period(i, periode, today)]
+    vue = "calendrier" if vue == "calendrier" else "liste"
+    first = _month(mois, today)
+    by_day: dict[date, list] = {}
+    for i in items:
+        by_day.setdefault(i["date"], []).append(i)
+    weeks = calendar.Calendar(firstweekday=0).monthdatescalendar(first.year, first.month)
+    prev_month = (first - timedelta(days=1)).replace(day=1)
+    next_month = (first + timedelta(days=32)).replace(day=1)
+    return _render(request, "deadlines.html", "/deadlines", items=items, all_clients=selected == "tous", selected=selected,
+                   clients=sorted(everyone, key=lambda d: d.client.lower()), periode=periode if periode in PERIODS else "",
+                   periods=PERIODS, vue=vue, month=first, weeks=weeks, by_day=by_day, prev_month=prev_month, next_month=next_month)
 
 
 @app.get("/agents", response_class=HTMLResponse)
@@ -536,14 +594,21 @@ async def settings_op_signout(request: Request):
     return _settings_page(request, message="Déconnecté de 1Password. Les secrets déjà lus restent en mémoire jusqu'au prochain changement ou redémarrage.")
 
 
+# Pages globales qui restent ouvertes quand on change de client dans le menu : leur client par défaut est celui du menu.
+CLIENT_FILTERED_PAGES = ("/", "/deadlines", "/actions", "/recette", "/injections", "/agents", "/notifications")
+
+
 @app.get("/client/{slug}")
 def switch_client(slug: str, vers: str = "/"):
     """Change de client en cours en restant sur la même page : même onglet de fiche, ou même page globale."""
     _get(slug)
-    if m := re.match(r"^/deploiements/[^/]+(/[a-z]+)?$", vers):
+    path, _, query = vers.partition("?")
+    if m := re.match(r"^/deploiements/[^/]+(/[a-z]+)?$", path):
         target = f"/deploiements/{slug}{m[1] or '/synthese'}"
-    elif vers in ("/", "/deadlines"):
-        target = vers
+    elif path in CLIENT_FILTERED_PAGES:  # pages globales : leurs filtres suivent le client en cours
+        dropped = ("client", "tous") if path == "/deadlines" else ("client",)  # tous=true : tous les clients sur Deadlines seulement
+        kept = urlencode([(k, v) for k, v in parse_qsl(query) if k not in dropped])
+        target = path + (f"?{kept}" if kept else "")
     else:
         target = f"/deploiements/{slug}/synthese"
     return _remember(RedirectResponse(target, status_code=303), slug)

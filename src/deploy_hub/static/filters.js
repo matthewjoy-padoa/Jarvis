@@ -7,6 +7,7 @@
 // - Lignes ou cartes avec data-group (todo, in_progress, ko, done) : filtre « Groupe » ajouté automatiquement.
 // - Graphiques : un élément [data-filter-set="clé=valeur;clé=valeur"] applique ces filtres au clic (re-clic : retire) ;
 //   avec [data-filter-href], il ouvre cette page, filtres passés dans l'ancre (#clé=valeur&clé=valeur).
+// - Filtre « Client » : présélectionné sur le client du menu en haut (body[data-current-client]), sauf ancre de filtres.
 (function () {
   const collator = new Intl.Collator("fr", { numeric: true, sensitivity: "base" });
   const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
@@ -247,6 +248,12 @@
   document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("table[data-filterable]").forEach(setupTable);
     document.querySelectorAll("[data-filterable][data-items]").forEach(setupCards);
+    // Client par défaut : celui du menu en haut, dans chaque filtre « Client » qui le propose (« tous » reste au choix).
+    const current = document.body.dataset.currentClient;
+    if (current) blocks.forEach((b) => {
+      const s = Object.entries(b.keys).find(([k]) => k.toLowerCase() === "client")?.[1];  // « client » ou en-tête « Client »
+      if (s && !s.value && [...s.options].some((o) => o.value === current)) { s.value = current; b.apply(); }
+    });
     if (location.hash.length > 1) applyFilters(parse(location.hash.slice(1), "&"));
     markCharts();
   });

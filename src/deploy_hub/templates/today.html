@@ -11,14 +11,14 @@
     <h1>{{ "Bonsoir" if hour >= 18 or hour < 5 else "Bonjour" }}. <span class="muted">{{ days[today.weekday()] | capitalize }} {{ today.day }} {{ months[today.month - 1] }}</span></h1>
     <p class="jarvis-line">
       {% if late or ko or due_today %}Jarvis a relevé
-        {%- if late %} <strong>{{ late | length }}</strong> élément(s) en retard{% endif %}
-        {%- if due_today %}{{ "," if late }} <strong>{{ due_today | length }}</strong> échéance(s) aujourd'hui{% endif %}
-        {%- if ko %}{{ " et" if late or due_today }} <strong>{{ ko | length }}</strong> injection(s) KO{% endif %}. Par quoi commence-t-on ?
+        {%- if late %} <a class="count-link" href="{{ links.retard.href }}"{% if links.retard.ticket %} data-ticket{% endif %}><strong>{{ late | length }}</strong> élément(s) en retard</a>{% endif %}
+        {%- if due_today %}{{ "," if late }} <a class="count-link" href="{{ links.aujourdhui.href }}"{% if links.aujourdhui.ticket %} data-ticket{% endif %}><strong>{{ due_today | length }}</strong> échéance(s) aujourd'hui</a>{% endif %}
+        {%- if ko %}{{ " et" if late or due_today }} <a class="count-link" href="{{ links.ko.href }}"{% if links.ko.ticket %} data-ticket{% endif %}><strong>{{ ko | length }}</strong> injection(s) KO</a>{% endif %}. Par quoi commence-t-on ?
       {% else %}Tous les systèmes sont au vert. Rien d'urgent aujourd'hui.{% endif %}
     </p>
   </div>
 </div>
-{{ charts.stats([("En retard", late | length, "ko"), ("À échéance aujourd'hui", due_today | length, "todo"), ("Dans les 7 jours", due_week | length, ""), ("Injections KO", ko | length, "ko")]) }}
+{{ charts.stats([("En retard", late | length, "ko", links.retard), ("À échéance aujourd'hui", due_today | length, "todo", links.aujourdhui), ("Dans les 7 jours", due_week | length, "", links.semaine), ("Injections KO", ko | length, "ko", links.ko)]) }}
 
 <section class="panel" id="whats-new">
   <div class="panel-head">
@@ -34,9 +34,9 @@
 <div class="two-col">
   <section class="panel">
     <h2>À traiter</h2>
-    {% set groups = [("En retard", late), ("Aujourd'hui", due_today), ("Dans les 7 jours", due_week)] %}
-    {% for title, items in groups if items %}
-    <h3 class="list-title">{{ title }} <span class="muted">· {{ items | length }}</span></h3>
+    {% set groups = [("En retard", late, "retard"), ("Aujourd'hui", due_today, "aujourdhui"), ("Dans les 7 jours", due_week, "semaine")] %}
+    {% for title, items, periode in groups if items %}
+    <h3 class="list-title"><a href="/deadlines?periode={{ periode }}" title="Voir la liste complète">{{ title }} <span class="muted">· {{ items | length }}</span></a></h3>
     <ul class="todo" data-limit="5">
       {% for i in items %}
       <li>
@@ -52,7 +52,7 @@
   </section>
   <section>
     <section class="panel">
-      <h2>Injections KO <span class="muted">· {{ ko | length }}</span></h2>
+      <h2>{% if ko %}<a href="{{ ko_url }}" title="Voir les injections KO">{% endif %}Injections KO <span class="muted">· {{ ko | length }}</span>{% if ko %}</a>{% endif %}</h2>
       <ul class="todo" data-limit="5">
         {% for d, a in ko %}
         <li><span class="badge g-ko">{{ a.injection_status }}</span>
@@ -63,7 +63,7 @@
       </ul>
     </section>
     <section class="panel">
-      <h2>Prochains jalons <span class="muted">· 3 semaines</span></h2>
+      <h2><a href="/deadlines" title="Toutes les échéances">Prochains jalons <span class="muted">· 3 semaines</span></a></h2>
       <ul class="todo" data-limit="5">
         {% for i in milestones %}<li><span class="date">{{ i.date.strftime("%d/%m") }}</span> <a href="{{ i.url }}">{{ i.label }}</a> <span class="muted">·{% if deployments | length > 1 %} {{ i.d.client }} ·{% endif %} J{{ '%+d' % -((i.date - today).days) }}</span></li>
         {% else %}<li class="muted">Aucun jalon dans les 3 semaines.</li>{% endfor %}
