@@ -16,6 +16,7 @@ from datetime import datetime
 
 import httpx
 
+from deploy_hub.config import secret
 from deploy_hub.sources import ActionResult
 
 # Stacks proposées. La prod existe côté orchestrator mais est désactivée ici (décision du 2026-11-05) :
@@ -45,7 +46,7 @@ class AirflowSource:
 
     @classmethod
     def from_env(cls) -> "AirflowSource":
-        return cls(os.getenv("AIRFLOW_BASE_URL", ""), os.getenv("AIRFLOW_USER", ""), os.getenv("AIRFLOW_PASSWORD", ""))
+        return cls(os.getenv("AIRFLOW_BASE_URL", ""), secret("AIRFLOW_USER"), secret("AIRFLOW_PASSWORD"))  # en clair ou op://…
 
     def _log(self, dag_id, padoa_env, client, card, result: ActionResult) -> ActionResult:
         self.runs.insert(0, DagRun(dag_id, padoa_env, client, card, datetime.now(), result.message, result.simulated))

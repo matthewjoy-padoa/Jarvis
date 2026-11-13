@@ -17,7 +17,7 @@ from pathlib import Path
 
 import httpx
 
-from deploy_hub.config import PROJECT_ROOT, data_dir
+from deploy_hub.config import PROJECT_ROOT, data_dir, resolve
 from deploy_hub.queries import ConfigError, page_id_of
 from deploy_hub.sync_notion import (RECETTE_COLUMNS, RECETTE_CONTENT, SyncError, add_users, load_config, publish,
                                     summary, unknown_users, versions)
@@ -94,16 +94,16 @@ TYPE_MAX = 40
 
 
 def load_token(root: Path = PROJECT_ROOT) -> str | None:
-    """NOTION_TOKEN de l'environnement, sinon du fichier .env de l'app (ignoré par git). Jamais affiché ni journalisé."""
-    if os.getenv("NOTION_TOKEN"):
-        return os.environ["NOTION_TOKEN"]
+    """NOTION_TOKEN de l'environnement, sinon du fichier .env de l'app (ignoré par git) ; en clair ou référence 1Password
+    (op://…, lue par op read). Jamais affiché ni journalisé ; None si absent ou illisible."""
+    raw = os.getenv("NOTION_TOKEN", "")
     env = root / ".env"
-    if env.is_file():
+    if not raw and env.is_file():
         for line in env.read_text(encoding="utf-8").splitlines():
             key, _, value = line.partition("=")
             if key.strip() == "NOTION_TOKEN" and value.strip():
-                return value.strip().strip('"').strip("'")
-    return None
+                raw = value.split(" #")[0].strip().strip('"').strip("'")
+    return resolve(raw) or None
 
 
 def _uuid(page_id: str) -> str:
@@ -356,6 +356,8 @@ def clients(root: Path = PROJECT_ROOT) -> list[str]:
 
 
 if __name__ == "__main__":
+    from deploy_hub.config import ensure_private_dirs
+    ensure_private_dirs()
     # uv run python -m deploy_hub.sources.notion_api [slug…]   (sans slug : tous les clients configurés)
     token = load_token()
     if not token:
