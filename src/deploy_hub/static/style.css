@@ -1021,3 +1021,6 @@ button.pal-open.search-wide { flex: 1 1 220px; max-width: 460px; min-width: 0; j
 /* Sélecteur du client : pas d'espace de ligne sous la pastille, elle se centre comme le reste de la barre */
 .topbar .client-switch { display: flex; align-items: center; }
 .topbar .client-switch > summary.client-chip { display: flex; margin: 0; }  /* annule « details summary { margin-top: 8px } » (ligne 101) */
+/* Écran large : la recherche plafonne à 460 px ; l'espace restant se partage autour d'elle (centrée), les boutons restent au bord droit */
+button.pal-open.search-wide { margin-left: auto; }
+.topbar .tool-launch { margin-left: auto; }
