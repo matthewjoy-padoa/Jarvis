@@ -66,6 +66,7 @@ def parse_deployment(path: Path, clients_dir: Path | None = None) -> Deployment:
         milestones=data.get("milestones") or {},
         links=[Link(**l) for l in data.get("links", [])],
         stacks=[Stack(**s) for s in (cfg.stacks if cfg else data.get("stacks") or [])],
+        drive=[Link(**l) for l in (cfg.drive if cfg else [])],
         orchestrator=cfg.orchestrator if cfg else data.get("orchestrator") or [],
         resources=[ResourceInjection(**r) for r in data.get("resources", [])],
         actions=[Action(**{**a, "notion_url": notion_link(a.get("notion_url", ""))}) for a in data.get("actions", [])],

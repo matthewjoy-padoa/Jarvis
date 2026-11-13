@@ -266,6 +266,7 @@ class Deployment:
     milestones: dict[str, date] = field(default_factory=dict)
     links: list[Link] = field(default_factory=list)
     stacks: list[Stack] = field(default_factory=list)
+    drive: list[Link] = field(default_factory=list)  # dossiers et fichiers Google Drive du client (configuration), jamais lus par Jarvis
     resources: list[ResourceInjection] = field(default_factory=list)
     actions: list[Action] = field(default_factory=list)
     retours: list[RetourRecette] = field(default_factory=list)

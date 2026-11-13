@@ -46,6 +46,11 @@
   <label class="field">Stacks Padoa
     <textarea name="stacks" rows="3" placeholder="une par ligne : env | libellé | adresse&#10;prod | Production | https://…">{{ val('stacks', cfg.stacks_text if cfg else '') }}</textarea></label>
 
+  <h2>Google Drive</h2>
+  <label class="field">Dossiers et fichiers du client
+    <textarea name="drive" rows="3" placeholder="un par ligne : libellé | adresse&#10;Dossier client | https://drive.google.com/drive/folders/…">{{ val('drive', cfg.drive_text if cfg else '') }}</textarea>
+    <small class="muted">Liens ouverts dans ton navigateur, avec ton compte Google. Jarvis ne lit jamais leur contenu et ne les donne pas aux agents Claude.</small></label>
+
   <div class="form-actions">
     <button type="submit">{{ "Ajouter le client" if new else "Enregistrer" }}</button>
     <a href="/clients" class="btn-link">Annuler</a>
