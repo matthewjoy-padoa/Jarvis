@@ -1089,3 +1089,23 @@ a.stat-link:hover .stat-go, a.stat-link:focus-visible .stat-go { opacity: 1; }
 .client-menu a.client-menu-fiche:hover { color: var(--accent); border-color: var(--accent); }
 /* Barre resserrée (901–1180 px) : onglets inactifs en icône seule, l'onglet actif garde son libellé */
 @media (min-width: 901px) and (max-width: 1180px) { .nav-item:not(.active) > span { display: none; } .nav-item:not(.active) { padding-left: 10px; padding-right: 10px; } }
+
+/* Raccourcis du client en cours : dock de boutons ronds au bord droit, centré en hauteur ; nom en bulle au survol.
+   Pas de rebond de défilement (Mac) : sinon la page rebondit et le dock, fixe, a l'air décroché. */
+html { overscroll-behavior-y: none; }
+.dock { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); z-index: 45; display: flex; flex-direction: column; gap: 8px;
+  padding: 8px; background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--border); border-radius: 99px;
+  box-shadow: var(--shadow); backdrop-filter: blur(8px); }
+.dock-btn { position: relative; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); text-decoration: none; transition: transform .15s var(--ease, ease), border-color .15s, color .15s; }
+.dock-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.dock-btn:hover, .dock-btn:focus-visible { transform: scale(1.08); border-color: var(--accent); color: var(--accent); text-decoration: none; }
+.dock-drive { color: var(--st-done); }
+.dock-add { border-style: dashed; color: var(--muted); }
+.dock-btn::after { content: attr(data-tip); position: absolute; right: calc(100% + 12px); top: 50%; transform: translate(4px, -50%); white-space: nowrap;
+  padding: 6px 10px; border-radius: 8px; background: var(--text); color: var(--surface); font-size: 12.5px; font-weight: 600;
+  opacity: 0; pointer-events: none; transition: opacity .12s, transform .12s; }
+.dock-btn:hover::after, .dock-btn:focus-visible::after { opacity: 1; transform: translate(0, -50%); }
+@media (min-width: 641px) and (max-width: 1260px) { body:has(.dock) main { padding-right: 84px; } }  /* place du dock : il ne cache jamais le contenu */
+@media (max-width: 640px) { .dock { display: none; } }  /* téléphone : les liens restent en haut de la fiche */
+@media print { .dock { display: none; } }

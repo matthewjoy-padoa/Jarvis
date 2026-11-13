@@ -4,11 +4,11 @@
   {% for s in d.stacks %}
   <a href="{{ s.url }}" target="_blank" rel="noopener" title="{{ s.url }}">{% if s.env %}<span class="env">{{ s.env }}</span>{% endif %}{{ s.label }} ↗</a>
   {% else %}
-  <a class="muted" href="/clients/{{ d.slug }}/configuration" title="Ajouter les stacks du client">+ Stacks</a>
+  <a class="muted" href="/clients/{{ d.slug }}/liens" title="Ajouter les stacks du client">+ Stacks</a>
   {% endfor %}
   {% for l in d.drive %}<a href="{{ l.url }}" target="_blank" rel="noopener noreferrer" title="Google Drive : s'ouvre avec ton compte"><span class="env">Drive</span>{{ l.label }} ↗</a>
   {% else %}
-  <a class="muted" href="/clients/{{ d.slug }}/configuration" title="Ajouter les liens Google Drive du client">+ Drive</a>
+  <a class="muted" href="/clients/{{ d.slug }}/liens" title="Ajouter les liens Google Drive du client">+ Drive</a>
   {% endfor %}
   {% for l in d.links %}<a href="{{ l.url }}" target="_blank" rel="noopener">{{ l.label }} ↗</a>{% endfor %}
 </div>
