@@ -1015,3 +1015,6 @@ button.pal-open.search-wide { flex: 1 1 220px; max-width: 460px; min-width: 0; j
 .topbar .nav a.nav-item { height: calc(var(--bar-h) - 8px); padding-top: 0; padding-bottom: 0; }
 .bar-icon, button.bar-icon, a.bar-icon { width: var(--bar-h); }
 .tool-launch button, button.pal-open.search-wide { display: inline-flex; align-items: center; padding-top: 0; padding-bottom: 0; }
+/* Icônes rondes : l'icône seule au centre ; le compteur de la cloche est posé dans le coin, hors de la mise en page */
+.bar-icon, button.bar-icon, a.bar-icon { gap: 0; }
+.bell.bar-icon #bell-count { position: absolute; top: 0; right: 0; width: 0; height: 0; }
