@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=89">
+  <link rel="stylesheet" href="/static/style.css?v=91">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=6" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
@@ -47,8 +47,11 @@
         {% if clients | length > 1 %}
         <p class="client-menu-label">Changer de client</p>
         {% for d in clients if d.slug != current.slug %}
-        <a role="menuitem" class="client-menu-item" href="/client/{{ d.slug }}?vers={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode }}">
+        <div class="client-menu-row">
+        <a role="menuitem" class="client-menu-item" href="/client/{{ d.slug }}?vers={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode }}" title="Passer à {{ d.client }} sur cette page">
           <span class="health h-{{ d.health_level }}" aria-hidden="true"></span>{{ ic.client_emoji(d) }}{{ d.client }}{{ ic.countdown(d) }}</a>
+        <a role="menuitem" class="client-menu-fiche" href="/client/{{ d.slug }}?vers=/deploiements/{{ d.slug }}/synthese" title="Ouvrir la fiche de {{ d.client }}" aria-label="Fiche de {{ d.client }}">Fiche</a>
+        </div>
         {% endfor %}
         {% endif %}
         <a role="menuitem" class="client-menu-all" href="/clients">Tous les clients et réglages</a>
@@ -58,8 +61,12 @@
     <nav class="nav" aria-label="Navigation">
       <div class="nav-group">
         {% for path, label in pages %}
-        <a href="{{ path }}" class="nav-item {{ 'active' if path == active or (path == '/clients' and active in cross) }}">
+        <a href="{{ path }}" class="nav-item {{ 'active' if path == active or (path == '/clients' and active in cross) }}" title="{{ label }}">
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">{{ icons.get(path, '') | safe }}</svg><span>{{ label }}</span></a>
+        {% if path == "/" and current %}{# La fiche du client en cours, à un clic de partout #}
+        <a href="/deploiements/{{ current.slug }}/synthese" class="nav-item nav-fiche {{ 'active' if active == '/deploiements/' ~ current.slug }}" title="Fiche de {{ current.client }}">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3.5" width="16" height="17" rx="2.5"/><circle cx="12" cy="9.5" r="2.5"/><path d="M8 16.5c.8-1.8 2.2-2.7 4-2.7s3.2.9 4 2.7"/></svg><span>Fiche</span></a>
+        {% endif %}
         {% endfor %}
       </div>
     </nav>

@@ -1081,3 +1081,11 @@ a.stat-link:hover .stat-go, a.stat-link:focus-visible .stat-go { opacity: 1; }
 .deadline-client-pick select { font: inherit; font-weight: 600; color: var(--text); border: 0; background: transparent; padding: 3px 4px; cursor: pointer; }
 .deadline-client-pick:focus-within { border-color: var(--accent); }
 .deadline-client-pick select:focus { outline: none; }
+
+/* Accès rapide à la fiche : onglet « Fiche » du client en cours, raccourci « Fiche » par client dans le menu */
+.client-menu-row { display: flex; align-items: center; gap: 4px; }
+.client-menu-row .client-menu-item { flex: 1; min-width: 0; }
+.client-menu a.client-menu-fiche { flex: none; font-size: 12px; font-weight: 600; color: var(--muted); padding: 4px 10px; border: 1px solid var(--border); border-radius: 99px; }
+.client-menu a.client-menu-fiche:hover { color: var(--accent); border-color: var(--accent); }
+/* Barre resserrée (901–1180 px) : onglets inactifs en icône seule, l'onglet actif garde son libellé */
+@media (min-width: 901px) and (max-width: 1180px) { .nav-item:not(.active) > span { display: none; } .nav-item:not(.active) { padding-left: 10px; padding-right: 10px; } }
