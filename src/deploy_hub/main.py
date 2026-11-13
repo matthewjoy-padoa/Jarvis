@@ -19,7 +19,7 @@ from deploy_hub import client_config
 from deploy_hub.config import PROCESS_KEYS, PROJECT_ROOT, clients_dir, data_dir, ensure_private_dirs, forget_secrets, load_settings, secret_problem
 from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
                                kanban_columns, notion_link, status_group)
-from deploy_hub import console, env_file, onepassword, shell
+from deploy_hub import brief, console, env_file, onepassword, shell
 from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
@@ -31,6 +31,7 @@ from deploy_hub.sources.external import external_statuses
 from deploy_hub.sources.journal import changes_since, group_changes
 from deploy_hub.sources import watchers
 from deploy_hub.sources.notifications import NotificationStore
+from deploy_hub.sources.personal import PersonalStore, remind_date
 from deploy_hub.sources.fiches import FicheSource
 
 HERE = Path(__file__).parent
@@ -45,6 +46,7 @@ claude = ClaudeRunner.from_env(settings.orchestrator_dir, live, notifications, d
 # Suivi des runs lancés (air.py d'Arthur) ; les suivis en cours au démarrage reprennent si Airflow est configuré.
 dag_watch = DagWatcher(data_dir() / "airflow", notifications, {"AIRFLOW_URL": airflow.base_url, "AIRFLOW_USER": airflow.user,
                                                                "AIRFLOW_PASSWORD": airflow.password} if airflow.live else None)
+personal = PersonalStore(data_dir() / "perso.json")  # épingles, notes et rappels : à moi seul, jamais dans Notion
 _refresh_lock = threading.Lock()  # un seul rafraîchissement Notion à la fois
 
 log = logging.getLogger("uvicorn.error")  # mêmes lignes que celles de uvicorn
@@ -224,6 +226,8 @@ def today_page(request: Request):
         links=links,
         ko_url=ko_url,
         milestones=[i for i in items if i["kind"] == "Jalon" and today <= i["date"] <= today + timedelta(days=21)],
+        pins=_pinned(current) if current else [],
+        **_reminders_context(current.slug if current else ""),
     )
 
 
@@ -633,7 +637,7 @@ async def settings_op_signout(request: Request):
 
 
 # Pages globales qui restent ouvertes quand on change de client dans le menu : leur client par défaut est celui du menu.
-CLIENT_FILTERED_PAGES = ("/", "/deadlines", "/actions", "/recette", "/injections", "/agents", "/notifications")
+CLIENT_FILTERED_PAGES = ("/", "/brief", "/deadlines", "/actions", "/recette", "/injections", "/agents", "/notifications")
 
 
 @app.get("/client/{slug}")
@@ -722,6 +726,27 @@ def ticket_url(slug: str, kind: str, ref: str) -> str:
 
 
 templates.env.globals["ticket_url"] = ticket_url
+templates.env.globals["perso"] = personal
+
+
+def _find_ticket(d: Deployment, kind: str, ref: str):
+    items = d.retours if kind == "retour" else d.actions
+    return next((i for i in items if (i.id if kind == "retour" else i.ref) == ref.upper()), None)
+
+
+def _ticket_item(slug: str, kind: str, ref: str):
+    """(fiche, retour ou carte) ; 404 si le type, le client ou le ticket est inconnu."""
+    if kind not in TICKET_KINDS:
+        raise HTTPException(404, f"Type inconnu : {kind}")
+    d = _get(slug)
+    item = _find_ticket(d, kind, ref)
+    if item is None:
+        raise HTTPException(404, f"{'Retour' if kind == 'retour' else 'Carte'} {ref} introuvable chez {d.client}")
+    return d, item
+
+
+def _ticket_label(kind: str, item) -> str:
+    return item.label if kind == "retour" else item.title
 
 
 @app.get("/deploiements/{slug}/ticket/{kind}/{ref}", response_class=HTMLResponse)
@@ -729,13 +754,7 @@ def ticket(request: Request, slug: str, kind: str, ref: str, agent: bool = False
     """Tout ce qu'on sait d'un retour ou d'une carte d'action : fiche, contenu, agents, historique.
     Panneau latéral quand la page l'appelle (htmx), page entière sinon (lien ouvert dans un nouvel onglet).
     agent=1 (commande « >agent » de la palette) : le bloc « Lancer un agent » arrive déplié, brief chargé, et prend le focus."""
-    if kind not in TICKET_KINDS:
-        raise HTTPException(404, f"Type inconnu : {kind}")
-    d = _get(slug)
-    items = d.retours if kind == "retour" else d.actions
-    item = next((i for i in items if (i.id if kind == "retour" else i.ref) == ref.upper()), None)
-    if item is None:
-        raise HTTPException(404, f"{'Retour' if kind == 'retour' else 'Carte'} {ref} introuvable chez {d.client}")
+    d, item = _ticket_item(slug, kind, ref)
     history = [c for c in changes_since(d, settings.deployments_dir, datetime.min) if c.notion_url == notion_link(item.notion_url)]
     runs = [r for r in claude.runs if r.slug == slug and r.subject == f"retour {ref.upper()}"] if kind == "retour" else []
     context = {"d": d, "kind": kind, "item": item, "history": history, "runs": runs, "today": date.today(), "open_agent": agent}
@@ -804,6 +823,74 @@ def refresh_one(request: Request, slug: str):
     return response
 
 
+# ============================================================ Perso : brief, épingles, notes, rappels
+def _pinned(d: Deployment) -> list[dict]:
+    """Tickets épinglés du client ; « item » vaut None quand le ticket a disparu de la fiche (reste à désépingler)."""
+    return [{**p, "item": (item := _find_ticket(d, p["kind"], p["ref"])), "label": _ticket_label(p["kind"], item) if item else p["ref"]}
+            for p in personal.pins(d.slug)]
+
+
+def _reminders_context(slug: str, error: str = "") -> dict:
+    return {"reminders": personal.reminders(slug or None), "remind_slug": slug, "remind_error": error, "today": date.today()}
+
+
+@app.get("/brief", response_class=HTMLResponse)
+def brief_page(request: Request, tous: bool = False):
+    """Brief du matin : le résumé de l'accueil en texte à copier (client en cours, ou tous les clients)."""
+    current = _current(request)
+    deployments = [current] if current and not tous else sorted(_deployments(request), key=_closest_go_live)
+    today = date.today()
+    return _render(request, "brief.html", "/", all_clients=tous or not current,
+                   text=brief.build(deployments, _deadlines(deployments), personal.due(today), today, _in_period))
+
+
+@app.post("/perso/epingle/{slug}/{kind}/{ref}", response_class=HTMLResponse)
+def pin_toggle(request: Request, slug: str, kind: str, ref: str):
+    d, _item = _ticket_item(slug, kind, ref)
+    pinned = personal.toggle_pin(slug, kind, ref.upper())
+    return templates.TemplateResponse(request, "_pin_button.html", {"d": d, "kind": kind, "ref": ref.upper(), "pinned": pinned})
+
+
+@app.post("/perso/note/{slug}", response_class=HTMLResponse)
+def note_save(request: Request, slug: str, texte: str = Form("")):
+    _get(slug)
+    personal.set_note(slug, texte)
+    return _result(request, ActionResult(True, f"Enregistré à {datetime.now():%H:%M}", simulated=False))
+
+
+@app.post("/perso/rappel", response_class=HTMLResponse)
+def reminder_add(request: Request, quand: str = Form(""), jour: str = Form(""), slug: str = Form(""), kind: str = Form(""),
+                 ref: str = Form(""), label: str = Form("")):
+    """Rappel sur un ticket (kind et ref : le libellé est celui du ticket) ou rappel libre de l'accueil (label)."""
+    d = item = None
+    if kind:
+        d, item = _ticket_item(slug, kind, ref)
+        ref, label = ref.upper(), _ticket_label(kind, item)
+    elif slug:
+        _get(slug)
+    due = remind_date(quand, jour)
+    error = "Choisis une date à venir." if due is None else "" if label.strip() else "Écris ce qu'il faut te rappeler."
+    if not error:
+        personal.add_reminder(due, label, slug, kind, ref)
+    if kind:
+        return templates.TemplateResponse(request, "_ticket_remind.html", {"d": d, "kind": kind, "ref": ref, "today": date.today(), "remind_error": error})
+    return templates.TemplateResponse(request, "_reminders.html", _reminders_context(slug, error))
+
+
+@app.post("/perso/rappel/{reminder_id}/fait", response_class=HTMLResponse)
+def reminder_done(reminder_id: int):
+    personal.remove_reminder(reminder_id)
+    return HTMLResponse("")
+
+
+def _reminder_notes(deployments: list[Deployment], today: date) -> list[dict]:
+    """Rappels arrivés à échéance : une notification chacun, qui mène au ticket (ou à l'accueil pour un rappel libre)."""
+    names = {d.slug: d.client for d in deployments}
+    return [{"key": f"rappel:{r.id}:{r.due.isoformat()}", "kind": "rappel", "level": "info", "title": f"Rappel : {r.label}",
+             "detail": names.get(r.slug, ""), "link": ticket_url(r.slug, r.kind, r.ref) if r.kind else "/", "client": names.get(r.slug, "")}
+            for r in personal.due(today)]
+
+
 # ============================================================ Notifications
 def _deadline_notes() -> None:
     """Veilles (sources/watchers.py) : échéance du jour, synchro en retard, santé qui se dégrade, jalon proche."""
@@ -816,6 +903,7 @@ def _deadline_notes() -> None:
         + watchers.sync_late_notes(deployments, now)
         + health
         + watchers.milestone_notes(deployments, now.date())
+        + _reminder_notes(deployments, now.date())
     )
     if seen != state.get("sante"):
         notifications.save_state({**state, "sante": seen})
