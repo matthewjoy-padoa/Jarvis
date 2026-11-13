@@ -1018,3 +1018,6 @@ button.pal-open.search-wide { flex: 1 1 220px; max-width: 460px; min-width: 0; j
 /* Icônes rondes : l'icône seule au centre ; le compteur de la cloche est posé dans le coin, hors de la mise en page */
 .bar-icon, button.bar-icon, a.bar-icon { gap: 0; }
 .bell.bar-icon #bell-count { position: absolute; top: 0; right: 0; width: 0; height: 0; }
+/* Sélecteur du client : pas d'espace de ligne sous la pastille, elle se centre comme le reste de la barre */
+.topbar .client-switch { display: flex; align-items: center; }
+.topbar .client-switch > summary.client-chip { display: flex; margin: 0; }  /* annule « details summary { margin-top: 8px } » (ligne 101) */
