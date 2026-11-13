@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=71">
+  <link rel="stylesheet" href="/static/style.css?v=85">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=4" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
@@ -25,6 +25,7 @@
   {% import "_icons.html" as ic %}
   {% set cross = cross_pages | map(attribute=0) | list %}
   <header class="topbar">
+    <div class="bar-left">
     <a href="/" class="brand" aria-label="Jarvis, accueil" title="Just A Rather Very Intelligent System">
       {{ ic.jarvis_mark() }}
       <span class="brand-name">Jarvis</span><span class="brand-dot" aria-hidden="true"></span></a>
@@ -62,17 +63,23 @@
         {% endfor %}
       </div>
     </nav>
+    </div>
+    {# Centre de la barre : la recherche (au milieu de l'écran dès 1100 px, voir .bar-left / .bar-right dans style.css). #}
+    <button type="button" class="secondary pal-open search-wide" data-palette-open aria-label="Rechercher dans Jarvis" title="Demander à Jarvis">{{ ic.icon("search") }}<span class="pal-open-label">Rechercher un client, un retour…</span><kbd data-palette-key>⌘K</kbd></button>
+    <div class="bar-right">
     {# Flow Digger (padoa/integration-flow-digger) : lancé sur la VM au besoin, ouvert dans sa propre fenêtre (réutilisée). #}
     <form method="post" action="/outils/flow-digger" target="flow-digger" class="tool-launch" data-own-window>
       <button type="submit" class="secondary" title="Ouvrir Flow Digger dans une autre fenêtre (le démarre sur la VM s'il ne tourne pas)">{{ ic.icon("shovel") }}<span class="tool-launch-label">Flow Digger</span><span class="tool-launch-ext" aria-hidden="true">↗</span></button>
     </form>
-    <button type="button" class="secondary pal-open" data-palette-open aria-label="Rechercher dans Jarvis" title="Demander à Jarvis">{{ ic.icon("search") }}<span class="pal-open-label">Rechercher</span><kbd data-palette-key>⌘K</kbd></button>
+    <span class="bar-sep" aria-hidden="true"></span>
     <div class="bell-wrap">
-      <button type="button" class="bell secondary icon-btn" aria-label="Notifications" aria-haspopup="true" aria-expanded="false"
+      <button type="button" class="bell secondary bar-icon" aria-label="Notifications" aria-haspopup="true" aria-expanded="false"
               hx-get="/notifications/panneau" hx-target="#notif-panel" hx-trigger="click">{{ ic.icon("bell") }}<span id="bell-count" hx-target="this" hx-get="/notifications/compte" hx-trigger="load, every 60s, notifs-changed from:body" hx-swap="innerHTML"></span></button>
       <div id="notif-panel" class="notif-panel" hidden></div>
     </div>
-    <button type="button" class="theme-toggle icon-btn" id="theme-toggle" title="Changer de thème">Auto</button>
+    <button type="button" class="theme-toggle bar-icon" id="theme-toggle" title="Changer de thème" aria-label="Thème">Auto</button>
+    <a href="/reglages" class="settings-link bar-icon {{ 'active' if active == '/reglages' }}" aria-label="Réglages" title="Réglages : Airflow, Notion, 1Password">{{ ic.icon("gear") }}</a>
+    </div>
   </header>
   <script>
     // Thème : Auto (suit le Mac) → Nuit → Clair → Auto. Retenu dans le navigateur.
@@ -89,6 +96,7 @@
         const t = root.dataset.theme || "";
         button.innerHTML = `${icons[t]} <span class="theme-label">${labels[t]}</span>`;
         button.title = `Thème : ${labels[t]} (cliquer pour changer)`;
+        button.setAttribute("aria-label", `Thème : ${labels[t]}`);
       };
       button.addEventListener("click", () => {
         const next = order[(order.indexOf(root.dataset.theme || "") + 1) % order.length];

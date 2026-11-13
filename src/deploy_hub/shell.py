@@ -26,8 +26,7 @@ from urllib.parse import urlsplit
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from deploy_hub.config import ENV_FILE_KEYS
-from deploy_hub.sources.claude_runner import SECRETS
+from deploy_hub.config import child_environment
 
 TOKEN = secrets.token_urlsafe(32)  # nouveau à chaque démarrage : une page restée ouverte d'avant doit être rechargée
 LOCAL_HOSTS = {"127.0.0.1", "::1"}  # adresse de la connexion
@@ -58,7 +57,7 @@ def refusal(ws: WebSocket) -> str:
 
 
 def _environment() -> dict[str, str]:
-    env = {k: v for k, v in os.environ.items() if k not in SECRETS and k not in ENV_FILE_KEYS and not k.startswith("JARVIS_SHELL")}
+    env = {k: v for k, v in child_environment().items() if not k.startswith("JARVIS_SHELL")}
     # SHELL = le shell lancé ; LANG UTF-8 pour les caractères des thèmes (➜, ✗) si le service n'en a pas.
     return {**env, "TERM": "xterm-256color", "COLORTERM": "truecolor", "SHELL": login_shell(), "LANG": env.get("LANG") or "C.UTF-8"}
 

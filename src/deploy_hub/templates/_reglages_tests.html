@@ -1,0 +1,5 @@
+<ul class="plain settings-results">
+  {% for label, (ok, message) in checks %}
+  <li><span class="dot {{ 'ok' if ok else 'off' }}"></span><strong>{{ label }}</strong> {{ '✓' if ok else '✗' }} {{ message }}</li>
+  {% endfor %}
+</ul>

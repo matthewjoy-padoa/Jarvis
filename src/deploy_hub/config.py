@@ -40,6 +40,16 @@ def deployments_dir(root: Path = PROJECT_ROOT) -> Path:
 
 
 ENV_FILE_KEYS: set[str] = set()  # variables venues du .env : réglages de Jarvis, jamais transmis aux agents
+PROCESS_KEYS: set[str] = set()  # variables du .env déjà fixées par l'environnement du processus (vm.conf…) : elles gagnent
+
+
+def parse_env_line(line: str) -> tuple[str, str] | None:
+    """« CLÉ=valeur  # commentaire » → (clé, valeur) ; None pour une ligne vide ou un commentaire."""
+    key, sep, value = line.partition("=")
+    key = key.strip()
+    if not sep or not key or key.startswith("#"):
+        return None
+    return key, value.split(" #")[0].strip().strip('"').strip("'")
 
 
 def load_env_file(path: Path | None = None) -> None:
@@ -49,11 +59,14 @@ def load_env_file(path: Path | None = None) -> None:
         return
     restrict(path)
     for line in path.read_text(encoding="utf-8").splitlines():
-        key, sep, value = line.partition("=")
-        key = key.strip()
-        if sep and key and not key.startswith("#") and key not in os.environ:  # l'environnement garde la main
-            ENV_FILE_KEYS.add(key)
-            os.environ[key] = value.split(" #")[0].strip().strip('"').strip("'")
+        if not (parsed := parse_env_line(line)):
+            continue
+        key, value = parsed
+        if key in os.environ and key not in ENV_FILE_KEYS:  # l'environnement garde la main
+            PROCESS_KEYS.add(key)
+            continue
+        ENV_FILE_KEYS.add(key)
+        os.environ[key] = value
 
 
 def restrict(path: Path) -> bool:
@@ -94,21 +107,39 @@ def resolve(value: str) -> str:
 
 
 def _read_op(value: str) -> str:
-    try:
-        out = subprocess.run(["op", "read", "--no-newline", value], capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
-    except FileNotFoundError:
+    from deploy_hub import onepassword
+    if not onepassword.installed():
         SECRET_ERRORS[value] = "1Password CLI (op) absent"
         return ""
+    try:
+        out = onepassword.run("read", "--no-newline", value)
     except (OSError, subprocess.TimeoutExpired) as e:
         SECRET_ERRORS[value] = f"op read a échoué ({type(e).__name__})"
         return ""
     if out.returncode or not out.stdout:
         # Message de op (jamais la valeur : elle n'est pas lue) ; le plus souvent « not signed in ».
-        SECRET_ERRORS[value] = (out.stderr.strip().splitlines() or ["op read a échoué"])[-1][:200]
+        SECRET_ERRORS[value] = onepassword.message(out.stderr) or "op read n'a rien renvoyé (champ vide ?)"
         return ""
     SECRET_ERRORS.pop(value, None)
     _resolved[value] = out.stdout
     return out.stdout
+
+
+def forget_secrets() -> None:
+    """Oublie les valeurs lues et les échecs : après une connexion à 1Password ou un changement de réglages."""
+    _resolved.clear()
+    _failed_at.clear()
+    SECRET_ERRORS.clear()
+
+
+PRIVATE_KEYS = ("NOTION_TOKEN", "AIRFLOW_USER", "AIRFLOW_PASSWORD")
+
+
+def child_environment() -> dict[str, str]:
+    """Environnement donné aux processus lancés par Jarvis (agents, shell, Flow Digger) : sans ses secrets, sans les
+    réglages de son .env et sans session 1Password (une session ouvrirait tous les coffres du compte)."""
+    return {k: v for k, v in os.environ.items()
+            if k not in PRIVATE_KEYS and k not in ENV_FILE_KEYS and not k.startswith("OP_SESSION_")}
 
 
 def secret(name: str) -> str:

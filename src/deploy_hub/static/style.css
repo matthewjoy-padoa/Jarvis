@@ -972,3 +972,63 @@ img.client-icon { width: 1em; height: 1em; object-fit: contain; vertical-align: 
 @media (max-width: 1440px) { .tool-launch-label { display: none; } }
 .tool-error { display: flex; gap: 8px; align-items: flex-start; color: var(--st-ko); }
 .tool-error .ic { flex: none; width: 18px; height: 18px; margin-top: 2px; }
+
+/* Page Réglages : .env, connexions, 1Password */
+.settings-form .field, .settings-signin .field { margin-bottom: 12px; }
+.settings-form .field .badge { align-self: flex-start; margin-left: 4px; font-weight: 500; }
+.settings-form .field { flex-direction: column; }
+.settings-signin { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.settings-signin .field { flex: 1 1 260px; margin-bottom: 0; }
+.settings-clear { display: inline-flex; gap: 4px; align-items: center; margin-left: 4px; }
+.settings-clear input { width: auto; margin: 0; }
+.settings-tests .refresh-wait { display: none; }
+.settings-tests.htmx-request .refresh-wait { display: inline; }
+.settings-results { list-style: none; padding: 0; margin: 8px 0; }
+.settings-results .dot { margin-right: 6px; }
+.settings-flash { font-size: 14px; }
+/* Lien Réglages de la barre : même gabarit que les boutons ronds voisins */
+a.settings-link { display: inline-flex; flex: none; align-items: center; border-radius: 999px; border: 2px solid var(--border); background: var(--surface); color: var(--muted); padding: 6px 12px; }
+a.settings-link:hover, a.settings-link.active { border-color: var(--accent); color: var(--text); }
+a.settings-link .ic { width: 16px; height: 16px; margin: 0; }
+.settings-intro code, .settings-form code { overflow-wrap: anywhere; }
+.settings-form .form-actions { flex-wrap: wrap; }
+.settings-form .form-actions button { max-width: 100%; white-space: normal; }
+
+/* Barre, disposition A : navigation à sa taille, recherche qui prend la place libre, puis Flow Digger | trois icônes rondes */
+@media (min-width: 901px) { .topbar .nav { flex: 0 1 auto; } }  /* sous 900 px, les onglets gardent leur ligne à eux (flex-basis 100 %) */
+button.pal-open.search-wide { flex: 1 1 220px; max-width: 460px; min-width: 0; justify-content: flex-start; gap: 10px; padding: 7px 8px 7px 14px; overflow: hidden; }
+.search-wide .pal-open-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; font-weight: 400; }
+.search-wide kbd { margin-left: auto; }
+.bar-sep { flex: none; width: 1px; height: 24px; background: var(--border); margin: 0 2px; }
+.bar-icon, button.bar-icon, a.bar-icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; border-radius: 999px; }
+.bar-icon .ic { width: 18px; height: 18px; margin: 0; vertical-align: 0; }
+.theme-toggle.bar-icon .theme-label { display: none; }
+@media (max-width: 1440px) { .search-wide .pal-open-label, .search-wide kbd { display: inline; } button.pal-open.search-wide { padding: 7px 8px 7px 14px; } }
+@media (max-width: 1100px) { .search-wide .pal-open-label { display: none; } button.pal-open.search-wide { flex: 0 0 auto; padding: 7px 12px; } }
+@media (max-width: 640px) { .bar-sep { display: none; } }
+/* Tout aligné sur une même hauteur : pastille du client, onglets, recherche, Flow Digger, icônes */
+.topbar { --bar-h: 40px; align-items: center; }
+.topbar .client-chip, .topbar .nav-group, button.pal-open.search-wide, .tool-launch button, .bar-icon, button.bar-icon, a.bar-icon {
+  height: var(--bar-h); box-sizing: border-box; }
+.topbar .client-chip { padding-top: 0; padding-bottom: 0; }
+.topbar .nav-group { align-items: center; }
+.topbar .nav a.nav-item { height: calc(var(--bar-h) - 8px); padding-top: 0; padding-bottom: 0; }
+.bar-icon, button.bar-icon, a.bar-icon { width: var(--bar-h); }
+.tool-launch button, button.pal-open.search-wide { display: inline-flex; align-items: center; padding-top: 0; padding-bottom: 0; }
+/* Icônes rondes : l'icône seule au centre ; le compteur de la cloche est posé dans le coin, hors de la mise en page */
+.bar-icon, button.bar-icon, a.bar-icon { gap: 0; }
+.bell.bar-icon #bell-count { position: absolute; top: 0; right: 0; width: 0; height: 0; }
+/* Sélecteur du client : pas d'espace de ligne sous la pastille, elle se centre comme le reste de la barre */
+.topbar .client-switch { display: flex; align-items: center; }
+.topbar .client-switch > summary.client-chip { display: flex; margin: 0; }  /* annule « details summary { margin-top: 8px } » (ligne 101) */
+/* Recherche au centre de la barre : trois colonnes (gauche | recherche | droite), les deux côtés de même largeur.
+   Sous 1100 px, les deux groupes sont transparents (display: contents) : la barre garde ses règles flex habituelles. */
+.bar-left, .bar-right { display: contents; }
+@media (min-width: 1101px) {
+  .topbar { display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(220px, 460px) minmax(max-content, 1fr); column-gap: 16px; }
+  .bar-left, .bar-right { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .bar-right { justify-content: flex-end; }
+  button.pal-open.search-wide { max-width: none; width: 100%; }
+}
+@media (max-width: 1100px) { .search-wide kbd { display: none; } }  /* la loupe seule : les onglets gardent leur place */
+@media (max-width: 700px) { .topbar { --bar-h: 36px; gap: 8px; padding-left: 12px; padding-right: 12px; } .topbar .brand-name { font-size: 18px; } }

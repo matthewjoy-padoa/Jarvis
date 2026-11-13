@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
-from deploy_hub.config import ENV_FILE_KEYS
+from deploy_hub.config import child_environment
 from deploy_hub.models import DONE, IN_PROGRESS, KO, Deployment, RetourRecette, status_group
 from deploy_hub.sources import ActionResult
 
@@ -62,7 +62,6 @@ DEFAULT_TOOLS = ("Bash(uv run *)", "Bash(uv sync *)", "Bash(ls *)", "Bash(cat *)
                  "Bash(git status *)", "Bash(git diff *)", "Bash(git log *)", "Bash(git show *)", "Bash(git ls-files *)",
                  "Bash(git grep *)", "Bash(git blame *)", "Bash(git add *)", "Bash(git commit *)", "Bash(git push *)",
                  "Bash(gh pr create *)", "Bash(gh pr view *)")
-SECRETS = ("NOTION_TOKEN", "AIRFLOW_USER", "AIRFLOW_PASSWORD")  # retirés aussi s'ils viennent de l'environnement du service
 
 
 def agent_branch(*parts: str) -> str:
@@ -272,7 +271,7 @@ class ClaudeRunner:
 
     def _env(self) -> dict[str, str]:
         """Environnement du service, sans les secrets ni les réglages venus du .env de Jarvis."""
-        return {k: v for k, v in os.environ.items() if k not in SECRETS and k not in ENV_FILE_KEYS}
+        return child_environment()
 
     def _work(self, run: AgentRun) -> None:
         try:
