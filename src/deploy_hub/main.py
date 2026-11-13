@@ -391,7 +391,8 @@ def dag_watch_stop(watch_id: int):
 @app.get("/sources", response_class=HTMLResponse)
 def sources(request: Request):
     return _render(request, "sources.html", "/sources", externals=external_statuses(notion_api.load_token() is not None,
-                                                                         secret_problem("NOTION_TOKEN")), settings=settings)
+                                                                         secret_problem("NOTION_TOKEN")), settings=settings,
+                   airflow_problem=" ; ".join(f"{n} : {e}" for n in ("AIRFLOW_USER", "AIRFLOW_PASSWORD") if (e := secret_problem(n))))
 
 
 @app.get("/deploiements/{slug}")

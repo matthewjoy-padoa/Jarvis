@@ -7,7 +7,7 @@
   <thead><tr><th>Source</th><th>État</th><th>Détail</th></tr></thead>
   <tbody>
     <tr><td><strong>Fiches de déploiement</strong></td><td><span class="dot ok"></span>lues</td><td class="muted"><code>{{ settings.deployments_dir }}</code></td></tr>
-    <tr><td><strong>Airflow</strong></td><td><span class="dot {{ 'ok' if airflow.live else 'off' }}"></span>{{ 'connecté' if airflow.live else 'simulé' }}</td><td class="muted">{% if airflow.live %}<code>{{ airflow.base_url }}</code>{% else %}AIRFLOW_BASE_URL, AIRFLOW_USER, AIRFLOW_PASSWORD à mettre dans .env{% endif %} · lancement et état des runs ; le suivi d'un run lancé depuis Jarvis (air.py) lit les logs de ses tâches</td></tr>
+    <tr><td><strong>Airflow</strong></td><td><span class="dot {{ 'ok' if airflow.live else 'off' }}"></span>{{ 'connecté' if airflow.live else 'simulé' }}</td><td class="muted">{% if airflow.live %}<code>{{ airflow.base_url }}</code>{% elif airflow_problem %}référence 1Password illisible : {{ airflow_problem }} (op signin, puis relance Jarvis){% else %}AIRFLOW_BASE_URL, AIRFLOW_USER, AIRFLOW_PASSWORD à mettre dans .env{% endif %} · lancement et état des runs ; le suivi d'un run lancé depuis Jarvis (air.py) lit les logs de ses tâches</td></tr>
     <tr><td><strong>Claude</strong></td><td><span class="dot {{ 'ok' if mode == 'live' else 'off' }}"></span>{{ mode }}</td><td class="muted"><code>{{ settings.orchestrator_dir }}</code></td></tr>
     {% for e in externals %}
     <tr><td><strong>{{ e.name }}</strong></td><td><span class="dot {{ 'ok' if e.connected else 'off' }}"></span>{{ 'connecté' if e.connected else 'non connecté' }}</td><td class="muted">{{ e.hint }}</td></tr>

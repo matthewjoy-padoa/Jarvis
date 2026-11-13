@@ -127,3 +127,13 @@ def test_the_sources_page_says_why_the_reference_is_unreadable(fake_op, monkeypa
     monkeypatch.setenv("NOTION_TOKEN", "op://Padoa-integration/Inconnu/champ")
     page = TestClient(app).get("/sources").text
     assert "référence 1Password illisible" in page and "not signed in" in page
+
+
+def test_the_sources_page_says_why_airflow_credentials_are_unreadable(fake_op, monkeypatch):
+    from fastapi.testclient import TestClient
+    from deploy_hub import config as cfg
+    from deploy_hub.main import app
+    monkeypatch.setenv("AIRFLOW_USER", "op://Padoa-integration/Inconnu/user")
+    cfg.secret("AIRFLOW_USER")  # lu au démarrage par AirflowSource.from_env
+    page = TestClient(app).get("/sources").text
+    assert "AIRFLOW_USER : " in page and "not signed in" in page
