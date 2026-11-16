@@ -4,7 +4,7 @@ Tableau de bord des déploiements clients de l'équipe Integration : ce qui est 
 
 - **Accueil** : retards, échéances, injections KO, prochains jalons, « Quoi de neuf » depuis ta dernière visite.
 - **Une fiche par client** : synthèse et jalons, injections par ressource (avec lancement des DAGs), actions par équipe, retours de recette (avec brief pour un agent Claude), règles de reprise, CED.
-- **Notifications** : agent terminé, changements urgents, échéances, avancement qui se dégrade, rappels arrivés à échéance.
+- **Notifications** : agent terminé, changements urgents, échéances, avancement qui se dégrade, rappels arrivés à échéance. Une fois « Activer les notifications du Mac » cliqué (panneau de la cloche), elles arrivent sur le Mac même onglet fermé (Web Push, [`sources/web_push.py`](src/deploy_hub/sources/web_push.py)) : le navigateur doit rester lancé ; le contenu part chiffré de bout en bout vers le service de push du navigateur ; clé et abonnements dans `data/push/`.
 - **Pour moi seulement** : brief du matin à copier, tickets épinglés, notes, rappels (voir [Perso](#perso)).
 
 Chacun configure **ses propres clients** : configuration et données restent sur sa machine.
