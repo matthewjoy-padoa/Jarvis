@@ -1,9 +1,9 @@
 {% import "_icons.html" as ic %}
-{# Attend : d. Notion : fiche « Clients en déploiement » + points de vigilance. Jalons dans la frise ; liens en tête de fiche. #}
 {% import "_charts.html" as charts with context %}
+{# Attend : d. Notion : fiche « Clients en déploiement » + points de vigilance. Jalons dans la frise ; liens en tête de fiche. #}
 <div class="kpis">
   <div class="kpi"><span class="muted">Avancement</span><strong>{{ d.progress }} %</strong>
-    {% if d.expected_progress is not none %}<span class="muted">attendu {{ d.expected_progress }} % ({{ '%+d' % (d.progress - d.expected_progress) }} pts)</span>{% endif %}</div>
+    {{ charts.progress(d.progress, d.expected_progress) }}</div>
   {% if d.days_to_freeze is not none %}<div class="kpi"><span class="muted">Freeze</span><strong>J{{ '%+d' % (-d.days_to_freeze) }}</strong></div>{% endif %}
   <a class="kpi kpi-link" href="/deploiements/{{ d.slug }}/recette"><span class="muted">Retours ouverts</span><strong>{{ d.open_retours | length }}</strong><span class="muted">voir la recette →</span></a>
   <a class="kpi kpi-link" href="/deploiements/{{ d.slug }}/actions"><span class="muted">Points de vigilance</span><strong>{{ d.vigilance | length }}</strong><span class="muted">voir les actions →</span></a>
@@ -31,14 +31,14 @@
   {% if points | length > 5 %}<p class="muted blocking-more">+ {{ points | length - 5 }} autre(s) point(s) avec un KO · <a href="/deploiements/{{ d.slug }}/injections">Injections</a> · <a href="/deploiements/{{ d.slug }}/recette">Recette</a></p>{% endif %}
 </section>
 
-{{ charts.timeline(d.timeline) }}
+{{ charts.timeline(d.timeline, d.slug) }}
 {% if not d.timeline and milestones %}
 <section class="panel"><h2>Jalons</h2><ul class="timeline">{% for label, day in milestones %}<li class="{{ 'past' if day < today }}"><span class="date">{{ day.strftime("%d/%m/%Y") }}</span> {{ label }}</li>{% endfor %}</ul></section>
 {% endif %}
 <div class="chart-row">
-  {{ charts.segbar("Injections (cartes)", d.injection_groups, "cartes", filter_key="groupe", href="/deploiements/" ~ d.slug ~ "/injections") }}
+  {{ charts.segbar("Injections (cartes)", d.injection_groups, "cartes", slim=true, filter_key="groupe", href="/deploiements/" ~ d.slug ~ "/injections") }}
   {% set recette = "/deploiements/" ~ d.slug ~ "/recette" %}
-  {{ charts.segbar("Retours de recette", d.retour_groups, "retours", filter_key="groupe", href=recette, hrefs={"done": recette ~ "?tous=true"}) }}
+  {{ charts.segbar("Retours de recette", d.retour_groups, "retours", slim=true, filter_key="groupe", href=recette, hrefs={"done": recette ~ "?tous=true"}) }}
 </div>
 
 <section class="panel">
