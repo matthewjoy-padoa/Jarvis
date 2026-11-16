@@ -1186,3 +1186,82 @@ button.notes-close { margin-left: auto; min-height: 0; padding: 0 8px; border: 0
 html.palette-open .notes, html.drawer-open .notes, html.term-open .notes { display: none; }
 @media (max-width: 640px) { button.notes-fab { bottom: 78px; } .notes { right: 16px; bottom: 138px; } }
 @media print { .notes { display: none; } }
+
+/* ---- Graphiques lisibles (barres segmentées, jauge d'avancement, frise, accueil) ---- */
+.chart figcaption { display: flex; justify-content: space-between; align-items: baseline; gap: 6px 12px; flex-wrap: wrap; font-size: 14px; }
+.seg-headline { font-size: 13px; font-weight: 500; color: var(--muted); }
+.seg-headline strong { color: var(--text); font-size: 15px; font-variant-numeric: tabular-nums; }
+.segbar { gap: 2px; height: 32px; border-radius: 8px; background: var(--surface); }
+.seg { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.seg:first-child { border-radius: 8px 0 0 8px; } .seg:last-child { border-radius: 0 8px 8px 0; } .seg:only-child { border-radius: 8px; }
+.seg-n { color: var(--on-status); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; pointer-events: none; }
+.chart.thin .segbar { height: 8px; } .chart.thin .seg { border-radius: 0; } .chart.thin .seg:first-child { border-radius: 99px 0 0 99px; } .chart.thin .seg:last-child { border-radius: 0 99px 99px 0; } .chart.thin .seg:only-child { border-radius: 99px; }
+.key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; flex: none; }
+.legend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px 16px; margin-top: 12px; font-size: 13px; }
+.legend-grid li { display: grid; grid-template-columns: auto 1fr auto 3.2em; align-items: center; gap: 0 6px; }
+.legend-grid li .key { margin: 0; }
+.legend-grid strong { font-size: 15px; font-variant-numeric: tabular-nums; text-align: right; }
+.legend-grid .muted { text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; }
+
+.gauge { display: flex; flex-direction: column; gap: 6px; }
+.gauge-head { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.gauge-head strong { font-size: 18px; color: var(--text); font-variant-numeric: tabular-nums; }
+.gauge-gap { margin-left: auto; padding: 1px 8px; border-radius: 99px; background: var(--pa-done); font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.gauge-track { position: relative; height: 10px; border-radius: 99px; background: color-mix(in srgb, var(--border) 70%, var(--surface)); }
+.gauge-fill { height: 100%; border-radius: 99px; background: var(--st-progress); min-width: 4px; }
+.gauge-expected { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--text); box-shadow: 0 0 0 2px var(--surface); }
+.gauge.behind .gauge-gap { background: var(--pa-todo); } .gauge.late .gauge-gap { background: var(--pa-ko); }
+.kpi .gauge { margin-top: 6px; } .kpi .gauge-head strong { display: none; } .kpi .gauge-head > span:first-of-type { display: none; }
+
+.tl { height: 40px; margin: 22px 0 10px; }
+.tl-track { top: 16px; height: 8px; }
+.tl-mark { top: 12px; width: 16px; height: 16px; margin-left: -8px; border-width: 3px; }
+.tl-mark.past { background: var(--st-progress); border-color: var(--surface); box-shadow: 0 0 0 1.5px var(--st-progress); }
+.tl-mark.next { width: 20px; height: 20px; top: 10px; margin-left: -10px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--st-progress) 25%, transparent); }
+.tl-today { top: -6px; bottom: 0; width: 2px; }
+.tl-today span { top: -18px; left: 50%; transform: translateX(-50%); font-weight: 600; color: var(--text); background: var(--surface); padding: 1px 6px; border-radius: 99px; border: 1px solid var(--border); }
+.tl-today.end span { left: auto; right: -6px; transform: none; }
+.tl-legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 12px; font-size: 13px; }
+.tl-legend li { display: flex; gap: 8px; align-items: baseline; padding: 4px 8px; border-radius: 8px; }
+.tl-legend .date { font-weight: 600; min-width: 3em; }
+.tl-legend li.past { opacity: .7; } .tl-legend li.past::after { content: "✓"; margin-left: auto; color: var(--st-done); }
+.tl-legend li.next { background: var(--pa-progress); font-weight: 600; } .tl-legend li.next .date { color: var(--text); }
+
+/* Cartes de la page Clients : jauge d'avancement puis injections et recette. */
+.card-charts { display: flex; flex-direction: column; gap: 14px; margin: 14px 0 10px; }
+.card-facts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--muted); margin: 0 0 6px; }
+.card-facts strong { color: var(--text); }
+.grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+
+/* Accueil : coup d'œil sur le client en cours. */
+.glance { display: grid; grid-template-columns: minmax(220px, 1fr) 1.4fr 1.4fr; gap: 4px 16px; align-items: start; padding: 16px 18px; }
+.glance-title { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px; font-size: 14px; }
+.glance .chart { background: none; border: 0; box-shadow: none; padding: 0; margin: 0; }
+@media (max-width: 900px) { .glance { grid-template-columns: 1fr; } }
+.panel.whats-new-panel #whats-new-body { max-height: 560px; overflow-y: auto; }
+.glance-title a { color: var(--text); }
+/* Graphiques cliquables : au-dessus du lien qui couvre la carte, retour visuel au survol. */
+.card-linked .card-charts [data-filter-set], .card-linked .card-charts .segbar, .card-linked .gauge-link { position: relative; z-index: 1; }
+a.gauge-link { display: block; color: inherit; text-decoration: none; border-radius: 10px; padding: 6px 8px; margin: -6px -8px; transition: background .15s; }
+a.gauge-link:hover, a.gauge-link:focus-visible { background: var(--bg); }
+a.tl-mark { cursor: pointer; z-index: 1; transition: transform .15s; }
+a.tl-mark:hover, a.tl-mark:focus-visible { transform: scale(1.3); }
+.tl-legend a { display: contents; color: inherit; text-decoration: none; }
+.tl-legend li:has(a):hover { background: var(--bg); }
+.tl-legend li.next:has(a):hover { background: color-mix(in srgb, var(--pa-progress) 70%, var(--accent) 12%); }
+
+/* Barres fines (slim) : cartes Clients, accueil, synthèse. */
+.chart.slim figcaption { margin-bottom: 8px; }
+.chart.slim .segbar { height: 8px; border-radius: 99px; gap: 2px; }
+.chart.slim .seg { border-radius: 0; } .chart.slim .seg:first-child { border-radius: 99px 0 0 99px; } .chart.slim .seg:last-child { border-radius: 0 99px 99px 0; } .chart.slim .seg:only-child { border-radius: 99px; }
+.legend-slim { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+.legend-slim li { display: inline-flex; align-items: center; gap: 4px; }
+.legend-slim .key { width: 8px; height: 8px; border-radius: 50%; margin: 0 2px 0 0; }
+.legend-slim strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.legend-slim li[data-filter-set] { border-radius: 4px; padding: 1px 4px; margin: -1px -4px; }
+.legend-slim li[data-filter-set]:hover { background: var(--bg); color: var(--text); }
+.card .chart.slim { margin: 0; border: 0; box-shadow: none; background: none; padding: 0; }
+/* Barre fine : zone de clic agrandie (8 px au-dessus et en dessous), sans changer le dessin. */
+.chart.slim .segbar, .chart.slim .seg { overflow: visible; }
+.chart.slim .seg[data-filter-set] { position: relative; min-width: 4px; }
+.chart.slim .seg[data-filter-set]::after { content: ""; position: absolute; inset: -8px 0; }

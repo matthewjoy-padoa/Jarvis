@@ -10,23 +10,30 @@
 {%- endif -%}
 {%- endmacro %}
 
-{# Barre segmentée : un tout découpé par groupe de statut, légende chiffrée en dessous.
+{# Barre segmentée : un tout découpé par groupe de statut. Chiffre écrit dans chaque segment assez large,
+   part « Terminé » en tête, légende en colonnes (pastille, libellé, nombre, %).
+   thin : barre fine sans légende (lignes de tableau) ; slim : barre fine, « % terminé » en tête, légende discrète sur une ligne.
    filter_key : clé de filtre du groupe (« groupe ») ; scope : filtres ajoutés (ex. client) ; href : page à ouvrir ;
    hrefs : page à ouvrir pour un groupe donné (ex. les retours terminés, masqués par défaut). #}
-{% macro segbar(title, groups, unit="", thin=false, filter_key=None, scope={}, href=None, hrefs={}) %}
+{% macro segbar(title, groups, unit="", thin=false, filter_key=None, scope={}, href=None, hrefs={}, slim=false) %}
 {% set total = groups.values() | sum %}
-<figure class="chart segbar-chart{{ ' thin' if thin }}"{% if filter_key %} data-filterable-chart title="Clique sur un segment pour filtrer"{% endif %}>
-  {% if title %}<figcaption>{{ title }} <span class="muted">· {{ total }}{{ ' ' ~ unit if unit }}</span></figcaption>{% endif %}
+{% set done_pct = ((100 * groups.get("done", 0) / total) | round | int) if total else 0 %}
+<figure class="chart segbar-chart{{ ' thin' if thin }}{{ ' slim' if slim }}"{% if filter_key %} data-filterable-chart title="Clique sur un segment pour filtrer"{% endif %}>
+  {% if title %}<figcaption><span>{{ title }} <span class="muted">· {{ total }}{{ ' ' ~ unit if unit }}</span></span>{% if total %}<span class="seg-headline"><strong>{{ done_pct }} %</strong> terminé</span>{% endif %}</figcaption>{% endif %}
   {% if total %}
   <div class="segbar" role="img" aria-label="{{ title }} : {% for g, n in groups.items() if n %}{{ GROUP_LABELS[g] }} {{ n }}{{ ', ' if not loop.last }}{% endfor %}">
     {% for g, n in groups.items() if n %}
-    <span class="seg g-{{ g }}" style="flex-grow: {{ n }}" title="{{ GROUP_LABELS[g] }} : {{ n }} ({{ (100 * n / total) | round | int }} %)"{{ _clickable(filter_key, g, scope, hrefs.get(g, href)) }}></span>
+    <span class="seg g-{{ g }}" style="flex-grow: {{ n }}" title="{{ GROUP_LABELS[g] }} : {{ n }} ({{ (100 * n / total) | round | int }} %)"{{ _clickable(filter_key, g, scope, hrefs.get(g, href)) }}>{% if not thin and not slim and 100 * n / total >= 7 %}<span class="seg-n">{{ n }}</span>{% endif %}</span>
     {% endfor %}
   </div>
-  {% if not thin %}
-  <ul class="legend">
+  {% if slim %}
+  <ul class="legend legend-slim">
+    {% for g, n in groups.items() if n %}<li {{ _clickable(filter_key, g, scope, hrefs.get(g, href)) }}><span class="key g-{{ g }}"></span><strong>{{ n }}</strong> {{ GROUP_LABELS[g] | lower if g != "ko" else "KO" }}</li>{% endfor %}
+  </ul>
+  {% elif not thin %}
+  <ul class="legend legend-grid">
     {% for g, n in groups.items() %}
-    <li class="{{ 'zero' if not n }}"{{ _clickable(filter_key, g, scope, hrefs.get(g, href)) if n }}><span class="key g-{{ g }}"></span>{{ GROUP_LABELS[g] }} <strong>{{ n }}</strong>{% if n %} <span class="muted">{{ (100 * n / total) | round | int }} %</span>{% endif %}</li>
+    <li class="{{ 'zero' if not n }}"{{ _clickable(filter_key, g, scope, hrefs.get(g, href)) if n }}><span class="key g-{{ g }}"></span><span class="lg-label">{{ GROUP_LABELS[g] }}</span><strong>{{ n }}</strong><span class="muted">{{ ((100 * n / total) | round | int) ~ ' %' if n else '–' }}</span></li>
     {% endfor %}
   </ul>
   {% endif %}
@@ -34,6 +41,27 @@
   <p class="muted">Rien pour l'instant.</p>
   {% endif %}
 </figure>
+{% endmacro %}
+
+{# Jauge d'avancement : valeur en barre pleine, attendu en repère vertical, écart en points dans le libellé. #}
+{% macro progress(value, expected=None, label="intégré") %}
+{% set gap = (value - expected) if expected is not none else None %}
+<div class="gauge{{ ' behind' if gap is not none and gap < -5 }}{{ ' late' if gap is not none and gap < -15 }}" role="img" aria-label="{{ value }} % {{ label }}{% if expected is not none %}, attendu {{ expected }} %{% endif %}">
+  <div class="gauge-head"><strong>{{ value }} %</strong> <span>{{ label }}</span>
+    {% if expected is not none %}<span class="gauge-gap">{{ '%+d' % gap }} pts <span class="muted">/ attendu {{ expected }} %</span></span>{% endif %}</div>
+  <div class="gauge-track"><div class="gauge-fill" style="width: {{ value }}%"></div>
+    {% if expected is not none %}<span class="gauge-expected" style="left: {{ expected }}%" title="Attendu aujourd'hui : {{ expected }} %"></span>{% endif %}</div>
+</div>
+{% endmacro %}
+
+{# Avancement, injections et recette d'un client, chaque segment mène à sa liste filtrée (cartes Clients, accueil).
+   gauge_href : la jauge mène à la fiche (inutile sur une carte déjà entièrement cliquable). #}
+{% macro client_bars(d, gauge_href=None) %}
+{% set base = "/deploiements/" ~ d.slug %}
+{% if gauge_href %}<a class="gauge-link" href="{{ gauge_href }}" title="Voir la synthèse de {{ d.client }}">{{ progress(d.progress, d.expected_progress) }}</a>
+{% else %}{{ progress(d.progress, d.expected_progress) }}{% endif %}
+{{ segbar("Injections", d.injection_groups, "cartes", slim=true, filter_key="groupe", href=base ~ "/injections?vue=liste") }}
+{{ segbar("Recette", d.retour_groups, "retours", slim=true, filter_key="groupe", href=base ~ "/recette", hrefs={"done": base ~ "/recette?tous=true"}) }}
 {% endmacro %}
 
 {# Barres horizontales : classement d'une seule mesure, valeur au bout de la barre. filter_key, scope, href : comme segbar. #}
@@ -59,20 +87,25 @@
 </figure>
 {% endmacro %}
 
-{# Frise du projet : jalons et position d'aujourd'hui entre le début et le déploiement. #}
-{% macro timeline(t) %}
+{# Frise du projet : jalons passés pleins, à venir creux, prochain jalon mis en avant (date et J-x). #}
+{% macro timeline(t, slug=None) %}
 {% if t %}
+{% set upcoming = t.marks | selectattr(1, "ge", today) | list %}
+{% set nxt = upcoming[0] if upcoming else None %}
 <figure class="chart">
-  <figcaption>Avancement dans le calendrier <span class="muted">· {{ t.start.strftime("%d/%m/%Y") }} → {{ t.end.strftime("%d/%m/%Y") }}</span></figcaption>
-  <div class="tl" role="img" aria-label="Aujourd'hui à {{ t.today | round | int }} % du calendrier">
+  <figcaption><span>Avancement dans le calendrier <span class="muted">· {{ t.start.strftime("%d/%m/%Y") }} → {{ t.end.strftime("%d/%m/%Y") }}</span></span>
+    {% if nxt %}<span class="seg-headline">Prochain : <strong>{{ nxt[0] }}</strong> le {{ nxt[1].strftime("%d/%m") }} · J{{ '%+d' % -((nxt[1] - today).days) }}</span>{% endif %}</figcaption>
+  <div class="tl" role="group" aria-label="Aujourd'hui à {{ t.today | round | int }} % du calendrier">
     <div class="tl-track"><div class="tl-elapsed" style="width: {{ t.today }}%"></div></div>
     {% for label, day, pos in t.marks %}
-    <span class="tl-mark" style="left: {{ pos }}%" title="{{ label }} : {{ day.strftime('%d/%m/%Y') }}"></span>
+    {% set cls = "tl-mark" ~ (" past" if day < today else "") ~ (" next" if nxt and day == nxt[1] else "") %}
+    {% if slug %}<a class="{{ cls }}" href="/deadlines?client={{ slug }}&vue=calendrier&mois={{ day.strftime('%Y-%m') }}" style="left: {{ pos }}%" title="{{ label }} : {{ day.strftime('%d/%m/%Y') }} · voir le calendrier"></a>
+    {% else %}<span class="{{ cls }}" style="left: {{ pos }}%" title="{{ label }} : {{ day.strftime('%d/%m/%Y') }}"></span>{% endif %}
     {% endfor %}
     <span class="tl-today{{ ' end' if t.today > 80 }}" style="left: {{ t.today }}%" title="Aujourd'hui"><span>Aujourd'hui</span></span>
   </div>
   <ol class="tl-legend">
-    {% for label, day, pos in t.marks %}<li class="{{ 'past' if day < today }}"><span class="date">{{ day.strftime("%d/%m") }}</span> {{ label }}</li>{% endfor %}
+    {% for label, day, pos in t.marks %}<li class="{{ 'past' if day < today }}{{ ' next' if nxt and day == nxt[1] }}">{% if slug %}<a href="/deadlines?client={{ slug }}&vue=calendrier&mois={{ day.strftime('%Y-%m') }}" title="Voir ce mois dans le calendrier des deadlines">{% endif %}<span class="date">{{ day.strftime("%d/%m") }}</span>{{ label }}{% if slug %}</a>{% endif %}</li>{% endfor %}
   </ol>
 </figure>
 {% endif %}

@@ -360,3 +360,21 @@ def test_kanban_columns_follow_notion_order():
         return S(status=status, group=status_group(status, RETOUR_STATUSES))
     cols = kanban_columns([(None, r("Validé")), (None, r("INTE - En cours")), (None, r("À faire")), (None, r("À faire"))], RETOUR_STATUSES)
     assert [c["status"] for c in cols] == ["À faire", "INTE - En cours", "Validé"] and len(cols[0]["cards"]) == 2
+
+
+def test_charts_are_readable_and_lead_to_the_tickets_they_count():
+    """Accueil, page Clients et synthèse : jauge d'avancement, barres fines Injections et Recette, tout cliquable."""
+    home = client.get("/").text
+    glance = home.split('class="panel glance"', 1)[1].split("</section>", 1)[0]
+    slug = re.search(r'class="gauge-link" href="/deploiements/([^/"]+)/synthese"', glance)[1]  # la jauge mène à la fiche
+    assert f'data-filter-href="/deploiements/{slug}/injections?vue=liste"' in glance
+    assert f'data-filter-href="/deploiements/{slug}/recette"' in glance and 'data-filter-set="groupe=' in glance
+    assert home.index('class="panel glance"') < home.index('id="whats-new"')  # « Quoi de neuf » passe en bas
+    cards = client.get("/clients").text
+    assert cards.count('class="card-charts"') == 2 and cards.count('class="gauge') >= 2 and "legend-slim" in cards
+    assert 'class="gauge-link"' not in cards  # la carte est déjà un lien vers la fiche
+    synthese = client.get("/deploiements/client-demo/synthese").text
+    assert 'class="gauge' in synthese
+    marks = re.findall(r'<a class="tl-mark[^"]*" href="([^"]+)"', synthese)  # jalons de la frise → calendrier des deadlines
+    assert marks and all(m.startswith("/deadlines?client=client-demo&vue=calendrier&mois=") for m in marks)
+    assert "Prochain :" in synthese and synthese.count("tl-mark next") == 1  # prochain jalon mis en avant

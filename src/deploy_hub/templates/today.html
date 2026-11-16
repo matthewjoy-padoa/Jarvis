@@ -21,16 +21,15 @@
 </div>
 {{ charts.stats([("En retard", late | length, "ko", links.retard), ("À échéance aujourd'hui", due_today | length, "todo", links.aujourdhui), ("Dans les 7 jours", due_week | length, "", links.semaine), ("Injections KO", ko | length, "ko", links.ko)]) }}
 
-<section class="panel" id="whats-new">
-  <div class="panel-head">
-    <h2>Quoi de neuf</h2>
-    <div class="segmented" role="group" aria-label="Période">
-      <a href="#" data-since="visit" class="active">Depuis ma dernière visite</a><a href="#" data-since="1">24 h</a><a href="#" data-since="7">7 jours</a>
-      <button type="button" class="secondary" id="mark-seen" title="Les changements actuels ne seront plus affichés comme nouveaux">Tout marquer comme vu</button>
-    </div>
-  </div>
-  <div id="whats-new-body" hx-get="/quoi-de-neuf" hx-trigger="load-changes from:body" hx-swap="innerHTML"><p class="muted">Jarvis consulte le journal…</p></div>
+{# Mes tickets épinglés : tout en haut, juste sous les compteurs. #}
+{% include "_pins.html" %}
+
+{% for d in deployments %}
+<section class="panel glance">
+  <h2 class="glance-title"><a href="/deploiements/{{ d.slug }}/synthese">{{ ic.client_emoji(d) }}{{ d.client }}</a>{% if d.go_live %}<span class="badge {{ 'g-ko' if d.days_left < 14 }}">J{{ '%+d' % (-d.days_left) }}</span>{% endif %}</h2>
+  {{ charts.client_bars(d, "/deploiements/" ~ d.slug ~ "/synthese") }}
 </section>
+{% endfor %}
 
 <div class="two-col">
   <section>
@@ -52,7 +51,6 @@
     </ul>
     {% else %}<p class="muted">Rien en retard ni à échéance cette semaine. Jarvis reste en veille.</p>{% endfor %}
   </section>
-  {% include "_pins.html" %}
   </section>
   <section>
     <section class="panel">
@@ -76,6 +74,18 @@
     {% include "_reminders.html" %}
   </section>
 </div>
+
+
+<section class="panel whats-new-panel" id="whats-new">
+  <div class="panel-head">
+    <h2>Quoi de neuf</h2>
+    <div class="segmented" role="group" aria-label="Période">
+      <a href="#" data-since="visit" class="active">Depuis ma dernière visite</a><a href="#" data-since="1">24 h</a><a href="#" data-since="7">7 jours</a>
+      <button type="button" class="secondary" id="mark-seen" title="Les changements actuels ne seront plus affichés comme nouveaux">Tout marquer comme vu</button>
+    </div>
+  </div>
+  <div id="whats-new-body" hx-get="/quoi-de-neuf" hx-trigger="load-changes from:body" hx-swap="innerHTML"><p class="muted">Jarvis consulte le journal…</p></div>
+</section>
 
 <script>
   // « Dernière visite » : mémorisée dans le navigateur quand on clique « Tout marquer comme vu ».
