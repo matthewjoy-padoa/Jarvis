@@ -31,11 +31,12 @@ from deploy_hub.sources import connections, flow_digger, notion_api
 from deploy_hub.sources.external import external_statuses
 from deploy_hub.sources.journal import changes_since, group_changes
 from deploy_hub.sources import watchers
-from deploy_hub.sources.notifications import NotificationStore
+from deploy_hub.sources.notifications import Notification, NotificationStore
 from deploy_hub.sources.personal import PersonalStore, remind_date
 from deploy_hub.sources.pulls import PullRequests
 from deploy_hub.sources import review as agent_review
 from deploy_hub.sources.fiches import FicheSource
+from deploy_hub.sources.web_push import WebPush
 
 HERE = Path(__file__).parent
 
@@ -54,6 +55,7 @@ dag_watch = DagWatcher(data_dir() / "airflow", notifications, {"AIRFLOW_URL": ai
 dag_chains = ChainRunner(data_dir() / "airflow" / "chaines.json",
                          lambda dag_id, padoa_env, slug, card: _launch_watched(dag_id, padoa_env, fiches.get_deployment(slug), card), notifications)
 dag_watch.on_end = dag_chains.watch_ended
+web_push = WebPush(data_dir() / "push")  # notifications du Mac même onglet fermé (voir sources/web_push.py)
 personal = PersonalStore(data_dir() / "perso.json")  # épingles, notes et rappels : à moi seul, jamais dans Notion
 _refresh_lock = threading.Lock()  # un seul rafraîchissement Notion à la fois
 
@@ -74,8 +76,29 @@ async def lifespan(_app):
     for line in connections.lines(*checks):
         log.info(line)
     await asyncio.to_thread(dag_chains.reconcile, lambda watch_id: dag_watch.get(watch_id))
+    pusher = asyncio.create_task(_push_loop())
     yield
+    pusher.cancel()
     dag_watch.shutdown()  # à l'arrêt (rechargement compris) : coupe les air.py, que le Jarvis suivant reprendra
+
+
+PUSH_EVERY = 60  # secondes, comme le panneau des notifications
+
+
+def _push_round() -> None:
+    """Un tour : échéances du jour (créées d'habitude à l'ouverture d'une page), puis envoi des nouvelles notifications."""
+    _deadline_notes()
+    web_push.pump(notifications)
+
+
+async def _push_loop() -> None:
+    """Toutes les minutes, même sans onglet ouvert : couvre aussi les notifications écrites par la synchro Notion (autre processus)."""
+    while True:
+        try:
+            await asyncio.to_thread(_push_round)
+        except Exception:
+            log.exception("Tour de Web Push en échec")
+        await asyncio.sleep(PUSH_EVERY)
 
 
 app = FastAPI(title="Jarvis", lifespan=lifespan)
@@ -1028,6 +1051,47 @@ def notifications_new(apres: int = 0):
     _deadline_notes()
     return JSONResponse([{"id": n.id, "key": n.key, "title": n.title, "detail": n.detail, "link": n.link, "level": n.level}
                          for n in notifications.after(apres)])
+
+
+@app.get("/sw.js")
+def service_worker():
+    """Service worker des notifications du Mac, servi à la racine pour couvrir tout le site."""
+    return FileResponse(HERE / "static" / "sw.js", media_type="text/javascript", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/notifications/push/cle")
+def push_key():
+    return JSONResponse({"key": web_push.public_key()})
+
+
+@app.post("/notifications/push/abonnement")
+async def push_subscribe(request: Request):
+    """Abonne un navigateur. Même origine exigée : sinon un autre site pourrait abonner sa propre adresse et recevoir les notifications."""
+    if not _from_jarvis(request):
+        return JSONResponse({"error": "requête d'une autre origine"}, status_code=403)
+    try:
+        web_push.subscribe(await request.json())
+    except (ValueError, AttributeError) as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return JSONResponse({"ok": True, "abonnes": len(web_push.subscriptions())})
+
+
+@app.post("/notifications/push/desabonnement")
+async def push_unsubscribe(request: Request):
+    if not _from_jarvis(request):
+        return JSONResponse({"error": "requête d'une autre origine"}, status_code=403)
+    web_push.unsubscribe(str((await request.json()).get("endpoint", "")))
+    return JSONResponse({"ok": True})
+
+
+@app.post("/notifications/push/test")
+def push_test(request: Request):
+    """Envoie une notification d'essai à chaque navigateur abonné, sans l'enregistrer."""
+    if not _from_jarvis(request):
+        return JSONResponse({"error": "requête d'une autre origine"}, status_code=403)
+    note = Notification(id=0, key="push-test", kind="rappel", level="info", title="Jarvis",
+                        detail="Les notifications du Mac fonctionnent, même onglet fermé.", link="/notifications")
+    return JSONResponse({"envoyees": web_push.send(note), "abonnes": len(web_push.subscriptions())})
 
 
 @app.post("/notifications/lu", response_class=HTMLResponse)
