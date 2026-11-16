@@ -1101,6 +1101,17 @@ html { overscroll-behavior-y: none; }
 .dock-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .dock-btn:hover, .dock-btn:focus-visible { transform: scale(1.08); border-color: var(--accent); color: var(--accent); text-decoration: none; }
 .dock-drive { color: var(--st-done); }
+/* Bouton Environnements : au survol ou au clavier, un petit menu s'ouvre à gauche du dock. */
+.dock-envs { position: relative; }
+.dock-envs > .dock-btn { cursor: pointer; padding: 0; font: inherit; }
+.dock-envs > .dock-btn::after { display: none; }
+.dock-pop { position: absolute; right: 100%; top: 50%; transform: translateY(-50%); padding-right: 12px; display: none; }
+.dock-envs:hover .dock-pop, .dock-envs:focus-within .dock-pop { display: block; }
+.dock-pop > * { display: block; white-space: nowrap; padding: 7px 12px; font-size: 13px; background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-top-width: 0; text-decoration: none; }
+.dock-pop > strong { border-top-width: 1px; border-radius: 10px 10px 0 0; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.dock-pop > :last-child { border-radius: 0 0 10px 10px; box-shadow: var(--shadow); }
+.dock-pop > a:hover, .dock-pop > a:focus-visible { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
 .dock-add { border-style: dashed; color: var(--muted); }
 .dock-btn::after { content: attr(data-tip); position: absolute; right: calc(100% + 12px); top: 50%; transform: translate(4px, -50%); white-space: nowrap;
   padding: 6px 10px; border-radius: 8px; background: var(--text); color: var(--surface); font-size: 12.5px; font-weight: 600;

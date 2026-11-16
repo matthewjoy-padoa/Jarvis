@@ -1,5 +1,7 @@
 """Un client à la fois : client en cours (cookie), sélecteur, accueil et Deadlines recentrés, changement de client."""
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -91,3 +93,18 @@ def test_the_side_shortcuts_follow_the_current_client():
     dock = html.split('<nav class="dock"', 1)[1].split("</nav>", 1)[0]
     assert 'aria-label="Raccourcis de Client Exemple"' in dock
     assert 'href="/clients/client-exemple/liens?vers=/deadlines"' in dock and 'data-tip="Ajouter un lien Drive"' in dock  # pas encore de lien
+
+
+def test_the_dock_gives_the_padoa_environments_of_the_current_client(monkeypatch):
+    c = fresh()
+    c.get("/deploiements/client-exemple/actions")
+    dock = lambda: c.get("/deadlines").text.split('<nav class="dock"', 1)[1].split("</nav>", 1)[0]  # noqa: E731
+    monkeypatch.delenv("PADOA_ENV_URL", raising=False)
+    assert 'aria-label="Environnements Padoa de Client Exemple"' in dock()
+    assert 'href="/reglages"' in dock() and "exemple.test" not in dock()  # pas de modèle : renvoi vers les Réglages
+    monkeypatch.setenv("PADOA_ENV_URL", "https://[stack]-[client].exemple.test/support")
+    hosts = re.findall(r'href="https://([^."]+)\.exemple\.test/support"', dock())
+    key = hosts[0].removeprefix("snap-")  # clé du client : la même dans les trois adresses
+    assert key and hosts == [f"snap-{key}", f"snap-recette-{key}", f"integration-{key}"]
+    monkeypatch.setenv("PADOA_ENV_URL", "javascript:alert(1)//[stack]")
+    assert "javascript:" not in dock()
