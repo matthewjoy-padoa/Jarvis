@@ -69,13 +69,14 @@ def report_name(dag_id: str, run_id: str) -> str:
 
 class DagWatcher:
     def __init__(self, state_dir: Path, notifications=None, airflow_env: dict[str, str] | None = None,
-                 command: list[str] | None = None):
+                 command: list[str] | None = None, on_end=None):
         """airflow_env : AIRFLOW_URL, AIRFLOW_USER, AIRFLOW_PASSWORD (vide en mode simulé : aucun suivi à reprendre)."""
         self.state_dir = state_dir
         self.state_file = state_dir / "suivis.json"
         self.notifications = notifications
         self.airflow_env = airflow_env or {}
         self.command = command or [sys.executable, "-m", "deploy_hub.air"]  # remplacé par un faux script dans les tests
+        self.on_end = on_end  # appelé avec le suivi quand il se termine (enchaînements : sources/dag_chain.py)
         self._lock = threading.RLock()
         self._procs: dict[int, subprocess.Popen] = {}
         self._stopped: set[int] = set()  # arrêtés par la personne (bouton) : « arrêté »
@@ -170,6 +171,12 @@ class DagWatcher:
                 w.summary = last[:300] or f"Code de sortie {code} : voir le journal du suivi."
         w.status, w.ended_at = status, datetime.now()
         self._save()
+        if self.on_end:
+            try:
+                self.on_end(w)
+            except Exception as e:  # noqa: BLE001 : la fin du suivi est déjà enregistrée, la suite ne doit pas tuer le thread
+                w.summary = f"{w.summary} · suite de l'enchaînement impossible : {e}".strip(" ·")
+                self._save()
 
     def _notify(self, w: DagWatch, msg: str) -> None:
         w.summary = msg
