@@ -194,3 +194,12 @@ def test_dag_watch_settings_go_to_the_next_watches(env):
     finally:
         os.environ.pop("JARVIS_DAG_MAX_CLEARS", None)
         os.environ.pop("JARVIS_DAG_INTERVAL_S", None)
+
+
+def test_mac_notifications_are_turned_on_from_the_settings_not_the_bell():
+    client = TestClient(main.app)
+    page, panel = client.get("/reglages").text, client.get("/notifications/panneau").text
+    assert 'id="notifications" data-browser-notifs' in page and "data-enable-browser-notifs" in page
+    assert "data-enable-browser-notifs" not in panel and 'href="/reglages#notifications"' in panel
+    script = client.get("/static/notify.js").text
+    assert "[data-browser-notifs]" in script and "Notification.requestPermission()" in script
