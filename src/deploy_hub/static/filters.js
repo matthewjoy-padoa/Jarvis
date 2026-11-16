@@ -7,12 +7,26 @@
 // - Lignes ou cartes avec data-group (todo, in_progress, ko, done) : filtre « Groupe » ajouté automatiquement.
 // - Graphiques : un élément [data-filter-set="clé=valeur;clé=valeur"] applique ces filtres au clic (re-clic : retire) ;
 //   avec [data-filter-href], il ouvre cette page, filtres passés dans l'ancre (#clé=valeur&clé=valeur).
+// - Recherche : sans accents ni majuscules, tous les mots doivent être présents ; elle lit aussi le groupe (« terminé »),
+//   la colonne du kanban et les attributs data-* de la carte.
+// - Éléments [data-out] (hors de la vue par défaut : retours terminés, actions non actives) : masqués, mais dès qu'une
+//   recherche ou un filtre en trouve, un bouton propose de les afficher (data-out-label sur le bloc : comment les nommer).
+//   S'il n'y a de résultat que parmi eux, ils sont affichés d'office.
 // - Filtre « Client » : présélectionné sur le client du menu en haut (body[data-current-client]), sauf ancre de filtres.
 (function () {
   const collator = new Intl.Collator("fr", { numeric: true, sensitivity: "base" });
   const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
   const GROUPS = { todo: "À faire", in_progress: "En cours", ko: "KO", done: "Terminé" };
   const blocks = []; // { keys: {clé: <select>}, apply, bar }
+  const fold = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const isClient = (k) => k.toLowerCase() === "client"; // « client » ou en-tête « Client »
+
+  // Texte où chercher : ce qui est affiché, le groupe, la colonne du kanban, les attributs data-* (cartes et cellules).
+  function haystack(el) {
+    const extra = [GROUPS[el.dataset.group] || "", el.closest(".kb-col")?.getAttribute("aria-label") || "", ...Object.values(el.dataset)];
+    el.querySelectorAll("[data-values]").forEach((c) => extra.push(c.dataset.values));
+    return fold(`${text(el)} ${extra.join(" ")}`);
+  }
 
   function compare(a, b) {
     if (a === b) return 0;
@@ -47,9 +61,11 @@
     reset.className = "secondary reset";
     reset.textContent = "Effacer les filtres";
     reset.hidden = true;
+    const more = reset.cloneNode();
+    more.className = "secondary more-out";
     bar.append(search);
     block.before(bar);
-    return { bar, search, count, reset };
+    return { bar, search, count, reset, more, outLabel: block.dataset.outLabel || "masqué(s)" };
   }
 
   function groupSelect(items, apply) {
@@ -58,23 +74,44 @@
     return select("Groupe", Object.entries(GROUPS).filter(([k]) => present.has(k)), apply);
   }
 
-  function register(bar, search, count, reset, keys, apply) {
+  function register(tools, keys, apply) {
+    const { bar, search, count, reset, more } = tools;
+    const entry = { ...tools, keys, apply, out: null, shownOut: false }; // out : choix fait au bouton (null : aucun) ; shownOut : état affiché
     reset.addEventListener("click", () => {
       search.value = "";
       Object.values(keys).forEach((s) => (s.value = ""));
       apply();
     });
-    bar.append(reset, count);
-    const entry = { keys, bar, search, reset, apply };
+    more.addEventListener("click", () => { entry.out = !entry.shownOut; apply(); });
+    bar.append(reset, more, count);
     blocks.push(entry);
     return entry;
   }
 
-  function finish(entry, shown, total) {
-    const active = entry.search.value || Object.values(entry.keys).some((s) => s.value);
+  // Affiche les éléments qui répondent à matches(el) ; ceux hors de la vue par défaut ([data-out]) seulement sur demande.
+  function show(entry, items, matches) {
+    const active = !!entry.search.value || Object.values(entry.keys).some((s) => s.value);
+    // Le client présélectionné ne compte pas : seuls une recherche ou un autre filtre font proposer les éléments masqués.
+    const narrowed = !!entry.search.value || Object.entries(entry.keys).some(([k, s]) => s.value && !isClient(k));
+    if (!narrowed) entry.out = null;
+    const found = items.filter(matches);
+    const inside = found.filter((el) => !el.hasAttribute("data-out"));
+    const outside = found.length - inside.length;
+    const out = entry.out ?? (narrowed && !inside.length && outside > 0); // sans choix fait : affichés s'il n'y a rien d'autre
+    entry.shownOut = out;
+    const visible = new Set(out ? found : inside);
+    items.forEach((el) => (el.hidden = !visible.has(el)));
+    entry.more.hidden = !(narrowed && outside);
+    entry.more.textContent = out ? `${outside} ${entry.outLabel} affiché(s) · masquer` : `+ ${outside} ${entry.outLabel} · afficher`;
     entry.reset.hidden = !active;
-    entry.bar.querySelector(".count-label").textContent = `${shown} / ${total}`;
+    const total = out ? items.length : items.filter((el) => !el.hasAttribute("data-out")).length;
+    entry.count.textContent = `${visible.size} / ${total}`;
     markCharts();
+  }
+
+  function searcher(search) {
+    const words = fold(search.value).split(/\s+/).filter(Boolean);
+    return (el) => { const hay = words.length ? haystack(el) : ""; return words.every((w) => hay.includes(w)); };
   }
 
   function setupTable(table) {
@@ -83,7 +120,8 @@
     const rows = [...body.rows].filter((r) => r.cells.length === headers.length);
     if (rows.length < 2) return;
     const cellValue = (row, i) => row.cells[i].dataset.sort ?? text(row.cells[i]);
-    const { bar, search, count, reset } = toolbar(table, apply);
+    const tools = toolbar(table, apply);
+    const { bar, search } = tools;
     const keys = {};
     const filters = headers
       .map((th, i) => [th, i])
@@ -99,19 +137,13 @@
       });
     const group = groupSelect(rows, apply);
     if (group) { bar.append(group[0]); keys.groupe = group[1]; }
-    const entry = register(bar, search, count, reset, keys, apply);
+    const entry = register(tools, keys, apply);
 
     function apply() {
-      const q = search.value.toLowerCase();
-      let shown = 0;
-      for (const r of rows) {
-        const ok = (!q || text(r).toLowerCase().includes(q))
-          && filters.every((f) => !f.s.value || f.cellValues(r).includes(f.s.value))
-          && (!keys.groupe || !keys.groupe.value || r.dataset.group === keys.groupe.value);
-        r.hidden = !ok;
-        shown += ok;
-      }
-      finish(entry, shown, rows.length);
+      const found = searcher(search);
+      show(entry, rows, (r) => found(r)
+        && filters.every((f) => !f.s.value || f.cellValues(r).includes(f.s.value))
+        && (!keys.groupe || !keys.groupe.value || r.dataset.group === keys.groupe.value));
     }
 
     headers.forEach((th, i) => {
@@ -139,7 +171,8 @@
   function setupCards(block) {
     const items = [...block.querySelectorAll(block.dataset.items)];
     if (items.length < 2) return;
-    const { bar, search, count, reset } = toolbar(block, apply);
+    const tools = toolbar(block, apply);
+    const { bar, search } = tools;
     const keys = {};
     const filters = pairs(block.dataset.filters).map(([label, attr]) => {
       const valuesOf = (it) => (it.dataset[attr] || "").split("|"); // « a|b » : la carte répond aux deux valeurs
@@ -164,23 +197,18 @@
       wrap.append(s);
       bar.append(wrap);
     }
-    const entry = register(bar, search, count, reset, keys, apply);
+    const entry = register(tools, keys, apply);
 
     function apply() {
-      const q = search.value.toLowerCase();
-      let shown = 0;
-      for (const it of items) {
-        const ok = (!q || text(it).toLowerCase().includes(q))
-          && filters.every((f) => !f.s.value || f.valuesOf(it).includes(f.s.value))
-          && (!keys.groupe || !keys.groupe.value || it.dataset.group === keys.groupe.value);
-        it.hidden = !ok;
-        shown += ok;
-      }
+      const found = searcher(search);
+      show(entry, items, (it) => found(it)
+        && filters.every((f) => !f.s.value || f.valuesOf(it).includes(f.s.value))
+        && (!keys.groupe || !keys.groupe.value || it.dataset.group === keys.groupe.value));
       block.querySelectorAll(".kb-col").forEach((col) => { // kanban : nombre de cartes visibles par colonne
         const n = col.querySelector(".kb-count");
         if (n) n.textContent = col.querySelectorAll(".kb-card:not([hidden])").length;
+        col.hidden = !entry.shownOut && !col.querySelector(".kb-card:not([data-out])"); // colonne faite seulement de cartes masquées
       });
-      finish(entry, shown, items.length);
     }
     apply();
   }
@@ -203,7 +231,8 @@
     const entry = blocks.find((b) => Object.keys(wanted).every((k) => k in b.keys));
     if (!entry) return false;
     const already = Object.entries(wanted).every(([k, v]) => entry.keys[k].value === v);
-    Object.values(entry.keys).forEach((s) => (s.value = ""));
+    // Clic sur un graphique de la page (toggle) : le client choisi reste ; ancre venue d'une autre page : elle seule compte.
+    Object.entries(entry.keys).forEach(([k, s]) => { if (!(toggle && isClient(k) && !(k in wanted))) s.value = ""; });
     if (!(toggle && already)) Object.entries(wanted).forEach(([k, v]) => setOption(entry.keys[k], v));
     entry.apply();
     if (scroll) entry.bar.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -218,7 +247,7 @@
         const wanted = parse(el.dataset.filterSet, ";");
         const entry = blocks.find((b) => Object.keys(wanted).every((k) => k in b.keys));
         const on = !!entry && Object.entries(wanted).every(([k, v]) => entry.keys[k].value === v)
-          && Object.entries(entry.keys).every(([k, s]) => k in wanted || !s.value);
+          && Object.entries(entry.keys).every(([k, s]) => k in wanted || isClient(k) || !s.value);
         el.classList.toggle("is-selected", on);
         any ||= on;
       });
@@ -251,7 +280,7 @@
     // Client par défaut : celui du menu en haut, dans chaque filtre « Client » qui le propose (« tous » reste au choix).
     const current = document.body.dataset.currentClient;
     if (current) blocks.forEach((b) => {
-      const s = Object.entries(b.keys).find(([k]) => k.toLowerCase() === "client")?.[1];  // « client » ou en-tête « Client »
+      const s = Object.entries(b.keys).find(([k]) => isClient(k))?.[1];
       if (s && !s.value && [...s.options].some((o) => o.value === current)) { s.value = current; b.apply(); }
     });
     if (location.hash.length > 1) applyFilters(parse(location.hash.slice(1), "&"));

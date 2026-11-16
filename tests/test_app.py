@@ -81,9 +81,26 @@ def test_global_pages(path, expected):
     assert f'href="{path}"' in r.text  # joignable : barre du haut, page Clients ou pied de page
 
 
-def test_recette_hides_closed_retours_unless_asked():
-    assert "R-01" not in client.get("/recette").text
-    assert "R-01" in client.get("/recette?tous=true").text
+def _tag(html: str, marker: str) -> str:
+    """La balise ouvrante (<article …> ou <tr …>) qui précède le texte donné."""
+    before = html[:html.index(marker)]
+    start = max(before.rfind("<article"), before.rfind("<tr"))
+    return before[start:before.index(">", start)]
+
+
+@pytest.mark.parametrize("vue", ["", "&vue=kanban"])
+def test_recette_hides_closed_retours_unless_asked(vue):
+    """Les retours terminés sont envoyés mais masqués (data-out) : la recherche de filters.js peut les proposer."""
+    default, everything = client.get(f"/recette?x=1{vue}").text, client.get(f"/recette?tous=true{vue}").text
+    assert " hidden data-out" in _tag(default, "<code>R-01</code>")  # R-01 : vérifié en intégration, donc terminé
+    assert "data-out" not in _tag(default, "<code>R-02</code>")
+    assert 'data-out-label="terminé(s)"' in default
+    assert "<code>R-01</code>" in everything and " hidden data-out" not in everything
+
+
+def test_demo_retours_have_owners_to_filter_on():
+    html = client.get("/recette?tous=true").text
+    assert 'data-responsable="Alex Martin|Sam Durand"' in html and 'data-responsable="Alex Martin"' in _tag(html, "<code>R-01</code>")
 
 
 def test_deadlines_skip_done_actions_and_closed_retours():
@@ -158,7 +175,7 @@ def test_dag_and_resource_actions_are_simulated():
 @pytest.mark.parametrize("path", ["/injections?vue=liste", "/actions", "/deadlines", "/deploiements/client-demo/regles", "/deploiements/client-demo/accompagnement", "/agents"])
 def test_tables_are_filterable(path):
     r = client.get(path).text
-    assert "<table data-filterable>" in r and "<th data-filter" in r and "/static/filters.js" in r
+    assert "<table data-filterable" in r and "<th data-filter" in r and "/static/filters.js" in r
 
 
 def test_recette_cards_carry_filter_and_sort_attributes():
@@ -172,8 +189,18 @@ def test_dates_sort_on_iso_value():
 
 
 def test_actions_show_active_by_default_and_all_on_demand():
-    assert "extraction complète" not in client.get("/actions").text  # terminée, hors fenêtre
-    assert "extraction complète" in client.get("/actions?tous=true").text
+    default, everything = client.get("/actions").text, client.get("/actions?tous=true").text
+    assert ' hidden data-out data-group="done"' in _tag(default, "extraction complète")  # terminée, hors fenêtre : masquée
+    assert 'data-out-label="hors des actives"' in default
+    assert "extraction complète" in everything and " hidden data-out" not in everything
+    kanban = client.get("/actions?vue=kanban").text
+    assert " hidden data-out" in _tag(kanban, "extraction complète") and "Responsable:responsable" in kanban
+
+
+def test_filters_script_searches_without_accents_and_offers_hidden_matches():
+    js = client.get("/static/filters.js").text
+    assert 'normalize("NFD")' in js and "data-out" in js and "more-out" in js
+    assert "filters.js?v=7" in client.get("/actions").text
 
 
 @pytest.mark.parametrize(
