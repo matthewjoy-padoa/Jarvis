@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% import "_icons.html" as ic %}
+{% import "_charts.html" as charts %}
 {% block title %}Agents · Jarvis{% endblock %}
 {% block content %}
 <h1>Agents lancés</h1>
 <p class="muted">{% if live %}Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.{% else %}Mode démo : les lancements sont simulés (<code>JARVIS_MODE=live</code> pour de vrais agents).{% endif %}</p>
 <table data-filterable>
-  <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>Sujet</th><th>Branche</th><th data-filter>État</th><th>PR</th></tr></thead>
+  <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>Sujet</th><th>Branche</th><th data-filter>État</th><th>Durée</th><th>Coût</th><th>PR</th></tr></thead>
   <tbody>
   {% for r in runs %}
     <tr>
@@ -14,11 +15,31 @@
       <td><a href="/agents/{{ r.id }}">{{ r.subject }}</a></td>
       <td><code>{{ r.branch }}</code></td>
       <td><span class="badge g-{{ r.group }}">{{ r.status }}</span>{% if r.simulated %} {{ ic.icon("flask", "Simulation", "ic-muted") }}{% endif %}</td>
+      <td data-sort="{{ r.duration.total_seconds() | int }}">{% if not r.simulated %}{{ r.duration | duree }}{% endif %}</td>
+      <td data-sort="{{ r.cost_usd or 0 }}">{% if r.cost_usd is not none %}{{ '%.2f' % r.cost_usd }} ${% endif %}</td>
       <td>{% if r.pr_url %}<a href="{{ r.pr_url }}" target="_blank" rel="noopener">PR ↗</a>{% endif %}</td>
     </tr>
-  {% else %}<tr><td colspan="7" class="muted">Aucun agent lancé.</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="9" class="muted">Aucun agent lancé.</td></tr>{% endfor %}
   </tbody>
 </table>
+
+{% if usage %}
+{% set t = usage.total %}
+<h2 id="bilan">Coût et durée</h2>
+<p class="muted">Agents réels terminés (ni simulés ni en cours). Le coût est celui que Claude Code annonce à la fin de l'agent ; un agent arrêté n'en a pas toujours.</p>
+{{ charts.stats([("Agents terminés", t.count, ""), ("PR ouvertes", t.prs, ""), ("Durée médiane", t.median | duree, ""), ("Temps cumulé", t.time | duree, ""), ("Coût moyen", ('%.2f $' % t.mean_cost) if t.mean_cost is not none else "—", ""), ("Coût total", ('%.2f $' % t.cost) if t.cost is not none else "—", "")]) }}
+<table>
+  <thead><tr><th>Type de ticket</th><th>Agents</th><th>PR</th><th>Durée médiane</th><th>Temps cumulé</th><th>Coût moyen</th><th>Coût total</th></tr></thead>
+  <tbody>
+  {% for row in usage.rows %}
+    <tr><td>{{ row.label }}</td><td>{{ row.count }}</td><td>{{ row.prs }}</td>
+      <td data-sort="{{ row.median.total_seconds() | int }}">{{ row.median | duree }}</td><td data-sort="{{ row.time.total_seconds() | int }}">{{ row.time | duree }}</td>
+      <td data-sort="{{ row.mean_cost or 0 }}">{% if row.mean_cost is not none %}{{ '%.2f' % row.mean_cost }} ${% else %}—{% endif %}</td>
+      <td data-sort="{{ row.cost or 0 }}">{% if row.cost is not none %}{{ '%.2f' % row.cost }} ${% else %}—{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
 
 <h2>Suivis de DAG</h2>
 <p class="muted">Après chaque lancement réel, <code>air.py</code> suit le run : relances automatiques des erreurs passagères, notifications, rapport à la fin.</p>

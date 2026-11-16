@@ -1,0 +1,23 @@
+<div id="pr-list">
+  <p class="muted">PR ouvertes de l'orchestrator qui concernent {{ d.client }} : scope du titre{% if d.orchestrator %} ({% for c in d.orchestrator %}<code>{{ c }}</code>{{ ", " if not loop.last }}{% endfor %}){% endif %}, PR d'un agent lancé ici, ou scope = son logiciel.
+    {% if read_at %}Lu chez GitHub à {{ read_at.strftime("%H:%M") }}.{% endif %}
+    <button type="button" class="secondary pr-refresh" hx-get="/deploiements/{{ d.slug }}/pr/liste?frais=true" hx-target="#pr-list" hx-swap="outerHTML" hx-disabled-elt="this">Actualiser</button></p>
+  {% if error %}<p class="result ko">{{ error }}</p>{% endif %}
+  <table>
+    <thead><tr><th>PR</th><th>Titre</th><th>Auteur</th><th>CI</th><th>Relecture</th><th title="Jours depuis l'ouverture">Ouverte</th><th title="Jours sans commit, commentaire ni relecture">Sans mouvement</th></tr></thead>
+    <tbody>
+    {% for pr in prs %}
+      {% set review, group = pr.review %}
+      <tr>
+        <td><a href="{{ pr.url }}" target="_blank" rel="noopener">#{{ pr.number }} ↗</a></td>
+        <td>{{ pr.title }}{% if pr.why != "client" %} <span class="badge" title="{{ 'PR ouverte par un agent lancé pour ce client' if pr.why == 'agent' else 'Le scope du titre est le logiciel du client' }}">{{ pr.why }}</span>{% endif %}<br><code class="muted">{{ pr.branch }}</code></td>
+        <td>{{ pr.author }}</td>
+        <td><span class="badge g-{{ pr.ci_group }}">{{ pr.ci }}</span></td>
+        <td><span class="badge g-{{ group }}">{{ review }}</span>{% if pr.reviewers %} <span class="muted">{{ pr.reviewers | join(", ") }}</span>{% endif %}</td>
+        <td data-sort="{{ pr.age(today) }}">{{ pr.age(today) }} j</td>
+        <td data-sort="{{ pr.idle(today) }}"{% if pr.idle(today) >= 3 %} class="pr-idle"{% endif %}>{{ pr.idle(today) }} j</td>
+      </tr>
+    {% else %}<tr><td colspan="7" class="muted">{{ "Liste indisponible." if error else "Aucune PR ouverte pour ce client." }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>

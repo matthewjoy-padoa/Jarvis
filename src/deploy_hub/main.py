@@ -24,7 +24,7 @@ from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
-from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, retour_prompt
+from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, duration_text, retour_prompt, usage
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_watch import DagWatcher
 from deploy_hub.sources import connections, flow_digger, notion_api
@@ -33,6 +33,8 @@ from deploy_hub.sources.journal import changes_since, group_changes
 from deploy_hub.sources import watchers
 from deploy_hub.sources.notifications import NotificationStore
 from deploy_hub.sources.personal import PersonalStore, remind_date
+from deploy_hub.sources.pulls import PullRequests
+from deploy_hub.sources import review as agent_review
 from deploy_hub.sources.fiches import FicheSource
 
 HERE = Path(__file__).parent
@@ -44,6 +46,7 @@ fiches = FicheSource(settings.deployments_dir, clients_dir())
 airflow = AirflowSource.from_env()
 notifications = NotificationStore(Path(os.getenv("DEPLOY_HUB_NOTIFICATIONS") or settings.deployments_dir.parent / "notifications.json"))
 claude = ClaudeRunner.from_env(settings.orchestrator_dir, live, notifications, data_dir() / "agents")
+pulls = PullRequests(settings.orchestrator_dir)  # PR ouvertes de l'orchestrator (gh), gardées cinq minutes
 # Suivi des runs lancés (air.py d'Arthur) ; les suivis en cours au démarrage reprennent si Airflow est configuré.
 dag_watch = DagWatcher(data_dir() / "airflow", notifications, {"AIRFLOW_URL": airflow.base_url, "AIRFLOW_USER": airflow.user,
                                                                "AIRFLOW_PASSWORD": airflow.password} if airflow.live else None)
@@ -78,6 +81,7 @@ async def lifespan(_app):
 app = FastAPI(title="Jarvis", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
+templates.env.filters["duree"] = duration_text
 templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STATUSES)
 templates.env.globals["kanban_columns"] = kanban_columns
 templates.env.globals["ACTION_STATUSES"] = ACTION_STATUSES
@@ -106,6 +110,7 @@ DEPLOYMENT_TABS = [
     ("injections", "Injections"),
     ("actions", "Actions"),
     ("recette", "Recette"),
+    ("pr", "PR"),
     ("regles", "Règles"),
     ("accompagnement", "Accompagnement"),
 ]
@@ -449,7 +454,8 @@ def deadlines(request: Request, tous: bool = False, client: str = "", periode: s
 
 @app.get("/agents", response_class=HTMLResponse)
 def agents(request: Request):
-    return _render(request, "agents.html", "/agents", runs=claude.runs, dag_runs=airflow.runs, watches=dag_watch.watches, chains=dag_chains.chains, live=claude.live)
+    return _render(request, "agents.html", "/agents", runs=claude.runs, dag_runs=airflow.runs, watches=dag_watch.watches, chains=dag_chains.chains, live=claude.live,
+                   usage=usage(claude.runs))
 
 
 def _run_or_404(run_id: int):
@@ -459,17 +465,23 @@ def _run_or_404(run_id: int):
     return run
 
 
+def _agent_context(run) -> dict:
+    """Journal de l'agent, et sa relecture guidée dès qu'il a fini (un agent simulé n'a rien à relire)."""
+    path = claude.log_path(run)
+    return {"run": run, "log": claude.log(run), "review": None if run.running or run.simulated else agent_review.build(run, path)}
+
+
 @app.get("/agents/{run_id}", response_class=HTMLResponse)
 def agent_detail(request: Request, run_id: int):
     run = _run_or_404(run_id)
-    return _render(request, "agent.html", "/agents", run=run, log=claude.log(run))
+    return _render(request, "agent.html", "/agents", **_agent_context(run))
 
 
 @app.get("/agents/{run_id}/journal", response_class=HTMLResponse)
 def agent_journal(request: Request, run_id: int):
     """Rafraîchi toutes les 5 s par la page de l'agent tant qu'il travaille."""
     run = _run_or_404(run_id)
-    return templates.TemplateResponse(request, "_agent_log.html", {"run": run, "log": claude.log(run)})
+    return templates.TemplateResponse(request, "_agent_log.html", _agent_context(run))
 
 
 @app.post("/agents/{run_id}/arreter")
@@ -660,6 +672,14 @@ def switch_client(slug: str, vers: str = "/"):
     else:
         target = f"/deploiements/{slug}/synthese"
     return _remember(RedirectResponse(target, status_code=303), slug)
+
+
+@app.get("/deploiements/{slug}/pr/liste", response_class=HTMLResponse)
+def deployment_pulls(request: Request, slug: str, frais: bool = False):
+    """PR ouvertes de l'orchestrator qui concernent ce client ; chargé par l'onglet PR (GitHub peut mettre quelques secondes)."""
+    d = _get(slug)
+    prs, error = pulls.for_client(d.slug, d.orchestrator, d.software, {r.pr_url for r in claude.runs if r.slug == slug and r.pr_url}, frais)
+    return templates.TemplateResponse(request, "_pr_list.html", {"d": d, "prs": prs, "error": error, "today": date.today(), "read_at": pulls.read_at})
 
 
 @app.get("/deploiements/{slug}/{tab}", response_class=HTMLResponse)
