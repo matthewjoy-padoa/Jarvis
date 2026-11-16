@@ -892,6 +892,9 @@ def _pinned(d: Deployment) -> list[dict]:
             for p in personal.pins(d.slug)]
 
 
+templates.env.globals["pins_of"] = _pinned  # encart « Épinglés » de la synthèse d'une fiche
+
+
 def _reminders_context(slug: str, error: str = "") -> dict:
     return {"reminders": personal.reminders(slug or None), "remind_slug": slug, "remind_error": error, "today": date.today()}
 

@@ -22,7 +22,7 @@ def build(deployments: list, items: list[dict], reminders: list, today: date, in
         mine = [i for i in items if i["d"] is d]
         head = f"*{d.client}*"
         if d.go_live:
-            head += f" · déploiement le {d.go_live.strftime('%d/%m/%Y')} (J{-d.days_left:+d})"
+            head += f" · déploiement le {d.go_live.strftime('%d/%m/%Y')} (J{(today - d.go_live).days:+d})"
         head += f" · {d.progress} % intégré"
 
         def lines(periode: str) -> list[str]:

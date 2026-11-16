@@ -3,4 +3,4 @@
 {% if pinned is not defined %}{% set pinned = perso.is_pinned(d.slug, kind, ref) %}{% endif %}
 <button type="button" class="secondary pin-btn{{ ' on' if pinned }}" aria-pressed="{{ 'true' if pinned else 'false' }}"
         hx-post="/perso/epingle/{{ d.slug }}/{{ kind }}/{{ ref }}" hx-swap="outerHTML"
-        title="{{ 'Retirer des épinglés de l\'accueil' if pinned else 'Garder ce ticket sous la main, sur l\'accueil' }}">{{ ic.icon("pin") }} {{ "Épinglé" if pinned else "Épingler" }}</button>
+        title="{{ 'Retirer des épinglés (accueil et fiche du client)' if pinned else 'Garder ce ticket sous la main : accueil et fiche du client' }}">{{ ic.icon("pin") }} {{ "Épinglé" if pinned else "Épingler" }}</button>
