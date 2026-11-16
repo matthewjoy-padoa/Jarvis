@@ -901,12 +901,11 @@ PADOA_ENV_URL = "https://[stack]-[client].aodap-staging.fr/support"  # modèle p
 
 def _env_links(d) -> list[tuple[str, str]]:
     """(environnement, adresse) des environnements Padoa d'un client, pour le bouton Environnements du dock.
-    Modèle : réglage PADOA_ENV_URL, où [stack] est l'environnement et [client] la première clé orchestrator du client
-    (son slug s'il n'en a pas). Vide : modèle par défaut ; pas en http(s) : aucun lien."""
+    Modèle : réglage PADOA_ENV_URL, où [stack] est l'environnement et [client] le nom du client dans Jarvis (son slug). Vide : modèle par défaut ; pas en http(s) : aucun lien."""
     template = os.environ.get("PADOA_ENV_URL", "").strip() or PADOA_ENV_URL
     if not template.startswith(("https://", "http://")):
         return []
-    key = quote(d.orchestrator[0] if d.orchestrator else d.slug, safe="")
+    key = quote(d.slug, safe="")
     return [(stack, template.replace("[stack]", stack).replace("[client]", key)) for stack in PADOA_STACKS]
 
 
