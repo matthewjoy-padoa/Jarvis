@@ -1093,7 +1093,8 @@ a.stat-link:hover .stat-go, a.stat-link:focus-visible .stat-go { opacity: 1; }
 /* Raccourcis du client en cours : dock de boutons ronds au bord droit, centré en hauteur ; nom en bulle au survol.
    Pas de rebond de défilement (Mac) : sinon la page rebondit et le dock, fixe, a l'air décroché. */
 html { overscroll-behavior-y: none; }
-.dock { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); z-index: 45; display: flex; flex-direction: column; gap: 8px;
+.dock-wrap { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); z-index: 45; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.dock, .dock-envs { display: flex; flex-direction: column; gap: 8px;
   padding: 8px; background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--border); border-radius: 99px;
   box-shadow: var(--shadow); backdrop-filter: blur(8px); }
 .dock-btn { position: relative; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--border);
@@ -1101,11 +1102,12 @@ html { overscroll-behavior-y: none; }
 .dock-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .dock-btn:hover, .dock-btn:focus-visible { transform: scale(1.08); border-color: var(--accent); color: var(--accent); text-decoration: none; }
 .dock-drive { color: var(--st-done); }
-/* Bouton Environnements : au survol ou au clavier, un petit menu s'ouvre à gauche du dock. */
+/* Bouton Environnements : à part au-dessus du dock ; au survol ou au clavier, un petit menu s'ouvre à sa gauche. */
 .dock-envs { position: relative; }
+.dock-envs img { display: block; }
 .dock-envs > .dock-btn { cursor: pointer; padding: 0; font: inherit; }
 .dock-envs > .dock-btn::after { display: none; }
-.dock-pop { position: absolute; right: 100%; top: 50%; transform: translateY(-50%); padding-right: 12px; display: none; }
+.dock-pop { position: absolute; right: 100%; top: 50%; transform: translateY(-50%); padding-right: 12px; display: none; z-index: 1; }
 .dock-envs:hover .dock-pop, .dock-envs:focus-within .dock-pop { display: block; }
 .dock-pop > * { display: block; white-space: nowrap; padding: 7px 12px; font-size: 13px; background: var(--surface); color: var(--text);
   border: 1px solid var(--border); border-top-width: 0; text-decoration: none; }
@@ -1118,8 +1120,8 @@ html { overscroll-behavior-y: none; }
   opacity: 0; pointer-events: none; transition: opacity .12s, transform .12s; }
 .dock-btn:hover::after, .dock-btn:focus-visible::after { opacity: 1; transform: translate(0, -50%); }
 @media (min-width: 641px) and (max-width: 1260px) { body:has(.dock) main { padding-right: 84px; } }  /* place du dock : il ne cache jamais le contenu */
-@media (max-width: 640px) { .dock { display: none; } }  /* téléphone : les liens restent en haut de la fiche */
-@media print { .dock { display: none; } }
+@media (max-width: 640px) { .dock-wrap { display: none; } }  /* téléphone : les liens restent en haut de la fiche */
+@media print { .dock-wrap { display: none; } }
 
 /* Perso : brief du matin, épingles, notes et rappels */
 .brief-text, .my-notes textarea { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 2px solid var(--border); border-radius: 10px;
