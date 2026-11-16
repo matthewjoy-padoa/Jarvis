@@ -32,6 +32,13 @@
   {% endif %}
 </section>
 
+<section class="panel" id="notifications" data-browser-notifs>
+  <div class="panel-head"><h2>Notifications du Mac</h2><span class="badge" data-notifs-state>…</span></div>
+  <p class="muted">Agent terminé, DAG en échec, échéances, rappels : Jarvis les affiche sur le Mac, même onglet fermé (le navigateur doit rester lancé). Le choix vaut pour ce navigateur ; rien n'est écrit dans <code>.env</code>.</p>
+  <button type="button" data-enable-browser-notifs hidden>Activer les notifications du Mac</button>
+  <p class="muted" data-notifs-help hidden></p>
+</section>
+
 <form class="panel settings-form" method="post" action="/reglages" autocomplete="off">
   {% for section in fields | map(attribute="field.section") | unique %}
   {% set items = fields | selectattr("field.section", "equalto", section) %}

@@ -57,13 +57,33 @@
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") { const p = document.getElementById("notif-panel"); if (p) p.hidden = true; } });
 
-  // Bouton « Activer les notifications du Mac » dans le panneau, tant que la permission n'est pas donnée.
-  document.addEventListener("htmx:afterSwap", (e) => {
-    const btn = e.target.querySelector && e.target.querySelector("[data-enable-browser-notifs]");
-    if (!btn || !("Notification" in window)) return;
-    btn.hidden = Notification.permission !== "default";
-    btn.addEventListener("click", () => Notification.requestPermission().then(() => { btn.hidden = true; subscribePush(); }));
+  // Réglages → « Notifications du Mac » : état de ce navigateur et bouton d'activation. Dans le panneau de la cloche,
+  // un simple lien vers ce réglage tant que la permission n'a pas été demandée.
+  const STATES = {
+    granted: ["activées", "g-done", ""],
+    denied: ["bloquées", "g-ko", "Ce navigateur les a refusées pour Jarvis : autorise les notifications de ce site dans ses réglages (cadenas de la barre d'adresse), puis recharge la page."],
+    default: ["à activer", "", ""],
+    none: ["indisponibles", "g-ko", "Ce navigateur ne sait pas afficher de notifications."],
+  };
+  function showState(root) {
+    const permission = "Notification" in window ? Notification.permission : "none";
+    root.querySelectorAll("[data-notifs-todo]").forEach((el) => { el.hidden = permission !== "default"; });
+    root.querySelectorAll("[data-browser-notifs]").forEach((box) => {
+      let [label, group, help] = STATES[permission];
+      if (permission === "granted" && !pushActive) { label = "activées, onglet ouvert"; help = "Sans Web Push dans ce navigateur, elles n'arrivent que tant qu'un onglet Jarvis est ouvert."; }
+      const badge = box.querySelector("[data-notifs-state]"), text = box.querySelector("[data-notifs-help]"), btn = box.querySelector("[data-enable-browser-notifs]");
+      badge.textContent = label;
+      badge.className = "badge" + (group ? " " + group : "");
+      text.textContent = help;
+      text.hidden = !help;
+      btn.hidden = permission !== "default";
+    });
+  }
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest && e.target.closest("[data-enable-browser-notifs]");
+    if (btn && "Notification" in window) Notification.requestPermission().then(subscribePush).then(() => showState(document));
   });
+  document.addEventListener("htmx:afterSwap", (e) => { if (e.target.querySelectorAll) showState(e.target); });
 
   async function poll() {
     const last = get();
@@ -79,5 +99,5 @@
       note.onclick = () => { window.focus(); if (n.link) location.href = n.link; note.close(); };
     });
   }
-  document.addEventListener("DOMContentLoaded", () => { subscribePush(); poll(); setInterval(poll, 60000); });
+  document.addEventListener("DOMContentLoaded", () => { showState(document); subscribePush().then(() => showState(document)); poll(); setInterval(poll, 60000); });
 })();
