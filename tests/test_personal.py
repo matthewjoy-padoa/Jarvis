@@ -119,6 +119,15 @@ def test_pinning_a_ticket_puts_it_on_the_home_page(client):
     assert "Épinglés" not in client.get("/").text
 
 
+def test_a_pinned_ticket_also_shows_on_the_synthese_of_its_client_only(client):
+    synthese = f"/deploiements/{SLUG}/synthese"
+    assert "Épinglés" not in client.get(synthese).text
+    client.post(f"/perso/epingle/{SLUG}/retour/{REF}")
+    page = client.get(synthese).text
+    assert "Épinglés" in page and f'href="{TICKET}"' in page
+    assert "Épinglés" not in client.get("/deploiements/client-exemple/synthese").text
+
+
 def test_pins_stay_with_their_client(client):
     client.post(f"/perso/epingle/{SLUG}/retour/{REF}")
     client.cookies.set(main.CLIENT_COOKIE, "client-exemple")

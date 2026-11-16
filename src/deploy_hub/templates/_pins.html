@@ -1,0 +1,14 @@
+{# Tickets épinglés d'un client (accueil et synthèse de sa fiche). Attend : pins (main._pinned) ; rien si la liste est vide. #}
+{% import "_icons.html" as ic %}
+{% if pins %}
+<section class="panel">
+  <h2>{{ ic.icon("pin") }} Épinglés <span class="muted">· {{ pins | length }}</span></h2>
+  <ul class="todo" data-limit="8">
+    {% for p in pins %}
+    <li>{% if p.item %}<span class="badge g-{{ p.item.group }}">{{ p.item.status }}</span> <a data-ticket href="{{ ticket_url(p.slug, p.kind, p.ref) }}">{{ p.label }}</a>
+      {% else %}<span class="muted"><code>{{ p.ref }}</code> n'est plus dans la fiche</span>{% endif %}
+      <button type="button" class="remind-drop" hx-post="/perso/epingle/{{ p.slug }}/{{ p.kind }}/{{ p.ref }}" hx-target="closest li" hx-swap="delete" aria-label="Désépingler" title="Désépingler">×</button></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}

@@ -9,6 +9,9 @@
   <a class="kpi kpi-link" href="/deploiements/{{ d.slug }}/actions"><span class="muted">Points de vigilance</span><strong>{{ d.vigilance | length }}</strong><span class="muted">voir les actions →</span></a>
 </div>
 
+{# Mes tickets épinglés de ce client : les mêmes que sur l'accueil. #}
+{% with pins = pins_of(d) %}{% include "_pins.html" %}{% endwith %}
+
 {# Où ça coince : les 5 points avec le plus de KO (blocs d'injection, types de retours), chacun mène à sa liste. #}
 {% set points = d.blocking_points %}
 <section class="panel blocking">
