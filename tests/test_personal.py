@@ -139,6 +139,25 @@ def test_a_client_note_is_saved_and_shown_on_its_synthese_only(client):
 
 
 # ------------------------------------------------------------ Rappels
+def test_every_page_has_the_notes_button_and_its_panel_is_loaded_on_demand(client):
+    page = client.get("/").text
+    assert "data-notes-open" in page and 'hx-get="/perso/notes"' in page and "/static/notes.js" in page
+    assert "<textarea" not in page.split('id="notes"')[1].split("</section>")[0]
+
+
+def test_the_notes_panel_holds_the_current_client_note_and_a_general_one(client):
+    client.post(f"/perso/note/{SLUG}", data={"texte": "Note du client"})
+    assert "Enregistré à" in client.post("/perso/note", data={"texte": "Penser au <daily>"}).text
+    client.cookies.set("jarvis_client", SLUG)
+    panel = client.get("/perso/notes").text
+    assert f'hx-post="/perso/note/{SLUG}"' in panel and "Note du client" in panel
+    assert 'hx-post="/perso/note"' in panel and "Penser au &lt;daily&gt;" in panel
+    client.cookies.set("jarvis_client", "client-exemple")
+    other = client.get("/perso/notes").text
+    assert "Note du client" not in other and "Penser au &lt;daily&gt;" in other
+    assert "Penser au" not in client.get(f"/deploiements/{SLUG}/synthese").text
+
+
 def test_a_ticket_reminder_takes_the_ticket_label_and_shows_on_the_ticket_and_home(client):
     r = client.post("/perso/rappel", data={"slug": SLUG, "kind": "retour", "ref": REF, "quand": "lundi", "label": "ignoré"})
     assert r.status_code == 200 and "Rappel le" in r.text

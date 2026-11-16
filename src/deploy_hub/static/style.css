@@ -1148,3 +1148,24 @@ li.review-ok::before { content: "✓"; color: var(--ok); }
 li.review-warn::before { content: "!"; color: var(--danger); }
 table.review-files { width: auto; border: 0; box-shadow: none; font-size: 13px; }
 table.review-files td { padding: 2px 14px 2px 0; border: 0; }
+
+/* ============================================================ Bouton et bloc-notes flottants (2026-11-13)
+   Même bouton que la console, posé au-dessus ; le bloc s'ouvre au-dessus des deux. Logique : notes.js. */
+button.notes-fab { bottom: 90px; background: var(--surface); color: var(--accent); box-shadow: 0 0 0 2px var(--border), 0 10px 24px -10px rgba(0, 18, 53, .35); }
+html.notes-open button.notes-fab { background: var(--accent); color: var(--on-accent); }
+.notes { position: fixed; right: 24px; bottom: 156px; z-index: 52; width: min(400px, calc(100vw - 32px)); max-height: calc(100vh - 190px);
+  display: flex; flex-direction: column; background: var(--surface); color: var(--text); border: 2px solid var(--border); border-radius: 14px;
+  box-shadow: 0 24px 50px -16px rgba(0, 18, 53, .45); animation: term-up .18s var(--ease); }
+.notes[hidden] { display: none; }
+.notes-bar { display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 14px; border-bottom: var(--line) solid var(--border); }
+.notes-bar .muted { font-size: 12.5px; }
+button.notes-close { margin-left: auto; min-height: 0; padding: 0 8px; border: 0; background: none; color: var(--muted); font-size: 20px; line-height: 1.2; }
+.notes-body { padding: 12px 14px 14px; overflow: auto; }
+.notes-field { display: block; margin-top: 10px; font-weight: 600; font-size: 13px; }
+.notes-field:first-child { margin-top: 0; }
+.notes-field textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; padding: 10px 12px; border: 2px solid var(--border);
+  border-radius: 10px; background: var(--bg); color: var(--text); font: 400 14px/1.5 inherit; resize: vertical; }
+.notes-field textarea:focus { outline: none; border-color: var(--accent); }
+html.palette-open .notes, html.drawer-open .notes, html.term-open .notes { display: none; }
+@media (max-width: 640px) { button.notes-fab { bottom: 78px; } .notes { right: 16px; bottom: 138px; } }
+@media print { .notes { display: none; } }

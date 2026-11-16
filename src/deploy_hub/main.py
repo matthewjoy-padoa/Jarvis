@@ -913,6 +913,19 @@ def pin_toggle(request: Request, slug: str, kind: str, ref: str):
     return templates.TemplateResponse(request, "_pin_button.html", {"d": d, "kind": kind, "ref": ref.upper(), "pinned": pinned})
 
 
+@app.get("/perso/notes", response_class=HTMLResponse)
+def notes_panel(request: Request):
+    """Contenu du bloc-notes flottant (bouton « Notes ») : notes du client en cours et notes générales."""
+    return templates.TemplateResponse(request, "_notes_panel.html", {"current": _current(request)})
+
+
+@app.post("/perso/note", response_class=HTMLResponse)
+def general_note_save(request: Request, texte: str = Form("")):
+    """Notes générales (sans client) : rangées sous la clé vide de data/perso.json."""
+    personal.set_note("", texte)
+    return _result(request, ActionResult(True, f"Enregistré à {datetime.now():%H:%M}", simulated=False))
+
+
 @app.post("/perso/note/{slug}", response_class=HTMLResponse)
 def note_save(request: Request, slug: str, texte: str = Form("")):
     _get(slug)
