@@ -101,7 +101,7 @@ def test_the_dock_gives_the_padoa_environments_of_the_current_client(monkeypatch
     dock = lambda: c.get("/deadlines").text.split('<div class="dock-envs"', 1)[1].split("<nav", 1)[0]  # noqa: E731
     monkeypatch.delenv("PADOA_ENV_URL", raising=False)
     assert 'aria-label="Environnements Padoa de Client Exemple"' in dock()
-    assert 'src="/static/padoa.svg"' in dock() and c.get("/static/padoa.svg").status_code == 200  # à part du dock, logo Padoa
+    assert 'src="/static/padoa.png"' in dock() and c.get("/static/padoa.png").status_code == 200  # à part du dock, logo Padoa
     assert dock().count(".aodap-staging.fr/support") == 3 and 'href="/reglages"' not in dock()  # réglage vide : modèle par défaut
     monkeypatch.setenv("PADOA_ENV_URL", "https://[stack]-[client].exemple.test/support")
     hosts = re.findall(r'href="https://([^."]+)\.exemple\.test/support"', dock())

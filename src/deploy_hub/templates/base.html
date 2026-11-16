@@ -228,7 +228,7 @@
   <div class="dock-wrap">
   {# Environnements Padoa du client : bouton à part, au-dessus du dock ; trois adresses bâties sur le modèle PADOA_ENV_URL. #}
   <div class="dock-envs">
-    <button type="button" class="dock-btn" aria-haspopup="true" aria-label="Environnements Padoa de {{ current.client }}"><img src="/static/padoa.svg" alt="" width="22" height="22"></button>
+    <button type="button" class="dock-btn" aria-haspopup="true" aria-label="Environnements Padoa de {{ current.client }}"><img src="/static/padoa.png" alt="" width="22" height="22"></button>
     <div class="dock-pop" role="group" aria-label="Environnements Padoa">
       <strong>Environnements Padoa</strong>
       {% for name, url in env_links(current) %}<a href="{{ url }}" target="_blank" rel="noopener">{{ name }} ↗</a>
