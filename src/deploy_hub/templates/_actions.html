@@ -21,23 +21,25 @@
 </div>
 {% if kanban %}
 {% set ns_kb = namespace(cards=[]) %}
-{% for d in deployments %}{% for a in (d.actions if show_all else d.active_actions) %}{% set ns_kb.cards = ns_kb.cards + [(d, a)] %}{% endfor %}{% endfor %}
-{% call(d, a) kb.board(kanban_columns(ns_kb.cards, ACTION_STATUSES), "Équipe:equipe,Injection:injection" ~ (",Client:client" if show_client else ""), "Actions par statut") %}
-<article class="kb-card"{% if a.ref %} data-ticket-card{% endif %} data-group="{{ a.group }}" data-equipe="{{ a.teams | join('|') if a.teams else 'Sans équipe' }}" data-injection="{{ a.injection_status or 'Sans injection' }}" data-client="{{ d.client }}">
+{% for d in deployments %}{% for a in d.actions %}{% set ns_kb.cards = ns_kb.cards + [(d, a)] %}{% endfor %}{% endfor %}
+{% call(d, a) kb.board(kanban_columns(ns_kb.cards, ACTION_STATUSES), "Équipe:equipe,Injection:injection,Responsable:responsable" ~ (",Client:client" if show_client else ""), "Actions par statut", "hors des actives") %}
+<article class="kb-card"{% if a.ref %} data-ticket-card{% endif %}{% if not show_all and not a.is_active %} hidden data-out{% endif %} data-group="{{ a.group }}" data-responsable="{{ a.owner }}" data-equipe="{{ a.teams | join('|') if a.teams else 'Sans équipe' }}" data-injection="{{ a.injection_status or 'Sans injection' }}" data-client="{{ d.client }}">
   <p class="kb-title">{% if a.vigilance %}{{ ic.icon("alert", "Point de vigilance", "ic-alert") }} {% endif %}{% if a.event %}{{ ic.icon("flag", "Date clé", "ic-muted") }} {% endif %}{% if a.ref %}<a data-ticket href="{{ ticket_url(d.slug, 'action', a.ref) }}">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}</p>
   <p class="kb-meta">{% for t in a.teams %}<span class="team team-{{ t | lower }}">{{ t }}</span>{% endfor %}
     {% if show_client %}<a class="muted" href="/deploiements/{{ d.slug }}/actions?vue=kanban">{{ d.client }}</a>{% endif %}
+    {% if a.owner %}<span class="muted">{{ ic.icon("user") }} {{ a.owner }}</span>{% endif %}
     {% if a.due %}<span class="{{ 'late' if a.group != 'done' and a.due < today else 'muted' }}">{{ ic.icon("calendar") }} {{ a.due.strftime("%d/%m") }}</span>{% endif %}</p>
   {% if a.injection_status %}<p class="kb-meta"><span class="badge g-{{ a.injection_group }}">{{ a.injection_status }}</span></p>{% endif %}
 </article>
 {% endcall %}
 {% else %}
 {% set has_owner = deployments | map(attribute="actions") | sum(start=[]) | selectattr("owner") | list | length > 0 %}
-<table data-filterable>
+{# Toutes les actions sont envoyées : en vue « Actives », les autres sont masquées (data-out) et la recherche propose de les afficher. #}
+<table data-filterable data-out-label="hors des actives">
   <thead><tr>{% if show_client %}<th data-filter>Client</th>{% endif %}<th>Intitulé</th><th data-filter="equipe" data-multi>Équipe</th><th data-filter>Statut</th><th data-filter>Injection</th>{% if has_owner %}<th data-filter>Responsable</th>{% endif %}<th>Deadline</th></tr></thead>
   <tbody>
-  {% for d in deployments %}{% for a in (d.actions if show_all else d.active_actions) %}
-    <tr class="{{ 'done' if a.group == 'done' }}"{% if a.ref %} data-ticket-card{% endif %}>
+  {% for d in deployments %}{% for a in d.actions %}
+    <tr class="{{ 'done' if a.group == 'done' }}"{% if a.ref %} data-ticket-card{% endif %}{% if not show_all and not a.is_active %} hidden data-out{% endif %} data-group="{{ a.group }}">
       {% if show_client %}<td><a href="/deploiements/{{ d.slug }}/actions">{{ d.client }}</a></td>{% endif %}
       <td>{% if a.vigilance %}{{ ic.icon("alert", "Point de vigilance", "ic-alert") }} {% endif %}{% if a.event %}{{ ic.icon("flag", "Date clé", "ic-muted") }} {% endif %}{% if a.ref %}<a data-ticket href="{{ ticket_url(d.slug, 'action', a.ref) }}">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}
         {% if a.notion_url %}<a class="muted notion-mini" href="{{ a.notion_url }}" target="_blank" rel="noopener" title="Ouvrir dans Notion">↗</a>{% endif %}

@@ -138,6 +138,14 @@ class Action:
         return status_group(self.injection_status, INJECTION_STATUSES)
 
     @property
+    def is_active(self) -> bool:
+        """Action à suivre : vigilance, date clé, échéance proche (J-7 à J+30), ou travail en cours (action ou injection)."""
+        return bool(self.vigilance or self.event
+                    or (self.due and -7 <= (self.due - date.today()).days <= 30)
+                    or self.group == IN_PROGRESS
+                    or self.injection_group in (IN_PROGRESS, KO))
+
+    @property
     def ref(self) -> str:
         """Référence courte de la carte (6 derniers caractères de l'id Notion), comme l'id d'un retour."""
         found = re.findall(r"[0-9a-f]{32}", (self.notion_url or "").replace("-", ""))
@@ -343,14 +351,7 @@ class Deployment:
     @property
     def active_actions(self) -> list[Action]:
         """Actions à suivre : vigilance, date clé, échéance proche, ou travail en cours (action ou injection)."""
-        today = date.today()
-        return [
-            a for a in self.actions
-            if a.vigilance or a.event
-            or (a.due and -7 <= (a.due - today).days <= 30)
-            or a.group == IN_PROGRESS
-            or a.injection_group in (IN_PROGRESS, KO)
-        ]
+        return [a for a in self.actions if a.is_active]
 
     @property
     def expected_progress(self) -> int | None:

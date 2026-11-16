@@ -31,10 +31,10 @@ actions:
   - {title: Mapping des codes AMT à valider par le client, status: À valider, owner: CDP, due: 2026-11-10, vigilance: true, comment: "Bloque l'injection amt_task"}
   - {title: Volume de documents CED à confirmer, status: À faire, owner: Inté, due: 2026-11-20, vigilance: true}
 retours:
-  - {id: R-01, status: INTE - Vérifié en INTEGRATION, data_type: Adhérents, resource: firm}
-  - {id: R-02, status: À faire, data_type: Visites historiques, resource: visit_histo, due: 2026-11-12, created: 2026-10-21}
-  - {id: R-03, status: OPS - Vérifié et pas OK, data_type: Examens complémentaires, due: 2026-11-15, ligne: "Examens complémentaires repris", commentaire_client: "Texte fictif : il manque des examens.", analyse: "Texte fictif : filtre trop strict."}
-  - {id: R-04, status: "INTE - 🤔 Besoin clarification retour", data_type: Vaccins, resource: vaccine_injection}
+  - {id: R-01, owners: [u-alex], status: INTE - Vérifié en INTEGRATION, data_type: Adhérents, resource: firm}
+  - {id: R-02, owners: [u-alex], status: À faire, data_type: Visites historiques, resource: visit_histo, due: 2026-11-12, created: 2026-10-21}
+  - {id: R-03, owners: [u-sam], status: OPS - Vérifié et pas OK, data_type: Examens complémentaires, due: 2026-11-15, ligne: "Examens complémentaires repris", commentaire_client: "Texte fictif : il manque des examens.", analyse: "Texte fictif : filtre trop strict."}
+  - {id: R-04, owners: [u-alex, u-sam], status: "INTE - 🤔 Besoin clarification retour", data_type: Vaccins, resource: vaccine_injection}
 regles:
   - {title: Clôturer les adhérents radiés avant 2020, resource_table: firm, type: Règle par défaut - logiciel, application: En flux - Transform, status: Active - Présentable}
   - {title: Ne pas reprendre les visites sans date, resource_table: visit_histo, type: Règle obligatoire - padoa, application: En flux - Cleaner, status: Active - A ne pas pousser}
