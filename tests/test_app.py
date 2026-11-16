@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import date, timedelta
 
 import pytest
@@ -231,6 +232,8 @@ def test_navigation_shows_the_current_client_and_the_others_in_its_menu():
     assert nav.count('class="client-chip') == 1 and "Client en cours : Client Démo" in nav
     assert 'href="/client/client-exemple?vers=/deploiements/client-demo/synthese"' in nav and "Tous les clients et réglages" in nav
     assert 'class="nav-item' in nav and '<span>Clients</span>' not in nav  # « Clients » quitte le menu principal
+    chip = lambda path: re.search(r'class="(client-chip[^"]*)"', TestClient(app).get(path).text)[1]  # noqa: E731
+    assert chip("/deploiements/client-demo/synthese") == chip("/deadlines")  # même aspect sur toutes les pages
 
 
 def test_empty_columns_are_hidden():

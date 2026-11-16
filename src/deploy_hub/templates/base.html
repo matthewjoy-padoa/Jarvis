@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=100">
+  <link rel="stylesheet" href="/static/style.css?v=112">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=6" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
@@ -39,7 +39,7 @@
     {# Le client en cours : on travaille sur un client à la fois ; les autres sont dans le menu, pas à côté. #}
     {% if current %}
     <details class="client-switch" data-client-switch>
-      <summary class="client-chip strong h-{{ current.health_level }} {{ 'active' if active == '/deploiements/' ~ current.slug }}"
+      <summary class="client-chip strong h-{{ current.health_level }}"
                title="Client en cours : {{ current.client }} · {{ current.progress }} % intégré{% if current.go_live %} · déploiement le {{ current.go_live.strftime('%d/%m/%Y') }}{% endif %}">
         <span class="dot" aria-hidden="true"></span>{{ ic.client_emoji(current) }}<span class="client-name">{{ current.client }}</span>{{ ic.countdown(current) }}
         <svg class="switch-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></summary>
@@ -230,9 +230,8 @@
   <div class="dock-envs">
     <button type="button" class="dock-btn" aria-haspopup="true" aria-label="Environnements Padoa de {{ current.client }}"><img src="/static/padoa.png" alt="" width="22" height="22"></button>
     <div class="dock-pop" role="group" aria-label="Environnements Padoa">
-      <strong>Environnements Padoa</strong>
-      {% for name, url in env_links(current) %}<a href="{{ url }}" target="_blank" rel="noopener">{{ name }} ↗</a>
-      {% else %}<a href="/reglages">Adresse à renseigner dans Réglages</a>{% endfor %}
+      {% for name, url in env_links(current) %}<a href="{{ url }}" target="_blank" rel="noopener" style="--i: {{ loop.index0 }}; --n: {{ loop.length }}">{{ name }} ↗</a>
+      {% else %}<a href="/reglages" style="--i: 0; --n: 1">Adresse à renseigner dans Réglages</a>{% endfor %}
     </div>
   </div>
   <nav class="dock" aria-label="Raccourcis de {{ current.client }}">

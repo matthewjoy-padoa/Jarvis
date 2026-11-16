@@ -103,6 +103,7 @@ def test_the_dock_gives_the_padoa_environments_of_the_current_client(monkeypatch
     assert 'aria-label="Environnements Padoa de Client Exemple"' in dock()
     assert 'src="/static/padoa.png"' in dock() and c.get("/static/padoa.png").status_code == 200  # à part du dock, logo Padoa
     assert dock().count(".aodap-staging.fr/support") == 3 and 'href="/reglages"' not in dock()  # réglage vide : modèle par défaut
+    assert [f'style="--i: {i}; --n: 3"' in dock() for i in range(3)] == [True] * 3  # éventail : rang et nombre de pastilles
     monkeypatch.setenv("PADOA_ENV_URL", "https://[stack]-[client].exemple.test/support")
     hosts = re.findall(r'href="https://([^."]+)\.exemple\.test/support"', dock())
     assert hosts == ["snap-client-exemple", "snap-recette-client-exemple", "integration-client-exemple"]  # le slug Jarvis
