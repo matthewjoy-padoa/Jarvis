@@ -45,3 +45,11 @@
     {% else %}<li class="muted">Aucun.</li>{% endfor %}
   </ul>
 </section>
+
+{# Notes libres sur ce client : gardées dans data/perso.json, jamais envoyées dans Notion. #}
+<section class="panel my-notes">
+  <h2>Mes notes <span class="muted">· pour moi seulement, jamais envoyées dans Notion</span></h2>
+  <textarea name="texte" rows="5" maxlength="20000" placeholder="Ce que je veux retenir sur {{ d.client }} : contacts, décisions, pièges…" aria-label="Mes notes sur {{ d.client }}"
+            hx-post="/perso/note/{{ d.slug }}" hx-trigger="keyup changed delay:800ms, change" hx-target="next .note-out" hx-swap="innerHTML">{{ perso.note(d.slug) }}</textarea>
+  <div class="note-out" role="status"></div>
+</section>

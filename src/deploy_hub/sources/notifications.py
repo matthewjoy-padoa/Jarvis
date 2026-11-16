@@ -12,7 +12,7 @@ from pathlib import Path
 
 MAX_KEPT = 500
 LEVELS = ("urgent", "info")
-KINDS = {"agent": "bot", "sync": "sync", "deadline": "calendar", "dag": "play"}  # icônes de templates/_icons.html
+KINDS = {"agent": "bot", "sync": "sync", "deadline": "calendar", "dag": "play", "rappel": "bell"}  # icônes de templates/_icons.html
 _lock = threading.Lock()
 
 
@@ -20,7 +20,7 @@ _lock = threading.Lock()
 class Notification:
     id: int
     key: str
-    kind: str  # agent | sync | deadline | dag
+    kind: str  # agent | sync | deadline | dag | rappel
     level: str  # urgent | info
     title: str
     detail: str = ""

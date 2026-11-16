@@ -1,0 +1,6 @@
+{# Bouton « Épingler » d'un ticket. Attend : d, kind, ref. Le clic renvoie ce même bouton dans son nouvel état. #}
+{% import "_icons.html" as ic %}
+{% if pinned is not defined %}{% set pinned = perso.is_pinned(d.slug, kind, ref) %}{% endif %}
+<button type="button" class="secondary pin-btn{{ ' on' if pinned }}" aria-pressed="{{ 'true' if pinned else 'false' }}"
+        hx-post="/perso/epingle/{{ d.slug }}/{{ kind }}/{{ ref }}" hx-swap="outerHTML"
+        title="{{ 'Retirer des épinglés de l\'accueil' if pinned else 'Garder ce ticket sous la main, sur l\'accueil' }}">{{ ic.icon("pin") }} {{ "Épinglé" if pinned else "Épingler" }}</button>

@@ -1,11 +1,12 @@
 {# Détail d'un retour de recette ou d'une carte d'action. Attend : d, kind (retour | action), item, history, runs. #}
 {% import "_icons.html" as ic %}
 {% set is_retour = kind == "retour" %}
+{% set ref = item.id if is_retour else item.ref %}
 {% set due_late = item.due and item.due < today and item.group != "done" %}
 <article class="ticket" data-group="{{ item.group }}">
   <header class="ticket-head">
     <p class="ticket-kicker muted"><span>{{ "Retour de recette" if is_retour else ("Carte d'injection" if item.injection else "Action") }}</span>
-      · <code>{{ item.id if is_retour else item.ref }}</code> · <a href="/deploiements/{{ d.slug }}/{{ 'recette' if is_retour else 'actions' }}">{{ d.client }}</a></p>
+      · <code>{{ ref }}</code> · <a href="/deploiements/{{ d.slug }}/{{ 'recette' if is_retour else 'actions' }}">{{ d.client }}</a></p>
     <h2 class="ticket-title">{% if not is_retour and item.vigilance %}{{ ic.icon("alert", "Point de vigilance", "ic-alert") }} {% endif %}{{ (item.ligne or item.data_type or "Type de données non précisé") if is_retour else item.title }}</h2>
     <div class="ticket-badges">
       <span class="badge g-{{ item.group }}">{{ item.status }}</span>
@@ -14,9 +15,11 @@
     </div>
     <div class="ticket-actions">
       {% if is_retour and item.is_open %}<button type="button" class="ticket-agent-btn" onclick="const a = this.closest('.ticket').querySelector('details.agent'); a.open = true; a.scrollIntoView({behavior: 'smooth', block: 'start'})">{{ ic.icon("bot") }} Lancer un agent</button>{% endif %}
+      {% include "_pin_button.html" %}
       {% if item.notion_url %}<a class="btn-link" href="{{ item.notion_url }}" target="_blank" rel="noopener">Ouvrir dans Notion ↗</a>{% endif %}
-      <a class="btn-link" href="{{ ticket_url(d.slug, kind, item.id if is_retour else item.ref) }}" target="_blank" rel="noopener" title="Ouvrir ce ticket dans un nouvel onglet">Nouvel onglet ↗</a>
+      <a class="btn-link" href="{{ ticket_url(d.slug, kind, ref) }}" target="_blank" rel="noopener" title="Ouvrir ce ticket dans un nouvel onglet">Nouvel onglet ↗</a>
     </div>
+    {% include "_ticket_remind.html" %}
   </header>
 
   <section class="ticket-section">

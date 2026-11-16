@@ -1109,3 +1109,22 @@ html { overscroll-behavior-y: none; }
 @media (min-width: 641px) and (max-width: 1260px) { body:has(.dock) main { padding-right: 84px; } }  /* place du dock : il ne cache jamais le contenu */
 @media (max-width: 640px) { .dock { display: none; } }  /* téléphone : les liens restent en haut de la fiche */
 @media print { .dock { display: none; } }
+
+/* Perso : brief du matin, épingles, notes et rappels */
+.brief-text, .my-notes textarea { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 2px solid var(--border); border-radius: 10px;
+  background: var(--surface); color: var(--text); font-size: 14px; line-height: 1.55; resize: vertical; }
+.brief-text { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 12px 0; }
+.brief-text:focus, .my-notes textarea:focus, .remind-form input:focus { outline: none; border-color: var(--accent); }
+.note-out .result { margin: 4px 0 0; }
+.pin-btn.on { border-color: var(--accent); color: var(--accent); }
+.remind, .remind-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.remind { margin: 4px 0 8px; font-size: 13px; }
+.remind .result { flex-basis: 100%; }
+.remind-form button, button.remind-done { min-height: 0; padding: 3px 10px; font-size: 12.5px; }
+.remind-form input, .remind-form select { font-size: 13px; padding: 4px 8px; border: 2px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
+.remind-form input[type=text] { flex: 1 1 160px; min-width: 0; }
+#reminders .remind-form { margin-top: 8px; }
+.remind-set { display: inline-flex; align-items: center; gap: 4px; }
+button.remind-drop, button.remind-drop:hover:not(:disabled) { min-height: 0; padding: 0 4px; border: 0; background: none; box-shadow: none; color: var(--muted); font-size: 15px; line-height: 1; transform: none; }
+button.remind-drop:hover:not(:disabled) { color: var(--text); }
+ul.todo li > button.remind-done, ul.todo li > button.remind-drop { margin-left: auto; }

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% import "_icons.html" as ic %}
+{% block title %}Brief du matin · Jarvis{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Brief du matin</h1>
+    <p class="muted">Le résumé de l'accueil en texte : à coller dans Slack ou à lire au daily. Tu peux le retoucher avant de copier.</p>
+  </div>
+  <div class="head-side">
+    <button type="button" id="brief-copy">{{ ic.icon("copy") }} Copier</button>
+    <span class="result ok" id="brief-copied" role="status" hidden>Copié dans le presse-papiers</span>
+  </div>
+</div>
+{% if current %}
+<div class="segmented" role="group" aria-label="Clients">
+  <a href="/brief"{% if not all_clients %} class="active"{% endif %}>{{ current.client }}</a><a href="/brief?tous=true"{% if all_clients %} class="active"{% endif %}>Tous les clients</a>
+</div>
+{% endif %}
+<textarea id="brief-text" class="brief-text" rows="{{ [text.count('\n') + 2, 30] | min }}" spellcheck="false" aria-label="Texte du brief">{{ text }}</textarea>
+<p class="muted"><a href="/">← Retour à l'accueil</a></p>
+<script>
+  (function () {
+    const text = document.getElementById("brief-text"), done = document.getElementById("brief-copied");
+    document.getElementById("brief-copy").addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(text.value); }
+      catch (e) { text.select(); document.execCommand("copy"); }  // page ouverte hors localhost : pas de presse-papiers moderne
+      done.hidden = false;
+      setTimeout(() => { done.hidden = true; }, 2500);
+    });
+  })();
+</script>
+{% endblock %}

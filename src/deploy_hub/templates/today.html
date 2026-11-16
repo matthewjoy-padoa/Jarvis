@@ -17,6 +17,7 @@
       {% else %}Tous les systèmes sont au vert. Rien d'urgent aujourd'hui.{% endif %}
     </p>
   </div>
+  <div class="head-side"><a class="btn-primary" href="/brief" title="Le résumé du jour en texte, à copier pour Slack ou le daily">{{ ic.icon("sun") }} Brief du matin</a></div>
 </div>
 {{ charts.stats([("En retard", late | length, "ko", links.retard), ("À échéance aujourd'hui", due_today | length, "todo", links.aujourdhui), ("Dans les 7 jours", due_week | length, "", links.semaine), ("Injections KO", ko | length, "ko", links.ko)]) }}
 
@@ -32,6 +33,7 @@
 </section>
 
 <div class="two-col">
+  <section>
   <section class="panel">
     <h2>À traiter</h2>
     {% set groups = [("En retard", late, "retard"), ("Aujourd'hui", due_today, "aujourdhui"), ("Dans les 7 jours", due_week, "semaine")] %}
@@ -49,6 +51,19 @@
       {% endfor %}
     </ul>
     {% else %}<p class="muted">Rien en retard ni à échéance cette semaine. Jarvis reste en veille.</p>{% endfor %}
+  </section>
+  {% if pins %}
+  <section class="panel">
+    <h2>{{ ic.icon("pin") }} Épinglés <span class="muted">· {{ pins | length }}</span></h2>
+    <ul class="todo" data-limit="8">
+      {% for p in pins %}
+      <li>{% if p.item %}<span class="badge g-{{ p.item.group }}">{{ p.item.status }}</span> <a data-ticket href="{{ ticket_url(p.slug, p.kind, p.ref) }}">{{ p.label }}</a>
+        {% else %}<span class="muted"><code>{{ p.ref }}</code> n'est plus dans la fiche</span>{% endif %}
+        <button type="button" class="remind-drop" hx-post="/perso/epingle/{{ p.slug }}/{{ p.kind }}/{{ p.ref }}" hx-target="closest li" hx-swap="delete" aria-label="Désépingler" title="Désépingler">×</button></li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
   </section>
   <section>
     <section class="panel">
@@ -69,6 +84,7 @@
         {% else %}<li class="muted">Aucun jalon dans les 3 semaines.</li>{% endfor %}
       </ul>
     </section>
+    {% include "_reminders.html" %}
   </section>
 </div>
 
