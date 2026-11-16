@@ -395,7 +395,6 @@ code.res, code.req { border-radius: 6px; border-width: 1px; }
 .nav a.nav-item.active .nav-icon { stroke: var(--accent); }
 .client-chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border: 2px solid var(--border); border-radius: 999px; color: var(--text); font-weight: 600; font-size: 14px; white-space: nowrap; background: var(--surface); transition: border-color .15s; }
 .client-chip:hover { border-color: var(--accent); }
-.client-chip.active { border-color: var(--accent); background: var(--accent-soft); }
 .client-chip .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); box-shadow: 0 0 0 2px var(--surface); }
 .client-chip.h-ok .dot { background: var(--st-done); } .client-chip.h-warn .dot { background: var(--st-todo); }
 .client-chip.h-ko .dot { background: var(--st-ko); } .client-chip.h-done .dot { background: var(--st-done); }
@@ -523,7 +522,8 @@ a.wn-title:hover { color: var(--accent); }
   @keyframes jarvis-online { 0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, #5ccb4d 25%, transparent); } 50% { box-shadow: 0 0 0 5px color-mix(in srgb, #5ccb4d 0%, transparent); } }
 }
 
-/* Puces clients du menu : contour en dégradé de la charte, nom en gras, client ouvert en plein, J-x en alerte sous 14 jours */
+/* Puces clients du menu : contour en dégradé de la charte, nom en gras, J-x en alerte sous 14 jours ;
+   même aspect sur toutes les pages (l'onglet Fiche dit déjà quand on est sur la fiche du client) */
 .client-chip.strong {
   --chip-grad: linear-gradient(100deg, #3333eb, #2f8fe8 55%, var(--cyan));
   border: 2px solid transparent; padding: 5px 13px 5px 11px; font-weight: 700;
@@ -532,12 +532,8 @@ a.wn-title:hover { color: var(--accent); }
 }
 .client-chip.strong:hover { border-color: transparent; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(51, 51, 235, .22); }
 .client-chip.strong .client-name { letter-spacing: -.01em; }
-.client-chip.strong.active { color: #fff; border-color: transparent; background: var(--chip-grad) padding-box, var(--chip-grad) border-box;
-  box-shadow: 0 4px 14px rgba(15, 163, 207, .35); }
 .client-chip.strong .dot { width: 10px; height: 10px; }
-.client-chip.strong.active .dot { box-shadow: 0 0 0 2px rgba(255, 255, 255, .85); }
 .client-chip.strong .jx.soon { background: var(--pa-ko); color: var(--text); }
-.client-chip.strong.active .jx { background: rgba(255, 255, 255, .22); color: #fff; }
 
 /* Logo : monogramme J sur carré arrondi en dégradé (même fichier que l'icône d'onglet) */
 .brand-mark { transition: transform .2s; }  /* logo rond : ni ombre ni halo derrière lui */
@@ -1093,7 +1089,8 @@ a.stat-link:hover .stat-go, a.stat-link:focus-visible .stat-go { opacity: 1; }
 /* Raccourcis du client en cours : dock de boutons ronds au bord droit, centré en hauteur ; nom en bulle au survol.
    Pas de rebond de défilement (Mac) : sinon la page rebondit et le dock, fixe, a l'air décroché. */
 html { overscroll-behavior-y: none; }
-.dock { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); z-index: 45; display: flex; flex-direction: column; gap: 8px;
+.dock-wrap { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); z-index: 45; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.dock, .dock-envs { display: flex; flex-direction: column; gap: 8px;
   padding: 8px; background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--border); border-radius: 99px;
   box-shadow: var(--shadow); backdrop-filter: blur(8px); }
 .dock-btn { position: relative; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--border);
@@ -1101,14 +1098,34 @@ html { overscroll-behavior-y: none; }
 .dock-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .dock-btn:hover, .dock-btn:focus-visible { transform: scale(1.08); border-color: var(--accent); color: var(--accent); text-decoration: none; }
 .dock-drive { color: var(--st-done); }
+/* Bouton Environnements : à part au-dessus du dock ; au survol ou au clavier, les environnements s'ouvrent en éventail à sa gauche.
+   Chaque pastille part du centre du bouton et va sur un arc de rayon --r, à l'angle --a (écart --step entre deux pastilles, l'éventail centré sur l'horizontale). */
+.dock-envs { position: relative; }
+.dock-envs img { display: block; }
+.dock-envs > .dock-btn { cursor: pointer; padding: 0; font: inherit; }
+.dock-envs > .dock-btn::after { display: none; }
+.dock-envs > .dock-btn:hover, .dock-envs > .dock-btn:focus-visible { background: var(--surface); }  /* le survol générique des boutons le peindrait en bleu, sur le trèfle bleu */
+.dock-pop { position: absolute; right: 50%; top: 50%; width: 0; height: 0; z-index: 1; --r: 64px; --step: 40deg; }
+.dock-envs:hover::before, .dock-envs:focus-within::before { content: ""; position: absolute; right: 50%; top: 50%; width: 220px; height: 150px; transform: translateY(-50%); }  /* garde l'éventail ouvert entre le bouton et les pastilles */
+.dock-pop > * { --a: calc((var(--i) - (var(--n) - 1) / 2) * var(--step));
+  position: absolute; right: 0; top: 0; white-space: nowrap; padding: 6px 12px; border-radius: 99px; font-size: 13px; font-weight: 600;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow); text-decoration: none;
+  transform: translate(0, -50%) scale(.4); opacity: 0; visibility: hidden; pointer-events: none; }
+.dock-envs:hover .dock-pop > *, .dock-envs:focus-within .dock-pop > * {
+  transform: translate(calc(-1 * var(--r) * cos(var(--a))), calc(var(--r) * sin(var(--a)) - 50%)); opacity: 1; visibility: visible; pointer-events: auto; }
+.dock-pop > a:hover, .dock-pop > a:focus-visible { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+@media (prefers-reduced-motion: no-preference) {
+  .dock-pop > * { transition: transform .22s var(--ease, ease) calc(var(--i) * 35ms), opacity .16s calc(var(--i) * 35ms), visibility 0s .22s; }
+  .dock-envs:hover .dock-pop > *, .dock-envs:focus-within .dock-pop > * { transition-delay: calc(var(--i) * 35ms), calc(var(--i) * 35ms), 0s; }
+}
 .dock-add { border-style: dashed; color: var(--muted); }
 .dock-btn::after { content: attr(data-tip); position: absolute; right: calc(100% + 12px); top: 50%; transform: translate(4px, -50%); white-space: nowrap;
   padding: 6px 10px; border-radius: 8px; background: var(--text); color: var(--surface); font-size: 12.5px; font-weight: 600;
   opacity: 0; pointer-events: none; transition: opacity .12s, transform .12s; }
 .dock-btn:hover::after, .dock-btn:focus-visible::after { opacity: 1; transform: translate(0, -50%); }
 @media (min-width: 641px) and (max-width: 1260px) { body:has(.dock) main { padding-right: 84px; } }  /* place du dock : il ne cache jamais le contenu */
-@media (max-width: 640px) { .dock { display: none; } }  /* téléphone : les liens restent en haut de la fiche */
-@media print { .dock { display: none; } }
+@media (max-width: 640px) { .dock-wrap { display: none; } }  /* téléphone : les liens restent en haut de la fiche */
+@media print { .dock-wrap { display: none; } }
 
 /* Perso : brief du matin, épingles, notes et rappels */
 .brief-text, .my-notes textarea { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 2px solid var(--border); border-radius: 10px;

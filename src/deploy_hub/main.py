@@ -6,7 +6,7 @@ import os
 import re
 from contextlib import asynccontextmanager
 import threading
-from urllib.parse import parse_qsl, urlencode, urlsplit
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -893,6 +893,23 @@ def _pinned(d: Deployment) -> list[dict]:
 
 
 templates.env.globals["pins_of"] = _pinned  # encart « Épinglés » de la synthèse d'une fiche
+
+
+PADOA_STACKS = ("snap", "snap-recette", "integration")
+PADOA_ENV_URL = "https://[stack]-[client].aodap-staging.fr/support"  # modèle par défaut ; réglage PADOA_ENV_URL pour le changer
+
+
+def _env_links(d) -> list[tuple[str, str]]:
+    """(environnement, adresse) des environnements Padoa d'un client, pour le bouton Environnements du dock.
+    Modèle : réglage PADOA_ENV_URL, où [stack] est l'environnement et [client] le nom du client dans Jarvis (son slug). Vide : modèle par défaut ; pas en http(s) : aucun lien."""
+    template = os.environ.get("PADOA_ENV_URL", "").strip() or PADOA_ENV_URL
+    if not template.startswith(("https://", "http://")):
+        return []
+    key = quote(d.slug, safe="")
+    return [(stack, template.replace("[stack]", stack).replace("[client]", key)) for stack in PADOA_STACKS]
+
+
+templates.env.globals["env_links"] = _env_links
 
 
 def _reminders_context(slug: str, error: str = "") -> dict:

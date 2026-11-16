@@ -38,6 +38,8 @@ FIELDS = (
     Field("NOTION_TOKEN", "Jeton Notion", "secret", "Facultatif : bouton « Rafraîchir depuis Notion ». Référence 1Password conseillée"),
     Field("ORCHESTRATOR_DIR", "Dossier de integration-orchestrator", "path", "Pour les agents Claude", live=False),
     Field("FLOW_DIGGER_DIR", "Dossier de Flow Digger", "path", "Vide : cherché aux emplacements habituels"),
+    Field("PADOA_ENV_URL", "Adresse des environnements Padoa", "text",
+          "Bouton Environnements du dock. Modèle avec [stack] et [client] ; vide : https://[stack]-[client].aodap-staging.fr/support"),
     Field("JARVIS_MODE", "Mode", "choice", "demo : agents simulés ; live : vrais agents (claude -p)", live=False, section=CLAUDE,
           choices=("", "demo", "live")),
     Field("CLAUDE_BIN", "Programme claude", "bin", "Vide : « claude » dans le PATH", section=CLAUDE),

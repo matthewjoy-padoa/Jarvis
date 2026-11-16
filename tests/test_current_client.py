@@ -1,5 +1,7 @@
 """Un client à la fois : client en cours (cookie), sélecteur, accueil et Deadlines recentrés, changement de client."""
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -91,3 +93,19 @@ def test_the_side_shortcuts_follow_the_current_client():
     dock = html.split('<nav class="dock"', 1)[1].split("</nav>", 1)[0]
     assert 'aria-label="Raccourcis de Client Exemple"' in dock
     assert 'href="/clients/client-exemple/liens?vers=/deadlines"' in dock and 'data-tip="Ajouter un lien Drive"' in dock  # pas encore de lien
+
+
+def test_the_dock_gives_the_padoa_environments_of_the_current_client(monkeypatch):
+    c = fresh()
+    c.get("/deploiements/client-exemple/actions")
+    dock = lambda: c.get("/deadlines").text.split('<div class="dock-envs"', 1)[1].split("<nav", 1)[0]  # noqa: E731
+    monkeypatch.delenv("PADOA_ENV_URL", raising=False)
+    assert 'aria-label="Environnements Padoa de Client Exemple"' in dock()
+    assert 'src="/static/padoa.png"' in dock() and c.get("/static/padoa.png").status_code == 200  # à part du dock, logo Padoa
+    assert dock().count(".aodap-staging.fr/support") == 3 and 'href="/reglages"' not in dock()  # réglage vide : modèle par défaut
+    assert [f'style="--i: {i}; --n: 3"' in dock() for i in range(3)] == [True] * 3  # éventail : rang et nombre de pastilles
+    monkeypatch.setenv("PADOA_ENV_URL", "https://[stack]-[client].exemple.test/support")
+    hosts = re.findall(r'href="https://([^."]+)\.exemple\.test/support"', dock())
+    assert hosts == ["snap-client-exemple", "snap-recette-client-exemple", "integration-client-exemple"]  # le slug Jarvis
+    monkeypatch.setenv("PADOA_ENV_URL", "javascript:alert(1)//[stack]")
+    assert "javascript:" not in dock() and 'href="/reglages"' in dock()  # modèle refusé : renvoi vers les Réglages
