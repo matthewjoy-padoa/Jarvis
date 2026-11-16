@@ -191,7 +191,8 @@ class ClaudeRunner:
     def __init__(self, orchestrator_dir: Path, state_dir: Path, live: bool = False, notifications=None,
                  worktrees_dir: Path | None = None, claude_bin: str = "claude", add_dirs: tuple[Path, ...] = (),
                  allowed_tools: tuple[str, ...] = DEFAULT_TOOLS, permission_mode: str = "acceptEdits",
-                 timeout_min: int = 90, max_running: int = 2, model: str = ""):
+                 timeout_min: int = 90, max_running: int = 2, model: str = "", fallback_model: str = "", effort: str = "",
+                 max_turns: int = 0, max_budget_usd: int = 0):
         self.orchestrator_dir = orchestrator_dir
         self.live = live
         self.notifications = notifications  # NotificationStore : « agent terminé »
@@ -205,6 +206,10 @@ class ClaudeRunner:
         self.timeout = timeout_min * 60
         self.max_running = max_running
         self.model = model
+        self.fallback_model = fallback_model
+        self.effort = effort
+        self.max_turns = max_turns
+        self.max_budget_usd = max_budget_usd
         self._lock = threading.RLock()  # runs et agents.json : threads des agents et requêtes
         self._procs: dict[int, subprocess.Popen] = {}
         self._stopped: set[int] = set()
@@ -224,6 +229,10 @@ class ClaudeRunner:
             "timeout_min": env("JARVIS_AGENT_TIMEOUT_MIN") and int(env("JARVIS_AGENT_TIMEOUT_MIN")),
             "max_running": env("JARVIS_AGENT_MAX") and int(env("JARVIS_AGENT_MAX")),
             "model": env("JARVIS_AGENT_MODEL"),
+            "fallback_model": env("JARVIS_AGENT_FALLBACK_MODEL"),
+            "effort": env("JARVIS_AGENT_EFFORT"),
+            "max_turns": env("JARVIS_AGENT_MAX_TURNS") and int(env("JARVIS_AGENT_MAX_TURNS")),
+            "max_budget_usd": env("JARVIS_AGENT_MAX_BUDGET_USD") and int(env("JARVIS_AGENT_MAX_BUDGET_USD")),
         }
         return {k: v for k, v in kw.items() if v}
 
@@ -236,7 +245,7 @@ class ClaudeRunner:
         Une variable vidée reprend la valeur par défaut de __init__."""
         defaults = {k: v.default for k, v in inspect.signature(ClaudeRunner.__init__).parameters.items()}
         options = {**{k: defaults[k] for k in ("claude_bin", "add_dirs", "allowed_tools", "permission_mode", "timeout_min",
-                                               "max_running", "model")}, **self._env_options()}
+                                               "max_running", "model", "fallback_model", "effort", "max_turns", "max_budget_usd")}, **self._env_options()}
         with self._lock:
             self.worktrees_dir = options.get("worktrees_dir") or self.orchestrator_dir / ".claude" / "worktrees" / "jarvis"
             self.timeout = options.pop("timeout_min") * 60
@@ -288,6 +297,10 @@ class ClaudeRunner:
                "--permission-mode", self.permission_mode]
         if self.model:
             cmd += ["--model", self.model]
+        for option, value in (("--fallback-model", self.fallback_model), ("--effort", self.effort), ("--max-turns", self.max_turns),
+                              ("--max-budget-usd", self.max_budget_usd)):
+            if value:
+                cmd += [option, str(value)]
         for d in self.add_dirs:
             cmd += ["--add-dir", str(d)]
         return cmd + ["--allowedTools", *self.allowed_tools]  # en dernier : l'option prend tous les arguments qui suivent
