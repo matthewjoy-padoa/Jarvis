@@ -101,10 +101,10 @@ def test_the_dock_gives_the_padoa_environments_of_the_current_client(monkeypatch
     dock = lambda: c.get("/deadlines").text.split('<nav class="dock"', 1)[1].split("</nav>", 1)[0]  # noqa: E731
     monkeypatch.delenv("PADOA_ENV_URL", raising=False)
     assert 'aria-label="Environnements Padoa de Client Exemple"' in dock()
-    assert 'href="/reglages"' in dock() and "exemple.test" not in dock()  # pas de modèle : renvoi vers les Réglages
+    assert dock().count(".aodap-staging.fr/support") == 3 and 'href="/reglages"' not in dock()  # réglage vide : modèle par défaut
     monkeypatch.setenv("PADOA_ENV_URL", "https://[stack]-[client].exemple.test/support")
     hosts = re.findall(r'href="https://([^."]+)\.exemple\.test/support"', dock())
     key = hosts[0].removeprefix("snap-")  # clé du client : la même dans les trois adresses
     assert key and hosts == [f"snap-{key}", f"snap-recette-{key}", f"integration-{key}"]
     monkeypatch.setenv("PADOA_ENV_URL", "javascript:alert(1)//[stack]")
-    assert "javascript:" not in dock()
+    assert "javascript:" not in dock() and 'href="/reglages"' in dock()  # modèle refusé : renvoi vers les Réglages
