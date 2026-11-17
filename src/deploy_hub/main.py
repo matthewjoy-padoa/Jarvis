@@ -24,9 +24,10 @@ from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
-from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, duration_text, retour_prompt, usage
+from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, duration_text, read_log, retour_prompt, usage
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_watch import DagWatcher
+from deploy_hub.sources.examples import Examples
 from deploy_hub.sources import connections, flow_digger, notion_api
 from deploy_hub.sources.external import external_statuses
 from deploy_hub.sources.journal import changes_since, group_changes
@@ -47,6 +48,7 @@ fiches = FicheSource(settings.deployments_dir, clients_dir())
 airflow = AirflowSource.from_env()
 notifications = NotificationStore(Path(os.getenv("DEPLOY_HUB_NOTIFICATIONS") or settings.deployments_dir.parent / "notifications.json"))
 claude = ClaudeRunner.from_env(settings.orchestrator_dir, live, notifications, data_dir() / "agents")
+examples = None if live else Examples()  # page Agents du mode démo : exemples fictifs, en mémoire, jamais dans l'historique
 pulls = PullRequests(settings.orchestrator_dir)  # PR ouvertes de l'orchestrator (gh), gardées cinq minutes
 # Suivi des runs lancés (air.py d'Arthur) ; les suivis en cours au démarrage reprennent si Airflow est configuré.
 dag_watch = DagWatcher(data_dir() / "airflow", notifications, {"AIRFLOW_URL": airflow.base_url, "AIRFLOW_USER": airflow.user,
@@ -477,12 +479,24 @@ def deadlines(request: Request, tous: bool = False, client: str = "", periode: s
 
 @app.get("/agents", response_class=HTMLResponse)
 def agents(request: Request):
-    return _render(request, "agents.html", "/agents", runs=claude.runs, dag_runs=airflow.runs, watches=dag_watch.watches, chains=dag_chains.chains, live=claude.live,
-                   usage=usage(claude.runs))
+    """Historique des lancements ; en mode démo, suivi des exemples fictifs (sources/examples.py), marqués « exemple »."""
+    ex = examples
+    runs = claude.runs + (ex.runs if ex else [])
+    own = usage(claude.runs)  # le bilan ne mélange jamais vrais agents et exemples
+    return _render(request, "agents.html", "/agents", runs=runs, dag_runs=airflow.runs + (ex.dag_runs if ex else []),
+                   watches=dag_watch.watches + (ex.watches if ex else []), chains=dag_chains.chains + (ex.chains if ex else []),
+                   live=claude.live, usage=own or (ex and usage(ex.runs)), usage_from_examples=bool(ex and not own))
+
+
+def _is_example(item) -> bool:
+    return examples is not None and item in examples
+
+
+templates.env.globals["is_example"] = _is_example
 
 
 def _run_or_404(run_id: int):
-    run = claude.get(run_id)
+    run = claude.get(run_id) or (examples and examples.run(run_id))
     if not run:
         raise HTTPException(404, f"Agent #{run_id} inconnu")
     return run
@@ -490,8 +504,8 @@ def _run_or_404(run_id: int):
 
 def _agent_context(run) -> dict:
     """Journal de l'agent, et sa relecture guidée dès qu'il a fini (un agent simulé n'a rien à relire)."""
-    path = claude.log_path(run)
-    return {"run": run, "log": claude.log(run), "review": None if run.running or run.simulated else agent_review.build(run, path)}
+    path = examples.agent_log(run) if _is_example(run) else claude.log_path(run)
+    return {"run": run, "log": read_log(path), "review": None if run.running or run.simulated else agent_review.build(run, path)}
 
 
 @app.get("/agents/{run_id}", response_class=HTMLResponse)
@@ -515,7 +529,7 @@ def agent_stop(run_id: int):
 
 
 def _watch_or_404(watch_id: int):
-    w = dag_watch.get(watch_id)
+    w = dag_watch.get(watch_id) or (examples and examples.watch(watch_id))
     if not w:
         raise HTTPException(404, f"Suivi #{watch_id} inconnu")
     return w
@@ -523,6 +537,9 @@ def _watch_or_404(watch_id: int):
 
 def _watch_context(watch_id: int) -> dict:
     w = _watch_or_404(watch_id)
+    if _is_example(w):
+        log, report = examples.watch_log(w), examples.watch_report(w)
+        return {"w": w, "log": log.read_text(encoding="utf-8"), "report": report.read_text(encoding="utf-8") if report.is_file() else ""}
     return {"w": w, "log": dag_watch.log(w), "report": dag_watch.report(w)}
 
 

@@ -3,7 +3,8 @@
     {% if run.pr_url %} · <a href="{{ run.pr_url }}" target="_blank" rel="noopener">Pull request ↗</a>{% endif %}
     {% if run.cost_usd is not none %} <span class="muted">· coût estimé {{ '%.2f' % run.cost_usd }} $</span>{% endif %}
     <span class="muted">· {{ "depuis" if run.running else "durée" }} {{ run.duration | duree }}{% if run.num_turns %} · {{ run.num_turns }} tours{% endif %}</span></p>
-  {% if run.running and not run.simulated %}
+  {% if is_example(run) %}<p class="muted"><span class="badge example">exemple</span> Agent fictif du mode démo : journal, relecture et PR sont inventés.</p>{% endif %}
+  {% if run.running and not run.simulated and not is_example(run) %}
   <form method="post" action="/agents/{{ run.id }}/arreter" onsubmit="return confirm('Arrêter l\'agent #{{ run.id }} ?')"><button type="submit" class="secondary">Arrêter l'agent</button></form>
   {% endif %}
   {% if run.summary %}<section class="panel"><h2>Compte rendu</h2><pre class="agent-summary">{{ run.summary }}</pre></section>{% endif %}

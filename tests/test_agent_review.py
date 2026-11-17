@@ -114,7 +114,10 @@ def test_agents_page_shows_duration_cost_and_the_summary(monkeypatch):
     page = TestClient(main.app).get("/agents").text
     assert "<th>Durée</th><th>Coût</th>" in page and "12 min" in page and "1 h 10" in page and "0.50 $" in page
     assert "Coût et durée" in page and "Visites historiques" in page and "2.00 $" in page  # coût total
+    assert "bilan des agents d'exemple" not in page  # de vrais agents ont fini : le bilan ne compte qu'eux
     monkeypatch.setattr(main.claude, "runs", [])
+    assert "bilan des agents d'exemple" in TestClient(main.app).get("/agents").text  # mode démo, rien de réel : exemples
+    monkeypatch.setattr(main, "examples", None)
     assert "Coût et durée" not in TestClient(main.app).get("/agents").text
 
 

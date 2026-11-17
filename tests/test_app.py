@@ -405,3 +405,30 @@ def test_charts_are_readable_and_lead_to_the_tickets_they_count():
     marks = re.findall(r'<a class="tl-mark[^"]*" href="([^"]+)"', synthese)  # jalons de la frise → calendrier des deadlines
     assert marks and all(m.startswith("/deadlines?client=client-demo&vue=calendrier&mois=") for m in marks)
     assert "Prochain :" in synthese and synthese.count("tl-mark next") == 1  # prochain jalon mis en avant
+
+
+def test_demo_agents_page_shows_fictional_examples():
+    """Mode démo : la page Agents montre des exemples fictifs, avec leurs pages de détail, sans rien écrire dans l'historique."""
+    from deploy_hub import main
+    client = TestClient(main.app)
+    before = list(main.claude.runs)
+    page = client.get("/agents").text
+    assert 'class="badge example"' in page and "Coût et durée" in page
+    for run in main.examples.runs:
+        assert f'href="/agents/{run.id}"' in page and client.get(f"/agents/{run.id}/journal").status_code == 200
+    done = client.get(f"/agents/{main.examples.runs[-2].id}").text  # terminé avec PR : relecture guidée tirée du journal d'exemple
+    assert "Relecture guidée" in done and "Dernier lancement de tests passé (12 passed in 4.0s)" in done and "Un test a été ajouté" in done
+    running = client.get(f"/agents/{main.examples.runs[0].id}").text
+    assert "Arrêter l'agent" not in running
+    for w in main.examples.watches:
+        assert client.get(f"/agents/suivis/{w.id}").status_code == 200
+    assert "Rapport de fin" in client.get(f"/agents/suivis/{main.examples.watches[1].id}").text
+    assert main.claude.runs == before and not (main.claude.state_dir / f"{main.examples.runs[0].id}.jsonl").exists()
+
+
+def test_examples_are_never_shown_in_live_mode(monkeypatch):
+    from deploy_hub import main
+    monkeypatch.setattr(main, "examples", None)
+    client = TestClient(main.app)
+    assert 'class="badge example"' not in client.get("/agents").text.split("</p>", 2)[-1]
+    assert client.get("/agents/901").status_code == 404 and client.get("/agents/suivis/901").status_code == 404

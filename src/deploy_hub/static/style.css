@@ -1265,3 +1265,7 @@ a.tl-mark:hover, a.tl-mark:focus-visible { transform: scale(1.3); }
 .chart.slim .segbar, .chart.slim .seg { overflow: visible; }
 .chart.slim .seg[data-filter-set] { position: relative; min-width: 4px; }
 .chart.slim .seg[data-filter-set]::after { content: ""; position: absolute; inset: -8px 0; }
+
+/* Exemples fictifs de la page Agents (mode démo) */
+.badge.example { background: transparent; border: 1px dashed var(--border); color: var(--muted); font-weight: 500; }
+td:has(> .badge.example) { white-space: nowrap; }
