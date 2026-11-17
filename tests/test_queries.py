@@ -16,6 +16,19 @@ def test_page_id_from_id_or_url(value):
     assert page_id_of(value) == PAGE
 
 
+VIEW = "fedcba9876543210fedcba9876543210"
+
+
+@pytest.mark.parametrize("value", [
+    f"https://app.notion.com/p/padoa/D-ploiement-Acme-{PAGE}?v={VIEW}&source=copy_link",  # lien copié depuis une vue
+    f"https://www.notion.so/padoa/{VIEW}?v={VIEW}&p={PAGE}&pm=s",  # page ouverte en aperçu depuis une base
+    f"https://app.notion.com/p/{PAGE}#{VIEW}",  # ancre vers un bloc de la page
+])
+def test_the_page_is_never_confused_with_the_view_or_a_block(value):
+    """Vu le 2026-11-17 : un lien « …-<page>?v=<vue> » donnait l'id de la vue, et la synchro ne trouvait pas la fiche."""
+    assert page_id_of(value) == PAGE
+
+
 def test_page_id_required():
     with pytest.raises(ConfigError):
         page_id_of("pas un id")
