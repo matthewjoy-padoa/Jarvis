@@ -49,7 +49,7 @@ Deux façons de lire Notion, au choix :
      2. Canal Slack où signaler un échec : #mon-canal (id), ou aucun. Rien sur Slack en cas de succès.
      ```
    - active le connecteur Notion pour la tâche et autorise le dossier de Jarvis ; lance-la une fois (« Run now ») pour vérifier.
-4. **Bouton dans Jarvis** (facultatif) : avec `JARVIS_MODE=live` dans `.env` et Claude Code en ligne de commande installé et connecté, « Rafraîchir depuis Notion » (fiche) et « Tout rafraîchir » (Clients) lancent la routine sans jeton ; l'état s'affiche sous le bouton et la page se recharge à la fin. En mode `demo` (par défaut), le bouton ne fait que simuler, comme pour les agents ; sans jeton ni `claude`, il est grisé.
+4. **Bouton dans Jarvis** (facultatif) : avec `JARVIS_MODE=live` dans `.env` et Claude Code en ligne de commande installé et connecté, « Rafraîchir depuis Notion » (fiche) et « Tout rafraîchir » (Clients) lancent la routine sans jeton ; l'état s'affiche sous le bouton et la page se recharge à la fin. En mode `demo` (par défaut), le bouton ne fait que simuler, comme pour les agents ; en `live` sans jeton ni `claude`, il est grisé.
 
 La consigne vit dans le dépôt : un `git pull` met à jour la tâche planifiée, la commande et le bouton. Détails (déroulé d'un passage, outils permis, journal) : [`docs/routine-synchro.md`](docs/routine-synchro.md).
 
