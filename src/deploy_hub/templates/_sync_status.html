@@ -8,5 +8,5 @@
     <span><strong>{{ progress.pct }} %</strong> · {{ progress.label }}</span></p>
 </div>
 {% else %}
-<p class="result {{ 'ok' if ok else 'ko' }}" title="Cliquer pour fermer">{% if simulated %}{{ ic.icon("flask", "Simulation", "ic-muted") }} {% endif %}{{ message }}</p>
+<p class="result {{ 'ok' if ok else 'ko' }}" title="Cliquer pour fermer"{% if ok and not simulated and reload %} data-reload-after="3"{% endif %}>{% if simulated %}{{ ic.icon("flask", "Simulation", "ic-muted") }} {% endif %}{{ message }}</p>
 {% endif %}

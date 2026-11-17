@@ -125,6 +125,11 @@
       const win = window.open("", form.target, "popup,width=1440,height=900");
       if (win) { win.opener = null; win.focus(); }  // la page ouverte ne peut pas piloter Jarvis
     }));
+    // Synchro réussie : le message reste visible quelques secondes, puis la page se recharge avec les données.
+    document.addEventListener("htmx:afterSwap", () => document.querySelectorAll("[data-reload-after]:not([data-armed])").forEach((el) => {
+      el.dataset.armed = "1";
+      setTimeout(() => location.reload(), Number(el.dataset.reloadAfter) * 1000);
+    }));
     // Résultat d'un rafraîchissement (encart sous le bouton) : un clic le ferme.
     document.addEventListener("click", (e) => { const r = e.target.closest(".refresh-out > .result"); if (r) r.remove(); });
     // Sélecteur du client en cours : se ferme au clic ailleurs et à Échap.

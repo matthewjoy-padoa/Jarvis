@@ -402,6 +402,7 @@ def _query(sql: Path, out: Path, params: list) -> dict:
             "sources": sorted(set(re.findall(r"collection://[0-9a-f-]+", sql.read_text(encoding="utf-8")))) if sql.is_file() else []}
 
 
+PLAN_ERRORS = "plan-erreurs.json"  # data/notion/plan-erreurs.json : erreurs par client du dernier « plan »
 VERIFICATIONS = "verifications.json"  # data/notion/verifications.json : dernière vérification de chaque client
 
 
@@ -429,7 +430,7 @@ def plan_all(root: Path = PROJECT_ROOT) -> dict:
             out["erreurs"][slug] = "absent de l'empreinte : relance « preparer »"
             continue
         if not rows[slug].get("fiche"):  # aucune page « Clients en déploiement » à cet id : rien ne sert de lire le reste
-            out["erreurs"][slug] = "fiche Notion introuvable : vérifie le page_id du client (Clients → Configurer)"
+            out["erreurs"][slug] = "fiche Notion introuvable : vérifie le lien de sa fiche « Clients en déploiement » (Clients → Configurer) et que tu y as accès dans Notion"
             continue
         p = plan_client(slug, rows[slug], root)
         raw.mkdir(parents=True, exist_ok=True)
@@ -444,6 +445,8 @@ def plan_all(root: Path = PROJECT_ROOT) -> dict:
                             for q, name, params in p["requetes"]]
         out["raisons"][slug] = p["raisons"]
     mark_checked(out["inchanges"], root)  # vérifiés, rien de neuf
+    # Erreurs par client : Jarvis les affiche à la fin de la synchro, quel que soit le compte rendu de Claude.
+    (folder / PLAN_ERRORS).write_text(json.dumps(out["erreurs"], ensure_ascii=False), encoding="utf-8")
     return out
 
 
