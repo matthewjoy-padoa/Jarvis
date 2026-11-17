@@ -15,7 +15,7 @@ Jarvis tourne en service systemd utilisateur sur la VM (les agents travaillent s
 3. **Installer le service**, sur la VM, depuis le dossier de Jarvis ; remplace les `<…>` (`JARVIS_AGENT_ADD_DIRS` est facultatif) :
    ```bash
    mkdir -p ~/.config/systemd/user/jarvis.service.d && cp deploy/jarvis.service ~/.config/systemd/user/
-   printf '[Service]\nWorkingDirectory=%s\nEnvironment=JARVIS_MODE=live\nEnvironment=ORCHESTRATOR_DIR=<dossier de integration-orchestrator>\nEnvironment=CLAUDE_BIN=%s/deploy/claude-vscode.sh\nEnvironment=JARVIS_AGENT_ADD_DIRS=<dossier de notes>\nEnvironment=AIRFLOW_BASE_URL=http://localhost:8888\n' "$PWD" "$PWD" > ~/.config/systemd/user/jarvis.service.d/vm.conf
+   printf '[Service]\nWorkingDirectory=%s\nEnvironment=ORCHESTRATOR_DIR=<dossier de integration-orchestrator>\nEnvironment=CLAUDE_BIN=%s/deploy/claude-vscode.sh\nEnvironment=JARVIS_AGENT_ADD_DIRS=<dossier de notes>\nEnvironment=AIRFLOW_BASE_URL=http://localhost:8888\n' "$PWD" "$PWD" > ~/.config/systemd/user/jarvis.service.d/vm.conf
    systemctl --user daemon-reload && systemctl --user enable --now jarvis
    loginctl enable-linger $USER   # le service continue après la déconnexion SSH
    ```

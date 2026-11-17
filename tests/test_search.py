@@ -223,7 +223,7 @@ def acme(catalogue, monkeypatch):
     return TestClient(main.app)
 
 
-def test_dag_launch_form_reuses_the_injection_route_without_prod(acme):
+def test_dag_launch_form_reuses_the_injection_route_without_prod(acme, fake_airflow):
     form = acme.get("/palette/dag/acme/demo-uegar-etl-firm")
     assert form.status_code == 200
     html = form.text
@@ -235,7 +235,7 @@ def test_dag_launch_form_reuses_the_injection_route_without_prod(acme):
     refresh = acme.get("/palette", params={"q": ">rafraichir acme"}).text
     assert 'hx-post="/actions/rafraichir/acme"' in refresh and 'hx-confirm="Jarvis : Rafraîchir Acme ?"' in refresh
     launched = acme.post("/actions/injection/acme", data={"dag_id": "demo-uegar-etl-firm", "padoa_env": "snap", "card": "Console Jarvis"})
-    assert "Simulation : demo-uegar-etl-firm sur snap" in launched.text
+    assert "demo-uegar-etl-firm lancé sur snap" in launched.text
 
 
 def test_every_page_carries_the_console_button():

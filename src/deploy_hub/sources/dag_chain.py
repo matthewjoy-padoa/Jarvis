@@ -1,7 +1,7 @@
 """Enchaînement de DAG : plusieurs DAG lancés dans l'ordre, le suivant seulement si le précédent finit vert.
 
 Chaque étape passe par le lancement habituel (main._launch_watched) : c'est le suivi du run (sources/dag_watch.py) qui dit
-quand il est fini et s'il est vert. Sans Airflow configuré, les lancements sont simulés et les étapes s'enchaînent aussitôt.
+quand il est fini et s'il est vert. Sans Airflow configuré, rien ne part : la chaîne s'arrête à la première étape.
 Jamais en prod. État : data/airflow/chaines.json (noms de DAG et de client seulement).
 """
 

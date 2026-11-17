@@ -11,7 +11,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 @dataclass(frozen=True)
 class Settings:
-    mode: str
     deployments_dir: Path
     airflow_base_url: str
     orchestrator_dir: Path
@@ -182,7 +181,6 @@ def ensure_private_dirs(root: Path = PROJECT_ROOT) -> None:
 
 def load_settings() -> Settings:
     return Settings(
-        mode=os.getenv("JARVIS_MODE") or os.getenv("DEPLOY_HUB_MODE", "demo"),
         deployments_dir=deployments_dir(),
         airflow_base_url=os.getenv("AIRFLOW_BASE_URL", "http://localhost:8080"),
         orchestrator_dir=Path(os.getenv("ORCHESTRATOR_DIR", "~/integration-orchestrator")).expanduser(),

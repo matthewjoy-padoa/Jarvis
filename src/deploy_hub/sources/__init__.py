@@ -1,4 +1,4 @@
-"""Sources de données et d'actions. Chaque source a un mode démo ; le mode live reste à brancher."""
+"""Sources de données et d'actions (Notion, Airflow, agents Claude, GitHub…)."""
 
 from dataclasses import dataclass
 
@@ -7,5 +7,5 @@ from dataclasses import dataclass
 class ActionResult:
     ok: bool
     message: str
-    simulated: bool = True
+    simulated: bool = False  # vrai seulement pour l'historique d'avant (plus de mode démo)
     run_id: str = ""  # run Airflow créé par un lancement réel : le suivi (dag_watch) s'y accroche
