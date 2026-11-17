@@ -7,7 +7,7 @@
   {% if a.due and a.due < today %}{% set ns.late = ns.late + 1 %}{% elif a.due and (a.due - today).days <= 7 %}{% set ns.week = ns.week + 1 %}{% endif %}
   {% if a.vigilance %}{% set ns.vig = ns.vig + 1 %}{% endif %}{% if a.event %}{% set ns.evt = ns.evt + 1 %}{% endif %}
 {% endfor %}{% endfor %}
-{{ charts.stats([("En retard", ns.late, "ko"), ("À échéance sous 7 jours", ns.week, "todo"), ("Points de vigilance", ns.vig, "ko"), ("Dates clés à venir", ns.evt, "")]) }}
+{{ charts.counts([("en retard", ns.late, "ko"), ("à échéance sous 7 jours", ns.week, "todo"), ("point(s) de vigilance", ns.vig, "ko"), ("date(s) clé(s) à venir", ns.evt, "")]) }}
 {% set base = request.url.path %}
 {% set kanban = vue == "kanban" %}
 {% set q_vue = "&vue=kanban" if kanban else "" %}

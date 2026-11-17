@@ -6,9 +6,16 @@
 {% for d in deployments if d.retours %}
 {% set scope = {"client": d.client} if show_client else {} %}
 <section class="chart-row">
-  {{ charts.segbar((d.client ~ " · retours") if show_client else "Statut des retours", d.retour_groups, "retours", filter_key="groupe", scope=scope, hrefs={} if show_all else {"done": base ~ "?tous=true"}) }}
-  {{ charts.hbars("Retours ouverts par type de données", d.open_retours_by_type, 6, filter_key="type", scope=scope) }}
+  {{ charts.segbar((d.client ~ " · retours") if show_client else "Statut des retours", d.retour_groups, "retours", slim=true, filter_key="groupe", scope=scope, hrefs={} if show_all else {"done": base ~ "?tous=true"}) }}
 </section>
+{# Répartition par type : repliée, le filtre « Type de données » de la liste fait le même tri. #}
+{% set by_type = d.open_retours_by_type %}
+{% if by_type %}
+<details class="fold">
+  <summary>Par type de données{% if show_client %} <span class="muted">· {{ d.client }}</span>{% endif %}</summary>
+  {{ charts.hbars("Retours ouverts par type de données", by_type, 6, filter_key="type", scope=scope) }}
+</details>
+{% endif %}
 {% endfor %}
 {% set kanban = vue == "kanban" %}
 <div class="view-bar">
@@ -18,7 +25,6 @@
 <div class="segmented" role="group" aria-label="Retours affichés">
   <a href="{{ base }}{{ '?vue=kanban' if kanban }}" class="{{ 'active' if not show_all }}">Ouverts</a><a href="{{ base }}?tous=true{{ '&vue=kanban' if kanban }}" class="{{ 'active' if show_all }}">Tous</a>
 </div>
-<span class="muted note" title="Le contenu des retours (commentaire, exemple, analyse…) est gardé sur cette machine : il n'est jamais versionné dans git.">Contenu des retours gardé en local, hors GitHub</span>
 </div>
 {% if kanban %}
 {% set ns_kb = namespace(cards=[]) %}
@@ -65,4 +71,5 @@
 {% endfor %}{% endfor %}
 </div>
 {% endif %}
-{% if not deployments | map(attribute="retours") | sum(start=[]) %}<p class="muted">Aucun retour de recette.</p>{% endif %}
+{% if not deployments | map(attribute="retours") | sum(start=[]) %}<p class="muted">Aucun retour de recette.</p>
+{% else %}<p class="muted small-note" title="Le contenu des retours (commentaire, exemple, analyse…) est gardé sur cette machine : il n'est jamais versionné dans git.">Contenu des retours gardé en local, hors GitHub.</p>{% endif %}

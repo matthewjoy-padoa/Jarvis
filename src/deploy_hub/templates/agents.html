@@ -27,7 +27,7 @@
   <a href="#dags" data-pane="pane-dags">DAG <span class="count" title="Suivis de DAG en cours">{{ watches | selectattr("running") | list | length }}</span></a>
 </nav>
 <div id="pane-agents" data-tab-pane>
-<p class="muted">{% if live %}Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.{% else %}Mode démo : les lancements sont simulés (<code>JARVIS_MODE=live</code> pour de vrais agents). Les lignes marquées <span class="badge example">exemple</span> sont fictives : elles montrent la page telle qu'elle se remplit en mode live, et n'entrent jamais dans l'historique.{% endif %}</p>
+<p class="muted">{% if live %}Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.{% else %}Mode démo : lancements simulés. Les lignes <span class="badge example">exemple</span> sont fictives et n'entrent pas dans l'historique.{% endif %}</p>
 {% if runs %}
 {% set lanes = [
   ("in_progress", "En cours", "L'agent travaille dans son worktree", runs | selectattr("running") | list),
@@ -38,7 +38,7 @@
 <section class="panel agent-flow" id="schema" aria-label="Où en sont les agents">
   {% for key, title, hint, found in lanes %}
   <div class="flow-lane flow-{{ key }}{{ ' is-empty' if not found }}">
-    <header><strong>{{ found | length }}</strong><span>{{ title }}</span><small class="muted">{{ hint }}</small></header>
+    <header title="{{ hint }}"><strong>{{ found | length }}</strong><span>{{ title }}</span></header>
     <div class="flow-nodes">
       {% for r in found[:24] %}
       <a class="flow-node flow-bot{{ ' is-sim' if r.simulated }}" href="/agents/{{ r.id }}" data-agent="{{ r.id }}" style="--i: {{ loop.index0 }}">
@@ -85,7 +85,9 @@
 
 {% if usage %}
 {% set t = usage.total %}
-<h2 id="bilan">Tokens et durée</h2>
+{# Bilan replié : une ligne de résumé, le détail (anneau, répartition, tableau par type de ticket) à l'ouverture. #}
+<details class="fold fold-section" id="bilan">
+<summary>Tokens et durée <span class="muted">· {{ t.count }} agent(s) terminé(s){% if t.tokens is not none %} · {{ t.tokens | tokens }} tokens{% endif %}</span></summary>
 <p class="muted">Agents réels terminés (ni simulés ni en cours).{% if usage_from_examples %} Ici : le bilan des agents d'exemple, tant qu'aucun agent réel n'a fini.{% endif %} Les tokens sont ceux que Claude Code annonce à la fin de l'agent ; un agent arrêté n'en a pas toujours.</p>
 <p class="flow-times"><strong>{{ t.count }}</strong> agent(s) terminé(s) · <strong>{{ t.prs }}</strong> PR · durée médiane <strong>{{ t.median | duree }}</strong> · temps cumulé <strong>{{ t.time | duree }}</strong></p>
 {% if t.tokens is not none %}
@@ -119,6 +121,7 @@
   {% endfor %}
   </tbody>
 </table>
+</details>
 {% endif %}
 </div>
 
@@ -180,6 +183,8 @@
       const pane = (target && target.closest("[data-tab-pane]")) || (id === "dags" ? panes[1] : panes[0]);
       panes.forEach((p) => { p.hidden = p !== pane; });
       links.forEach((a) => a.classList.toggle("active", a.dataset.pane === pane.id));
+      const fold = target && target.closest("details");  // ancre dans un bloc replié (#bilan, #tokens) : on l'ouvre
+      if (fold) fold.open = true;
       if (target) target.scrollIntoView();
     };
     links.forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); history.replaceState(null, "", a.hash); show(); }));

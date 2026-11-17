@@ -1,12 +1,11 @@
 {% import "_icons.html" as ic %}
 {% import "_charts.html" as charts with context %}
 {# Attend : d. Notion : fiche « Clients en déploiement » + points de vigilance. Jalons dans la frise ; liens en tête de fiche. #}
-<div class="kpis">
+{# Deux tuiles seulement. Retours ouverts : compteur de l'onglet Recette et barre plus bas ; points de vigilance : bloc plus bas. #}
+<div class="kpis kpis-lean">
   <div class="kpi"><span class="muted">Avancement</span><strong>{{ d.progress }} %</strong>
     {{ charts.progress(d.progress, d.expected_progress) }}</div>
   {% if d.days_to_freeze is not none %}<div class="kpi"><span class="muted">Freeze</span><strong>J{{ '%+d' % (-d.days_to_freeze) }}</strong></div>{% endif %}
-  <a class="kpi kpi-link" href="/deploiements/{{ d.slug }}/recette"><span class="muted">Retours ouverts</span><strong>{{ d.open_retours | length }}</strong><span class="muted">voir la recette →</span></a>
-  <a class="kpi kpi-link" href="/deploiements/{{ d.slug }}/actions"><span class="muted">Points de vigilance</span><strong>{{ d.vigilance | length }}</strong><span class="muted">voir les actions →</span></a>
 </div>
 
 {# Mes tickets épinglés de ce client : les mêmes que sur l'accueil. #}
@@ -41,18 +40,24 @@
   {{ charts.segbar("Retours de recette", d.retour_groups, "retours", slim=true, filter_key="groupe", href=recette, hrefs={"done": recette ~ "?tous=true"}) }}
 </div>
 
+{% set vig = d.vigilance %}
+{% if vig %}
 <section class="panel">
-  <h2>{{ ic.icon("alert", "", "ic-alert") }} Points de vigilance</h2>
+  <h2>{{ ic.icon("alert", "", "ic-alert") }} <a href="/deploiements/{{ d.slug }}/actions" title="Voir les actions">Points de vigilance <span class="muted">· {{ vig | length }}</span></a></h2>
   <ul class="plain">
-    {% for a in d.vigilance %}<li>{% if a.notion_url %}<a href="{{ a.notion_url }}" target="_blank" rel="noopener">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}{% if a.due %} <span class="muted">· {{ a.due.strftime("%d/%m") }}</span>{% endif %}{% if a.comment %} <span class="muted">· {{ a.comment }}</span>{% endif %}</li>
-    {% else %}<li class="muted">Aucun.</li>{% endfor %}
+    {% for a in vig %}<li>{% if a.notion_url %}<a href="{{ a.notion_url }}" target="_blank" rel="noopener">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}{% if a.due %} <span class="muted">· {{ a.due.strftime("%d/%m") }}</span>{% endif %}{% if a.comment %} <span class="muted">· {{ a.comment }}</span>{% endif %}</li>{% endfor %}
   </ul>
 </section>
+{% endif %}
 
-{# Notes libres sur ce client : gardées dans data/perso.json, jamais envoyées dans Notion. #}
+{# Notes libres sur ce client : gardées dans data/perso.json, jamais envoyées dans Notion. Affichées ici dès qu'il y en a une ;
+   pour en commencer une, le bouton « Notes » (touche n) écrit au même endroit. #}
+{% set note = perso.note(d.slug) %}
+{% if note %}
 <section class="panel my-notes">
   <h2>Mes notes <span class="muted">· pour moi seulement, jamais envoyées dans Notion</span></h2>
   <textarea name="texte" rows="5" maxlength="20000" placeholder="Ce que je veux retenir sur {{ d.client }} : contacts, décisions, pièges…" aria-label="Mes notes sur {{ d.client }}"
-            hx-post="/perso/note/{{ d.slug }}" hx-trigger="keyup changed delay:800ms, change" hx-target="next .note-out" hx-swap="innerHTML">{{ perso.note(d.slug) }}</textarea>
+            hx-post="/perso/note/{{ d.slug }}" hx-trigger="keyup changed delay:800ms, change" hx-target="next .note-out" hx-swap="innerHTML">{{ note }}</textarea>
   <div class="note-out" role="status"></div>
 </section>
+{% endif %}

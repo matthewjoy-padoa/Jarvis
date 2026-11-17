@@ -210,7 +210,7 @@ def test_filters_script_searches_without_accents_and_offers_hidden_matches():
         ("/deploiements/client-demo/injections", ["Répartition des injections", 'class="segbar"']),
         ("/deploiements/client-demo/recette", ["Statut des retours", "Retours ouverts par type de données"]),
         ("/deploiements/client-demo/regles", ["Règles par type"]),
-        ("/actions", ["En retard", "Points de vigilance"]),
+        ("/actions", ['class="counts"', "en retard", "point(s) de vigilance"]),
         ("/deadlines", ["Dans les 7 jours"]),
         ("/clients", ['class="segbar"']),
     ],

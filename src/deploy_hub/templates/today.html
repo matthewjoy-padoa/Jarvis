@@ -19,9 +19,8 @@
   </div>
   <div class="head-side"><a class="btn-primary" href="/brief" title="Le résumé du jour en texte, à copier pour Slack ou le daily">{{ ic.icon("sun") }} Brief du matin</a></div>
 </div>
-{{ charts.stats([("En retard", late | length, "ko", links.retard), ("À échéance aujourd'hui", due_today | length, "todo", links.aujourdhui), ("Dans les 7 jours", due_week | length, "", links.semaine), ("Injections KO", ko | length, "ko", links.ko)]) }}
 
-{# Mes tickets épinglés : tout en haut, juste sous les compteurs. #}
+{# Pas de tuiles de compteurs : la phrase de Jarvis les porte déjà, chacun mène à sa liste. Mes tickets épinglés : tout en haut. #}
 {% include "_pins.html" %}
 
 {% for d in deployments %}
@@ -53,17 +52,19 @@
   </section>
   </section>
   <section>
+    {% if ko %}{# sans KO, pas de bloc : la phrase de Jarvis dit déjà que tout est au vert #}
     <section class="panel">
-      <h2>{% if ko %}<a href="{{ ko_url }}" title="Voir les injections KO">{% endif %}Injections KO <span class="muted">· {{ ko | length }}</span>{% if ko %}</a>{% endif %}</h2>
+      <h2><a href="{{ ko_url }}" title="Voir les injections KO">Injections KO <span class="muted">· {{ ko | length }}</span></a></h2>
       <ul class="todo" data-limit="5">
         {% for d, a in ko %}
         <li><span class="badge g-ko">{{ a.injection_status }}</span>
           {% if a.ref %}<a data-ticket href="{{ ticket_url(d.slug, 'action', a.ref) }}">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}
           <span class="muted">· {% for r in a.resources %}<code class="res">{{ r }}</code> {% endfor %}{{ d.client if deployments | length > 1 }}</span>
           <a class="btn-link" href="/deploiements/{{ d.slug }}/injections#{{ d.slug }}-{{ a.resources | join('-') or 'sans-ressource' }}">Relancer ↗</a></li>
-        {% else %}<li class="muted">Aucune injection KO. Tous les systèmes sont opérationnels.</li>{% endfor %}
+        {% endfor %}
       </ul>
     </section>
+    {% endif %}
     <section class="panel">
       <h2><a href="/deadlines" title="Toutes les échéances">Prochains jalons <span class="muted">· 3 semaines</span></a></h2>
       <ul class="todo" data-limit="5">

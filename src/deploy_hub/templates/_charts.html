@@ -46,7 +46,7 @@
 {# Jauge d'avancement : valeur en barre pleine, attendu en repère vertical, écart en points dans le libellé. #}
 {% macro progress(value, expected=None, label="intégré") %}
 {% set gap = (value - expected) if expected is not none else None %}
-<div class="gauge{{ ' behind' if gap is not none and gap < -5 }}{{ ' late' if gap is not none and gap < -15 }}" role="img" aria-label="{{ value }} % {{ label }}{% if expected is not none %}, attendu {{ expected }} %{% endif %}">
+<div class="gauge{{ ' behind' if gap is not none and gap < -5 }}{{ ' is-late' if gap is not none and gap < -15 }}" role="img" aria-label="{{ value }} % {{ label }}{% if expected is not none %}, attendu {{ expected }} %{% endif %}">
   <div class="gauge-head"><strong>{{ value }} %</strong> <span>{{ label }}</span>
     {% if expected is not none %}<span class="gauge-gap">{{ '%+d' % gap }} pts <span class="muted">/ attendu {{ expected }} %</span></span>{% endif %}</div>
   <div class="gauge-track"><div class="gauge-fill" style="width: {{ value }}%"></div>
@@ -121,16 +121,11 @@
 {% endif %}
 {% endmacro %}
 
-{# Compteurs. Chaque élément : (libellé, valeur, ton) ou (libellé, valeur, ton, lien) ; lien = {"href", "ticket"} ou None.
-   Avec un lien, la tuile mène aux éléments comptés (ticket : ouvert dans le panneau, voir static/drawer.js). #}
-{% macro stats(items) %}
-<div class="stats">
-  {% for item in items %}
-  {% set label, value, tone = item[0], item[1], item[2] %}
-  {% set link = item[3] if item | length > 3 else None %}
-  {% set cls = "stat" ~ (" stat-" ~ tone if tone and value else "") %}
-  {% if link %}<a class="{{ cls }} stat-link" href="{{ link.href }}"{% if link.ticket %} data-ticket{% endif %} title="Voir {{ 'le ticket' if link.ticket else 'les éléments' }}"><strong>{{ value }}</strong><span>{{ label }} <span class="stat-go" aria-hidden="true">→</span></span></a>
-  {% else %}<div class="{{ cls }}"><strong>{{ value }}</strong><span>{{ label }}</span></div>{% endif %}
-  {% endfor %}
-</div>
+{# Compteurs en ligne : une phrase discrète plutôt que des tuiles. Chaque élément : (libellé, valeur, ton) ; les zéros sont omis.
+   ton : groupe de statut (« ko », « todo ») qui colore la pastille, ou "" pour aucune ; cls : classe du paragraphe. #}
+{% macro counts(items, cls="counts") %}
+{% set shown = items | selectattr(1) | list %}
+{% if shown %}
+<p class="{{ cls }}">{% for label, value, tone in shown %}<span>{% if tone %}<span class="key g-{{ tone }}"></span>{% endif %}<strong>{{ value }}</strong> {{ label }}</span>{% endfor %}</p>
+{% endif %}
 {% endmacro %}
