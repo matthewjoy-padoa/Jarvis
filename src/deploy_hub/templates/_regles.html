@@ -3,9 +3,11 @@
 {% for d in deployments if d.regles %}
 {% set ns = namespace(c={}) %}
 {% for r in d.regles %}{% set _ = ns.c.update({(r.type or "Non précisé"): ns.c.get(r.type or "Non précisé", 0) + 1}) %}{% endfor %}
-<div class="chart-row">{{ charts.hbars("Règles par type", ns.c | dictsort(by="value", reverse=true), 6, filter_key="type") }}</div>
+<details class="fold"><summary>Règles par type <span class="muted">· {{ ns.c | length }} type(s)</span></summary>
+  {{ charts.hbars("Règles par type", ns.c | dictsort(by="value", reverse=true), 6, filter_key="type") }}
+</details>
 {% endfor %}
-<table data-filterable>
+<table data-filterable data-fold-filters>
   <thead><tr><th>Règle</th><th data-filter>Table</th><th data-filter="type">Type</th><th data-filter>Application</th><th data-filter>Statut</th></tr></thead>
   <tbody>
   {% for d in deployments %}{% for r in d.regles %}

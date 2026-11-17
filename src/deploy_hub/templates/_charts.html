@@ -28,7 +28,7 @@
   </div>
   {% if slim %}
   <ul class="legend legend-slim">
-    {% for g, n in groups.items() if n %}<li {{ _clickable(filter_key, g, scope, hrefs.get(g, href)) }}><span class="key g-{{ g }}"></span><strong>{{ n }}</strong> {{ GROUP_LABELS[g] | lower if g != "ko" else "KO" }}</li>{% endfor %}
+    {% for g, n in groups.items() if n %}<li title="{{ GROUP_LABELS[g] }} : {{ n }} ({{ (100 * n / total) | round | int }} %)"{{ _clickable(filter_key, g, scope, hrefs.get(g, href)) }}><span class="key g-{{ g }}"></span><strong>{{ n }}</strong> {{ GROUP_LABELS[g] | lower if g != "ko" else "KO" }}</li>{% endfor %}
   </ul>
   {% elif not thin %}
   <ul class="legend legend-grid">
@@ -46,7 +46,7 @@
 {# Jauge d'avancement : valeur en barre pleine, attendu en repère vertical, écart en points dans le libellé. #}
 {% macro progress(value, expected=None, label="intégré") %}
 {% set gap = (value - expected) if expected is not none else None %}
-<div class="gauge{{ ' behind' if gap is not none and gap < -5 }}{{ ' late' if gap is not none and gap < -15 }}" role="img" aria-label="{{ value }} % {{ label }}{% if expected is not none %}, attendu {{ expected }} %{% endif %}">
+<div class="gauge{{ ' behind' if gap is not none and gap < -5 }}{{ ' is-late' if gap is not none and gap < -15 }}" role="img" aria-label="{{ value }} % {{ label }}{% if expected is not none %}, attendu {{ expected }} %{% endif %}">
   <div class="gauge-head"><strong>{{ value }} %</strong> <span>{{ label }}</span>
     {% if expected is not none %}<span class="gauge-gap">{{ '%+d' % gap }} pts <span class="muted">/ attendu {{ expected }} %</span></span>{% endif %}</div>
   <div class="gauge-track"><div class="gauge-fill" style="width: {{ value }}%"></div>
@@ -97,8 +97,9 @@
 </svg>
 {% endmacro %}
 
-{# Frise du projet : jalons passés pleins, à venir creux, prochain jalon mis en avant (date et J-x). #}
-{% macro timeline(t, slug=None) %}
+{# Frise du projet : jalons passés pleins, à venir creux, prochain jalon mis en avant (date et J-x).
+   fold_legend : la liste détaillée des jalons sous la frise est repliée (« Tous les jalons »), ouverte au clic. #}
+{% macro timeline(t, slug=None, fold_legend=false) %}
 {% if t %}
 {% set upcoming = t.marks | selectattr(1, "ge", today) | list %}
 {% set nxt = upcoming[0] if upcoming else None %}
@@ -114,9 +115,11 @@
     {% endfor %}
     <span class="tl-today{{ ' end' if t.today > 80 }}" style="left: {{ t.today }}%" title="Aujourd'hui"><span>Aujourd'hui</span></span>
   </div>
+  {% if fold_legend %}<details class="fold tl-fold"><summary>Tous les jalons <span class="muted">· {{ t.marks | length }}</span></summary>{% endif %}
   <ol class="tl-legend">
     {% for label, day, pos in t.marks %}<li class="{{ 'past' if day < today }}{{ ' next' if nxt and day == nxt[1] }}">{% if slug %}<a href="/deadlines?client={{ slug }}&vue=calendrier&mois={{ day.strftime('%Y-%m') }}" title="Voir ce mois dans le calendrier des deadlines">{% endif %}<span class="date">{{ day.strftime("%d/%m") }}</span>{{ label }}{% if slug %}</a>{% endif %}</li>{% endfor %}
   </ol>
+  {% if fold_legend %}</details>{% endif %}
 </figure>
 {% endif %}
 {% endmacro %}
@@ -133,4 +136,10 @@
   {% else %}<div class="{{ cls }}"><strong>{{ value }}</strong><span>{{ label }}</span></div>{% endif %}
   {% endfor %}
 </div>
+{% endmacro %}
+
+{# Compteurs en ligne : une phrase discrète à la place des tuiles, mêmes chiffres. Chaque élément : (libellé, valeur, ton) ;
+   ton : groupe de statut (« ko », « todo ») qui colore la pastille, ou "". Un compteur à zéro reste, en grisé. #}
+{% macro counts(items) %}
+<p class="counts">{% for label, value, tone in items %}<span class="{{ 'is-zero' if not value }}">{% if tone %}<span class="key g-{{ tone if value else 'none' }}"></span>{% endif %}<strong>{{ value }}</strong> {{ label }}</span>{% endfor %}</p>
 {% endmacro %}

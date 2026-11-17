@@ -1,5 +1,5 @@
 {# Attend : deployments. Notion : « Remontées Opsbot » (Slack), filtrées sur la reprise de données. #}
-<table data-filterable>
+<table data-filterable data-fold-filters>
   <thead><tr><th>Remontée</th><th data-filter>Contexte</th><th data-filter>Statut</th><th>Posté le</th><th data-nosort>Slack</th></tr></thead>
   <tbody>
   {% for d in deployments %}{% for r in d.remontees %}
