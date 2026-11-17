@@ -34,22 +34,41 @@
 <div class="two-col">
   <section>
   <section class="panel">
-    <h2>À traiter</h2>
-    {% set groups = [("En retard", late, "retard"), ("Aujourd'hui", due_today, "aujourdhui"), ("Dans les 7 jours", due_week, "semaine")] %}
-    {% for title, items, periode in groups if items %}
-    <h3 class="list-title"><a href="/deadlines?periode={{ periode }}" title="Voir la liste complète">{{ title }} <span class="muted">· {{ items | length }}</span></a></h3>
+    {# Une période visible à la fois : onglets avec leur nombre, la plus urgente ouverte. Les autres listes sont dans la page,
+       masquées, et s'affichent au clic sur leur onglet. #}
+    {% set groups = [("En retard", late, "retard"), ("Aujourd'hui", due_today, "aujourdhui"), ("Dans les 7 jours", due_week, "semaine")] | selectattr(1) | list %}
+    <div class="panel-head todo-head">
+      <h2>À traiter</h2>
+      {% if groups %}<div class="segmented todo-tabs" role="tablist" aria-label="Période">
+        {%- for title, items, periode in groups %}<button type="button" role="tab" id="todo-tab-{{ periode }}" aria-controls="todo-{{ periode }}" aria-selected="{{ 'true' if loop.first else 'false' }}" class="{{ 'active' if loop.first }}" data-todo-tab="{{ periode }}">{{ title }} <span class="todo-n">{{ items | length }}</span></button>{% endfor -%}
+      </div>{% endif %}
+    </div>
+    {% for title, items, periode in groups %}
+    <div class="todo-pane" id="todo-{{ periode }}" role="tabpanel" aria-labelledby="todo-tab-{{ periode }}"{% if not loop.first %} hidden{% endif %}>
     <ul class="todo" data-limit="5">
       {% for i in items %}
       <li>
         <span class="date {{ 'late' if i.date < today }}">{{ i.date.strftime("%d/%m") }}</span>
-        <span class="badge">{{ i.kind }}</span>
-        {% if i.url %}<a href="{{ i.url }}"{% if i.url.startswith('http') %} target="_blank" rel="noopener"{% elif '/ticket/' in i.url %} data-ticket{% endif %}>{{ i.label }}</a>{% else %}{{ i.label }}{% endif %}
-        {% if i.action and i.action.vigilance %}{{ ic.icon("alert", "Point de vigilance", "ic-alert") }}{% endif %}
-        {% if deployments | length > 1 %}<span class="muted">· {{ i.d.client }}</span>{% endif %}
+        <span class="todo-label">{% if i.url %}<a href="{{ i.url }}"{% if i.url.startswith('http') %} target="_blank" rel="noopener"{% elif '/ticket/' in i.url %} data-ticket{% endif %}>{{ i.label }}</a>{% else %}{{ i.label }}{% endif %}
+        {%- if i.action and i.action.vigilance %} {{ ic.icon("alert", "Point de vigilance", "ic-alert") }}{% endif %}</span>
+        <span class="todo-kind">{{ i.kind }}{% if deployments | length > 1 %} · {{ i.d.client }}{% endif %}</span>
       </li>
       {% endfor %}
     </ul>
+    <a class="todo-all muted" href="/deadlines?periode={{ periode }}">{{ title }} : voir dans Deadlines →</a>
+    </div>
     {% else %}<p class="muted">Rien en retard ni à échéance cette semaine. Jarvis reste en veille.</p>{% endfor %}
+    <script>
+      // Onglets de « À traiter » : affichent la liste de leur période, masquent les autres.
+      document.querySelectorAll("[data-todo-tab]").forEach((tab) => tab.addEventListener("click", () => {
+        document.querySelectorAll("[data-todo-tab]").forEach((t) => {
+          const on = t === tab;
+          t.classList.toggle("active", on);
+          t.setAttribute("aria-selected", String(on));
+          document.getElementById("todo-" + t.dataset.todoTab).hidden = !on;
+        });
+      }));
+    </script>
   </section>
   </section>
   <section>
