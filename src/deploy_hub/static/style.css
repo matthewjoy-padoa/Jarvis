@@ -1,5 +1,5 @@
 :root {
-  /* Ambiance du logo « Anneaux » (2026-11-12) : marine #001235, bleu Padoa #3333eb, cyan #5ce1ff ; Figtree conservé.
+  /* Ambiance du logo « Anneaux » (2026-11-12) : marine #001235, bleu Padoa #3333eb, cyan #5ce1ff ; typo Inter depuis le 2026-11-17 (plus compacte que Figtree, à la demande de Matthew).
      Clair : fond gris-bleu froid. KO en rouge corail (le rose de la charte jurait avec le cyan). */
   --bg: #eef2f8; --surface: #ffffff; --text: #001235; --muted: #5d6883; --border: #dde4ef;
   --accent: #3333eb; --accent-soft: #dbe3ff; --on-accent: #ffffff; --cyan: #0b7fb5;
@@ -34,7 +34,7 @@
 }
 :root[data-theme="light"] { color-scheme: light; }
 * { box-sizing: border-box; }
-body { margin: 0; font: 15px/1.5 'Figtree', system-ui, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+body { margin: 0; font: 14px/1.55 'Inter', system-ui, sans-serif; font-feature-settings: "cv11"; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
 a { color: var(--accent); text-decoration: none; }
 main { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
 .topbar { display: flex; gap: 12px; align-items: center; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
@@ -103,7 +103,6 @@ pre { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--bord
 .count { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 99px; background: var(--danger); color: var(--on-status); font-size: 11px; text-align: center; }
 @media (max-width: 700px) { .retour dl, .meta-list { grid-template-columns: 1fr; } }
 .nav { scrollbar-width: none; } .nav::-webkit-scrollbar { display: none; }
-.counts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 16px; }
 .agent-form { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .agent-form label { font-size: 13px; color: var(--muted); }
 .agent-form textarea { font: inherit; font-size: 14px; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); resize: vertical; }
@@ -595,8 +594,8 @@ button .ic, .btn-primary .ic, .btn-link .ic { width: 15px; height: 15px; }
 button:focus-visible, .btn-primary:focus-visible, .btn-link:focus-visible, .segmented a:focus-visible, .theme-toggle:focus-visible,
 .card-linked:focus-within, a.kpi-link:focus-visible { outline: none; box-shadow: var(--ring); }
 button:disabled { opacity: .45; box-shadow: none; transform: none; }
-.dag-form.is-prod button { background: var(--st-ko); border-color: var(--st-ko); }
-.dag-form.is-prod button:hover:not(:disabled) { background: color-mix(in srgb, var(--st-ko) 85%, #000); border-color: color-mix(in srgb, var(--st-ko) 85%, #000); }
+.dag-form.is-prod button { background: var(--st-ko); border-color: var(--st-ko); color: var(--on-accent); }
+.dag-form.is-prod button:hover:not(:disabled) { color: var(--on-accent); background: color-mix(in srgb, var(--st-ko) 85%, #000); border-color: color-mix(in srgb, var(--st-ko) 85%, #000); }
 
 /* --- Contrôles segmentés (vues, filtres Actives/Toutes…) : une piste, l'option choisie en relief ---------- */
 .segmented { display: inline-flex; gap: 2px; padding: 3px; margin: 8px 0 4px; border-radius: 999px;
@@ -1416,3 +1415,47 @@ tr.is-hot > td { background: color-mix(in srgb, var(--accent) 9%, transparent); 
   .flow-bot, .flow-bot *, .bot-wrap::after { animation: none !important; }
   .flow-in_progress .flow-nodes { display: flex; height: auto; } .flow-in_progress .flow-bot { position: relative; bottom: auto; }
 }
+
+/* Pages client : moins de choses visibles d'un coup, rien de retiré : le détail se déplie au clic */
+/* Bloc replié : une ligne « ▸ titre · chiffre » qui s'ouvre sur le graphique ou la liste */
+details.fold { margin: 2px 0 12px; }
+details.fold > summary { width: max-content; max-width: 100%; cursor: pointer; padding: 4px 2px; font-size: 13.5px; font-weight: 600; color: var(--muted); }
+details.fold > summary:hover, details.fold[open] > summary { color: var(--text); }
+details.fold > .chart { margin-top: 6px; }
+.tl-fold { margin: 10px 0 0; }
+/* Panneau replié (Mes notes) : son titre sert de ligne à déplier, avec le début de la note */
+details.fold-panel > summary { cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }  /* triangle natif, comme les autres replis */
+details.fold-panel > summary h2 { display: inline; margin: 0 4px 0 2px; }
+details.fold-panel > summary .muted { font-size: 13px; }
+details.fold-panel[open] > summary { margin-bottom: 10px; }
+/* Compteurs en ligne (Actions) : mêmes chiffres que les tuiles, sur une ligne ; un zéro reste, en grisé */
+.counts { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 10px 2px 12px; font-size: 13.5px; color: var(--muted); }
+.counts strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.counts .key { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; vertical-align: 1px; }
+.counts .key.g-none { background: var(--border); }
+.counts .is-zero strong { color: var(--muted); font-weight: 500; }
+/* Listes de la fiche : la recherche et un bouton « Filtres » ; les menus déroulants dans un panneau qu'il ouvre */
+.toolbar .filters-toggle { min-height: 0; padding: 4px 12px; font-size: 13px; }
+.toolbar .filters-toggle.is-on { border-color: var(--accent); color: var(--accent); }
+.filter-panel { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px; }
+.filter-panel[hidden] { display: none; }
+/* Boutons de ligne (lancer un DAG, Claude) : compacts, sur une ligne, visibles au survol ou au clavier ; toujours sur écran tactile */
+td.actions { white-space: nowrap; }
+td.actions > .dag-form { display: inline-flex; vertical-align: middle; margin: 0 4px 0 0; }
+td.actions button { min-height: 0; margin: 0; padding: 3px 12px; font-size: 12.5px; }
+td.actions select { font-size: 12.5px; }
+@media (hover: hover) {
+  td.actions > .dag-form, td.actions > button { transition: opacity .12s; }
+  tr:not(:hover):not(:focus-within) > td.actions > .dag-form, tr:not(:hover):not(:focus-within) > td.actions > button { opacity: 0; }
+}
+/* Cartes de retour : « Voir le retour » et « Lancer un agent » sur une ligne ; celui qu'on ouvre se déplie dessous, en pleine largeur */
+.retour-more { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin-top: 6px; }
+.retour-more > details[open] { order: 1; flex-basis: 100%; }
+.retour .retour-more summary { margin: 0; }
+.retour-more details.agent:not([open]) > summary { padding: 3px 12px 3px 10px; font-size: 12.5px; font-weight: 600; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); box-shadow: none; }
+.retour-more details.agent:not([open]) > summary .ic { width: 15px; height: 15px; }
+.retour-more details.agent:not([open]) > summary:hover { filter: none; border-color: var(--accent); color: var(--accent); box-shadow: none; }
+/* Petite note en bas de liste */
+.small-note { font-size: 12.5px; }
+p.small-note { margin: 10px 2px 0; }

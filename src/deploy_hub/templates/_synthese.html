@@ -15,7 +15,7 @@
 {# Où ça coince : les 5 points avec le plus de KO (blocs d'injection, types de retours), chacun mène à sa liste. #}
 {% set points = d.blocking_points %}
 <section class="panel blocking">
-  <h2>{{ ic.icon("alert", "", "ic-alert") }} Où ça coince{% if points %} <span class="muted">· KO d'abord, puis le plus d'éléments ouverts</span>{% endif %}</h2>
+  <h2{% if points %} title="KO d'abord, puis le plus d'éléments ouverts"{% endif %}>{{ ic.icon("alert", "", "ic-alert") }} Où ça coince</h2>
   {% for p in points[:5] %}
   <a class="blocking-row" href="{{ p.href }}">
     <span class="blocking-rank">{{ loop.index }}</span>
@@ -31,7 +31,7 @@
   {% if points | length > 5 %}<p class="muted blocking-more">+ {{ points | length - 5 }} autre(s) point(s) avec un KO · <a href="/deploiements/{{ d.slug }}/injections">Injections</a> · <a href="/deploiements/{{ d.slug }}/recette">Recette</a></p>{% endif %}
 </section>
 
-{{ charts.timeline(d.timeline, d.slug) }}
+{{ charts.timeline(d.timeline, d.slug, fold_legend=true) }}
 {% if not d.timeline and milestones %}
 <section class="panel"><h2>Jalons</h2><ul class="timeline">{% for label, day in milestones %}<li class="{{ 'past' if day < today }}"><span class="date">{{ day.strftime("%d/%m/%Y") }}</span> {{ label }}</li>{% endfor %}</ul></section>
 {% endif %}
@@ -50,9 +50,10 @@
 </section>
 
 {# Notes libres sur ce client : gardées dans data/perso.json, jamais envoyées dans Notion. #}
-<section class="panel my-notes">
-  <h2>Mes notes <span class="muted">· pour moi seulement, jamais envoyées dans Notion</span></h2>
+{% set note = perso.note(d.slug) %}
+<details class="panel fold-panel my-notes">
+  <summary><h2>Mes notes</h2> <span class="muted">· {{ (note | truncate(70)) if note else "pour moi seulement, jamais envoyées dans Notion" }}</span></summary>
   <textarea name="texte" rows="5" maxlength="20000" placeholder="Ce que je veux retenir sur {{ d.client }} : contacts, décisions, pièges…" aria-label="Mes notes sur {{ d.client }}"
-            hx-post="/perso/note/{{ d.slug }}" hx-trigger="keyup changed delay:800ms, change" hx-target="next .note-out" hx-swap="innerHTML">{{ perso.note(d.slug) }}</textarea>
+            hx-post="/perso/note/{{ d.slug }}" hx-trigger="keyup changed delay:800ms, change" hx-target="next .note-out" hx-swap="innerHTML">{{ note }}</textarea>
   <div class="note-out" role="status"></div>
-</section>
+</details>

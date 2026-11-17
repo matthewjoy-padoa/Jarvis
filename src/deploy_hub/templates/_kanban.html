@@ -4,7 +4,7 @@
    Pas de data-sorts : le tri de filters.js déplace les cartes à la racine du bloc et les sortirait de leurs colonnes. #}
 {% macro board(columns, filters, label, out_label="") -%}
 {% if columns %}
-<div class="kanban" data-filterable data-items=".kb-card" data-filters="{{ filters }}"{% if out_label %} data-out-label="{{ out_label }}"{% endif %} role="list" aria-label="{{ label }}">
+<div class="kanban" data-filterable data-fold-filters data-items=".kb-card" data-filters="{{ filters }}"{% if out_label %} data-out-label="{{ out_label }}"{% endif %} role="list" aria-label="{{ label }}">
   {% for col in columns %}
   <section class="kb-col kb-{{ col.group }}" role="listitem" aria-label="{{ col.status }}">
     <header class="kb-head"><span class="badge g-{{ col.group }}">{{ col.status }}</span><span class="kb-count muted">{{ col.cards | length }}</span></header>
