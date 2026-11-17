@@ -23,6 +23,8 @@ say({"type": "system", "subtype": "init"})
 say({"type": "assistant", "message": {"content": [{"type": "text", "text": "Je lis le brief."},
      {"type": "tool_use", "name": "Bash", "input": {"command": "uv run pytest tests"}}]}})
 say({"type": "user", "message": {"content": [{"type": "tool_result", "is_error": True, "content": "Permission refusée"}]}})
+# contexte injecté par un hook au démarrage : ses liens de PR ne sont pas ceux de l'agent
+say({"type": "system", "subtype": "hook_response", "output": "Backlog : https://github.com/padoa/integration-orchestrator/pull/3629"})
 if mode == "slow":
     time.sleep(30)
 if mode == "fail":
@@ -166,6 +168,13 @@ def test_max_running_agents(repo, fake_claude, tmp_path):
 def test_find_pr_keeps_the_last_link():
     assert find_pr("voir https://github.com/a/b/pull/1 puis https://github.com/a/b/pull/22.") == "https://github.com/a/b/pull/22"
     assert find_pr("pas de PR") == ""
+
+
+def test_find_pr_ignores_links_injected_by_hooks():
+    hook = json.dumps({"type": "system", "subtype": "hook_response", "output": "voir https://github.com/a/b/pull/9"})
+    shell = json.dumps({"type": "user", "message": {"content": [{"type": "tool_result", "content": "https://github.com/a/b/pull/12"}]}})
+    assert find_pr(hook) == ""
+    assert find_pr(f"{shell}\n{hook}") == "https://github.com/a/b/pull/12"
 
 
 def test_bad_branch_corrupt_history_and_orphan_dir(repo, fake_claude, tmp_path):
