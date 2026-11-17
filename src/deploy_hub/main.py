@@ -641,7 +641,7 @@ def _guard_settings(request: Request) -> None:
 
 def _settings_page(request: Request, message: str = "", error: str = "", op_error: str = "") -> HTMLResponse:
     op = onepassword.status()
-    return _render(request, "reglages.html", "/reglages", fields=env_file.view(), env_path=env_file.path(), op=op,
+    return _render(request, "reglages.html", "/reglages", fields=env_file.view(), sections=env_file.SECTIONS, env_path=env_file.path(), op=op,
                    message=message, error=error, op_error=op_error or op.get("error", ""))
 
 
