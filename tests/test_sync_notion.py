@@ -283,7 +283,8 @@ def test_a_copied_tool_result_file_is_read_as_is(root):
 
 def test_unknown_notion_page_is_reported_before_any_query(root):
     p = fingerprint(root, fiche=None)
-    assert p["requetes"] == [] and "page_id" in p["erreurs"]["demo"]
+    why = p["erreurs"]["demo"]
+    assert p["requetes"] == [] and "fiche Notion introuvable" in why and "Clients → Configurer" in why
 
 
 def test_the_routine_keeps_the_emoji_of_the_direct_refresh(root):
