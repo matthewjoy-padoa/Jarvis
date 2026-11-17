@@ -163,12 +163,14 @@ def usage(runs: list[AgentRun]) -> dict | None:
     def line(label: str, group: list[AgentRun]) -> dict:
         costs = [r.cost_usd for r in group if r.cost_usd is not None]
         spent = [r.tokens for r in group if r.tokens is not None]
+        filled = [r.context_pct for r in group if r.context_pct is not None]
         kinds = [(label, sum(getattr(r, name) or 0 for r in group)) for name, label, _ in TOKEN_KINDS] if spent else []
         return {"label": label, "count": len(group), "prs": sum(bool(r.pr_url) for r in group),
                 "time": sum((r.duration for r in group), timedelta()), "median": median(r.duration for r in group),
                 "cost": sum(costs) if costs else None, "mean_cost": sum(costs) / len(costs) if costs else None,
                 "tokens": sum(spent) if spent else None, "mean_tokens": round(sum(spent) / len(spent)) if spent else None,
-                "token_kinds": kinds}
+                "token_kinds": kinds, "context_pct": round(sum(filled) / len(filled)) if filled else None,
+                "context_max": max(filled) if filled else None}
 
     groups: dict[str, list[AgentRun]] = {}
     for r in ended:

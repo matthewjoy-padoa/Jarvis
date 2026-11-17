@@ -112,7 +112,7 @@ def test_usage_by_ticket_type_leaves_out_simulated_and_running_agents():
 def test_agents_page_shows_duration_cost_and_the_summary(monkeypatch):
     monkeypatch.setattr(main.claude, "runs", [run(1, 12, 0.5, "AMT"), run(2, 70, 1.5, "Visites historiques")])
     page = TestClient(main.app).get("/agents").text
-    assert "<th>Durée</th><th>Contexte</th><th>Tokens</th>" in page and "12 min" in page and "1 h 10" in page
+    assert "<th>Durée</th><th>Tokens</th>" in page and "12 min" in page and "1 h 10" in page
     assert "Tokens et durée" in page and "Visites historiques" in page and "0.50 $" not in page and "2.00 $" not in page  # pas de coût en argent
     assert "bilan des agents d'exemple" not in page  # de vrais agents ont fini : le bilan ne compte qu'eux
     monkeypatch.setattr(main.claude, "runs", [])

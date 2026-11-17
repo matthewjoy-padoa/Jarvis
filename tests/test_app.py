@@ -458,9 +458,10 @@ def test_demo_agents_page_shows_tokens_chart_and_full_brief(monkeypatch):
     monkeypatch.setattr(main, "examples", Examples())
     client = TestClient(main.app)
     page = client.get("/agents").text
-    assert "Tokens par agent" in page and "Tokens au total" in page and "Coût" not in page
-    assert 'class="ring ring-high"' in page and "86 %" in page  # agent 902 : contexte à 172 000 sur 200 000
-    assert "27 %" in page  # l'agent en cours a déjà son anneau
+    assert "Coût" not in page and "<th>Contexte</th>" not in page  # ni coût en argent, ni anneau par agent
+    assert page.count('<svg class="ring') == 1 and "ring-cell" not in page  # un seul anneau : le bilan, à la place des tuiles de tokens
+    assert "<strong>49 %</strong> du contexte utilisé" in page and "au plus 86 %" in page  # 172 k, 86 k et 38 k sur 200 k
+    assert "<strong>5,3 M</strong> tokens au total" in page and "Cache relu" in page
     assert "3,6 M" in page  # agent 902 : 1 840 + 21 600 + 3 420 000 + 186 000
     detail = client.get("/agents/902").text
     assert "86 %</strong> du contexte" in detail and "172 k sur 200 k tokens" in detail

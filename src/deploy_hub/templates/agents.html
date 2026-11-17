@@ -6,7 +6,7 @@
 <h1>Agents lancés</h1>
 <p class="muted">{% if live %}Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.{% else %}Mode démo : les lancements sont simulés (<code>JARVIS_MODE=live</code> pour de vrais agents). Les lignes marquées <span class="badge example">exemple</span> sont fictives : elles montrent la page telle qu'elle se remplit en mode live, et n'entrent jamais dans l'historique.{% endif %}</p>
 <table data-filterable>
-  <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>Sujet</th><th>Branche</th><th data-filter>État</th><th>Durée</th><th>Contexte</th><th>Tokens</th><th>PR</th></tr></thead>
+  <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>Sujet</th><th>Branche</th><th data-filter>État</th><th>Durée</th><th>Tokens</th><th>PR</th></tr></thead>
   <tbody>
   {% for r in runs %}
     <tr>
@@ -16,7 +16,6 @@
       <td><code>{{ r.branch }}</code></td>
       <td><span class="badge g-{{ r.group }}">{{ r.status }}</span>{% if r.simulated %} {{ ic.icon("flask", "Simulation", "ic-muted") }}{% endif %}</td>
       <td data-sort="{{ r.duration.total_seconds() | int }}">{% if not r.simulated %}{{ r.duration | duree }}{% endif %}</td>
-      <td data-sort="{{ r.context_pct or 0 }}">{% if r.context_pct is not none %}<span class="ring-cell" title="Contexte : {{ r.context_tokens | tokens }} sur {{ r.context_window | tokens }}">{{ charts.ring(r.context_pct) }} {{ r.context_pct }} %</span>{% endif %}</td>
       <td data-sort="{{ r.tokens or 0 }}"{% if r.tokens is not none %} title="{% for label, n in r.token_parts %}{{ label }} {{ n | tokens }}{{ ' · ' if not loop.last }}{% endfor %}"{% endif %}>{{ r.tokens | tokens }}</td>
       <td>{% if r.pr_url %}<a href="{{ r.pr_url }}" target="_blank" rel="noopener">PR ↗</a>{% endif %}</td>
     </tr>
@@ -27,8 +26,27 @@
 {% if usage %}
 {% set t = usage.total %}
 <h2 id="bilan">Tokens et durée</h2>
-<p class="muted">Agents réels terminés (ni simulés ni en cours).{% if usage_from_examples %} Ici : le bilan des agents d'exemple, tant qu'aucun agent réel n'a fini.{% endif %} Les tokens sont ceux que Claude Code annonce à la fin de l'agent ; un agent arrêté n'en a pas toujours. Contexte : ce que l'agent relit à chaque tour, sur la fenêtre du modèle.</p>
-{{ charts.stats([("Agents terminés", t.count, ""), ("PR ouvertes", t.prs, ""), ("Durée médiane", t.median | duree, ""), ("Temps cumulé", t.time | duree, ""), ("Tokens par agent", (t.mean_tokens | tokens) if t.mean_tokens is not none else "—", ""), ("Tokens au total", (t.tokens | tokens) if t.tokens is not none else "—", "")]) }}
+<p class="muted">Agents réels terminés (ni simulés ni en cours).{% if usage_from_examples %} Ici : le bilan des agents d'exemple, tant qu'aucun agent réel n'a fini.{% endif %} Les tokens sont ceux que Claude Code annonce à la fin de l'agent ; un agent arrêté n'en a pas toujours.</p>
+{{ charts.stats([("Agents terminés", t.count, ""), ("PR ouvertes", t.prs, ""), ("Durée médiane", t.median | duree, ""), ("Temps cumulé", t.time | duree, "")]) }}
+{% if t.tokens is not none %}
+<section class="panel token-panel" id="tokens">
+  <div class="token-ring">
+    {% if t.context_pct is not none %}{{ charts.ring(t.context_pct, 72, "Contexte utilisé en moyenne : " ~ t.context_pct ~ " %") }}
+    <div><strong>{{ t.context_pct }} %</strong> du contexte utilisé<br><span class="muted">en moyenne à la fin d'un agent · au plus {{ t.context_max }} %</span></div>
+    {% else %}<div><strong>{{ t.tokens | tokens }}</strong> tokens<br><span class="muted">contexte non relevé</span></div>{% endif %}
+  </div>
+  <div class="token-kinds">
+    <p><strong>{{ t.tokens | tokens }}</strong> tokens au total <span class="muted">· {{ t.mean_tokens | tokens }} par agent</span></p>
+    <ul class="hbars">
+      {% for label, n in t.token_kinds %}
+      <li title="{{ label }} : {{ '{:,}'.format(n).replace(',', ' ') }} tokens"><span class="hbar-label">{{ label }}</span>
+        <span class="hbar-track"><span class="hbar" style="width: {{ (100 * n / t.tokens) | round(1) }}%"></span></span>
+        <span class="hbar-value">{{ n | tokens }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}
 
 <table>
   <thead><tr><th>Type de ticket</th><th>Agents</th><th>PR</th><th>Durée médiane</th><th>Temps cumulé</th><th>Tokens par agent</th><th>Tokens au total</th></tr></thead>
