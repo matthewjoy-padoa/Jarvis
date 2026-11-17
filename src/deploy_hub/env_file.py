@@ -22,46 +22,67 @@ class Field:
     kind: str        # url, secret, path, bin (programme), int, choice ou text
     help: str
     live: bool = True  # False : pris en compte au prochain démarrage de Jarvis
-    section: str = "Connexions et dossiers"
+    section: str = "Airflow"
     choices: tuple[str, ...] = ()  # kind « choice » : valeurs permises ("" = défaut)
     minimum: int = 1  # kind « int » : plus petite valeur permise
+    group: str = ""  # sous-titre dans une partie longue (Agents Claude)
 
 
-CLAUDE = "Agents Claude"
-DAGS = "Suivi des DAG"
+@dataclass(frozen=True)
+class Section:
+    """Une partie de la page Réglages : son ancre (sommaire), son icône (_icons.html) et ce qu'on y règle."""
+    anchor: str
+    icon: str
+    about: str
+
+
+AIRFLOW, NOTION, FOLDERS, CLAUDE, DAGS = "Airflow", "Notion", "Dossiers et liens", "Agents Claude", "Suivi des DAG"
+SECTIONS = {
+    AIRFLOW: Section("airflow", "play", "Où Jarvis lance et suit les DAG. Sans adresse, les lancements sont simulés."),
+    NOTION: Section("notion", "note", "Pour relire les tickets à la demande (bouton « Rafraîchir depuis Notion »)."),
+    FOLDERS: Section("dossiers", "folder", "Où sont les dépôts sur cette machine, et l'adresse des environnements Padoa."),
+    CLAUDE: Section("agents", "bot", "Avec quel modèle les agents travaillent, jusqu'où ils vont et ce qu'ils ont le droit de faire."),
+    DAGS: Section("dags", "sync", "Comment Jarvis surveille un run lancé et relance les tâches en échec."),
+}
+ENGINE, LIMITS, RIGHTS = "Moteur", "Limites", "Permissions et dossiers"
 
 
 FIELDS = (
     Field("AIRFLOW_BASE_URL", "Adresse d'Airflow", "url", "Vue depuis la machine de Jarvis : sur la VM, http://localhost:8888"),
     Field("AIRFLOW_USER", "Utilisateur Airflow", "secret", "Référence 1Password conseillée : op://<coffre>/<élément>/<champ>"),
     Field("AIRFLOW_PASSWORD", "Mot de passe Airflow", "secret", "Référence 1Password conseillée : op://<coffre>/<élément>/<champ>"),
-    Field("NOTION_TOKEN", "Jeton Notion", "secret", "Facultatif : bouton « Rafraîchir depuis Notion ». Référence 1Password conseillée"),
-    Field("ORCHESTRATOR_DIR", "Dossier de integration-orchestrator", "path", "Pour les agents Claude", live=False),
-    Field("FLOW_DIGGER_DIR", "Dossier de Flow Digger", "path", "Vide : cherché aux emplacements habituels"),
+    Field("NOTION_TOKEN", "Jeton Notion", "secret", "Facultatif. Référence 1Password conseillée : op://<coffre>/<élément>/<champ>",
+          section=NOTION),
+    Field("ORCHESTRATOR_DIR", "Dossier de integration-orchestrator", "path", "Pour les agents Claude", live=False, section=FOLDERS),
+    Field("FLOW_DIGGER_DIR", "Dossier de Flow Digger", "path", "Vide : cherché aux emplacements habituels", section=FOLDERS),
     Field("PADOA_ENV_URL", "Adresse des environnements Padoa", "text",
-          "Bouton Environnements du dock. Modèle avec [stack] et [client] ; vide : https://[stack]-[client].aodap-staging.fr/support"),
+          "Bouton Environnements du dock. Modèle avec [stack] et [client] ; vide : https://[stack]-[client].aodap-staging.fr/support",
+          section=FOLDERS),
     Field("JARVIS_MODE", "Mode", "choice", "demo : agents simulés ; live : vrais agents (claude -p)", live=False, section=CLAUDE,
-          choices=("", "demo", "live")),
-    Field("CLAUDE_BIN", "Programme claude", "bin", "Vide : « claude » dans le PATH", section=CLAUDE),
+          choices=("", "demo", "live"), group=ENGINE),
+    Field("CLAUDE_BIN", "Programme claude", "bin", "Vide : « claude » dans le PATH", section=CLAUDE, group=ENGINE),
     Field("JARVIS_AGENT_MODEL", "Modèle", "text", "Vide : modèle par défaut de Claude Code. Un alias (opus, sonnet, haiku) ou un nom complet",
-          section=CLAUDE),
-    Field("JARVIS_AGENT_FALLBACK_MODEL", "Modèle de secours", "text", "Pris à la place du modèle quand il est saturé. Vide : aucun", section=CLAUDE),
+          section=CLAUDE, group=ENGINE),
+    Field("JARVIS_AGENT_FALLBACK_MODEL", "Modèle de secours", "text", "Pris à la place du modèle quand il est saturé. Vide : aucun",
+          section=CLAUDE, group=ENGINE),
     Field("JARVIS_AGENT_EFFORT", "Effort de réflexion", "choice",
           "Du plus rapide (low) au plus poussé (max) : plus haut, l'agent réfléchit plus, coûte plus et dure plus. Vide : celui de Claude Code",
-          section=CLAUDE, choices=("", "low", "medium", "high", "xhigh", "max")),
+          section=CLAUDE, choices=("", "low", "medium", "high", "xhigh", "max"), group=ENGINE),
+    Field("JARVIS_AGENT_MAX", "Agents simultanés au plus", "int", "Vide : 2", section=CLAUDE, group=LIMITS),
+    Field("JARVIS_AGENT_TIMEOUT_MIN", "Durée maximale d'un agent (min)", "int", "Vide : 90 ; au-delà, l'agent est interrompu", section=CLAUDE,
+          group=LIMITS),
     Field("JARVIS_AGENT_MAX_TURNS", "Tours au plus", "int", "L'agent s'arrête après ce nombre d'allers-retours avec ses outils. Vide : pas de limite",
-          section=CLAUDE),
+          section=CLAUDE, group=LIMITS),
     Field("JARVIS_AGENT_MAX_BUDGET_USD", "Dépense maximale par agent ($)", "int", "L'agent s'arrête une fois ce montant atteint. Vide : pas de limite",
-          section=CLAUDE),
+          section=CLAUDE, group=LIMITS),
     Field("JARVIS_AGENT_PERMISSION_MODE", "Mode de permission", "choice",
           "acceptEdits : modifie les fichiers sans demander ; plan : lecture seule ; default : refuse ce qui n'est pas autorisé",
-          section=CLAUDE, choices=("", "acceptEdits", "plan", "default")),
-    Field("JARVIS_AGENT_MAX", "Agents simultanés au plus", "int", "Vide : 2", section=CLAUDE),
-    Field("JARVIS_AGENT_TIMEOUT_MIN", "Durée maximale d'un agent (min)", "int", "Vide : 90 ; au-delà, l'agent est interrompu", section=CLAUDE),
-    Field("JARVIS_AGENT_ADD_DIRS", "Dossiers lisibles en plus", "text", "Séparés par « : » (ex. ~/Documents/Claude_vault)", section=CLAUDE),
+          section=CLAUDE, choices=("", "acceptEdits", "plan", "default"), group=RIGHTS),
     Field("JARVIS_AGENT_ALLOWED_TOOLS", "Outils autorisés", "text", "Vide : liste par défaut (lire, modifier, uv run, git, gh pr create) ; sinon séparés par « ; »",
-          section=CLAUDE),
-    Field("JARVIS_WORKTREES_DIR", "Dossier des worktrees", "path", "Vide : <dossier de l'orchestrator>/.claude/worktrees/jarvis", section=CLAUDE),
+          section=CLAUDE, group=RIGHTS),
+    Field("JARVIS_AGENT_ADD_DIRS", "Dossiers lisibles en plus", "text", "Séparés par « : » (ex. ~/Documents/Claude_vault)", section=CLAUDE, group=RIGHTS),
+    Field("JARVIS_WORKTREES_DIR", "Dossier des worktrees", "path", "Vide : <dossier de l'orchestrator>/.claude/worktrees/jarvis", section=CLAUDE,
+          group=RIGHTS),
     Field("JARVIS_DAG_MAX_CLEARS", "Relances automatiques au plus", "int",
           "Vide : 3. Tâches en échec relancées (clear) par le suivi avant d'abandonner ; 0 : aucune relance", section=DAGS, minimum=0),
     Field("JARVIS_DAG_INTERVAL_S", "Intervalle entre deux vérifications (s)", "int", "Vide : 60", section=DAGS, minimum=10),

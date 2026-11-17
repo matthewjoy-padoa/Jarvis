@@ -225,3 +225,20 @@ def test_agent_engine_and_effort_go_to_the_claude_command(env):
         for key in form:
             os.environ.pop(key, None)
         claude.reconfigure()
+
+
+def test_settings_are_split_into_parts_with_a_summary(env):
+    page = TestClient(main.app).get("/reglages").text
+    assert {f.section for f in env_file.FIELDS} == set(env_file.SECTIONS)  # aucun réglage hors d'une partie affichée
+    for name, part in env_file.SECTIONS.items():  # chaque partie : un lien dans le sommaire et sa carte
+        assert f'href="#{part.anchor}"' in page and f'id="{part.anchor}"' in page and name in page
+    assert 'href="#1password"' in page and 'href="#notifications"' in page
+    for f in env_file.FIELDS:  # chaque réglage une seule fois, dans la carte de sa partie
+        assert page.count(f'name="{f.key}"') == 1
+        start = page.index(f'id="{env_file.SECTIONS[f.section].anchor}"')
+        assert start < page.index(f'name="{f.key}"') < page.index("</section>", page.index(f'name="{f.key}"'))
+        assert "</section>" not in page[start:page.index(f'name="{f.key}"')]
+    agents = page[page.index('id="agents"'):page.index('id="dags"')]
+    assert [g for g in ("Moteur", "Limites", "Permissions et dossiers") if f'<h3 class="settings-group">{g}</h3>' in agents] \
+        == ["Moteur", "Limites", "Permissions et dossiers"]
+    assert agents.index("Limites") < agents.index('name="JARVIS_AGENT_MAX_TURNS"') < agents.index("Permissions et dossiers")
