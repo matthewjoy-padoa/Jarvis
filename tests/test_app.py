@@ -512,3 +512,9 @@ def test_context_is_read_from_the_journal_even_while_the_agent_runs():
     end = json.dumps({"type": "result", "modelUsage": {"modele": {"contextWindow": 1_000_000}}})
     read_context(run, "\n".join([turn(499_000), end]))
     assert (run.context_window, run.context_pct) == (1_000_000, 50)
+
+
+def test_footer_shows_version_from_pyproject():
+    import tomllib
+    expected = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())["project"]["version"]
+    assert f"v{expected}</a></footer>" in client.get("/").text

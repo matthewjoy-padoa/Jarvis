@@ -125,6 +125,8 @@ uv run pytest
 uv run uvicorn deploy_hub.main:app --port 8765 --reload --reload-dir src
 ```
 
+Versions : numéro dans `pyproject.toml`, historique et règle de numérotation dans [`CHANGELOG.md`](CHANGELOG.md) (une ligne par PR sous « Non publié »).
+
 Routes dans `src/deploy_hub/main.py`, pages dans `templates/` et `static/`, synchro Notion dans `sync_notion.py` (consigne de la routine : `sync/routine.md`, lanceur : `sources/sync_routine.py`), sources (Notion, Airflow, agents, PR GitHub, perso, notifications) dans `sources/`.
 
 ## Limites connues
