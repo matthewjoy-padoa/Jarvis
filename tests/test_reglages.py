@@ -170,6 +170,8 @@ def test_claude_settings_are_in_the_page_and_applied_to_the_next_agents(env):
     ("JARVIS_DAG_INTERVAL_S", "5", "un nombre entier, 10 au moins"),
     ("JARVIS_AGENT_PERMISSION_MODE", "bypassPermissions", "acceptEdits ou plan ou default"),
     ("JARVIS_MODE", "prod", "demo ou live"),
+    ("JARVIS_AGENT_EFFORT", "extreme", "low ou medium ou high ou xhigh ou max"),
+    ("JARVIS_AGENT_MAX_TURNS", "0", "un nombre entier, 1 au moins"),
 ])
 def test_invalid_claude_settings_write_nothing(env, key, value, why):
     before = env.read_text()
@@ -203,3 +205,23 @@ def test_mac_notifications_are_turned_on_from_the_settings_not_the_bell():
     assert "data-enable-browser-notifs" not in panel and 'href="/reglages#notifications"' in panel
     script = client.get("/static/notify.js").text
     assert "[data-browser-notifs]" in script and "Notification.requestPermission()" in script
+
+
+def test_agent_engine_and_effort_go_to_the_claude_command(env):
+    page = TestClient(main.app).get("/reglages").text
+    assert '<select name="JARVIS_AGENT_EFFORT">' in page and 'name="JARVIS_AGENT_FALLBACK_MODEL"' in page
+    form = {"JARVIS_AGENT_MODEL": "opus", "JARVIS_AGENT_FALLBACK_MODEL": "sonnet", "JARVIS_AGENT_EFFORT": "high",
+            "JARVIS_AGENT_MAX_TURNS": "40", "JARVIS_AGENT_MAX_BUDGET_USD": "5"}
+    claude = main.claude
+    try:
+        TestClient(main.app).post("/reglages", data=form, headers=SAME)
+        cmd = claude.build_command()
+        for option, value in (("--model", "opus"), ("--fallback-model", "sonnet"), ("--effort", "high"), ("--max-turns", "40"), ("--max-budget-usd", "5")):
+            assert cmd[cmd.index(option) + 1] == value
+        assert cmd.index("--allowedTools") > cmd.index("--max-budget-usd")  # --allowedTools prend tout ce qui suit
+        TestClient(main.app).post("/reglages", data={k: "" for k in form}, headers=SAME)  # vidés : aucune de ces options
+        assert not {"--model", "--fallback-model", "--effort", "--max-turns", "--max-budget-usd"} & set(claude.build_command())
+    finally:
+        for key in form:
+            os.environ.pop(key, None)
+        claude.reconfigure()
