@@ -8,6 +8,8 @@ Jarvis suit une numérotation `0.MINEUR.CORRECTIF` tant qu'il n'est pas stable :
 
 ## Non publié
 
+- Plus de mode démo : `JARVIS_MODE` disparaît ; agents Claude et synchro Notion toujours réels, DAG lancés seulement avec Airflow configuré ; ce qui manque est dit (Claude Code, orchestrator, Airflow) au lieu d'être simulé ; plus d'agents fictifs sur la page Agents.
+
 ## [0.1.0] · 2026-11-17
 
 Première version suivie : tout ce qui a été fusionné jusqu'à la PR #50.

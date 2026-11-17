@@ -70,7 +70,7 @@ def report_name(dag_id: str, run_id: str) -> str:
 class DagWatcher:
     def __init__(self, state_dir: Path, notifications=None, airflow_env: dict[str, str] | None = None,
                  command: list[str] | None = None, on_end=None):
-        """airflow_env : AIRFLOW_URL, AIRFLOW_USER, AIRFLOW_PASSWORD (vide en mode simulé : aucun suivi à reprendre)."""
+        """airflow_env : AIRFLOW_URL, AIRFLOW_USER, AIRFLOW_PASSWORD (vide sans Airflow configuré : aucun suivi à reprendre)."""
         self.state_dir = state_dir
         self.state_file = state_dir / "suivis.json"
         self.notifications = notifications

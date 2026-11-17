@@ -34,7 +34,7 @@ Deux façons de lire Notion, au choix :
 |---|---|---|
 | Comment | Claude exécute les requêtes avec son connecteur Notion, en suivant [`sync/routine.md`](sync/routine.md) | Jarvis appelle l'API avec une intégration Notion interne en lecture seule |
 | Prérequis | Connecteur Notion activé dans Claude, avec accès aux bases Notion du déploiement | `NOTION_TOKEN` dans `.env`, intégration connectée aux bases Clients en déploiement, Actions de déploiement, Retours Recette, Catalogue RDD, Bible déploiement et Resources |
-| Bouton « Rafraîchir depuis Notion » | Lance la routine en arrière-plan (`claude -p`) ; il faut aussi `JARVIS_MODE=live` et Claude Code en ligne de commande (`claude` dans le PATH, ou `CLAUDE_BIN`) | Appelle l'API directement |
+| Bouton « Rafraîchir depuis Notion » | Lance la routine en arrière-plan (`claude -p`) ; il faut aussi Claude Code en ligne de commande (`claude` dans le PATH, ou `CLAUDE_BIN`) | Appelle l'API directement |
 
 ### Mettre en place la routine
 
@@ -49,14 +49,14 @@ Deux façons de lire Notion, au choix :
      2. Canal Slack où signaler un échec : #mon-canal (id), ou aucun. Rien sur Slack en cas de succès.
      ```
    - active le connecteur Notion pour la tâche et autorise le dossier de Jarvis ; lance-la une fois (« Run now ») pour vérifier.
-4. **Bouton dans Jarvis** (facultatif) : avec `JARVIS_MODE=live` dans `.env` et Claude Code en ligne de commande installé et connecté, « Rafraîchir depuis Notion » (fiche) et « Tout rafraîchir » (Clients) lancent la routine sans jeton ; l'état s'affiche sous le bouton et la page se recharge à la fin. En mode `demo` (par défaut), le bouton ne fait que simuler, comme pour les agents ; en `live` sans jeton ni `claude`, il est grisé.
+4. **Bouton dans Jarvis** (facultatif) : avec Claude Code en ligne de commande installé et connecté, « Rafraîchir depuis Notion » (fiche) et « Tout rafraîchir » (Clients) lancent la routine sans jeton ; l'état s'affiche sous le bouton et la page se recharge à la fin. Sans jeton ni `claude`, il est grisé et son infobulle dit pourquoi.
 
 La consigne vit dans le dépôt : un `git pull` met à jour la tâche planifiée, la commande et le bouton. Détails (déroulé d'un passage, outils permis, journal) : [`docs/routine-synchro.md`](docs/routine-synchro.md).
 
 ## Lancer des DAGs
 
 L'onglet Injections propose les DAGs de l'orchestrator qui traitent chaque ressource, sur integration, snap ou recette (la prod est désactivée).
-- Réglages Airflow dans `.env` (`AIRFLOW_BASE_URL`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD`) ; sans eux, les lancements sont simulés.
+- Réglages Airflow dans `.env` (`AIRFLOW_BASE_URL`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD`) ; sans eux, aucun DAG n'est lancé et Jarvis dit quoi régler.
 - Après chaque lancement réel, [`air.py`](src/deploy_hub/air.py) (le script d'Arthur) suit le run : il relance les échecs passagers (3 fois au plus), envoie ses alertes en notifications et fait un rapport (**Agents → Suivis de DAG**). Il lit les logs des tâches qu'il suit ; ce qu'il écrit reste dans `data/airflow/`.
 - **Enchaînement** : plusieurs DAG cochés partent dans l'ordre ; le suivant ne part que si le suivi du précédent finit vert, sinon la chaîne s'arrête et le dit en notification (**Agents → Enchaînements**, bouton « Arrêter »). Jamais en prod.
 - Catalogue des DAGs : `sync/dags/catalogue.json`, à régénérer quand `dags/config_deployment.py` change ([`sync/dags/generer_catalogue.py`](sync/dags/generer_catalogue.py)).
@@ -67,7 +67,7 @@ Le bouton **Flow Digger ↗** de la barre ouvre [integration-flow-digger](https:
 
 ## Lancer des agents Claude
 
-Sur un retour de recette, « Lancer un agent » envoie le brief à Claude Code (`JARVIS_MODE=live`) :
+Sur un retour de recette, « Lancer un agent » envoie le brief à Claude Code (`claude -p`) :
 - dans un **worktree** de l'orchestrator, sur la branche `fix-<client>-<retour>` : ton clone de travail n'est jamais modifié ;
 - outils limités à `JARVIS_AGENT_ALLOWED_TOOLS` (lire, modifier, `uv run`, git sans reset, `gh pr create`), lecture hors worktree limitée à `JARVIS_AGENT_ADD_DIRS`, sans les jetons de Jarvis ;
 - suivi dans **Agents** (journal, compte rendu, PR, bouton « Arrêter ») ;
@@ -112,7 +112,7 @@ Tous facultatifs, voir [`.env.example`](.env.example) :
 | `NOTION_TOKEN` | Synchro par l'API Notion ; vide : le bouton « Rafraîchir depuis Notion » lance la routine Claude Code |
 | `CLAUDE_BIN`, `JARVIS_SYNC_ALLOWED_TOOLS` | Routine lancée par le bouton : binaire `claude`, outils permis (vide : liste par défaut) |
 | `AIRFLOW_BASE_URL`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD` | Lancement réel des DAGs |
-| `ORCHESTRATOR_DIR`, `JARVIS_MODE`, `CLAUDE_BIN`, `JARVIS_AGENT_*` | Agents Claude |
+| `ORCHESTRATOR_DIR`, `CLAUDE_BIN`, `JARVIS_AGENT_*` | Agents Claude |
 | `FLOW_DIGGER_DIR`, `FLOW_DIGGER_PORT`, `FLOW_DIGGER_URL` | Bouton Flow Digger (dossier, port 4004, adresse si le transfert de port en change) |
 | `PADOA_ENV_URL` | Bouton Environnements du dock (snap, snap-recette, integration) : modèle d'adresse avec `[stack]` et `[client]`, vide : `https://[stack]-[client].aodap-staging.fr/support` ; `[client]` = nom du client dans Jarvis (son slug) |
 

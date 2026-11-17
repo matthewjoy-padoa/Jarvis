@@ -12,6 +12,8 @@ import pytest
 from deploy_hub.sources.claude_runner import INSTRUCTION, ClaudeRunner, agent_branch, find_pr, read_log
 from deploy_hub.sources.notifications import NotificationStore
 
+from conftest import instant_agents
+
 FAKE_CLAUDE = r'''
 import json, os, sys, time
 brief = sys.stdin.read()
@@ -73,7 +75,7 @@ class R:
 
 
 def _runner(repo: Path, claude: Path, tmp_path: Path, **kw) -> ClaudeRunner:
-    return ClaudeRunner(repo, tmp_path / "agents", live=True, notifications=NotificationStore(tmp_path / "notifs.json"),
+    return ClaudeRunner(repo, tmp_path / "agents", notifications=NotificationStore(tmp_path / "notifs.json"),
                         claude_bin=str(claude), add_dirs=(tmp_path / "vault",), **kw)
 
 
@@ -140,7 +142,19 @@ def test_agent_can_be_stopped_and_relaunch_reuses_worktree(repo, fake_claude, tm
     assert runner.get(2).status == "terminé" and runner.get(2).worktree == runner.get(1).worktree
 
 
+def test_missing_orchestrator_is_refused_with_what_to_do(tmp_path, fake_claude):
+    """Plus de simulation : sans clone de l'orchestrator, Jarvis le dit au lieu de faire semblant."""
+    result = _runner(tmp_path / "absent", fake_claude, tmp_path).launch_retour(D, R, prompt="x")
+    assert not result.ok and not result.simulated and "ORCHESTRATOR_DIR" in result.message
+
+
+def test_missing_claude_is_refused_with_what_to_do(repo, tmp_path):
+    result = ClaudeRunner(repo, tmp_path / "agents", claude_bin=str(tmp_path / "pas-de-claude")).launch_retour(D, R, prompt="x")
+    assert not result.ok and "CLAUDE_BIN" in result.message
+
+
 def test_worktree_failure_ends_in_failure(tmp_path, fake_claude):
+    (tmp_path / "pas-un-depot" / ".git").mkdir(parents=True)  # ressemble à un clone, mais git échoue
     runner = _runner(tmp_path / "pas-un-depot", fake_claude, tmp_path)
     runner.launch_retour(D, R, prompt="x")
     _wait(runner, 1)
@@ -148,11 +162,11 @@ def test_worktree_failure_ends_in_failure(tmp_path, fake_claude):
 
 
 def test_history_survives_restart_and_running_agents_become_interrupted(tmp_path):
-    first = ClaudeRunner(tmp_path, tmp_path / "agents")
-    first.launch_retour(D, R, prompt="simulé")
+    first = instant_agents(ClaudeRunner(tmp_path, tmp_path / "agents"))
+    first.launch_retour(D, R, prompt="fini aussitôt")
     first.runs[0].status = "en cours"  # comme si Jarvis s'était arrêté pendant le travail
     first._save()
-    second = ClaudeRunner(tmp_path, tmp_path / "agents")
+    second = instant_agents(ClaudeRunner(tmp_path, tmp_path / "agents"))
     assert [r.id for r in second.runs] == [1] and second.runs[0].status == "interrompu"
     assert isinstance(second.runs[0].started_at, datetime)
     second.launch_retour(D, R, prompt="encore")

@@ -210,14 +210,14 @@ def test_a_real_launch_starts_the_watch_and_the_agents_pages_show_it(live_app):
     assert app.get("/agents/suivis/1/journal").status_code == 200 and app.get("/agents/suivis/9").status_code == 404
 
 
-def test_a_simulated_launch_starts_no_watch(monkeypatch, tmp_path):
+def test_without_airflow_no_launch_and_no_watch(monkeypatch, tmp_path):
     watcher = DagWatcher(tmp_path, command=["false"])
     monkeypatch.setattr(main, "dag_watch", watcher)
     monkeypatch.setattr(main, "airflow", AirflowSource(""))
     monkeypatch.setattr(main.fiches, "get_deployment", lambda slug: Deployment(slug="acme", client="Acme", software="Uegar", orchestrator=["acme-uegar"]))
     monkeypatch.setattr(main.dag_catalogue, "known_dag", lambda customers, dag_id: True)
     page = TestClient(main.app).post("/actions/injection/acme", data={"dag_id": "acme-uegar-etl-firm", "padoa_env": "snap"})
-    assert "Simulation" in page.text and "suivi" not in page.text and watcher.watches == []
+    assert "Airflow non configuré" in page.text and "Simulation" not in page.text and watcher.watches == []
 
 
 def test_watch_state_stays_in_jarvis_data_not_the_vault():

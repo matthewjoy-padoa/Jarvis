@@ -136,13 +136,19 @@ def test_the_injections_tab_offers_the_chain(app):
     assert all(f'name="dag_id" value="{dag}"' in html for dag in DAGS)
 
 
-def test_a_chain_follows_the_click_order_and_shows_on_the_agents_page(app):
+def test_a_chain_follows_the_click_order_and_shows_on_the_agents_page(app, fake_airflow):
     wanted = [DAGS[2], DAGS[0]]
     r = app.post("/actions/chaine/acme", data={"padoa_env": "snap", "dag_id": [DAGS[0], DAGS[2]], "ordre": ",".join(wanted)})
-    assert "Enchaînement #1 simulé de bout en bout" in r.text and f"{DAGS[2]} → {DAGS[0]}" in r.text
+    assert "Enchaînement #1 lancé sur snap" in r.text and f"{DAGS[2]} → {DAGS[0]}" in r.text
     assert [s.dag_id for s in main.dag_chains.get(1).steps] == wanted
+    assert fake_airflow.runs[0].dag_id == DAGS[2]  # le premier cliqué part d'abord ; le second attend la fin de son suivi
     page = app.get("/agents").text
-    assert 'id="chaines"' in page and "terminée" in page and DAGS[2] in page and "/agents/chaines/1/arreter" not in page
+    assert 'id="chaines"' in page and DAGS[2] in page and "/agents/chaines/1/arreter" in page  # en cours : arrêtable
+
+
+def test_a_chain_without_airflow_starts_nothing(app):
+    r = app.post("/actions/chaine/acme", data={"padoa_env": "snap", "dag_id": [DAGS[0], DAGS[2]], "ordre": f"{DAGS[0]},{DAGS[2]}"})
+    assert "Airflow non configuré" in r.text and "Simulation" not in r.text
 
 
 @pytest.mark.parametrize(("data", "why"), [

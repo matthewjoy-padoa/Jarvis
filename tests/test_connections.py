@@ -41,7 +41,7 @@ def test_airflow_unreachable():
 
 
 def test_airflow_simulated_says_why():
-    assert connections.airflow_status(AirflowSource("", "", ""))[1].startswith("simulé : AIRFLOW_BASE_URL")
+    assert connections.airflow_status(AirflowSource("", "", ""))[1].startswith("non configuré : AIRFLOW_BASE_URL")
     ok, message = connections.airflow_status(AirflowSource("http://localhost:8888", "", ""), "AIRFLOW_USER : does not have a field 'user'")
     assert not ok and "référence 1Password illisible" in message and "does not have a field" in message
 

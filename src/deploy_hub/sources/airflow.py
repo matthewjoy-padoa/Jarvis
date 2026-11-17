@@ -6,8 +6,8 @@ Un DAG en pause est d'abord sorti de pause (sinon le run attendrait), et le mess
 Ce module ne lit pas les logs ; le suivi lancé ensuite (dag_watch.py → air.py d'Arthur) les lit pour les runs qu'il suit
 (dérogation décidée par Matthew le 2026-11-12).
 
-Réel dès que AIRFLOW_BASE_URL, AIRFLOW_USER et AIRFLOW_PASSWORD sont renseignés (environnement ou .env de l'app) ;
-sinon simulé.
+Actif dès que AIRFLOW_BASE_URL, AIRFLOW_USER et AIRFLOW_PASSWORD sont renseignés (environnement ou .env de l'app) ;
+sinon aucun DAG n'est lancé et le message dit quoi régler.
 """
 
 import os
@@ -58,8 +58,8 @@ class AirflowSource:
         if padoa_env not in PADOA_ENVS:
             return ActionResult(False, f"Environnement inconnu : {padoa_env}", simulated=False)
         if not self.live:
-            return self._log(dag_id, padoa_env, client, card, ActionResult(
-                True, f"Simulation : {dag_id} sur {padoa_env} (Airflow non configuré : AIRFLOW_BASE_URL, AIRFLOW_USER, AIRFLOW_PASSWORD)"))
+            return ActionResult(False, "Airflow non configuré : renseigne AIRFLOW_BASE_URL, AIRFLOW_USER et AIRFLOW_PASSWORD dans Réglages.",
+                                simulated=False)
         try:
             dag = self.http.get(f"/dags/{dag_id}")
             if dag.status_code in (401, 403):

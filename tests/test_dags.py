@@ -59,10 +59,16 @@ def test_injection_tab_offers_the_card_dags_and_the_stacks(app):
         assert f'<option value="{env}">' in html
 
 
-def test_launch_on_a_chosen_stack(app):
+def test_launch_on_a_chosen_stack(app, fake_airflow):
     r = app.post("/actions/injection/acme", data={"dag_id": "acme-uegar-etl-firm", "padoa_env": "snap", "card": "Injection des firms"})
-    assert "Simulation : acme-uegar-etl-firm sur snap" in r.text
+    assert "acme-uegar-etl-firm lancé sur snap" in r.text
     assert main.airflow.runs[0].padoa_env == "snap" and main.airflow.runs[0].card == "Injection des firms"
+
+
+def test_without_airflow_nothing_is_launched(app):
+    """Plus de mode démo : sans Airflow configuré, Jarvis dit quoi régler au lieu de simuler un lancement."""
+    r = app.post("/actions/injection/acme", data={"dag_id": "acme-uegar-etl-firm", "padoa_env": "snap"})
+    assert "Airflow non configuré" in r.text and "AIRFLOW_BASE_URL" in r.text and "Simulation" not in r.text and not main.airflow.runs
 
 
 def test_prod_is_disabled(app):
@@ -71,7 +77,7 @@ def test_prod_is_disabled(app):
     assert "prod désactivé" in r.text and not any(run.padoa_env == "prod" for run in main.airflow.runs)
 
 
-def test_prod_needs_typed_confirmation_once_enabled(app, monkeypatch):
+def test_prod_needs_typed_confirmation_once_enabled(app, monkeypatch, fake_airflow):
     monkeypatch.setattr(main, "PADOA_ENVS", ("integration", "snap", "recette", "prod"))
     monkeypatch.setattr("deploy_hub.sources.airflow.PADOA_ENVS", ("integration", "snap", "recette", "prod"))
     data = {"dag_id": "acme-uegar-etl-firm", "padoa_env": "prod"}
@@ -127,7 +133,7 @@ def test_ced_cards_rule(title, injection, expected):
     assert Action(title=title, injection=injection).is_ced is expected
 
 
-def test_ced_view_and_launch(app, monkeypatch):
+def test_ced_view_and_launch(app, monkeypatch, fake_airflow):
     d = main.fiches.get_deployment("acme")
     d.orchestrator = ["acme-pulse"]
     d.actions.append(Action(title="[INTE] [PULSE] Injecter les fichiers"))
@@ -135,7 +141,7 @@ def test_ced_view_and_launch(app, monkeypatch):
     assert "<code>acme-pulse-ced</code>" in html and "type 46" in html and 'class="req req-client"' in html
     assert "Injecter les fichiers" in html
     r = app.post("/actions/injection/acme", data={"dag_id": "acme-pulse-ced", "padoa_env": "recette", "card": "CED acme-pulse"})
-    assert "Simulation : acme-pulse-ced sur recette" in r.text
+    assert "acme-pulse-ced lancé sur recette" in r.text
     assert "Par ressource" in app.get("/deploiements/acme/injections").text  # vue par défaut : groupée
 
 

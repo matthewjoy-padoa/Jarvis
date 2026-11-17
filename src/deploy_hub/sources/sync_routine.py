@@ -35,9 +35,8 @@ def routine_text() -> str:
 class SyncRoutine:
     """Lance la routine et garde son dernier état (data/notion/routine.json) et son journal (routine.log)."""
 
-    def __init__(self, live: bool, notifications=None, folder: Path | None = None, claude_bin: str | None = None,
+    def __init__(self, notifications=None, folder: Path | None = None, claude_bin: str | None = None,
                  allowed_tools: tuple[str, ...] = (), timeout_min: int = 30):
-        self.live = live
         self.notifications = notifications
         self.folder = folder or data_dir() / "notion"
         self._claude_bin = claude_bin
@@ -81,8 +80,6 @@ class SyncRoutine:
 
     def problem(self) -> str | None:
         """Ce qui empêche de lancer la routine (None : rien)."""
-        if not self.live:
-            return None
         if not shutil.which(self.claude_bin):
             return f"Claude Code en ligne de commande introuvable ({self.claude_bin}) : installe-le ou renseigne CLAUDE_BIN dans Réglages."
         if not ROUTINE.is_file():
@@ -99,8 +96,6 @@ class SyncRoutine:
         return {k: v for k, v in os.environ.items() if k not in ENV_FILE_KEYS}
 
     def start(self) -> ActionResult:
-        if not self.live:
-            return ActionResult(True, "Simulation : la routine de synchro Notion aurait été lancée (sync/routine.md, claude -p).", True)
         if (problem := self.problem()):
             return ActionResult(False, problem, False)
         with self._lock:
