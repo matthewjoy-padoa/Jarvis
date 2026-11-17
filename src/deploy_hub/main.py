@@ -107,6 +107,17 @@ async def _push_loop() -> None:
 app = FastAPI(title="Jarvis", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
+def when_text(moment: datetime | None) -> str:
+    """« aujourd'hui à 14:04 », « hier à 16:00 », « le 12/11 à 09:03 » (« le 12/11/2025 à … » une autre année)."""
+    if not moment:
+        return ""
+    days = (date.today() - moment.date()).days
+    day = "aujourd'hui" if days == 0 else "hier" if days == 1 else \
+        f"le {moment:%d/%m}" if moment.year == date.today().year else f"le {moment:%d/%m/%Y}"
+    return f"{day} à {moment:%H:%M}"
+
+
+templates.env.filters["quand"] = when_text
 templates.env.filters["duree"] = duration_text
 templates.env.filters["tokens"] = tokens_text
 templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STATUSES)

@@ -6,7 +6,7 @@ et « Retours Recette » ; les groupes (à faire / en cours / KO / terminé) ser
 
 import re
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from urllib.parse import quote
 
 TODO, IN_PROGRESS, KO, DONE = "todo", "in_progress", "ko", "done"
@@ -269,7 +269,8 @@ class Deployment:
     icone: str = ""  # ou son image, téléchargée dans data/notion/<slug>/ (servie par /icones/<slug>)
     orchestrator: list[str] = field(default_factory=list)  # clés client de l'orchestrator (configuration du client)
     notion_url: str = ""
-    synced_at: str = ""
+    synced_at: str = ""  # fiche réécrite (données changées), « JJ/MM/AAAA HH:MM »
+    checked_at: str = ""  # dernière vérification dans Notion, même sans changement (data/notion/verifications.json)
     injection_counts: dict[str, int] = field(default_factory=dict)  # synchro Notion : nb de cartes par statut
     milestones: dict[str, date] = field(default_factory=dict)
     links: list[Link] = field(default_factory=list)
@@ -281,6 +282,16 @@ class Deployment:
     regles: list[Regle] = field(default_factory=list)
     remontees: list[Remontee] = field(default_factory=list)
     pending: bool = False  # client configuré, pas encore synchronisé : fiche vide en attendant la première synchro
+
+    @property
+    def last_sync(self) -> datetime | None:
+        """Dernière synchro : la plus récente entre la dernière écriture de la fiche et la dernière vérification."""
+        def parse(value: str) -> datetime | None:
+            try:
+                return datetime.strptime(value, "%d/%m/%Y %H:%M") if value else None
+            except ValueError:
+                return None
+        return max(filter(None, (parse(self.synced_at), parse(self.checked_at))), default=None)
 
     @property
     def go_live(self) -> date | None:
