@@ -88,10 +88,10 @@
 </figure>
 {% endmacro %}
 
-{# Anneau de remplissage : part d'un tout (contexte d'un agent), toujours accompagné de son chiffre écrit à côté.
-   Passe en alerte à 80 %. #}
-{% macro ring(pct, size=18, label="") %}
-<svg class="ring{{ ' ring-high' if pct >= 80 }}" width="{{ size }}" height="{{ size }}" viewBox="0 0 36 36" role="img" aria-label="{{ label or (pct ~ ' %') }}">
+{# Anneau de remplissage : part d'un tout (contexte d'un agent, avancement d'une synchro), toujours accompagné de son chiffre
+   écrit à côté. Passe en alerte à partir de « alert » % (80 pour le contexte) ; alert=none : jamais (avancement). #}
+{% macro ring(pct, size=18, label="", alert=80) %}
+<svg class="ring{{ ' ring-high' if alert is not none and pct >= alert }}" width="{{ size }}" height="{{ size }}" viewBox="0 0 36 36" role="img" aria-label="{{ label or (pct ~ ' %') }}">
   <circle class="ring-track" cx="18" cy="18" r="15.915"/>
   <circle class="ring-fill" cx="18" cy="18" r="15.915" stroke-dasharray="{{ pct }} 100" transform="rotate(-90 18 18)"/>
 </svg>

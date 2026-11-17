@@ -22,8 +22,9 @@ NOTION_SERVERS = ("mcp__claude_ai_Notion", "mcp__notion", "mcp__Notion")  # noms
 
 
 def default_tools(data: Path) -> tuple[str, ...]:
-    """Outils permis : les commandes de synchro, la copie des résultats, l'écriture dans le dossier de données, Notion."""
-    return ("Bash(uv run python -m deploy_hub.sync_notion:*)", "Bash(cp:*)", f"Write(/{data.resolve()}/**)", *NOTION_SERVERS)
+    """Outils permis : les commandes de synchro, la copie des résultats, l'écriture dans le dossier de données
+    (Edit : seule forme de règle à chemin que Claude Code applique aussi à Write), Notion."""
+    return ("Bash(uv run python -m deploy_hub.sync_notion:*)", "Bash(cp:*)", f"Edit(/{data.resolve()}/**)", *NOTION_SERVERS)
 
 
 def routine_text() -> str:
@@ -126,6 +127,36 @@ class SyncRoutine:
         if not ok and self.notifications is not None:
             self.notifications.add(f"sync-routine-fail:{datetime.now().isoformat(timespec='minutes')}", "sync", "urgent",
                                    "Synchro Notion en échec", reason[:300], "/clients")
+
+    def progress(self) -> dict:
+        """Avancement de la synchro en cours, lu dans les fichiers que la routine dépose (data/notion/) depuis son lancement :
+        empreinte, plan de chaque client (ses requêtes), résultats déposés, fusion. {"pct": 0-100, "label": "..."}."""
+        try:
+            since = datetime.fromisoformat(self.state()["started"]).timestamp()
+        except (KeyError, TypeError, ValueError):
+            return {"pct": 0, "label": "Démarrage…"}
+        fresh = lambda path: path.is_file() and path.stat().st_mtime >= since  # noqa: E731
+        if not fresh(self.folder / "empreintes.json"):
+            return {"pct": 5, "label": "Empreinte de tous les clients…"}
+        done = total = merged = 0
+        for raw in (p for p in self.folder.iterdir() if p.is_dir()):
+            plan = raw / "plan.json"
+            if fresh(plan):
+                try:
+                    outputs = json.loads(plan.read_text(encoding="utf-8")).get("sorties", [])
+                except (OSError, ValueError):
+                    outputs = []
+                total += len(outputs)
+                done += sum((raw / f"{name}.json").is_file() for name in outputs)
+            elif fresh(raw / "etat-synchro.json"):  # client fusionné : son plan est effacé
+                merged += 1
+        if merged:
+            return {"pct": 92, "label": f"Fusion : {merged} client(s)…"}
+        if not total:
+            return {"pct": 15, "label": "Plan des requêtes…"}
+        if done < total:
+            return {"pct": 20 + 65 * done // total, "label": f"Requêtes : {done} / {total}"}
+        return {"pct": 88, "label": "Fusion…"}
 
     def summary(self, lines: int = 8) -> str:
         """Fin du compte rendu de Claude (des comptes, jamais de lignes de données : voir la consigne)."""

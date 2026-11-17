@@ -901,9 +901,11 @@ def _refresh(slugs: list[str]) -> tuple[bool, str]:
 
 
 def _sync_status(request: Request, running: bool, ok: bool, message: str, simulated: bool = False) -> HTMLResponse:
-    """État de la routine sous le bouton : il se met à jour seul tant qu'elle tourne ; la page se recharge à la fin si tout va bien."""
+    """État de la routine sous le bouton : un cercle d'avancement qui se met à jour seul tant qu'elle tourne ;
+    la page se recharge à la fin si tout va bien."""
     response = templates.TemplateResponse(request, "_sync_status.html", {"running": running, "ok": ok, "message": message,
-                                                                         "simulated": simulated})
+                                                                         "simulated": simulated,
+                                                                         "progress": sync_routine.progress() if running else None})
     if not running and ok and not simulated and request.method == "GET":
         response.headers["HX-Refresh"] = "true"
     return response

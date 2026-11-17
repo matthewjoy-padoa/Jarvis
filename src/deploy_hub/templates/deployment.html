@@ -13,7 +13,7 @@
     {% include "_stacks.html" %}
     <div class="refresh">
   <button type="button" class="secondary" hx-post="/actions/rafraichir/{{ d.slug }}" hx-target="next .refresh-out" hx-indicator="closest .refresh" hx-disabled-elt="this"{% if not notion_ready %} disabled title="Ni jeton Notion ni Claude Code en ligne de commande : voir docs/routine-synchro.md"{% endif %}>{{ ic.icon("sync") }} Rafraîchir depuis Notion</button>
-  <span class="refresh-wait muted">Jarvis interroge Notion…</span>
+  <span class="refresh-wait muted" role="status"><svg class="ring ring-spin" width="18" height="18" viewBox="0 0 36 36" aria-hidden="true"><circle class="ring-track" cx="18" cy="18" r="15.915"/><circle class="ring-fill" cx="18" cy="18" r="15.915" stroke-dasharray="25 100"/></svg> Jarvis interroge Notion…</span>
   <div class="refresh-out"></div>
 </div>
   </div>
