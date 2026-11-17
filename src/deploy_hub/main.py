@@ -28,6 +28,7 @@ from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, duration_tex
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_watch import DagWatcher
 from deploy_hub.sources.examples import Examples
+from deploy_hub.sources.sync_routine import SyncRoutine
 from deploy_hub.sources import connections, flow_digger, notion_api
 from deploy_hub.sources.external import external_statuses
 from deploy_hub.sources.journal import changes_since, group_changes
@@ -48,6 +49,8 @@ fiches = FicheSource(settings.deployments_dir, clients_dir())
 airflow = AirflowSource.from_env()
 notifications = NotificationStore(Path(os.getenv("DEPLOY_HUB_NOTIFICATIONS") or settings.deployments_dir.parent / "notifications.json"))
 claude = ClaudeRunner.from_env(settings.orchestrator_dir, live, notifications, data_dir() / "agents")
+# Synchro Notion sans jeton : le bouton « Rafraîchir depuis Notion » fait suivre sync/routine.md à Claude Code (claude -p).
+sync_routine = SyncRoutine(live, notifications)
 examples = None if live else Examples()  # page Agents du mode démo : exemples fictifs, en mémoire, jamais dans l'historique
 pulls = PullRequests(settings.orchestrator_dir)  # PR ouvertes de l'orchestrator (gh), gardées cinq minutes
 # Suivi des runs lancés (air.py d'Arthur) ; les suivis en cours au démarrage reprennent si Airflow est configuré.
@@ -186,7 +189,7 @@ def _render(request: Request, template: str, active: str, **context) -> HTMLResp
             "dags_for": dag_catalogue.dags_for,
             "ced_for": dag_catalogue.ced_for,
             "padoa_envs": PADOA_ENVS,
-            "notion_ready": notion_api.load_token() is not None,
+            "notion_ready": notion_api.load_token() is not None or sync_routine.problem() is None,  # jeton, ou routine via Claude
             "today": date.today(),
             **context,
         },
@@ -891,7 +894,7 @@ def launch_agent_on_retour(request: Request, slug: str, retour_id: str, descript
 
 def _refresh(slugs: list[str]) -> tuple[bool, str]:
     token = notion_api.load_token()
-    if not token:
+    if not token:  # sans jeton : routine Claude Code, voir refresh_by_routine
         return False, "Jeton Notion absent : ajoute NOTION_TOKEN dans le fichier .env de l'app (voir README)."
     if not _refresh_lock.acquire(blocking=False):
         return False, "Un rafraîchissement est déjà en cours."
@@ -911,8 +914,38 @@ def _refresh(slugs: list[str]) -> tuple[bool, str]:
         _refresh_lock.release()
 
 
+def _sync_status(request: Request, running: bool, ok: bool, message: str, simulated: bool = False) -> HTMLResponse:
+    """État de la routine sous le bouton : il se met à jour seul tant qu'elle tourne ; la page se recharge à la fin si tout va bien."""
+    response = templates.TemplateResponse(request, "_sync_status.html", {"running": running, "ok": ok, "message": message,
+                                                                         "simulated": simulated})
+    if not running and ok and not simulated and request.method == "GET":
+        response.headers["HX-Refresh"] = "true"
+    return response
+
+
+def refresh_by_routine(request: Request) -> HTMLResponse | None:
+    """Sans jeton Notion : la routine (tous les clients configurés dans l'app) ; None si un jeton permet l'API."""
+    if notion_api.load_token():
+        return None
+    r = sync_routine.start()
+    return _sync_status(request, r.ok and not r.simulated, r.ok, r.message, r.simulated)
+
+
+@app.get("/actions/rafraichir/etat", response_class=HTMLResponse)
+def refresh_status(request: Request):
+    if sync_routine.running:
+        return _sync_status(request, True, True, "Synchro Notion en cours…")
+    state = sync_routine.state()
+    if state.get("running"):  # lancée avant un redémarrage de Jarvis : plus suivie par ce processus
+        return _sync_status(request, False, False, "Synchro interrompue : Jarvis a redémarré pendant qu'elle tournait. Relance-la.")
+    ok = bool(state.get("ok"))
+    return _sync_status(request, False, ok, ("Synchro terminée. " if ok else "Synchro en échec : ") + (state.get("summary") or ""))
+
+
 @app.post("/actions/rafraichir", response_class=HTMLResponse)
 def refresh_all(request: Request):
+    if (routine := refresh_by_routine(request)) is not None:
+        return routine
     ok, message = _refresh(notion_api.clients())
     response = _result(request, ActionResult(ok, message, simulated=False))
     if ok:
@@ -923,6 +956,8 @@ def refresh_all(request: Request):
 @app.post("/actions/rafraichir/{slug}", response_class=HTMLResponse)
 def refresh_one(request: Request, slug: str):
     _get(slug)
+    if (routine := refresh_by_routine(request)) is not None:  # la routine passe sur tous les clients en une empreinte
+        return routine
     ok, message = _refresh([slug])
     response = _result(request, ActionResult(ok, message, simulated=False))
     if ok:

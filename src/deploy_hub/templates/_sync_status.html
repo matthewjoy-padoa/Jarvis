@@ -1,0 +1,9 @@
+{# État de la routine de synchro Notion (bouton « Rafraîchir depuis Notion » sans jeton). Attend : running, ok, message, simulated. #}
+{% import "_icons.html" as ic %}
+{% if running %}
+<div class="sync-status" hx-get="/actions/rafraichir/etat" hx-trigger="every 4s" hx-swap="outerHTML">
+  <p class="result ok">{{ ic.icon("sync") }} {{ message }}</p>
+</div>
+{% else %}
+<p class="result {{ 'ok' if ok else 'ko' }}">{% if simulated %}{{ ic.icon("flask", "Simulation", "ic-muted") }} {% endif %}{{ message }}</p>
+{% endif %}

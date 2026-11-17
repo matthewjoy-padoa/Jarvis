@@ -267,14 +267,6 @@ def test_token_comes_from_env_file(tmp_path, monkeypatch):
     assert notion_api.load_token(tmp_path) == "ntn_test"
 
 
-def test_refresh_button_without_token(monkeypatch):
-    from fastapi.testclient import TestClient
-    from deploy_hub import main
-    monkeypatch.setattr(notion_api, "load_token", lambda root=None: None)
-    r = TestClient(main.app).post("/actions/rafraichir")
-    assert "Jeton Notion absent" in r.text and "HX-Refresh" not in r.headers
-
-
 def test_people_column_keeps_notion_ids():
     assert notion_api.value({"type": "people", "people": [{"id": "u-1", "name": "X"}, {"id": "u-2"}]}) == '["user://u-1", "user://u-2"]'
     assert notion_api.value({"type": "people", "people": []}) is None
