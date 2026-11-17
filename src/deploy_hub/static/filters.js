@@ -13,11 +13,13 @@
 //   recherche ou un filtre en trouve, un bouton propose de les afficher (data-out-label sur le bloc : comment les nommer).
 //   S'il n'y a de résultat que parmi eux, ils sont affichés d'office.
 // - Filtre « Client » : présélectionné sur le client du menu en haut (body[data-current-client]), sauf ancre de filtres.
+// - Barre : la recherche et un bouton « Filtres » (nombre de filtres actifs) ; les listes déroulantes sont dans un
+//   panneau replié qu'il ouvre, pour ne pas empiler cinq menus au-dessus de chaque liste.
 (function () {
   const collator = new Intl.Collator("fr", { numeric: true, sensitivity: "base" });
   const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
   const GROUPS = { todo: "À faire", in_progress: "En cours", ko: "KO", done: "Terminé" };
-  const blocks = []; // { keys: {clé: <select>}, apply, bar }
+  const blocks = []; // { keys: {clé: <select>}, apply, bar, panel }
   const fold = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const isClient = (k) => k.toLowerCase() === "client"; // « client » ou en-tête « Client »
 
@@ -63,9 +65,20 @@
     reset.hidden = true;
     const more = reset.cloneNode();
     more.className = "secondary more-out";
-    bar.append(search);
+    const toggle = reset.cloneNode();
+    toggle.className = "secondary filters-toggle";
+    toggle.hidden = false;
+    toggle.setAttribute("aria-expanded", "false");
+    const panel = document.createElement("div");
+    panel.className = "filter-panel";
+    panel.hidden = true;
+    toggle.addEventListener("click", () => {
+      panel.hidden = !panel.hidden;
+      toggle.setAttribute("aria-expanded", String(!panel.hidden));
+    });
+    bar.append(search, toggle);
     block.before(bar);
-    return { bar, search, count, reset, more, outLabel: block.dataset.outLabel || "masqué(s)" };
+    return { bar, panel, toggle, search, count, reset, more, outLabel: block.dataset.outLabel || "masqué(s)" };
   }
 
   function groupSelect(items, apply) {
@@ -75,7 +88,7 @@
   }
 
   function register(tools, keys, apply) {
-    const { bar, search, count, reset, more } = tools;
+    const { bar, panel, toggle, search, count, reset, more } = tools;
     const entry = { ...tools, keys, apply, out: null, shownOut: false }; // out : choix fait au bouton (null : aucun) ; shownOut : état affiché
     reset.addEventListener("click", () => {
       search.value = "";
@@ -83,7 +96,8 @@
       apply();
     });
     more.addEventListener("click", () => { entry.out = !entry.shownOut; apply(); });
-    bar.append(reset, more, count);
+    bar.append(reset, more, count, panel);
+    toggle.hidden = !panel.children.length;  // rien à filtrer : la recherche suffit
     blocks.push(entry);
     return entry;
   }
@@ -104,6 +118,9 @@
     entry.more.hidden = !(narrowed && outside);
     entry.more.textContent = out ? `${outside} ${entry.outLabel} affiché(s) · masquer` : `+ ${outside} ${entry.outLabel} · afficher`;
     entry.reset.hidden = !active;
+    const used = Object.values(entry.keys).filter((s) => s.value).length;
+    entry.toggle.textContent = used ? `Filtres · ${used}` : "Filtres";
+    entry.toggle.classList.toggle("is-on", used > 0);
     const total = out ? items.length : items.filter((el) => !el.hasAttribute("data-out")).length;
     entry.count.textContent = `${visible.size} / ${total}`;
     markCharts();
@@ -121,7 +138,7 @@
     if (rows.length < 2) return;
     const cellValue = (row, i) => row.cells[i].dataset.sort ?? text(row.cells[i]);
     const tools = toolbar(table, apply);
-    const { bar, search } = tools;
+    const { panel, search } = tools;
     const keys = {};
     const filters = headers
       .map((th, i) => [th, i])
@@ -131,12 +148,12 @@
         const cellValues = (r) => (multi ? (r.cells[i].dataset.values || "").split("|") : [text(r.cells[i])]);
         const values = [...new Set(rows.flatMap(cellValues))].filter((v) => v && v !== "—").sort(compare);
         const [wrap, s] = select(text(th), values.map((v) => [v, v]), apply);
-        bar.append(wrap);
+        panel.append(wrap);
         keys[th.dataset.filter || text(th)] = s;
         return { i, s, cellValues };
       });
     const group = groupSelect(rows, apply);
-    if (group) { bar.append(group[0]); keys.groupe = group[1]; }
+    if (group) { panel.append(group[0]); keys.groupe = group[1]; }
     const entry = register(tools, keys, apply);
 
     function apply() {
@@ -172,7 +189,7 @@
     const items = [...block.querySelectorAll(block.dataset.items)];
     if (items.length < 2) return;
     const tools = toolbar(block, apply);
-    const { bar, search } = tools;
+    const { panel, search } = tools;
     const keys = {};
     const filters = pairs(block.dataset.filters).map(([label, attr]) => {
       const valuesOf = (it) => (it.dataset[attr] || "").split("|"); // « a|b » : la carte répond aux deux valeurs
@@ -180,9 +197,9 @@
       const [wrap, s] = select(label, values.map((v) => [v, v]), apply);
       return { attr, s, wrap, valuesOf };
     }).filter((f) => f.s.options.length > 2);
-    filters.forEach((f) => { bar.append(f.wrap); keys[f.attr] = f.s; });
+    filters.forEach((f) => { panel.append(f.wrap); keys[f.attr] = f.s; });
     const group = groupSelect(items, apply);
-    if (group) { bar.append(group[0]); keys.groupe = group[1]; }
+    if (group) { panel.append(group[0]); keys.groupe = group[1]; }
     const sorts = pairs(block.dataset.sorts);
     if (sorts.length) {
       const wrap = document.createElement("label");
@@ -195,7 +212,7 @@
         block.append(...order);
       });
       wrap.append(s);
-      bar.append(wrap);
+      panel.append(wrap);
     }
     const entry = register(tools, keys, apply);
 

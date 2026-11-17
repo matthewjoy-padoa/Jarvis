@@ -97,8 +97,9 @@
 </svg>
 {% endmacro %}
 
-{# Frise du projet : jalons passés pleins, à venir creux, prochain jalon mis en avant (date et J-x). #}
-{% macro timeline(t, slug=None) %}
+{# Frise du projet : jalons passés pleins, à venir creux, prochain jalon mis en avant (date et J-x).
+   upcoming_only : la légende sous la frise ne liste que les jalons à venir (les passés restent sur la frise, au survol). #}
+{% macro timeline(t, slug=None, upcoming_only=false) %}
 {% if t %}
 {% set upcoming = t.marks | selectattr(1, "ge", today) | list %}
 {% set nxt = upcoming[0] if upcoming else None %}
@@ -115,7 +116,7 @@
     <span class="tl-today{{ ' end' if t.today > 80 }}" style="left: {{ t.today }}%" title="Aujourd'hui"><span>Aujourd'hui</span></span>
   </div>
   <ol class="tl-legend">
-    {% for label, day, pos in t.marks %}<li class="{{ 'past' if day < today }}{{ ' next' if nxt and day == nxt[1] }}">{% if slug %}<a href="/deadlines?client={{ slug }}&vue=calendrier&mois={{ day.strftime('%Y-%m') }}" title="Voir ce mois dans le calendrier des deadlines">{% endif %}<span class="date">{{ day.strftime("%d/%m") }}</span>{{ label }}{% if slug %}</a>{% endif %}</li>{% endfor %}
+    {% for label, day, pos in (upcoming if upcoming_only else t.marks) %}<li class="{{ 'past' if day < today }}{{ ' next' if nxt and day == nxt[1] }}">{% if slug %}<a href="/deadlines?client={{ slug }}&vue=calendrier&mois={{ day.strftime('%Y-%m') }}" title="Voir ce mois dans le calendrier des deadlines">{% endif %}<span class="date">{{ day.strftime("%d/%m") }}</span>{{ label }}{% if slug %}</a>{% endif %}</li>{% endfor %}
   </ol>
 </figure>
 {% endif %}

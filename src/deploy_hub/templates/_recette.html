@@ -1,22 +1,17 @@
 {% import "_icons.html" as ic %}
-{# Attend : deployments, show_client, show_all. Notion : « Retours Recette » ; contenu lu depuis contenu-recette.json (exclu de git). #}
+{# Attend : deployments, show_client, show_all. Notion : « Retours Recette » ; contenu lu depuis contenu-recette.json (exclu de git).
+   Une carte par retour, cliquable : son volet (_ticket.html) porte le contenu, l'agent à lancer et le lien Notion. #}
 {% import "_charts.html" as charts with context %}
 {% import "_kanban.html" as kb %}
 {% set base = request.url.path %}
+{# Vue tous clients : une barre par client pour comparer ; sur la fiche, rien en tête (la synthèse porte la barre). #}
+{% if show_client %}
 {% for d in deployments if d.retours %}
-{% set scope = {"client": d.client} if show_client else {} %}
 <section class="chart-row">
-  {{ charts.segbar((d.client ~ " · retours") if show_client else "Statut des retours", d.retour_groups, "retours", slim=true, filter_key="groupe", scope=scope, hrefs={} if show_all else {"done": base ~ "?tous=true"}) }}
+  {{ charts.segbar(d.client, d.retour_groups, "retours", slim=true, filter_key="groupe", scope={"client": d.client}, hrefs={} if show_all else {"done": base ~ "?tous=true"}) }}
 </section>
-{# Répartition par type : repliée, le filtre « Type de données » de la liste fait le même tri. #}
-{% set by_type = d.open_retours_by_type %}
-{% if by_type %}
-<details class="fold">
-  <summary>Par type de données{% if show_client %} <span class="muted">· {{ d.client }}</span>{% endif %}</summary>
-  {{ charts.hbars("Retours ouverts par type de données", by_type, 6, filter_key="type", scope=scope) }}
-</details>
-{% endif %}
 {% endfor %}
+{% endif %}
 {% set kanban = vue == "kanban" %}
 <div class="view-bar">
 <div class="segmented" role="group" aria-label="Présentation">
@@ -50,26 +45,10 @@
       <strong><a data-ticket href="{{ ticket_url(d.slug, 'retour', r.id) }}">{{ r.ligne or r.data_type or "Type de données non précisé" }}</a></strong>{% if r.ligne and r.data_type %} <span class="muted">· {{ r.data_type }}</span>{% endif %}
       {% if show_client %}<a href="/deploiements/{{ d.slug }}/recette" class="muted">{{ d.client }}</a>{% endif %}
     </header>
-    <p class="muted"><code>{{ r.id }}</code> · {{ r.software or d.software }}{% if r.owners %} · {{ ic.icon("user") }} {{ r.owners | join(", ") }}{% endif %}{% if r.resource %} · <code>{{ r.resource }}</code>{% endif %}{% if r.due %} · <span class="{{ 'late' if r.is_open and r.due < today }}">deadline {{ r.due.strftime("%d/%m/%Y") }}</span>{% endif %}{% if r.created %} · créé le {{ r.created.strftime("%d/%m/%Y") }}{% endif %}</p>
+    <p class="muted"><code>{{ r.id }}</code>{% if r.owners %} · {{ r.owners | join(", ") }}{% endif %}{% if r.resource %} · <code>{{ r.resource }}</code>{% endif %}{% if r.due %} · <span class="{{ 'late' if r.is_open and r.due < today }}">{{ r.due.strftime("%d/%m") }}</span>{% endif %}</p>
   </div>
-  <div class="retour-actions">
-    {% if r.notion_url %}<a class="btn-link" href="{{ r.notion_url }}" target="_blank" rel="noopener">Notion ↗</a>{% endif %}
-  </div>
-  {% if r.content %}
-  <details class="retour-content">
-    <summary>Voir le retour</summary>
-    <dl>{% for label, text in r.content %}<dt>{{ label }}</dt><dd>{{ text }}</dd>{% endfor %}</dl>
-  </details>
-  {% endif %}
-  {% if r.is_open %}
-  <details class="agent" hx-get="/deploiements/{{ d.slug }}/recette/{{ r.id }}/brief" hx-trigger="toggle once" hx-target="find .agent-body">
-    <summary>{{ ic.icon("bot") }} Lancer un agent</summary>
-    <div class="agent-body"><p class="muted">Jarvis prépare le brief…</p></div>
-  </details>
-  {% endif %}
 </article>
 {% endfor %}{% endfor %}
 </div>
 {% endif %}
-{% if not deployments | map(attribute="retours") | sum(start=[]) %}<p class="muted">Aucun retour de recette.</p>
-{% else %}<p class="muted small-note" title="Le contenu des retours (commentaire, exemple, analyse…) est gardé sur cette machine : il n'est jamais versionné dans git.">Contenu des retours gardé en local, hors GitHub.</p>{% endif %}
+{% if not deployments | map(attribute="retours") | sum(start=[]) %}<p class="muted">Aucun retour de recette.</p>{% endif %}

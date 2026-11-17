@@ -90,9 +90,9 @@ def test_the_side_shortcuts_follow_the_current_client():
     c = fresh()
     c.get("/deploiements/client-exemple/actions")
     html = c.get("/deadlines").text
-    dock = html.split('<nav class="dock"', 1)[1].split("</nav>", 1)[0]
-    assert 'aria-label="Raccourcis de Client Exemple"' in dock
-    assert 'href="/clients/client-exemple/liens?vers=/deadlines"' in dock and 'data-tip="Ajouter un lien Drive"' in dock  # pas encore de lien
+    dock = html.split('<details class="dock-links"', 1)[1].split("</details>", 1)[0]  # un bouton, la liste à l'ouverture
+    assert 'aria-label="Liens de Client Exemple"' in dock
+    assert 'href="/clients/client-exemple/liens?vers=/deadlines"' in dock and "Ajouter un lien Drive" in dock  # pas encore de lien
 
 
 def test_the_dock_gives_the_padoa_environments_of_the_current_client(monkeypatch):

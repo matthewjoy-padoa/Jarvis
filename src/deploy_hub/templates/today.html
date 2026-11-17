@@ -2,7 +2,6 @@
 {% import "_icons.html" as ic %}
 {% block title %}Accueil · Jarvis{% endblock %}
 {% block content %}
-{% import "_charts.html" as charts with context %}
 {% set days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"] %}
 {% set months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"] %}
 {% set hour = now.hour %}
@@ -20,15 +19,10 @@
   <div class="head-side"><a class="btn-primary" href="/brief" title="Le résumé du jour en texte, à copier pour Slack ou le daily">{{ ic.icon("sun") }} Brief du matin</a></div>
 </div>
 
-{# Pas de tuiles de compteurs : la phrase de Jarvis les porte déjà, chacun mène à sa liste. Mes tickets épinglés : tout en haut. #}
+{# Pas de tuiles ni de graphiques : la phrase de Jarvis porte les compteurs (chacun mène à sa liste), la synthèse du client
+   porte l'avancement. Mes tickets épinglés : tout en haut. #}
 {% include "_pins.html" %}
 
-{% for d in deployments %}
-<section class="panel glance">
-  <h2 class="glance-title"><a href="/deploiements/{{ d.slug }}/synthese">{{ ic.client_emoji(d) }}{{ d.client }}</a>{% if d.go_live %}<span class="badge {{ 'g-ko' if d.days_left < 14 }}">J{{ '%+d' % (-d.days_left) }}</span>{% endif %}</h2>
-  {{ charts.client_bars(d, "/deploiements/" ~ d.slug ~ "/synthese") }}
-</section>
-{% endfor %}
 
 <div class="two-col">
   <section>

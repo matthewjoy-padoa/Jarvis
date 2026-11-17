@@ -10,9 +10,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=125">
+  <link rel="stylesheet" href="/static/style.css?v=126">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
-  <script src="/static/filters.js?v=7" defer></script>
+  <script src="/static/filters.js?v=8" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
   <script src="/static/limit.js?v=1" defer></script>
   <script src="/static/notify.js?v=4" defer></script>
@@ -85,14 +85,15 @@
               hx-get="/notifications/panneau" hx-target="#notif-panel" hx-trigger="click">{{ ic.icon("bell") }}<span id="bell-count" hx-target="this" hx-get="/notifications/compte" hx-trigger="load, every 60s, notifs-changed from:body" hx-swap="innerHTML"></span></button>
       <div id="notif-panel" class="notif-panel" hidden></div>
     </div>
-    <button type="button" class="theme-toggle bar-icon" id="theme-toggle" title="Changer de thème" aria-label="Thème">Auto</button>
-    <a href="/reglages" class="settings-link bar-icon {{ 'active' if active == '/reglages' }}" aria-label="Réglages" title="Réglages : Airflow, Notion, 1Password">{{ ic.icon("gear") }}</a>
+    <a href="/reglages" class="settings-link bar-icon {{ 'active' if active == '/reglages' }}" aria-label="Réglages" title="Réglages : thème, Airflow, Notion, 1Password">{{ ic.icon("gear") }}</a>
     </div>
   </header>
+  <main>{% block content %}{% endblock %}</main>
   <script>
-    // Thème : Auto (suit le Mac) → Nuit → Clair → Auto. Retenu dans le navigateur.
+    // Thème : Auto (suit le Mac) → Nuit → Clair → Auto. Retenu dans le navigateur. Bouton dans Réglages.
     (function () {
       const root = document.documentElement, button = document.getElementById("theme-toggle");
+      if (!button) return;
       const order = ["", "dark", "light"], labels = { "": "Auto", dark: "Nuit", light: "Clair" };
       const svg = (paths) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
       const icons = {
@@ -115,7 +116,6 @@
       show();
     })();
   </script>
-  <main>{% block content %}{% endblock %}</main>
   <script>
     // Outils externes (Flow Digger) : une fenêtre à part, nommée, réutilisée au clic suivant ; le formulaire s'y envoie.
     // Fenêtres bloquées : le formulaire ouvre alors un onglet du même nom.
@@ -235,16 +235,29 @@
       {% else %}<a href="/reglages" style="--i: 0; --n: 1">Adresse à renseigner dans Réglages</a>{% endfor %}
     </div>
   </div>
-  <nav class="dock" aria-label="Raccourcis de {{ current.client }}">
-    {% for l in current.drive %}
-    {% set kind = "folder" if "/folders/" in l.url else ("sheet" if "/spreadsheets/" in l.url else "doc") %}
-    <a class="dock-btn dock-drive" href="{{ l.url }}" target="_blank" rel="noopener noreferrer" data-tip="Drive · {{ l.label }} ↗" aria-label="Drive : {{ l.label }} (nouvel onglet)">{{ dock_icon(kind) }}</a>
-    {% endfor %}
-    {% if current.notion_url %}<a class="dock-btn" href="{{ current.notion_url }}" target="_blank" rel="noopener" data-tip="Notion · Dashboard ↗" aria-label="Dashboard Notion (nouvel onglet)">{{ dock_icon("notion") }}</a>{% endif %}
-    {% for st in current.stacks %}<a class="dock-btn" href="{{ st.url }}" target="_blank" rel="noopener" data-tip="{{ (st.env ~ ' · ') if st.env }}{{ st.label }} ↗" aria-label="Stack {{ st.label }} (nouvel onglet)">{{ dock_icon("stack") }}</a>{% endfor %}
-    {% for l in current.links %}<a class="dock-btn" href="{{ l.url }}" target="_blank" rel="noopener" data-tip="{{ l.label }} ↗" aria-label="{{ l.label }} (nouvel onglet)">{{ dock_icon("link") }}</a>{% endfor %}
-    <a class="dock-btn dock-add" href="/clients/{{ current.slug }}/liens?vers={{ here }}" data-tip="{{ 'Ajouter un lien Drive' if not current.drive else 'Ajouter ou modifier les liens' }}" aria-label="Ajouter ou modifier les liens de {{ current.client }}">{{ dock_icon("add") }}</a>
-  </nav>
+  {# Liens du client : un bouton, la liste nommée à l'ouverture (une icône par lien en faisait une colonne illisible). #}
+  {% set n_links = current.drive | length + (1 if current.notion_url else 0) + current.stacks | length + current.links | length %}
+  <details class="dock-links" data-dock-links>
+    <summary class="dock-btn" aria-label="Liens de {{ current.client }}" data-tip="Liens{{ ' · ' ~ n_links if n_links }}">{{ dock_icon("link") }}{% if n_links %}<span class="dock-n">{{ n_links }}</span>{% endif %}</summary>
+    <nav class="dock-list" aria-label="Liens de {{ current.client }}">
+      {% if current.notion_url %}<a href="{{ current.notion_url }}" target="_blank" rel="noopener" aria-label="Dashboard Notion (nouvel onglet)">{{ dock_icon("notion") }}Dashboard Notion ↗</a>{% endif %}
+      {% for st in current.stacks %}<a href="{{ st.url }}" target="_blank" rel="noopener" aria-label="Stack {{ st.label }} (nouvel onglet)">{{ dock_icon("stack") }}{{ (st.env ~ ' · ') if st.env }}{{ st.label }} ↗</a>{% endfor %}
+      {% for l in current.drive %}
+      {% set kind = "folder" if "/folders/" in l.url else ("sheet" if "/spreadsheets/" in l.url else "doc") %}
+      <a class="dock-drive" href="{{ l.url }}" target="_blank" rel="noopener noreferrer" aria-label="Drive : {{ l.label }} (nouvel onglet)">{{ dock_icon(kind) }}Drive · {{ l.label }} ↗</a>
+      {% endfor %}
+      {% for l in current.links %}<a href="{{ l.url }}" target="_blank" rel="noopener" aria-label="{{ l.label }} (nouvel onglet)">{{ dock_icon("link") }}{{ l.label }} ↗</a>{% endfor %}
+      <a class="dock-add" href="/clients/{{ current.slug }}/liens?vers={{ here }}" aria-label="Ajouter ou modifier les liens de {{ current.client }}">{{ dock_icon("add") }}{{ 'Ajouter un lien Drive' if not current.drive else 'Ajouter ou modifier les liens' }}</a>
+    </nav>
+  </details>
+  <script>
+    // Liste des liens : se ferme au clic ailleurs et à Échap.
+    (function () {
+      const box = document.querySelector("[data-dock-links]");
+      document.addEventListener("click", (e) => { if (box.open && !box.contains(e.target)) box.open = false; });
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape" && box.open) { box.open = false; box.querySelector("summary").focus(); } });
+    })();
+  </script>
   </div>
   {% endif %}
 </body>

@@ -40,7 +40,6 @@
     <summary>
       <span class="res-name">{% for r in b.resources %}<code class="res">{{ r }}</code> {% else %}<span class="muted">{{ b.label }}</span>{% endfor %}</span>
       <span class="res-count muted">{{ b.cards | length }} carte(s)</span>
-      <span class="res-bar">{{ charts.segbar("", b.counts, thin=true) }}</span>
       <span class="res-status">{% for g, n in b.counts.items() if n %}<span class="badge g-{{ g }}">{{ n }} {{ {"todo": "à faire", "in_progress": "en cours", "ko": "KO", "done": "terminé"}[g] }}</span>{% endfor %}</span>
     </summary>
     <div class="res-body">

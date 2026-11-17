@@ -116,7 +116,7 @@ def test_deadlines_skip_done_actions_and_closed_retours():
         ("synthese", "Points de vigilance"),
         ("injections", "Lancer le DAG"),
         ("actions", "Volume de documents CED"),
-        ("recette", "Lancer un agent"),
+        ("recette", "Visites historiques"),
         ("regles", "Ne pas reprendre les visites sans date"),
         ("accompagnement", "Question sur la reprise des pièces jointes"),
     ],
@@ -149,7 +149,9 @@ def test_agent_on_open_retour_uses_my_description_and_is_listed():
     r = client.post("/actions/agent-retour/client-demo/R-02", data={"description": "Conclusion absente"})
     assert r.status_code == 200 and "Simulation : agent #" in r.text and "fix-client-demo-r-02" in r.text
     assert claude.runs[0].subject == "retour R-02" and "Conclusion absente" in claude.runs[0].prompt
-    assert "fix-client-demo-r-02" in client.get("/agents").text
+    run = claude.runs[0]
+    assert f'href="/agents/{run.id}"' in client.get("/agents").text  # listé ; la branche est sur la page de l'agent
+    assert "fix-client-demo-r-02" in client.get(f"/agents/{run.id}").text
 
 
 def test_agent_needs_a_description():
@@ -200,15 +202,16 @@ def test_actions_show_active_by_default_and_all_on_demand():
 def test_filters_script_searches_without_accents_and_offers_hidden_matches():
     js = client.get("/static/filters.js").text
     assert 'normalize("NFD")' in js and "data-out" in js and "more-out" in js
-    assert "filters.js?v=7" in client.get("/actions").text
+    assert "filters-toggle" in js and "filter-panel" in js  # menus déroulants repliés derrière « Filtres »
+    assert "filters.js?v=8" in client.get("/actions").text
 
 
 @pytest.mark.parametrize(
     ("path", "expected"),
     [
         ("/deploiements/client-demo/synthese", ["Avancement dans le calendrier", "Injections (cartes)", "Retours de recette"]),
-        ("/deploiements/client-demo/injections", ["Répartition des injections", 'class="segbar"']),
-        ("/deploiements/client-demo/recette", ["Statut des retours", "Retours ouverts par type de données"]),
+        ("/injections", ["Client Démo", 'class="segbar"']),
+        ("/recette", ["Client Démo", 'class="segbar"']),
         ("/deploiements/client-demo/regles", ["Règles par type"]),
         ("/actions", ['class="counts"', "en retard", "point(s) de vigilance"]),
         ("/deadlines", ["Dans les 7 jours"]),
@@ -220,6 +223,13 @@ def test_summaries_are_rendered(path, expected):
     assert r.status_code == 200
     for text in expected:
         assert text in r.text, text
+
+
+@pytest.mark.parametrize("tab", ["injections", "injections?vue=liste", "recette"])
+def test_fiche_lists_start_with_the_list(tab):
+    """Sur la fiche, Injections et Recette n'empilent plus de graphique au-dessus de la liste : la synthèse les porte."""
+    main = client.get(f"/deploiements/client-demo/{tab}").text.split("<main>", 1)[1]
+    assert 'class="segbar"' not in main and 'class="hbars"' not in main
 
 
 def test_segbar_counts_match_the_retours():
@@ -247,9 +257,10 @@ def test_stacks_fall_back_on_the_client_yaml(tmp_path):
     assert [(s.env, s.label, s.url) for s in d.stacks] == [("prod", "Prod", "https://example.com/acme")]
 
 
-def test_theme_switch_is_in_every_page():
-    html = client.get("/").text
-    assert 'id="theme-toggle"' in html and 'localStorage.getItem("theme")' in html
+def test_theme_switch_is_in_the_settings_and_applies_everywhere():
+    home = client.get("/").text
+    assert 'localStorage.getItem("theme")' in home and 'id="theme-toggle"' not in home  # thème appliqué, bouton hors de la barre
+    assert 'id="theme-toggle"' in client.get("/reglages").text
 
 
 def test_navigation_shows_the_current_client_and_the_others_in_its_menu():
@@ -269,18 +280,16 @@ def test_empty_columns_are_hidden():
 
 def test_charts_set_filters():
     inj = client.get("/deploiements/client-demo/injections?vue=liste").text
-    assert 'data-filter-set="groupe=todo"' in inj and 'data-group="' in inj and '<th data-filter="injection">' in inj
-    rec = client.get("/deploiements/client-demo/recette").text
-    assert 'data-filter-set="type=' in rec
-    assert 'data-filter-set="groupe=done" data-filter-href="/deploiements/client-demo/recette?tous=true"' in rec  # retours clos masqués par défaut
+    assert 'data-group="' in inj and '<th data-filter="injection">' in inj
     syn = client.get("/deploiements/client-demo/synthese").text
     assert 'data-filter-href="/deploiements/client-demo/injections"' in syn
+    assert 'data-filter-set="groupe=done" data-filter-href="/deploiements/client-demo/recette?tous=true"' in syn  # retours clos masqués par défaut
     assert 'data-filter-set="groupe=todo;client=Client Démo"' in client.get("/injections").text
 
 
 def test_retour_content_is_shown_and_given_to_the_agent():
-    html = client.get("/deploiements/client-demo/recette?tous=true").text
-    assert "Voir le retour" in html and "Texte fictif : filtre trop strict." in html
+    html = client.get("/deploiements/client-demo/ticket/retour/R-03").text  # le volet du retour, ouvert depuis la liste
+    assert "Contenu du retour" in html and "Texte fictif : filtre trop strict." in html
     claude.runs.clear()
     r = client.post("/actions/agent-retour/client-demo/R-03", data={"description": ""})  # descriptif facultatif
     assert "Simulation : agent #" in r.text
@@ -299,7 +308,9 @@ def test_recette_content_is_read_from_the_local_file(tmp_path):
 
 
 def test_agent_brief_is_prefilled_and_sent_as_edited():
-    html = client.get("/deploiements/client-demo/recette").text
+    listing = client.get("/deploiements/client-demo/recette").text
+    assert 'href="/deploiements/client-demo/ticket/retour/R-02"' in listing  # la carte ouvre le volet du retour
+    html = client.get("/deploiements/client-demo/ticket/retour/R-02").text
     assert 'hx-get="/deploiements/client-demo/recette/R-02/brief"' in html  # chargé à l'ouverture
     form = client.get("/deploiements/client-demo/recette/R-03/brief").text
     assert 'name="prompt"' in form and "&lt;commentaire_client&gt;" in form and "&lt;contrat&gt;" in form
@@ -390,18 +401,16 @@ def test_kanban_columns_follow_notion_order():
 
 
 def test_charts_are_readable_and_lead_to_the_tickets_they_count():
-    """Accueil, page Clients et synthèse : jauge d'avancement, barres fines Injections et Recette, tout cliquable."""
-    home = client.get("/").text
-    glance = home.split('class="panel glance"', 1)[1].split("</section>", 1)[0]
-    slug = re.search(r'class="gauge-link" href="/deploiements/([^/"]+)/synthese"', glance)[1]  # la jauge mène à la fiche
-    assert f'data-filter-href="/deploiements/{slug}/injections?vue=liste"' in glance
-    assert f'data-filter-href="/deploiements/{slug}/recette"' in glance and 'data-filter-set="groupe=' in glance
-    assert home.index('class="panel glance"') < home.index('id="whats-new"')  # « Quoi de neuf » passe en bas
+    """Page Clients et synthèse : barres fines Injections et Recette, cliquables. L'accueil n'a plus de graphique :
+    la phrase de Jarvis porte les compteurs, la fiche porte l'avancement."""
+    home = client.get("/").text.split("<main>", 1)[1]
+    assert 'class="segbar"' not in home and 'class="gauge' not in home
     cards = client.get("/clients").text
     assert cards.count('class="card-charts"') == 2 and cards.count('class="gauge') >= 2 and "legend-slim" in cards
     assert 'class="gauge-link"' not in cards  # la carte est déjà un lien vers la fiche
     synthese = client.get("/deploiements/client-demo/synthese").text
-    assert 'class="gauge' in synthese
+    assert 'class="kpi"' not in synthese and "<strong class=\"text\">20 %</strong> intégré" in synthese  # avancement dans l'en-tête
+    assert "attendu 86 %" in synthese  # en retard sur le calendrier : l'attendu s'affiche
     marks = re.findall(r'<a class="tl-mark[^"]*" href="([^"]+)"', synthese)  # jalons de la frise → calendrier des deadlines
     assert marks and all(m.startswith("/deadlines?client=client-demo&vue=calendrier&mois=") for m in marks)
     assert "Prochain :" in synthese and synthese.count("tl-mark next") == 1  # prochain jalon mis en avant

@@ -1,12 +1,7 @@
 {% import "_icons.html" as ic %}
 {% import "_charts.html" as charts with context %}
-{# Attend : d. Notion : fiche « Clients en déploiement » + points de vigilance. Jalons dans la frise ; liens en tête de fiche. #}
-{# Deux tuiles seulement. Retours ouverts : compteur de l'onglet Recette et barre plus bas ; points de vigilance : bloc plus bas. #}
-<div class="kpis kpis-lean">
-  <div class="kpi"><span class="muted">Avancement</span><strong>{{ d.progress }} %</strong>
-    {{ charts.progress(d.progress, d.expected_progress) }}</div>
-  {% if d.days_to_freeze is not none %}<div class="kpi"><span class="muted">Freeze</span><strong>J{{ '%+d' % (-d.days_to_freeze) }}</strong></div>{% endif %}
-</div>
+{# Attend : d. Notion : fiche « Clients en déploiement » + points de vigilance. Avancement et freeze : dans l'en-tête de la fiche.
+   Ordre : ce qui coince, le calendrier, l'état des injections et de la recette, les points de vigilance. #}
 
 {# Mes tickets épinglés de ce client : les mêmes que sur l'accueil. #}
 {% with pins = pins_of(d) %}{% include "_pins.html" %}{% endwith %}
@@ -14,7 +9,7 @@
 {# Où ça coince : les 5 points avec le plus de KO (blocs d'injection, types de retours), chacun mène à sa liste. #}
 {% set points = d.blocking_points %}
 <section class="panel blocking">
-  <h2>{{ ic.icon("alert", "", "ic-alert") }} Où ça coince{% if points %} <span class="muted">· KO d'abord, puis le plus d'éléments ouverts</span>{% endif %}</h2>
+  <h2>{{ ic.icon("alert", "", "ic-alert") }} Où ça coince</h2>
   {% for p in points[:5] %}
   <a class="blocking-row" href="{{ p.href }}">
     <span class="blocking-rank">{{ loop.index }}</span>
@@ -30,7 +25,7 @@
   {% if points | length > 5 %}<p class="muted blocking-more">+ {{ points | length - 5 }} autre(s) point(s) avec un KO · <a href="/deploiements/{{ d.slug }}/injections">Injections</a> · <a href="/deploiements/{{ d.slug }}/recette">Recette</a></p>{% endif %}
 </section>
 
-{{ charts.timeline(d.timeline, d.slug) }}
+{{ charts.timeline(d.timeline, d.slug, upcoming_only=true) }}
 {% if not d.timeline and milestones %}
 <section class="panel"><h2>Jalons</h2><ul class="timeline">{% for label, day in milestones %}<li class="{{ 'past' if day < today }}"><span class="date">{{ day.strftime("%d/%m/%Y") }}</span> {{ label }}</li>{% endfor %}</ul></section>
 {% endif %}
