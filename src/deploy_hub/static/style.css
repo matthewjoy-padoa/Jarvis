@@ -1272,3 +1272,18 @@ td:has(> .badge.example) { white-space: nowrap; }
 
 /* Brief d'un agent : texte long, renvoyé à la ligne plutôt que défilé en largeur */
 .agent-brief { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Anneau de contexte d'un agent (comme la jauge de contexte de Claude) et panneau « tokens » de sa page */
+.ring { vertical-align: -4px; flex: none; }
+.ring circle { fill: none; stroke-width: 5; }
+.ring-track { stroke: var(--border); }
+.ring-fill { stroke: var(--accent); stroke-linecap: round; }
+.ring-high .ring-fill { stroke: var(--st-ko); }
+.ring-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.token-panel { display: grid; grid-template-columns: auto minmax(240px, 1fr); gap: 16px 40px; align-items: center; }
+.token-ring { display: flex; align-items: center; gap: 14px; }
+.token-ring strong, .token-kinds p strong { font-size: 22px; }
+.token-kinds p { margin: 0 0 8px; }
+.token-kinds .hbars li { grid-template-columns: 90px 1fr auto; }
+.token-kinds .hbar-track { background: var(--bg); border-radius: 99px; overflow: hidden; }
+@media (max-width: 640px) { .token-panel { grid-template-columns: 1fr; } }

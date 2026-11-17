@@ -413,7 +413,7 @@ def test_demo_agents_page_shows_fictional_examples():
     client = TestClient(main.app)
     before = list(main.claude.runs)
     page = client.get("/agents").text
-    assert 'class="badge example"' in page and "Coût, tokens et durée" in page
+    assert 'class="badge example"' in page and "Tokens et durée" in page
     for run in main.examples.runs:
         assert f'href="/agents/{run.id}"' in page and client.get(f"/agents/{run.id}/journal").status_code == 200
     done = client.get(f"/agents/{main.examples.runs[-2].id}").text  # terminé avec PR : relecture guidée tirée du journal d'exemple
@@ -458,10 +458,32 @@ def test_demo_agents_page_shows_tokens_chart_and_full_brief(monkeypatch):
     monkeypatch.setattr(main, "examples", Examples())
     client = TestClient(main.app)
     page = client.get("/agents").text
-    assert "Tokens par agent" in page and "Tokens par nature" in page and "Cache relu" in page
+    assert "Tokens par agent" in page and "Tokens au total" in page and "Coût" not in page
+    assert 'class="ring ring-high"' in page and "86 %" in page  # agent 902 : contexte à 172 000 sur 200 000
+    assert "27 %" in page  # l'agent en cours a déjà son anneau
     assert "3,6 M" in page  # agent 902 : 1 840 + 21 600 + 3 420 000 + 186 000
     detail = client.get("/agents/902").text
-    assert "3,6 M tokens" in detail
+    assert "86 %</strong> du contexte" in detail and "172 k sur 200 k tokens" in detail
+    assert "<strong>3,6 M</strong> tokens au total" in detail and "Cache relu" in detail and "coût estimé" not in detail
     for part in ("&lt;contexte&gt;", "&lt;retour&gt;", "&lt;demarche&gt;", "&lt;contrat&gt;", "&lt;compte_rendu&gt;", "Retour de recette : R-02"):
         assert part in detail
     assert "À COMPLÉTER" not in detail
+
+
+def test_context_is_read_from_the_journal_even_while_the_agent_runs():
+    import json
+
+    from deploy_hub.sources.claude_runner import AgentRun, read_context
+
+    def turn(tokens, parent=None):
+        return json.dumps({"type": "assistant", "parent_tool_use_id": parent, "message": {"content": [], "usage": {
+            "input_tokens": 10, "cache_read_input_tokens": tokens, "cache_creation_input_tokens": 990, "output_tokens": 500}}})
+
+    run = AgentRun(1, "client-demo", "Client Démo", "retour R-01", "fix-r-01", "brief", datetime(2026, 11, 17, 9), "en cours")
+    read_context(run, "")
+    assert run.context_pct is None
+    read_context(run, "\n".join([turn(20_000), turn(49_000), turn(5_000, parent="sous-agent")]))
+    assert (run.context_tokens, run.context_window, run.context_pct) == (50_000, 200_000, 25)  # dernier tour de l'agent lui-même
+    end = json.dumps({"type": "result", "modelUsage": {"modele": {"contextWindow": 1_000_000}}})
+    read_context(run, "\n".join([turn(499_000), end]))
+    assert (run.context_window, run.context_pct) == (1_000_000, 50)

@@ -482,6 +482,8 @@ def deadlines(request: Request, tous: bool = False, client: str = "", periode: s
 def agents(request: Request):
     """Historique des lancements ; en mode démo, suivi des exemples fictifs (sources/examples.py), marqués « exemple »."""
     ex = examples
+    for run in claude.runs:
+        claude.refresh_context(run)  # agents en cours : où en est leur contexte
     runs = claude.runs + (ex.runs if ex else [])
     own = usage(claude.runs)  # le bilan ne mélange jamais vrais agents et exemples
     return _render(request, "agents.html", "/agents", runs=runs, dag_runs=airflow.runs + (ex.dag_runs if ex else []),
@@ -506,6 +508,8 @@ def _run_or_404(run_id: int):
 def _agent_context(run) -> dict:
     """Journal de l'agent, et sa relecture guidée dès qu'il a fini (un agent simulé n'a rien à relire)."""
     path = examples.agent_log(run) if _is_example(run) else claude.log_path(run)
+    if not _is_example(run):
+        claude.refresh_context(run)
     return {"run": run, "log": read_log(path), "review": None if run.running or run.simulated else agent_review.build(run, path)}
 
 

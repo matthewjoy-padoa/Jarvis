@@ -1,9 +1,29 @@
 <div id="agent-log"{% if run.running %} hx-get="/agents/{{ run.id }}/journal" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
   <p><span class="badge g-{{ run.group }}">{{ run.status }}{{ " (simulé)" if run.simulated }}</span>
     {% if run.pr_url %} · <a href="{{ run.pr_url }}" target="_blank" rel="noopener">Pull request ↗</a>{% endif %}
-    {% if run.cost_usd is not none %} <span class="muted">· coût estimé {{ '%.2f' % run.cost_usd }} $</span>{% endif %}
-    <span class="muted">· {{ "depuis" if run.running else "durée" }} {{ run.duration | duree }}{% if run.num_turns %} · {{ run.num_turns }} tours{% endif %}</span>
-    {% if run.tokens is not none %}<span class="muted">· {{ run.tokens | tokens }} tokens ({% for label, n in run.token_parts %}{{ label | lower }} {{ n | tokens }}{{ ', ' if not loop.last }}{% endfor %})</span>{% endif %}</p>
+    <span class="muted">· {{ "depuis" if run.running else "durée" }} {{ run.duration | duree }}{% if run.num_turns %} · {{ run.num_turns }} tours{% endif %}</span></p>
+  {% if run.context_pct is not none or run.tokens is not none %}
+  {% import "_charts.html" as charts %}
+  <section class="panel token-panel" id="tokens">
+    {% if run.context_pct is not none %}
+    <div class="token-ring">{{ charts.ring(run.context_pct, 72) }}
+      <div><strong>{{ run.context_pct }} %</strong> du contexte{{ " utilisé" if run.running else " utilisé à la fin" }}<br>
+        <span class="muted">{{ run.context_tokens | tokens }} sur {{ run.context_window | tokens }} tokens</span></div></div>
+    {% endif %}
+    {% if run.tokens is not none %}
+    <div class="token-kinds">
+      <p><strong>{{ run.tokens | tokens }}</strong> tokens au total{% if run.num_turns %} <span class="muted">· {{ run.num_turns }} tours</span>{% endif %}</p>
+      <ul class="hbars">
+        {% for label, n in run.token_parts %}
+        <li title="{{ label }} : {{ '{:,}'.format(n).replace(',', ' ') }} tokens"><span class="hbar-label">{{ label }}</span>
+          <span class="hbar-track"><span class="hbar" style="width: {{ (100 * n / run.tokens) | round(1) }}%"></span></span>
+          <span class="hbar-value">{{ n | tokens }}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
   {% if is_example(run) %}<p class="muted"><span class="badge example">exemple</span> Agent fictif du mode démo : journal, relecture et PR sont inventés.</p>{% endif %}
   {% if run.running and not run.simulated and not is_example(run) %}
   <form method="post" action="/agents/{{ run.id }}/arreter" onsubmit="return confirm('Arrêter l\'agent #{{ run.id }} ?')"><button type="submit" class="secondary">Arrêter l'agent</button></form>

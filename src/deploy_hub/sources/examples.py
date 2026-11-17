@@ -39,6 +39,7 @@ RETOURS = {
              "Adhérent fictif « Société Exemple » : l'adresse s'arrête au 38e caractère.", ""),
 }
 # Tokens fictifs annoncés à la fin de chaque agent d'exemple : (entrée, sortie, cache relu, cache écrit), dans l'ordre de TOKEN_KINDS
+CONTEXT = {"running": 54_000, "vaccine": 38_000, "visit_histo": 172_000, "firm": 86_000}  # remplissage du contexte, sur 200 000
 TOKENS = {"visit_histo": (1_840, 21_600, 3_420_000, 186_000), "firm": (920, 8_400, 1_180_000, 74_000), "vaccine": (410, 2_900, 402_000, 31_000)}
 
 
@@ -141,6 +142,8 @@ class Examples:
             brief = retour_prompt(Deployment(slug, client, SOFTWARES[slug]), retour)
             run = AgentRun(FIRST_ID + n, slug, client, f"{ref} · {subject}", f"fix-{slug}-{ref.lower()}", brief, start, status,
                            ended_at=start + timedelta(minutes=minutes) if minutes else None, category=category, **more)
+            if log in CONTEXT:
+                run.context_tokens, run.context_window = CONTEXT[log], 200_000
             if log in TOKENS:  # relevés comme pour un vrai agent, dans le dernier évènement de son journal
                 read_tokens(run, AGENT_LOGS[log][-1])
             if log:

@@ -88,6 +88,15 @@
 </figure>
 {% endmacro %}
 
+{# Anneau de remplissage : part d'un tout (contexte d'un agent), toujours accompagné de son chiffre écrit à côté.
+   Passe en alerte à 80 %. #}
+{% macro ring(pct, size=18, label="") %}
+<svg class="ring{{ ' ring-high' if pct >= 80 }}" width="{{ size }}" height="{{ size }}" viewBox="0 0 36 36" role="img" aria-label="{{ label or (pct ~ ' %') }}">
+  <circle class="ring-track" cx="18" cy="18" r="15.915"/>
+  <circle class="ring-fill" cx="18" cy="18" r="15.915" stroke-dasharray="{{ pct }} 100" transform="rotate(-90 18 18)"/>
+</svg>
+{% endmacro %}
+
 {# Frise du projet : jalons passés pleins, à venir creux, prochain jalon mis en avant (date et J-x). #}
 {% macro timeline(t, slug=None) %}
 {% if t %}

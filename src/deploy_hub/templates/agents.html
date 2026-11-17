@@ -6,7 +6,7 @@
 <h1>Agents lancés</h1>
 <p class="muted">{% if live %}Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.{% else %}Mode démo : les lancements sont simulés (<code>JARVIS_MODE=live</code> pour de vrais agents). Les lignes marquées <span class="badge example">exemple</span> sont fictives : elles montrent la page telle qu'elle se remplit en mode live, et n'entrent jamais dans l'historique.{% endif %}</p>
 <table data-filterable>
-  <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>Sujet</th><th>Branche</th><th data-filter>État</th><th>Durée</th><th>Coût</th><th>Tokens</th><th>PR</th></tr></thead>
+  <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>Sujet</th><th>Branche</th><th data-filter>État</th><th>Durée</th><th>Contexte</th><th>Tokens</th><th>PR</th></tr></thead>
   <tbody>
   {% for r in runs %}
     <tr>
@@ -16,7 +16,7 @@
       <td><code>{{ r.branch }}</code></td>
       <td><span class="badge g-{{ r.group }}">{{ r.status }}</span>{% if r.simulated %} {{ ic.icon("flask", "Simulation", "ic-muted") }}{% endif %}</td>
       <td data-sort="{{ r.duration.total_seconds() | int }}">{% if not r.simulated %}{{ r.duration | duree }}{% endif %}</td>
-      <td data-sort="{{ r.cost_usd or 0 }}">{% if r.cost_usd is not none %}{{ '%.2f' % r.cost_usd }} ${% endif %}</td>
+      <td data-sort="{{ r.context_pct or 0 }}">{% if r.context_pct is not none %}<span class="ring-cell" title="Contexte : {{ r.context_tokens | tokens }} sur {{ r.context_window | tokens }}">{{ charts.ring(r.context_pct) }} {{ r.context_pct }} %</span>{% endif %}</td>
       <td data-sort="{{ r.tokens or 0 }}"{% if r.tokens is not none %} title="{% for label, n in r.token_parts %}{{ label }} {{ n | tokens }}{{ ' · ' if not loop.last }}{% endfor %}"{% endif %}>{{ r.tokens | tokens }}</td>
       <td>{% if r.pr_url %}<a href="{{ r.pr_url }}" target="_blank" rel="noopener">PR ↗</a>{% endif %}</td>
     </tr>
@@ -26,24 +26,17 @@
 
 {% if usage %}
 {% set t = usage.total %}
-<h2 id="bilan">Coût, tokens et durée</h2>
-<p class="muted">Agents réels terminés (ni simulés ni en cours).{% if usage_from_examples %} Ici : le bilan des agents d'exemple, tant qu'aucun agent réel n'a fini.{% endif %} Le coût et les tokens sont ceux que Claude Code annonce à la fin de l'agent ; un agent arrêté n'en a pas toujours.</p>
-{{ charts.stats([("Agents terminés", t.count, ""), ("PR ouvertes", t.prs, ""), ("Durée médiane", t.median | duree, ""), ("Temps cumulé", t.time | duree, ""), ("Coût moyen", ('%.2f $' % t.mean_cost) if t.mean_cost is not none else "—", ""), ("Coût total", ('%.2f $' % t.cost) if t.cost is not none else "—", ""), ("Tokens par agent", (t.mean_tokens | tokens) if t.mean_tokens is not none else "—", ""), ("Tokens au total", (t.tokens | tokens) if t.tokens is not none else "—", "")]) }}
-{% if t.tokens is not none %}
-<div class="chart-row" id="tokens">
-  {{ charts.hbars("Tokens par agent", usage.tokens_by_agent, 8, as_tokens=true) }}
-  {{ charts.hbars("Tokens par nature", t.token_kinds, 4, as_tokens=true) }}
-</div>
-<p class="muted">Tokens = entrée + sortie + cache. Le cache relu (le contexte que l'agent relit à chaque tour) pèse l'essentiel du volume, mais il est facturé bien moins cher que la sortie.</p>
-{% endif %}
+<h2 id="bilan">Tokens et durée</h2>
+<p class="muted">Agents réels terminés (ni simulés ni en cours).{% if usage_from_examples %} Ici : le bilan des agents d'exemple, tant qu'aucun agent réel n'a fini.{% endif %} Les tokens sont ceux que Claude Code annonce à la fin de l'agent ; un agent arrêté n'en a pas toujours. Contexte : ce que l'agent relit à chaque tour, sur la fenêtre du modèle.</p>
+{{ charts.stats([("Agents terminés", t.count, ""), ("PR ouvertes", t.prs, ""), ("Durée médiane", t.median | duree, ""), ("Temps cumulé", t.time | duree, ""), ("Tokens par agent", (t.mean_tokens | tokens) if t.mean_tokens is not none else "—", ""), ("Tokens au total", (t.tokens | tokens) if t.tokens is not none else "—", "")]) }}
+
 <table>
-  <thead><tr><th>Type de ticket</th><th>Agents</th><th>PR</th><th>Durée médiane</th><th>Temps cumulé</th><th>Coût moyen</th><th>Coût total</th><th>Tokens</th></tr></thead>
+  <thead><tr><th>Type de ticket</th><th>Agents</th><th>PR</th><th>Durée médiane</th><th>Temps cumulé</th><th>Tokens par agent</th><th>Tokens au total</th></tr></thead>
   <tbody>
   {% for row in usage.rows %}
     <tr><td>{{ row.label }}</td><td>{{ row.count }}</td><td>{{ row.prs }}</td>
       <td data-sort="{{ row.median.total_seconds() | int }}">{{ row.median | duree }}</td><td data-sort="{{ row.time.total_seconds() | int }}">{{ row.time | duree }}</td>
-      <td data-sort="{{ row.mean_cost or 0 }}">{% if row.mean_cost is not none %}{{ '%.2f' % row.mean_cost }} ${% else %}—{% endif %}</td>
-      <td data-sort="{{ row.cost or 0 }}">{% if row.cost is not none %}{{ '%.2f' % row.cost }} ${% else %}—{% endif %}</td>
+      <td data-sort="{{ row.mean_tokens or 0 }}">{{ (row.mean_tokens | tokens) if row.mean_tokens is not none else "—" }}</td>
       <td data-sort="{{ row.tokens or 0 }}">{{ (row.tokens | tokens) if row.tokens is not none else "—" }}</td></tr>
   {% endfor %}
   </tbody>
