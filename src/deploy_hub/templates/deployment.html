@@ -18,6 +18,7 @@
 </div>
   </div>
 </div>
+{% if d.pending %}<p class="result ok pending-note">Pas encore synchronisé : les données Notion de {{ d.client }} arriveront à la première synchro. « Rafraîchir depuis Notion » la lance (ou <code>/jarvis-sync</code> dans Claude Code ouvert sur le dossier de Jarvis).</p>{% endif %}
 <nav class="tabs" aria-label="Onglets">
   {% for key, label in tabs %}<a href="/deploiements/{{ d.slug }}/{{ key }}" class="{{ 'active' if key == tab }}">{{ label }}{% if key == 'recette' and d.open_retours %} <span class="count" title="Retours ouverts">{{ d.open_retours | length }}</span>{% endif %}</a>{% endfor %}
 </nav>

@@ -280,6 +280,7 @@ class Deployment:
     retours: list[RetourRecette] = field(default_factory=list)
     regles: list[Regle] = field(default_factory=list)
     remontees: list[Remontee] = field(default_factory=list)
+    pending: bool = False  # client configuré, pas encore synchronisé : fiche vide en attendant la première synchro
 
     @property
     def go_live(self) -> date | None:

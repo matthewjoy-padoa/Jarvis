@@ -57,6 +57,7 @@ def test_retire_keeps_the_file(tmp_path):
 def app(tmp_path, monkeypatch):
     monkeypatch.setenv("JARVIS_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.setenv("JARVIS_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setattr(main.fiches, "clients_dir", tmp_path / "config" / "clients")  # lu au démarrage par l'app
     return TestClient(main.app)
 
 
@@ -174,3 +175,25 @@ def test_the_links_page_refuses_bad_links_and_foreign_returns(app):
     r = app.post("/clients/acme/liens", data={"drive": "", "vers": "//site-hostile.example/"}, follow_redirects=False)
     assert r.headers["location"] == "/deploiements/acme/synthese"  # jamais de redirection hors de Jarvis
     assert app.get("/clients/inconnu/liens", follow_redirects=False).headers["location"] == "/clients/inconnu/configuration"
+
+
+def test_a_client_just_added_is_in_the_selector_with_an_empty_fiche(app, tmp_path):
+    """Un client ajouté apparaît tout de suite (sélecteur, fiche vide, bouton Rafraîchir), sans attendre la première synchro."""
+    app.post("/clients/enregistrer", data={"client": "Acme", "page_id": PAGE, "software": "Pulse"}, follow_redirects=False)
+    home = app.get("/").text
+    bar = home.split("<main>", 1)[0]
+    assert "Acme" in bar and 'class="client-switch"' in bar  # dans le sélecteur
+    fiche = app.get("/deploiements/acme/synthese")
+    assert fiche.status_code == 200 and "Pas encore synchronisé" in fiche.text and 'hx-post="/actions/rafraichir/acme"' in fiche.text
+    clients_page = app.get("/clients").text
+    assert "En attente de première synchro" in clients_page  # carte « en attente », pas une carte vide de client synchronisé
+    fiche_file = tmp_path / "data" / "deploiements" / "acme.md"  # après la synchro : la vraie fiche prend le relais
+    fiche_file.parent.mkdir(parents=True)
+    fiche_file.write_text("---\nclient: Acme\nsynced_at: 17/11 16:00\n---\n")
+    monkeypatch_dir = main.fiches.deployments_dir
+    try:
+        main.fiches.deployments_dir = fiche_file.parent
+        assert "Pas encore synchronisé" not in app.get("/deploiements/acme/synthese").text
+    finally:
+        main.fiches.deployments_dir = monkeypatch_dir
+

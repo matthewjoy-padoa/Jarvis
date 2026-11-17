@@ -341,9 +341,9 @@ def whats_new(request: Request, depuis: str = "", client: str = ""):
 
 @app.get("/clients", response_class=HTMLResponse)
 def index(request: Request, enregistre: str = "", retire: str = ""):
-    deployments = _deployments(request)
-    synced = {d.slug for d in deployments}
-    pending = [c for slug in client_config.slugs() if slug not in synced and (c := client_config.load(slug))]
+    everyone = _deployments(request)
+    deployments = [d for d in everyone if not d.pending]  # cartes : clients synchronisés
+    pending = [c for d in everyone if d.pending and (c := client_config.load(d.slug))]  # configurés, pas encore synchronisés
     return _render(request, "index.html", "/clients", deployments=deployments, pending=pending, saved=enregistre, retired=retire)
 
 
