@@ -203,6 +203,7 @@ def _render(request: Request, template: str, active: str, **context) -> HTMLResp
             "ced_for": dag_catalogue.ced_for,
             "padoa_envs": PADOA_ENVS,
             "notion_ready": notion_api.load_token() is not None or sync_routine.problem() is None,  # jeton, ou routine via Claude
+            "sync_running": sync_routine.running,  # synchro lancée avant ce chargement : le bouton reprend son avancement
             "today": date.today(),
             **context,
         },

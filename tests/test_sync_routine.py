@@ -214,3 +214,16 @@ def test_the_refresh_button_fills_up_instead_of_a_box():
     page = client.get("/").text
     assert "is-syncing" in page and "✓ Synchro terminée" in page  # script du bouton dans base.html
 
+
+def test_a_running_sync_is_picked_up_again_when_the_page_loads(monkeypatch, tmp_path):
+    """Rechargement ou changement de page pendant une synchro : le bouton reprend son avancement au lieu de l'oublier."""
+    from deploy_hub import main as app_module
+    routine = SyncRoutine(folder=tmp_path / "notion")
+    monkeypatch.setattr(app_module, "sync_routine", routine)
+    client = TestClient(app_module.app)
+    resume = 'hx-get="/actions/rafraichir/etat" hx-trigger="load"'
+    assert resume not in client.get("/deploiements/client-demo/synthese").text  # rien en cours : rien à reprendre
+    monkeypatch.setattr(SyncRoutine, "running", property(lambda self: True))
+    for path in ("/deploiements/client-demo/synthese", "/clients"):
+        assert resume in client.get(path).text
+
