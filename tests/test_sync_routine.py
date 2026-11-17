@@ -44,7 +44,7 @@ def test_without_token_the_refresh_button_runs_the_routine(monkeypatch, tmp_path
     routine = SyncRoutine(folder=tmp_path / "notion", claude_bin=str(claude))
     monkeypatch.setattr(main, "sync_routine", routine)
     r = TestClient(main.app).post("/actions/rafraichir/client-demo")
-    assert "Synchro Notion lancée" in r.text and 'hx-get="/actions/rafraichir/etat"' in r.text and "Simulation" not in r.text
+    assert '<svg class="ring' in r.text and 'hx-get="/actions/rafraichir/etat"' in r.text and "Simulation" not in r.text  # cercle d'avancement
     assert wait(routine)["ok"]
     page = TestClient(main.app).get("/deploiements/client-demo/synthese").text
     assert 'hx-post="/actions/rafraichir/client-demo"' in page and "Ni jeton Notion ni Claude Code" not in page  # bouton actif
@@ -93,7 +93,7 @@ def test_live_routine_runs_claude_in_the_app_folder_with_the_app_environment(tmp
     assert Path(cwd) == PROJECT_ROOT and prompt == routine_text() and config_dir == str(tmp_path / "ma-config")
     tools = args[args.index("--allowedTools") + 1:]
     assert "Bash(uv run python -m deploy_hub.sync_notion:*)" in tools and any(t.startswith("mcp__") for t in tools)
-    assert any(t.startswith("Write(//") and t.endswith("/**)") for t in tools)  # écriture limitée au dossier de données
+    assert any(t.startswith("Edit(//") and t.endswith("/**)") for t in tools)  # écriture limitée au dossier de données
 
 
 def test_live_routine_failure_is_reported_and_notified(tmp_path):
@@ -137,4 +137,32 @@ def test_status_reloads_the_page_only_when_a_live_sync_ends_well(monkeypatch, tm
     routine._save(running=True, started="2026-11-17T16:00:00")  # lancée avant un redémarrage : aucun processus ne la suit
     r = TestClient(main.app).get("/actions/rafraichir/etat")
     assert "Synchro interrompue" in r.text and "hx-trigger" not in r.text
+
+
+def test_progress_follows_the_files_the_routine_drops(tmp_path):
+    """Cercle d'avancement : empreinte, plan, requêtes déposées, fusion, lus dans data/notion depuis le lancement."""
+    import json
+    folder = tmp_path / "notion"
+    routine = SyncRoutine(folder=folder)
+    routine._save(running=True, started="2000-01-01T00:00:00")
+    assert routine.progress() == {"pct": 5, "label": "Empreinte de tous les clients…"}
+    (folder / "empreintes.json").write_text("{}")
+    assert routine.progress()["label"] == "Plan des requêtes…"
+    raw = folder / "acme"
+    raw.mkdir()
+    (raw / "plan.json").write_text(json.dumps({"sorties": ["actions", "recette", "client", "regles"]}))
+    (raw / "actions.json").write_text("{}")
+    assert routine.progress() == {"pct": 20 + 65 * 1 // 4, "label": "Requêtes : 1 / 4"}
+    for name in ("recette", "client", "regles"):
+        (raw / f"{name}.json").write_text("{}")
+    assert routine.progress()["label"] == "Fusion…"
+    (raw / "plan.json").unlink()
+    (raw / "etat-synchro.json").write_text("{}")  # fusionné : le plan est effacé
+    assert routine.progress() == {"pct": 92, "label": "Fusion : 1 client(s)…"}
+
+
+def test_refresh_button_does_not_move_when_clicked():
+    """Attente, avancement et résultat vont dans un encart posé sous le bouton (position absolue), jamais à côté de lui."""
+    css = (PROJECT_ROOT / "src" / "deploy_hub" / "static" / "style.css").read_text(encoding="utf-8")
+    assert ".refresh .refresh-wait, .refresh .refresh-out { position: absolute; top: calc(100% + 6px)" in css
 
