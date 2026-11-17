@@ -1287,3 +1287,35 @@ td:has(> .badge.example) { white-space: nowrap; }
 .token-kinds .hbars li { grid-template-columns: 90px 1fr auto; }
 .token-kinds .hbar-track { background: var(--bg); border-radius: 99px; overflow: hidden; }
 @media (max-width: 640px) { .token-panel { grid-template-columns: 1fr; } }
+
+/* Schéma des agents : une colonne par étape, un nœud par agent (survol : détail ; clic : la page de l'agent) */
+.agent-flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; padding: 0; overflow: visible; }
+.flow-lane { --lane: var(--st-progress); position: relative; padding: 14px 18px 16px; border-left: 1px solid var(--border); }
+.flow-lane:first-child { border-left: 0; }
+.flow-done { --lane: var(--st-done); } .flow-pr { --lane: var(--cyan); } .flow-ko { --lane: var(--st-ko); }
+.flow-in_progress::after, .flow-done::after { content: "→"; position: absolute; right: -10px; top: 24px; width: 18px; height: 18px; line-height: 17px;
+  text-align: center; font-size: 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 50%; z-index: 1; }
+.flow-lane header { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; border-top: 3px solid var(--lane); margin: -14px -18px 12px; padding: 11px 18px 0; }
+.flow-lane:first-child header { border-top-left-radius: 9px; } .flow-lane:last-child header { border-top-right-radius: 9px; }
+.flow-lane header strong { font-size: 26px; line-height: 1; font-variant-numeric: tabular-nums; }
+.flow-lane header small { grid-column: 1 / -1; font-size: 12px; margin-top: 3px; }
+.flow-lane.is-empty header strong { color: var(--muted); }
+.flow-nodes { display: flex; flex-wrap: wrap; gap: 8px; min-height: 34px; }
+.flow-node { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px 5px 9px; border-radius: 99px; font-size: 13px; font-weight: 600;
+  font-variant-numeric: tabular-nums; text-decoration: none; color: var(--text); background: color-mix(in srgb, var(--lane) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--lane) 45%, transparent); transition: transform .12s, box-shadow .12s; }
+.flow-node::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--lane); flex: none; }
+.flow-node.is-sim { border-style: dashed; }
+.flow-in_progress .flow-node::before { animation: flow-pulse 1.4s ease-in-out infinite; }
+@keyframes flow-pulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--lane) 25%, transparent); } }
+.flow-node:hover, .flow-node:focus-visible, .flow-node.is-hot { transform: translateY(-2px); box-shadow: 0 0 0 3px color-mix(in srgb, var(--lane) 30%, transparent); outline: none; z-index: 5; }
+.flow-tip { display: none; position: absolute; left: 0; top: calc(100% + 8px); width: max-content; max-width: 280px; padding: 10px 12px; border-radius: 8px; font-weight: 400;
+  font-size: 12.5px; line-height: 1.45; text-align: left; color: var(--text); background: var(--surface); border: 1px solid var(--border); box-shadow: 0 8px 24px rgb(0 0 0 / .18); }
+.flow-tip > * { display: block; } .flow-tip > span { color: var(--muted); }
+.flow-node:hover .flow-tip, .flow-node:focus-visible .flow-tip { display: block; }
+.flow-lane:nth-child(n+3) .flow-tip { left: auto; right: 0; }
+tr.is-hot > td { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.flow-times { margin: 10px 0; color: var(--muted); } .flow-times strong { color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .flow-in_progress .flow-node::before { animation: none; } .flow-node { transition: none; } }
+@media (max-width: 760px) { .agent-flow { grid-template-columns: 1fr 1fr; } .flow-lane::after { display: none; } .flow-lane:nth-child(odd) { border-left: 0; }
+  .flow-lane:nth-child(n+3) { border-top: 1px solid var(--border); } .flow-lane header { border-radius: 0 !important; } }

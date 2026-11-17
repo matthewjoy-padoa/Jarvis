@@ -462,6 +462,8 @@ def test_demo_agents_page_shows_tokens_chart_and_full_brief(monkeypatch):
     assert page.count('<svg class="ring') == 1 and "ring-cell" not in page  # un seul anneau : le bilan, à la place des tuiles de tokens
     assert "<strong>49 %</strong> du contexte utilisé" in page and "au plus 86 %" in page  # 172 k, 86 k et 38 k sur 200 k
     assert "<strong>5,3 M</strong> tokens au total" in page and "Cache relu" in page
+    assert 'class="flow-lane flow-in_progress"' in page and 'class="stats"' not in page  # schéma des agents à la place des tuiles
+    assert page.count('class="flow-node') == 5 and '<tr data-agent="902">' in page  # un nœud par agent, lié à sa ligne
     assert "3,6 M" in page  # agent 902 : 1 840 + 21 600 + 3 420 000 + 186 000
     detail = client.get("/agents/902").text
     assert "86 %</strong> du contexte" in detail and "172 k sur 200 k tokens" in detail
