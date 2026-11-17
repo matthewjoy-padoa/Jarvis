@@ -130,10 +130,10 @@ def test_status_reloads_the_page_only_when_a_live_sync_ends_well(monkeypatch, tm
     monkeypatch.setattr(main, "sync_routine", routine)
     routine._save(running=False, finished="2026-11-17T16:00:00", ok=True, summary="client-demo : inchangé")
     r = TestClient(main.app).get("/actions/rafraichir/etat")
-    assert "Synchro terminée" in r.text and r.headers.get("HX-Refresh") == "true"
+    assert "Synchro terminée" in r.text and 'data-reload-after="3"' in r.text and "HX-Refresh" not in r.headers  # message, puis rechargement
     routine._save(running=False, finished="2026-11-17T16:00:00", ok=False, summary="ÉCHEC tous : plan : délai")
     r = TestClient(main.app).get("/actions/rafraichir/etat")
-    assert "Synchro en échec" in r.text and "HX-Refresh" not in r.headers
+    assert "Synchro en échec" in r.text and "data-reload-after" not in r.text  # l'échec reste affiché
     routine._save(running=True, started="2026-11-17T16:00:00")  # lancée avant un redémarrage : aucun processus ne la suit
     r = TestClient(main.app).get("/actions/rafraichir/etat")
     assert "Synchro interrompue" in r.text and "hx-trigger" not in r.text
@@ -165,4 +165,40 @@ def test_refresh_button_does_not_move_when_clicked():
     """Attente, avancement et résultat vont dans un encart posé sous le bouton (position absolue), jamais à côté de lui."""
     css = (PROJECT_ROOT / "src" / "deploy_hub" / "static" / "style.css").read_text(encoding="utf-8")
     assert ".refresh .refresh-wait, .refresh .refresh-out { position: absolute; top: calc(100% + 6px)" in css
+
+
+def test_a_failure_buried_in_a_long_report_is_still_a_failure(tmp_path):
+    """Claude a écrit « ÉCHEC » en haut d'un long compte rendu (vu le 2026-11-17 sur la VM) : c'est un échec, pas un succès."""
+    report = "\n".join(["La synchro a échoué pour acme.", "", "**ÉCHEC acme : plan : fiche Notion introuvable.**"] + [f"ligne {i}" for i in range(15)])
+    claude = fake_claude(tmp_path, f"print({report!r})")
+    routine = SyncRoutine(folder=tmp_path / "notion", claude_bin=str(claude))
+    assert routine.start().ok
+    state = wait(routine)
+    assert not state["ok"] and "ÉCHEC acme : plan : fiche Notion introuvable." in state["summary"] and "**" not in state["summary"]
+
+
+def test_plan_errors_are_reported_per_client_whatever_claude_writes(tmp_path):
+    """Les erreurs par client du « plan » (fichier écrit par Python) suffisent à signaler l'échec, même si Claude ne dit rien."""
+    import json
+    folder = tmp_path / "notion"
+    script = f"""import json, pathlib
+pathlib.Path({str(folder / "plan-erreurs.json")!r}).write_text(json.dumps({{"apst2607": "fiche Notion introuvable : vérifie le lien"}}))
+print("Tout s'est bien passé.")"""
+    routine = SyncRoutine(folder=folder, claude_bin=str(fake_claude(tmp_path, script)))
+    assert routine.start().ok
+    state = wait(routine)
+    assert not state["ok"] and state["summary"] == "apst2607 : fiche Notion introuvable : vérifie le lien"
+
+
+def test_plan_writes_its_errors_for_jarvis(tmp_path):
+    """« plan » note ses erreurs par client dans data/notion/plan-erreurs.json (ici : client absent de l'empreinte)."""
+    import json
+    folder = tmp_path / "config" / "clients"
+    folder.mkdir(parents=True)
+    (folder / "acme.yaml").write_text(f"client: Acme\nsoftware: Pulse\nstatus: en cours\npage_id: {'a' * 32}\n", encoding="utf-8")
+    (tmp_path / "data" / "notion").mkdir(parents=True)
+    (tmp_path / "data" / "notion" / "empreintes.json").write_text(json.dumps({"results": []}), encoding="utf-8")
+    out = sync_notion.plan_all(tmp_path)
+    written = json.loads((tmp_path / "data" / "notion" / "plan-erreurs.json").read_text(encoding="utf-8"))
+    assert written == out["erreurs"] and "acme" in written
 

@@ -119,11 +119,16 @@ class SyncRoutine:
             proc.kill()
             code = None
         log.close()
-        tail = self.summary()
-        ok = code == 0 and "ÉCHEC" not in tail
-        reason = "délai dépassé" if code is None else (tail or f"code de sortie {code}")
+        failures = self.failures()
+        ok = code == 0 and not failures
+        if code is None:
+            reason = "délai dépassé"
+        elif failures:
+            reason = " · ".join(failures)
+        else:
+            reason = self.summary() or f"code de sortie {code}"
         self._save(running=False, started=self.state().get("started"), finished=datetime.now().isoformat(timespec="seconds"),
-                   ok=ok, summary=tail if ok else reason)
+                   ok=ok, summary=self.summary() if ok else reason)
         if not ok and self.notifications is not None:
             self.notifications.add(f"sync-routine-fail:{datetime.now().isoformat(timespec='minutes')}", "sync", "urgent",
                                    "Synchro Notion en échec", reason[:300], "/clients")
@@ -157,6 +162,25 @@ class SyncRoutine:
         if done < total:
             return {"pct": 20 + 65 * done // total, "label": f"Requêtes : {done} / {total}"}
         return {"pct": 88, "label": "Fusion…"}
+
+    def failures(self) -> list[str]:
+        """Échecs de la dernière synchro, où qu'ils soient : erreurs par client du « plan » (fichier écrit par Python, sûr)
+        et lignes « ÉCHEC » du compte rendu de Claude, en entier (pas seulement la fin)."""
+        out = []
+        try:
+            started = datetime.fromisoformat(self.state()["started"]).timestamp()
+            errors_file = self.folder / "plan-erreurs.json"
+            if errors_file.is_file() and errors_file.stat().st_mtime >= started:
+                out += [f"{slug} : {why}" for slug, why in json.loads(errors_file.read_text(encoding="utf-8")).items()]
+        except (KeyError, TypeError, ValueError, OSError):
+            pass
+        try:
+            for line in self.log_path.read_text(encoding="utf-8").splitlines():
+                if "ÉCHEC" in line and not out:  # le fichier du plan, quand il existe, dit déjà la même chose, mieux
+                    out.append(line.replace("**", "").strip(" -*·"))
+        except OSError:
+            pass
+        return out
 
     def summary(self, lines: int = 8) -> str:
         """Fin du compte rendu de Claude (des comptes, jamais de lignes de données : voir la consigne)."""
