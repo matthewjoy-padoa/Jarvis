@@ -1292,3 +1292,127 @@ a.tl-mark:hover, a.tl-mark:focus-visible { transform: scale(1.3); }
 .chart.slim .segbar, .chart.slim .seg { overflow: visible; }
 .chart.slim .seg[data-filter-set] { position: relative; min-width: 4px; }
 .chart.slim .seg[data-filter-set]::after { content: ""; position: absolute; inset: -8px 0; }
+
+/* Exemples fictifs de la page Agents (mode démo) */
+.badge.example { background: transparent; border: 1px dashed var(--border); color: var(--muted); font-weight: 500; }
+td:has(> .badge.example) { white-space: nowrap; }
+
+/* Brief d'un agent : texte long, renvoyé à la ligne plutôt que défilé en largeur */
+.agent-brief { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Anneau de contexte d'un agent (comme la jauge de contexte de Claude) et panneau « tokens » de sa page */
+.ring { vertical-align: -4px; flex: none; }
+.ring circle { fill: none; stroke-width: 5; }
+.ring-track { stroke: var(--border); }
+.ring-fill { stroke: var(--accent); stroke-linecap: round; }
+.ring-high .ring-fill { stroke: var(--st-ko); }
+.ring-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.token-panel { display: grid; grid-template-columns: auto minmax(240px, 1fr); gap: 16px 40px; align-items: center; }
+.token-ring { display: flex; align-items: center; gap: 14px; }
+.token-ring strong, .token-kinds p strong { font-size: 22px; }
+.token-kinds p { margin: 0 0 8px; }
+.token-kinds .hbars li { grid-template-columns: 90px 1fr auto; }
+.token-kinds .hbar-track { background: var(--bg); border-radius: 99px; overflow: hidden; }
+@media (max-width: 640px) { .token-panel { grid-template-columns: 1fr; } }
+
+/* Schéma des agents : une colonne par étape, un nœud par agent (survol : détail ; clic : la page de l'agent) */
+.agent-flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; padding: 0; overflow: visible; }
+.flow-lane { --lane: var(--st-progress); position: relative; padding: 14px 18px 16px; border-left: 1px solid var(--border); }
+.flow-lane:first-child { border-left: 0; }
+.flow-done { --lane: var(--st-done); } .flow-pr { --lane: var(--cyan); } .flow-ko { --lane: var(--st-ko); }
+.flow-in_progress::after, .flow-done::after { content: "→"; position: absolute; right: -10px; top: 24px; width: 18px; height: 18px; line-height: 17px;
+  text-align: center; font-size: 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 50%; z-index: 1; }
+.flow-lane header { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; border-top: 3px solid var(--lane); margin: -14px -18px 12px; padding: 11px 18px 0; }
+.flow-lane:first-child header { border-top-left-radius: 9px; } .flow-lane:last-child header { border-top-right-radius: 9px; }
+.flow-lane header strong { font-size: 26px; line-height: 1; font-variant-numeric: tabular-nums; }
+.flow-lane header small { grid-column: 1 / -1; font-size: 12px; margin-top: 3px; }
+.flow-lane.is-empty header strong { color: var(--muted); }
+.flow-nodes { display: flex; flex-wrap: wrap; gap: 8px; min-height: 34px; }
+.flow-node { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px 5px 9px; border-radius: 99px; font-size: 13px; font-weight: 600;
+  font-variant-numeric: tabular-nums; text-decoration: none; color: var(--text); background: color-mix(in srgb, var(--lane) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--lane) 45%, transparent); transition: transform .12s, box-shadow .12s; }
+.flow-node::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--lane); flex: none; }
+.flow-node.is-sim { border-style: dashed; }
+.flow-in_progress .flow-node::before { animation: flow-pulse 1.4s ease-in-out infinite; }
+@keyframes flow-pulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--lane) 25%, transparent); } }
+.flow-node:hover, .flow-node:focus-visible, .flow-node.is-hot { transform: translateY(-2px); box-shadow: 0 0 0 3px color-mix(in srgb, var(--lane) 30%, transparent); outline: none; z-index: 5; }
+.flow-tip { display: none; position: absolute; left: 0; top: calc(100% + 8px); width: max-content; max-width: 280px; padding: 10px 12px; border-radius: 8px; font-weight: 400;
+  font-size: 12.5px; line-height: 1.45; text-align: left; color: var(--text); background: var(--surface); border: 1px solid var(--border); box-shadow: 0 8px 24px rgb(0 0 0 / .18); }
+.flow-tip > * { display: block; } .flow-tip > span { color: var(--muted); }
+.flow-node:hover .flow-tip, .flow-node:focus-visible .flow-tip { display: block; }
+.flow-lane:nth-child(n+3) .flow-tip { left: auto; right: 0; }
+tr.is-hot > td { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.flow-times { margin: 10px 0; color: var(--muted); } .flow-times strong { color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .flow-in_progress .flow-node::before { animation: none; } .flow-node { transition: none; } }
+@media (max-width: 760px) { .agent-flow { grid-template-columns: 1fr 1fr; } .flow-lane::after { display: none; } .flow-lane:nth-child(odd) { border-left: 0; }
+  .flow-lane:nth-child(n+3) { border-top: 1px solid var(--border); } .flow-lane header { border-radius: 0 !important; } }
+
+/* Robots des agents (schéma de la page Agents) : en cours = il fait les cent pas, terminé = il dort, PR = il brandit son fanion, KO = sur le dos */
+.flow-node.flow-bot { flex-direction: column; gap: 0; padding: 0 2px; background: none; border: 0; border-radius: 8px; font-size: 12px; }
+.flow-node.flow-bot::before { display: none; }
+.flow-node.flow-bot:hover, .flow-node.flow-bot:focus-visible, .flow-node.flow-bot.is-hot { box-shadow: none; transform: none; }
+.flow-bot:hover .bot, .flow-bot:focus-visible .bot, .flow-bot.is-hot .bot { filter: drop-shadow(0 0 5px var(--lane)); }
+.flow-bot .bot-id { padding: 0 7px; border-radius: 99px; background: color-mix(in srgb, var(--lane) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--lane) 40%, transparent); }
+.flow-bot.is-sim .bot-id { border-style: dashed; }
+.flow-nodes { min-height: 78px; align-items: flex-end; border-bottom: 2px dashed var(--border); padding-bottom: 6px; }
+.bot-wrap { position: relative; display: block; line-height: 0; }
+.bot { display: block; overflow: visible; transform-origin: 50% 100%; }
+.bot-skin { fill: var(--lane); } .bot-face { fill: var(--surface); } .bot-body { opacity: .8; }
+.bot-antenna, .bot-flag line { stroke: var(--lane); stroke-width: 1.6; stroke-linecap: round; }
+.bot-led { fill: var(--st-todo); }
+.bot-eyes circle { fill: var(--text); } .bot-eyes path { fill: none; stroke: var(--text); stroke-width: 1.6; stroke-linecap: round; }
+.eyes-closed, .eyes-x, .bot-flag { display: none; }
+.bot-flag path { fill: var(--st-todo); }
+.bot-leg-a, .bot-leg-b, .bot-arm-l, .bot-arm-r, .bot-eyes, .bot-flag { transform-box: fill-box; transform-origin: 50% 0; }
+/* bulle de pensée */
+.bot-wrap::after { position: absolute; left: 62%; bottom: 82%; padding: 2px 6px; border-radius: 8px 8px 8px 2px; white-space: nowrap; font-size: 10.5px; font-weight: 600; line-height: 1.3;
+  color: var(--text); background: var(--surface); border: 1px solid var(--border); opacity: 0; pointer-events: none; }
+/* en cours : va-et-vient d'un bord à l'autre de la colonne, demi-tour aux extrémités */
+.flow-in_progress .flow-nodes { display: block; position: relative; height: 84px; }
+.flow-in_progress .flow-bot { --t: calc(7s + var(--i) * 1.9s); --d: calc(var(--i) * -3.1s); position: absolute; bottom: 6px; left: 0;
+  animation: bot-walk var(--t) linear var(--d) infinite alternate; }
+.flow-in_progress .bot { animation: bot-turn calc(var(--t) * 2) steps(1) var(--d) infinite, bot-bob .45s ease-in-out infinite alternate; }
+.flow-in_progress .bot-leg-a { animation: bot-step .45s ease-in-out infinite alternate; }
+.flow-in_progress .bot-leg-b { animation: bot-step .45s ease-in-out -.45s infinite alternate; }
+.flow-in_progress .bot-arm-l { animation: bot-swing .45s ease-in-out infinite alternate; }
+.flow-in_progress .bot-arm-r { animation: bot-swing .45s ease-in-out -.45s infinite alternate; }
+.flow-in_progress .bot-led { animation: bot-blink 1s steps(1) infinite; }
+.flow-in_progress .eyes-open { transform-origin: 50% 50%; animation: bot-wink 3.4s ease-in-out infinite; }
+.flow-in_progress .bot-wrap::after { content: "pytest…"; animation: bot-say 9s ease-in-out calc(var(--i) * -2.7s) infinite; }
+.flow-in_progress .flow-bot:nth-child(3n+2) .bot-wrap::after { content: "grep grep grep"; }
+.flow-in_progress .flow-bot:nth-child(3n) .bot-wrap::after { content: "git push ?"; }
+.flow-in_progress .flow-bot:hover, .flow-in_progress .flow-bot:focus-visible, .flow-in_progress .flow-bot:hover *, .flow-in_progress .flow-bot.is-hot { animation-play-state: paused; }
+/* terminé sans PR : il fait la sieste */
+.flow-done .eyes-open { display: none; } .flow-done .eyes-closed { display: block; }
+.flow-done .bot { animation: bot-snore 2.8s ease-in-out calc(var(--i) * -.9s) infinite; }
+.flow-done .bot-led { fill: var(--border); }
+.flow-done .bot-wrap::after { content: "z z z"; border: 0; background: none; color: var(--muted); animation: bot-zzz 2.8s ease-out calc(var(--i) * -.9s) infinite; }
+/* PR ouverte : il saute en agitant son fanion */
+.flow-pr .bot-flag { display: block; transform-origin: 0 100%; animation: bot-wave .5s ease-in-out infinite alternate; }
+.flow-pr .bot { animation: bot-hop 1.3s cubic-bezier(.3, 0, .4, 1) calc(var(--i) * -.45s) infinite; }
+.flow-pr .bot-led { fill: var(--st-done); }
+.flow-pr .bot-wrap::after { content: "relis-moi !"; animation: bot-say 7s ease-in-out calc(var(--i) * -3.5s - 1s) infinite; }
+/* KO : sur le dos, les jambes qui gigotent */
+.flow-ko .eyes-open { display: none; } .flow-ko .eyes-x { display: block; }
+.flow-ko .bot { transform: rotate(-90deg); transform-origin: 50% 50%; }
+.flow-ko .bot-leg-a { animation: bot-kick .9s ease-in-out infinite alternate; }
+.flow-ko .bot-leg-b { animation: bot-kick .9s ease-in-out -.5s infinite alternate; }
+.flow-ko .bot-led { animation: bot-blink .35s steps(1) infinite; fill: var(--st-ko); }
+.flow-ko .bot-wrap::after { content: "aïe."; left: 20%; animation: bot-say 6s ease-in-out calc(var(--i) * -2s) infinite; }
+@keyframes bot-walk { from { left: 0; } to { left: calc(100% - 56px); } }
+@keyframes bot-turn { 0% { scale: 1 1; } 50% { scale: -1 1; } }
+@keyframes bot-bob { to { translate: 0 -2px; } }
+@keyframes bot-step { from { transform: translateY(0) rotate(14deg); } to { transform: translateY(-2.5px) rotate(-14deg); } }
+@keyframes bot-swing { from { transform: rotate(-22deg); } to { transform: rotate(22deg); } }
+@keyframes bot-blink { 50% { opacity: .15; } }
+@keyframes bot-wink { 0%, 92%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+@keyframes bot-say { 0%, 55%, 100% { opacity: 0; transform: translateY(4px) scale(.8); } 62%, 90% { opacity: 1; transform: none; } }
+@keyframes bot-snore { 50% { transform: scale(1.04, .95); } }
+@keyframes bot-zzz { 0% { opacity: 0; transform: translate(-6px, 8px) scale(.6); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(8px, -14px) scale(1.15); } }
+@keyframes bot-hop { 0%, 100% { transform: translateY(0) scale(1.06, .92); } 45% { transform: translateY(-13px) scale(.96, 1.06); } 70% { transform: translateY(0) scale(1.08, .9); } }
+@keyframes bot-wave { from { transform: rotate(-10deg); } to { transform: rotate(14deg); } }
+@keyframes bot-kick { from { transform: rotate(-30deg); } to { transform: rotate(30deg) translateY(-1px); } }
+@media (prefers-reduced-motion: reduce) {
+  .flow-bot, .flow-bot *, .bot-wrap::after { animation: none !important; }
+  .flow-in_progress .flow-nodes { display: flex; height: auto; } .flow-in_progress .flow-bot { position: relative; bottom: auto; }
+}

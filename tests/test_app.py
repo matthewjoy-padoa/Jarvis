@@ -1,6 +1,6 @@
 import os
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -405,3 +405,89 @@ def test_charts_are_readable_and_lead_to_the_tickets_they_count():
     marks = re.findall(r'<a class="tl-mark[^"]*" href="([^"]+)"', synthese)  # jalons de la frise → calendrier des deadlines
     assert marks and all(m.startswith("/deadlines?client=client-demo&vue=calendrier&mois=") for m in marks)
     assert "Prochain :" in synthese and synthese.count("tl-mark next") == 1  # prochain jalon mis en avant
+
+
+def test_demo_agents_page_shows_fictional_examples():
+    """Mode démo : la page Agents montre des exemples fictifs, avec leurs pages de détail, sans rien écrire dans l'historique."""
+    from deploy_hub import main
+    client = TestClient(main.app)
+    before = list(main.claude.runs)
+    page = client.get("/agents").text
+    assert 'class="badge example"' in page and "Tokens et durée" in page
+    for run in main.examples.runs:
+        assert f'href="/agents/{run.id}"' in page and client.get(f"/agents/{run.id}/journal").status_code == 200
+    done = client.get(f"/agents/{main.examples.runs[-2].id}").text  # terminé avec PR : relecture guidée tirée du journal d'exemple
+    assert "Relecture guidée" in done and "Dernier lancement de tests passé (12 passed in 4.0s)" in done and "Un test a été ajouté" in done
+    running = client.get(f"/agents/{main.examples.runs[0].id}").text
+    assert "Arrêter l'agent" not in running
+    for w in main.examples.watches:
+        assert client.get(f"/agents/suivis/{w.id}").status_code == 200
+    assert "Rapport de fin" in client.get(f"/agents/suivis/{main.examples.watches[1].id}").text
+    assert main.claude.runs == before and not (main.claude.state_dir / f"{main.examples.runs[0].id}.jsonl").exists()
+
+
+def test_examples_are_never_shown_in_live_mode(monkeypatch):
+    from deploy_hub import main
+    monkeypatch.setattr(main, "examples", None)
+    client = TestClient(main.app)
+    assert 'class="badge example"' not in client.get("/agents").text.split("</p>", 2)[-1]
+    assert client.get("/agents/901").status_code == 404 and client.get("/agents/suivis/901").status_code == 404
+
+
+def test_agent_tokens_are_read_from_the_result_event_and_shown(tmp_path):
+    from deploy_hub.sources.claude_runner import AgentRun, read_tokens, tokens_text, usage
+
+    run = AgentRun(1, "client-demo", "Client Démo", "retour R-01", "fix-r-01", "brief", datetime(2026, 11, 17, 9), "terminé",
+                   ended_at=datetime(2026, 11, 17, 9, 10), category="Adhérents")
+    assert run.tokens is None
+    read_tokens(run, {"usage": {"input_tokens": 900, "output_tokens": 8_100, "cache_read_input_tokens": 1_200_000,
+                                "cache_creation_input_tokens": 70_000, "service_tier": "standard"}})
+    assert (run.input_tokens, run.output_tokens, run.cache_read_tokens, run.cache_write_tokens) == (900, 8_100, 1_200_000, 70_000)
+    assert run.tokens == 1_279_000 and tokens_text(run.tokens) == "1,3 M"
+    assert [tokens_text(n) for n in (0, 950, 412_300, 999_600)] == ["0", "950", "412 k", "1,0 M"]
+    total = usage([run])["total"]
+    assert total["tokens"] == 1_279_000 and total["token_kinds"][2] == ("Cache relu", 1_200_000)
+    read_tokens(run, {})  # agent arrêté : Claude Code n'annonce rien
+    assert run.tokens is None and usage([run])["total"]["tokens"] is None
+
+
+def test_demo_agents_page_shows_tokens_chart_and_full_brief(monkeypatch):
+    import deploy_hub.main as main
+    from deploy_hub.sources.examples import Examples
+
+    monkeypatch.setattr(main, "examples", Examples())
+    client = TestClient(main.app)
+    page = client.get("/agents").text
+    assert "Coût" not in page and "<th>Contexte</th>" not in page  # ni coût en argent, ni anneau par agent
+    assert page.count('<svg class="ring') == 1 and "ring-cell" not in page  # un seul anneau : le bilan, à la place des tuiles de tokens
+    assert "<strong>49 %</strong> du contexte utilisé" in page and "au plus 86 %" in page  # 172 k, 86 k et 38 k sur 200 k
+    assert "<strong>5,3 M</strong> tokens au total" in page and "Cache relu" in page
+    assert 'href="#dags" data-pane="pane-dags"' in page and page.index('id="pane-dags"') < page.index("<h2>Suivis de DAG</h2>")  # onglet DAG
+    assert 'class="flow-lane flow-in_progress"' in page and 'class="stats"' not in page  # schéma des agents à la place des tuiles
+    assert page.count('<a class="flow-node') >= 5 and '<tr data-agent="902">' in page  # un nœud par agent, lié à sa ligne
+    assert "3,6 M" in page  # agent 902 : 1 840 + 21 600 + 3 420 000 + 186 000
+    detail = client.get("/agents/902").text
+    assert "86 %</strong> du contexte" in detail and "172 k sur 200 k tokens" in detail
+    assert "<strong>3,6 M</strong> tokens au total" in detail and "Cache relu" in detail and "coût estimé" not in detail
+    for part in ("&lt;contexte&gt;", "&lt;retour&gt;", "&lt;demarche&gt;", "&lt;contrat&gt;", "&lt;compte_rendu&gt;", "Retour de recette : R-02"):
+        assert part in detail
+    assert "À COMPLÉTER" not in detail
+
+
+def test_context_is_read_from_the_journal_even_while_the_agent_runs():
+    import json
+
+    from deploy_hub.sources.claude_runner import AgentRun, read_context
+
+    def turn(tokens, parent=None):
+        return json.dumps({"type": "assistant", "parent_tool_use_id": parent, "message": {"content": [], "usage": {
+            "input_tokens": 10, "cache_read_input_tokens": tokens, "cache_creation_input_tokens": 990, "output_tokens": 500}}})
+
+    run = AgentRun(1, "client-demo", "Client Démo", "retour R-01", "fix-r-01", "brief", datetime(2026, 11, 17, 9), "en cours")
+    read_context(run, "")
+    assert run.context_pct is None
+    read_context(run, "\n".join([turn(20_000), turn(49_000), turn(5_000, parent="sous-agent")]))
+    assert (run.context_tokens, run.context_window, run.context_pct) == (50_000, 200_000, 25)  # dernier tour de l'agent lui-même
+    end = json.dumps({"type": "result", "modelUsage": {"modele": {"contextWindow": 1_000_000}}})
+    read_context(run, "\n".join([turn(499_000), end]))
+    assert (run.context_window, run.context_pct) == (1_000_000, 50)
