@@ -187,17 +187,17 @@ def test_lists_open_tickets_in_the_drawer(app):
 
 def test_home_counters_lead_to_the_counted_tickets(app, acme):
     html = app.get("/").text
-    # les compteurs sont dans la phrase de Jarvis (plus de tuiles) ; un seul retour aujourd'hui : il ouvre son ticket dans le panneau
-    assert 'class="count-link" href="/deploiements/acme/ticket/retour/0001AB" data-ticket' in html
-    # le seul retard n'a pas de ticket (pas de lien Notion) : le compteur ouvre la liste filtrée
-    assert 'class="count-link" href="/deadlines?periode=retard"' in html
-    assert 'class="stat' not in html
-    assert 'class="count-link" href="/deploiements/acme/ticket/action/' in html.split("Injections KO")[0]  # une seule injection KO : son ticket
+    # un seul retour aujourd'hui : la tuile ouvre directement son ticket dans le panneau
+    assert 'class="stat stat-todo stat-link" href="/deploiements/acme/ticket/retour/0001AB" data-ticket' in html
+    # le seul retard n'a pas de ticket (pas de lien Notion) : la tuile ouvre la liste filtrée
+    assert 'class="stat stat-ko stat-link" href="/deadlines?periode=retard"' in html
+    assert 'class="count-link" href="/deadlines?periode=retard"' in html  # la phrase de Jarvis aussi
+    assert 'href="/deploiements/acme/ticket/action/' in html.split("Injections KO")[0]  # une seule injection KO : son ticket
     assert 'href="/deploiements/acme/injections?vue=liste#groupe=ko"' in html  # titre du bloc KO : la liste filtrée
     assert 'href="/deadlines?periode=semaine"' not in html  # rien dans les 7 jours : rien à ouvrir
     d, _ = acme
     d.actions.append(Action(title="Relancer le client", status="À faire", due=date.today(), notion_url="https://app.notion.com/" + "d" * 32))
-    assert 'class="count-link" href="/deadlines?periode=aujourdhui"' in app.get("/").text  # deux : la liste
+    assert 'class="stat stat-todo stat-link" href="/deadlines?periode=aujourdhui"' in app.get("/").text  # deux : la liste
 
 
 def test_deadlines_filtered_by_period_link_each_ticket(app):

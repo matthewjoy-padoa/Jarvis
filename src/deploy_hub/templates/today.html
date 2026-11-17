@@ -2,6 +2,7 @@
 {% import "_icons.html" as ic %}
 {% block title %}Accueil · Jarvis{% endblock %}
 {% block content %}
+{% import "_charts.html" as charts with context %}
 {% set days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"] %}
 {% set months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"] %}
 {% set hour = now.hour %}
@@ -18,11 +19,17 @@
   </div>
   <div class="head-side"><a class="btn-primary" href="/brief" title="Le résumé du jour en texte, à copier pour Slack ou le daily">{{ ic.icon("sun") }} Brief du matin</a></div>
 </div>
+{{ charts.stats([("En retard", late | length, "ko", links.retard), ("À échéance aujourd'hui", due_today | length, "todo", links.aujourdhui), ("Dans les 7 jours", due_week | length, "", links.semaine), ("Injections KO", ko | length, "ko", links.ko)]) }}
 
-{# Pas de tuiles ni de graphiques : la phrase de Jarvis porte les compteurs (chacun mène à sa liste), la synthèse du client
-   porte l'avancement. Mes tickets épinglés : tout en haut. #}
+{# Mes tickets épinglés : tout en haut, juste sous les compteurs. #}
 {% include "_pins.html" %}
 
+{% for d in deployments %}
+<section class="panel glance">
+  <h2 class="glance-title"><a href="/deploiements/{{ d.slug }}/synthese">{{ ic.client_emoji(d) }}{{ d.client }}</a>{% if d.go_live %}<span class="badge {{ 'g-ko' if d.days_left < 14 }}">J{{ '%+d' % (-d.days_left) }}</span>{% endif %}</h2>
+  {{ charts.client_bars(d, "/deploiements/" ~ d.slug ~ "/synthese") }}
+</section>
+{% endfor %}
 
 <div class="two-col">
   <section>
@@ -46,19 +53,17 @@
   </section>
   </section>
   <section>
-    {% if ko %}{# sans KO, pas de bloc : la phrase de Jarvis dit déjà que tout est au vert #}
     <section class="panel">
-      <h2><a href="{{ ko_url }}" title="Voir les injections KO">Injections KO <span class="muted">· {{ ko | length }}</span></a></h2>
+      <h2>{% if ko %}<a href="{{ ko_url }}" title="Voir les injections KO">{% endif %}Injections KO <span class="muted">· {{ ko | length }}</span>{% if ko %}</a>{% endif %}</h2>
       <ul class="todo" data-limit="5">
         {% for d, a in ko %}
         <li><span class="badge g-ko">{{ a.injection_status }}</span>
           {% if a.ref %}<a data-ticket href="{{ ticket_url(d.slug, 'action', a.ref) }}">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}
           <span class="muted">· {% for r in a.resources %}<code class="res">{{ r }}</code> {% endfor %}{{ d.client if deployments | length > 1 }}</span>
           <a class="btn-link" href="/deploiements/{{ d.slug }}/injections#{{ d.slug }}-{{ a.resources | join('-') or 'sans-ressource' }}">Relancer ↗</a></li>
-        {% endfor %}
+        {% else %}<li class="muted">Aucune injection KO. Tous les systèmes sont opérationnels.</li>{% endfor %}
       </ul>
     </section>
-    {% endif %}
     <section class="panel">
       <h2><a href="/deadlines" title="Toutes les échéances">Prochains jalons <span class="muted">· 3 semaines</span></a></h2>
       <ul class="todo" data-limit="5">

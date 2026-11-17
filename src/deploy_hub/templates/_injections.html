@@ -6,14 +6,13 @@
 {% if vue == 'ced' %}{% include "_ced.html" %}{% else %}
 {% set grouped = vue != 'liste' %}
 {% import "_charts.html" as charts with context %}
-{# Vue tous clients : une barre par client pour comparer ; sur la fiche, rien en tête (la synthèse porte la barre). #}
-{% if show_client %}
 {% for d in deployments if d.injection_counts or d.resources %}
 <section class="chart-row">
-  {{ charts.segbar(d.client, d.injection_groups, "cartes", slim=true, filter_key="groupe", scope={"client": d.client}, href=(base ~ "?vue=liste") if grouped else None) }}
+  {% set scope = {"client": d.client} if show_client else {} %}
+  {{ charts.segbar(d.client if show_client else "Répartition des injections", d.injection_groups, "cartes", filter_key="groupe", scope=scope, href=(base ~ "?vue=liste") if grouped else None) }}
+  {% if d.injection_counts %}{{ charts.hbars("Par statut d'injection", d.injection_counts | dictsort(by="value", reverse=true), 5, filter_key="injection", scope=scope, href=(base ~ "?vue=liste") if grouped else None) }}{% endif %}
 </section>
 {% endfor %}
-{% endif %}
 {% if grouped %}{% include "_injections_blocks.html" %}{% else %}
 <table data-filterable>
   <thead><tr>{% if show_client %}<th data-filter="client">Client</th>{% endif %}<th>Carte</th><th data-filter="injection">Statut injection</th><th>Ressources</th><th data-nosort>Lancer un DAG</th></tr></thead>
@@ -32,7 +31,7 @@
           <input type="hidden" name="card" value="{{ a.title }}">
           <select name="dag_id" aria-label="DAG">{% for c in choices %}<option value="{{ c.dag_id }}" title="{{ c.dag_id }}">{{ c.label }}</option>{% endfor %}</select>
           <select name="padoa_env" aria-label="Stack cible">{% for e in padoa_envs %}<option value="{{ e }}">{{ e }}</option>{% endfor %}</select>
-          <button type="submit" class="secondary">Lancer</button>
+          <button type="submit">Lancer</button>
         </form>
         <div class="dag-out"></div>
         {% elif a.resources %}<span class="muted" title="Aucun DAG de {{ d.orchestrator | join(', ') or d.client }} ne traite ces ressources dans dags/config_deployment.py">aucun DAG{% if not d.orchestrator %} (client absent de l'orchestrator){% endif %}</span>
@@ -52,7 +51,7 @@
         <form class="dag-form" hx-post="/actions/dag/{{ r.dag_id }}" hx-target="#{{ out }}" data-dag-form>
           <input type="hidden" name="dag_id" value="{{ r.dag_id }}">
           <select name="padoa_env" aria-label="Stack cible">{% for e in padoa_envs %}<option value="{{ e }}">{{ e }}</option>{% endfor %}</select>
-          <button type="submit" class="secondary">Lancer le DAG</button></form>
+          <button type="submit">Lancer le DAG</button></form>
         {% endif %}
         <button class="secondary" hx-post="/actions/claude/{{ d.slug }}/{{ r.name }}" hx-target="#{{ out }}" hx-confirm="Lancer Claude sur {{ r.name }} ?">Lancer Claude</button>
         <div id="{{ out }}"></div>

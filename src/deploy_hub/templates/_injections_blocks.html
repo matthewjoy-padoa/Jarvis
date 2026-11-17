@@ -2,8 +2,6 @@
 {# Attend : deployments, show_client. Cartes d'injection regroupées par ressources liées (Deployment.injection_blocks) :
    un bloc par ressource, son état, le DAG à lancer une fois pour toutes les cartes du bloc. #}
 {% import "_charts.html" as charts with context %}
-{# Recherche et filtres des blocs : seulement s'il y a des blocs à filtrer. #}
-{% if deployments | selectattr("injection_cards") | list %}
 <div class="toolbar blocks-toolbar" data-blocks-toolbar>
   <input type="search" placeholder="Rechercher une ressource ou une carte…" aria-label="Rechercher">
   <div class="segmented" role="group" aria-label="Filtrer les blocs">
@@ -12,7 +10,6 @@
   <button type="button" class="secondary" data-toggle-all>Tout déplier</button>
   <span class="muted count-label"></span>
 </div>
-{% endif %}
 {% for d in deployments %}
 {% if show_client and d.injection_blocks %}<h2>{{ d.client }}</h2>{% endif %}
 {% set all_dags = dags_for(d.orchestrator) %}
@@ -40,6 +37,7 @@
     <summary>
       <span class="res-name">{% for r in b.resources %}<code class="res">{{ r }}</code> {% else %}<span class="muted">{{ b.label }}</span>{% endfor %}</span>
       <span class="res-count muted">{{ b.cards | length }} carte(s)</span>
+      <span class="res-bar">{{ charts.segbar("", b.counts, thin=true) }}</span>
       <span class="res-status">{% for g, n in b.counts.items() if n %}<span class="badge g-{{ g }}">{{ n }} {{ {"todo": "à faire", "in_progress": "en cours", "ko": "KO", "done": "terminé"}[g] }}</span>{% endfor %}</span>
     </summary>
     <div class="res-body">
@@ -78,7 +76,7 @@
         {% if r.dag_id %}<form class="dag-form" hx-post="/actions/dag/{{ r.dag_id }}" hx-target="#{{ out }}" data-dag-form>
           <input type="hidden" name="dag_id" value="{{ r.dag_id }}">
           <select name="padoa_env" aria-label="Stack cible">{% for e in padoa_envs %}<option value="{{ e }}">{{ e }}</option>{% endfor %}</select>
-          <button type="submit" class="secondary">Lancer le DAG</button></form>{% endif %}
+          <button type="submit">Lancer le DAG</button></form>{% endif %}
         <button class="secondary" hx-post="/actions/claude/{{ d.slug }}/{{ r.name }}" hx-target="#{{ out }}" hx-confirm="Lancer Claude sur {{ r.name }} ?">Lancer Claude</button>
         <div id="{{ out }}"></div></td></tr>
   {% endfor %}

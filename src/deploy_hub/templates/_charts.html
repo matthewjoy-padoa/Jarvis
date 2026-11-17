@@ -97,9 +97,8 @@
 </svg>
 {% endmacro %}
 
-{# Frise du projet : jalons passés pleins, à venir creux, prochain jalon mis en avant (date et J-x).
-   upcoming_only : la légende sous la frise ne liste que les jalons à venir (les passés restent sur la frise, au survol). #}
-{% macro timeline(t, slug=None, upcoming_only=false) %}
+{# Frise du projet : jalons passés pleins, à venir creux, prochain jalon mis en avant (date et J-x). #}
+{% macro timeline(t, slug=None) %}
 {% if t %}
 {% set upcoming = t.marks | selectattr(1, "ge", today) | list %}
 {% set nxt = upcoming[0] if upcoming else None %}
@@ -116,17 +115,22 @@
     <span class="tl-today{{ ' end' if t.today > 80 }}" style="left: {{ t.today }}%" title="Aujourd'hui"><span>Aujourd'hui</span></span>
   </div>
   <ol class="tl-legend">
-    {% for label, day, pos in (upcoming if upcoming_only else t.marks) %}<li class="{{ 'past' if day < today }}{{ ' next' if nxt and day == nxt[1] }}">{% if slug %}<a href="/deadlines?client={{ slug }}&vue=calendrier&mois={{ day.strftime('%Y-%m') }}" title="Voir ce mois dans le calendrier des deadlines">{% endif %}<span class="date">{{ day.strftime("%d/%m") }}</span>{{ label }}{% if slug %}</a>{% endif %}</li>{% endfor %}
+    {% for label, day, pos in t.marks %}<li class="{{ 'past' if day < today }}{{ ' next' if nxt and day == nxt[1] }}">{% if slug %}<a href="/deadlines?client={{ slug }}&vue=calendrier&mois={{ day.strftime('%Y-%m') }}" title="Voir ce mois dans le calendrier des deadlines">{% endif %}<span class="date">{{ day.strftime("%d/%m") }}</span>{{ label }}{% if slug %}</a>{% endif %}</li>{% endfor %}
   </ol>
 </figure>
 {% endif %}
 {% endmacro %}
 
-{# Compteurs en ligne : une phrase discrète plutôt que des tuiles. Chaque élément : (libellé, valeur, ton) ; les zéros sont omis.
-   ton : groupe de statut (« ko », « todo ») qui colore la pastille, ou "" pour aucune ; cls : classe du paragraphe. #}
-{% macro counts(items, cls="counts") %}
-{% set shown = items | selectattr(1) | list %}
-{% if shown %}
-<p class="{{ cls }}">{% for label, value, tone in shown %}<span>{% if tone %}<span class="key g-{{ tone }}"></span>{% endif %}<strong>{{ value }}</strong> {{ label }}</span>{% endfor %}</p>
-{% endif %}
+{# Compteurs. Chaque élément : (libellé, valeur, ton) ou (libellé, valeur, ton, lien) ; lien = {"href", "ticket"} ou None.
+   Avec un lien, la tuile mène aux éléments comptés (ticket : ouvert dans le panneau, voir static/drawer.js). #}
+{% macro stats(items) %}
+<div class="stats">
+  {% for item in items %}
+  {% set label, value, tone = item[0], item[1], item[2] %}
+  {% set link = item[3] if item | length > 3 else None %}
+  {% set cls = "stat" ~ (" stat-" ~ tone if tone and value else "") %}
+  {% if link %}<a class="{{ cls }} stat-link" href="{{ link.href }}"{% if link.ticket %} data-ticket{% endif %} title="Voir {{ 'le ticket' if link.ticket else 'les éléments' }}"><strong>{{ value }}</strong><span>{{ label }} <span class="stat-go" aria-hidden="true">→</span></span></a>
+  {% else %}<div class="{{ cls }}"><strong>{{ value }}</strong><span>{{ label }}</span></div>{% endif %}
+  {% endfor %}
+</div>
 {% endmacro %}

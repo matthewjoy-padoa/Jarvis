@@ -27,6 +27,12 @@
     <a href="{{ link({'vue': '', 'mois': ''}) }}"{% if vue == "liste" %} class="active"{% endif %}>Liste</a><a href="{{ link({'vue': 'calendrier', 'mois': month.strftime('%Y-%m')}) }}"{% if vue == "calendrier" %} class="active"{% endif %}>Calendrier</a>
   </div>
 </div>
+{% import "_charts.html" as charts with context %}
+{% set ns = namespace(late=0, week=0, month=0) %}
+{% for i in items %}{% set days = (i.date - today).days %}
+  {% if days < 0 and i.kind != "Jalon" %}{% set ns.late = ns.late + 1 %}{% elif 0 <= days <= 7 %}{% set ns.week = ns.week + 1 %}{% elif 7 < days <= 30 %}{% set ns.month = ns.month + 1 %}{% endif %}
+{% endfor %}
+{{ charts.stats([("En retard (actions et retours)", ns.late, "ko"), ("Dans les 7 jours", ns.week, "todo"), ("Entre 8 et 30 jours", ns.month, "")]) }}
 
 {% macro item_link(i) -%}
 {% if i.url %}<a href="{{ i.url }}"{% if i.url.startswith('http') %} target="_blank" rel="noopener"{% elif '/ticket/' in i.url %} data-ticket{% endif %}>{{ i.label }}</a>{% else %}{{ i.label }}{% endif %}
@@ -58,7 +64,7 @@
 </section>
 {% else %}
 <table data-filterable>
-  <thead><tr><th>Date</th><th data-nosort>Dans</th><th data-filter>Type</th><th>Quoi</th>{% if all_clients %}<th data-filter>Client</th>{% endif %}</tr></thead>
+  <thead><tr><th>Date</th><th data-nosort>Dans</th><th data-filter>Type</th><th>Quoi</th><th{% if all_clients %} data-filter{% endif %}>Client</th></tr></thead>
   <tbody>
   {% for i in items %}
     {% set days = (i.date - today).days %}
@@ -67,10 +73,10 @@
       <td><span class="badge {{ 'danger' if 0 <= days < 7 }}">J{{ '%+d' % (-days) }}</span></td>
       <td><span class="badge">{{ i.kind }}</span></td>
       <td>{{ item_link(i) }}</td>
-      {% if all_clients %}<td><a href="/deploiements/{{ i.d.slug }}/synthese">{{ i.d.client }}</a></td>{% endif %}
+      <td><a href="/deploiements/{{ i.d.slug }}/synthese">{{ i.d.client }}</a></td>
     </tr>
   {% else %}
-    <tr><td colspan="{{ 5 if all_clients else 4 }}" class="muted">Aucune échéance{{ " sur cette période" if periode }}.</td></tr>
+    <tr><td colspan="5" class="muted">Aucune échéance{{ " sur cette période" if periode }}.</td></tr>
   {% endfor %}
   </tbody>
 </table>

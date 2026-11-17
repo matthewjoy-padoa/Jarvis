@@ -103,6 +103,7 @@ pre { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--bord
 .count { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 99px; background: var(--danger); color: var(--on-status); font-size: 11px; text-align: center; }
 @media (max-width: 700px) { .retour dl, .meta-list { grid-template-columns: 1fr; } }
 .nav { scrollbar-width: none; } .nav::-webkit-scrollbar { display: none; }
+.counts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 16px; }
 .agent-form { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .agent-form label { font-size: 13px; color: var(--muted); }
 .agent-form textarea { font: inherit; font-size: 14px; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); resize: vertical; }
@@ -146,6 +147,12 @@ th[data-dir=desc]::after { content: " ▼"; }
 .tl-legend { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; }
 .tl-legend li.past { color: var(--muted); }
 .tl-legend .date { font-variant-numeric: tabular-nums; color: var(--muted); margin-right: 2px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 12px 0 16px; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; }
+.stat strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; color: var(--muted); }
+.stat-ko { border-color: var(--danger); } .stat-ko span::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--st-ko); margin-right: 6px; vertical-align: 1px; }
+.stat-todo { border-color: var(--warn); }
 .tl-today.end span { left: auto; right: 6px; }
 
 /* Sélecteur de thème : un seul bouton qui alterne Auto → Nuit → Clair */
@@ -176,18 +183,24 @@ th[data-dir=desc]::after { content: " ▼"; }
 .segmented a { padding: 4px 12px; border-radius: 99px; border: 1px solid var(--border); color: var(--muted); font-size: 13px; background: var(--surface); }
 .segmented a:hover { color: var(--text); }
 .segmented a.active { color: var(--text); border-color: var(--accent); font-weight: 600; }
+.segmented .note { margin-left: auto; }
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px 16px 8px; margin: 12px 0; }
 .panel h2 { margin: 12px 0 4px; font-size: 15px; }
 .panel .plain li { border-bottom: 1px solid var(--border); padding: 7px 0; }
 .panel .plain li:last-child { border-bottom: 0; }
+.kpi-link { color: var(--text); }
+.kpi-link:hover { border-color: var(--accent); }
 .retour { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 14px; margin: 8px 0; }
 .retour header { gap: 8px; }
 .retour p { margin: 4px 0 0; }
+.retour-actions { display: flex; gap: 8px; align-items: flex-start; }
 .btn-link { font-size: 13px; padding: 3px 10px; border: 1px solid var(--border); border-radius: 6px; white-space: nowrap; }
 .btn-link:hover { border-color: var(--accent); }
+.retour .agent { grid-column: 1 / -1; }
+.retour .agent summary { color: var(--accent); margin-top: 6px; width: max-content; }
 .late { color: var(--danger); }
 tbody tr:hover td { background: var(--bg); }
-@media (max-width: 700px) { .tabs { top: 0; position: static; } .stacks { justify-content: flex-start; } }
+@media (max-width: 700px) { .tabs { top: 0; position: static; } .segmented .note { margin-left: 0; } .stacks { justify-content: flex-start; } }
 .footer { max-width: 1100px; margin: 0 auto; padding: 8px 16px 24px; }
 @media (max-width: 700px) {
   .topbar { flex-wrap: wrap; position: static; }
@@ -218,6 +231,10 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 @media (max-width: 700px) { .head-side, .refresh { align-items: flex-start; justify-content: flex-start; } .refresh .refresh-out { text-align: left; } }
 
 /* Contenu d'un retour de recette */
+.retour .retour-content { grid-column: 1 / -1; }
+.retour .retour-content summary { color: var(--accent); margin-top: 6px; width: max-content; }
+.retour .retour-content dl { grid-template-columns: 180px 1fr; margin: 8px 0 4px; }
+.retour .retour-content dd { white-space: pre-wrap; }
 
 /* Brief pré-rempli de l'agent */
 .agent-form textarea { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; min-height: 280px; }
@@ -255,17 +272,18 @@ ul.changes .btn-link { margin-left: auto; }
 .res-block { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
 .res-block.worst-0 { border-left: 3px solid var(--danger); }
 .res-block.worst-1 { border-left: 3px solid var(--accent); }
-.res-block > summary { display: grid; grid-template-columns: minmax(160px, 1fr) auto auto; gap: 6px 12px; align-items: center; padding: 10px 14px; cursor: pointer; list-style: none; color: var(--text); font-size: 14px; margin: 0; }
+.res-block > summary { display: grid; grid-template-columns: minmax(160px, 1.4fr) auto minmax(90px, 1fr) auto; gap: 6px 12px; align-items: center; padding: 10px 14px; cursor: pointer; list-style: none; color: var(--text); font-size: 14px; margin: 0; }
 .res-block > summary::-webkit-details-marker { display: none; }
 .res-block > summary::before { content: "▸"; color: var(--muted); position: absolute; margin-left: -10px; }
 .res-block[open] > summary::before { content: "▾"; }
+.res-block > summary .chart.thin { margin: 0; }
 .res-status { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
 .res-body { padding: 0 14px 12px; }
 .res-body table { border: 0; }
 .res-body td { padding: 7px 8px; }
 .res-body .dag-form { margin: 2px 0 6px; }
 .blocks-toolbar .segmented { margin: 0; }
-@media (max-width: 700px) { .res-block > summary { grid-template-columns: 1fr auto; } .res-status { grid-column: 1 / -1; justify-content: flex-start; } }
+@media (max-width: 700px) { .res-block > summary { grid-template-columns: 1fr auto; } .res-bar { grid-column: 1 / -1; } .res-status { justify-content: flex-start; } }
 
 /* Listes limitées (« Voir plus ») */
 .is-collapsed { display: none !important; }
@@ -283,9 +301,11 @@ button, input, select, textarea { font-family: inherit; }
 .brand small { font-weight: 500; color: var(--muted); font-size: 14px; }
 .nav a { border-radius: 999px; font-weight: 500; }
 .nav a.active { background: var(--accent-soft); color: var(--text); font-weight: 600; }
-.card, .kpi, .chart, .panel, .retour, .res-block, table { border: 2px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
-.card:hover { border-color: var(--accent); }
-.kpi strong { font-size: 30px; font-weight: 700; line-height: 1.1; }
+.card, .kpi, .stat, .chart, .panel, .retour, .res-block, table { border: 2px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.card:hover, .kpi-link:hover { border-color: var(--accent); }
+.kpi strong, .stat strong { font-size: 30px; font-weight: 700; line-height: 1.1; }
+.stat { padding: 14px 16px; }
+.stat-ko { border-color: var(--st-ko); } .stat-todo { border-color: var(--st-todo); }
 th { background: var(--bg); color: var(--muted); font-weight: 600; }
 th, td { border-bottom: 1px solid var(--border); }
 tbody tr:hover td { background: color-mix(in srgb, var(--bg) 60%, transparent); }
@@ -573,10 +593,10 @@ button.secondary:hover:not(:disabled), .theme-toggle:hover, .btn-link:hover {
 .btn-link { min-height: 28px; padding: 3px 12px; font-size: 12.5px; }
 button .ic, .btn-primary .ic, .btn-link .ic { width: 15px; height: 15px; }
 button:focus-visible, .btn-primary:focus-visible, .btn-link:focus-visible, .segmented a:focus-visible, .theme-toggle:focus-visible,
-.card-linked:focus-within { outline: none; box-shadow: var(--ring); }
+.card-linked:focus-within, a.kpi-link:focus-visible { outline: none; box-shadow: var(--ring); }
 button:disabled { opacity: .45; box-shadow: none; transform: none; }
-.dag-form.is-prod button { background: var(--st-ko); border-color: var(--st-ko); color: var(--on-accent); }
-.dag-form.is-prod button:hover:not(:disabled) { color: var(--on-accent); background: color-mix(in srgb, var(--st-ko) 85%, #000); border-color: color-mix(in srgb, var(--st-ko) 85%, #000); }
+.dag-form.is-prod button { background: var(--st-ko); border-color: var(--st-ko); }
+.dag-form.is-prod button:hover:not(:disabled) { background: color-mix(in srgb, var(--st-ko) 85%, #000); border-color: color-mix(in srgb, var(--st-ko) 85%, #000); }
 
 /* --- Contrôles segmentés (vues, filtres Actives/Toutes…) : une piste, l'option choisie en relief ---------- */
 .segmented { display: inline-flex; gap: 2px; padding: 3px; margin: 8px 0 4px; border-radius: 999px;
@@ -585,24 +605,34 @@ button:disabled { opacity: .45; box-shadow: none; transform: none; }
   transition: color .15s, background-color .15s var(--ease), box-shadow .15s var(--ease); }
 .segmented a:hover { color: var(--text); background: color-mix(in srgb, var(--surface) 55%, transparent); }
 .segmented a.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 18, 53, .14); }
-.segmented > .muted:not(a) { padding: 0 8px; }
+.segmented > .muted:not(a), .segmented .note { padding: 0 8px; }
 .view-bar { gap: 8px 12px; margin: 8px 0 4px; }
 .view-bar .segmented { margin: 0; }
+.view-bar .note { font-size: 12.5px; }
 
 /* --- Cartes ----------------------------------------------------------------------------------------- */
-.card, .kpi, .chart, .panel, .retour, .res-block, table, .wn-item, .kb-card, .pending-card {
+.card, .kpi, .stat, .chart, .panel, .retour, .res-block, table, .wn-item, .kb-card, .pending-card {
   border: var(--line) solid var(--border); box-shadow: var(--shadow-card); }
-.card, .kpi, .chart, .panel, .retour, .res-block { border-radius: var(--radius); }
+.card, .kpi, .stat, .chart, .panel, .retour, .res-block { border-radius: var(--radius); }
 .card { padding: 16px 18px; }
 .card-head { gap: 10px; }
 .card-head strong { font-size: 15.5px; }
-.card-linked, .kb-card, .wn-item { transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s; }
-.card-linked:hover, .kb-card:hover, .wn-item:hover {
+.card-linked, a.kpi-link, .kb-card, .wn-item { transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s; }
+.card-linked:hover, a.kpi-link:hover, .kb-card:hover, .wn-item:hover {
   transform: translateY(-2px); box-shadow: var(--shadow-lift); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
 .card-config { font-size: 12.5px; font-weight: 600; }
 .pending-card { border-style: dashed; box-shadow: none; background: color-mix(in srgb, var(--surface) 60%, transparent); }
 .empty-state { text-align: center; padding: 28px 20px; }
 .empty-state .btn-primary { margin: 6px 0 10px; }
+
+/* Tuiles de chiffres : liseré de couleur à gauche plutôt qu'un contour coloré */
+.stat { position: relative; overflow: hidden; padding: 14px 16px 14px 20px; gap: 2px; }
+.stat::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--border); }
+.stat-ko, .stat-todo { border-color: var(--border); }
+.stat-ko::before { background: var(--st-ko); }
+.stat-todo::before { background: var(--st-todo); }
+.stat-ko span::before { display: none; }
+.stat strong { letter-spacing: -.02em; }
 
 /* Panneaux et retours de recette */
 .panel { padding: 6px 18px 12px; }
@@ -612,6 +642,7 @@ button:disabled { opacity: .45; box-shadow: none; transform: none; }
 .retour[data-group="in_progress"] { border-left-color: var(--st-progress); }
 .retour[data-group="ko"] { border-left-color: var(--st-ko); }
 .retour[data-group="done"] { border-left-color: var(--st-done); }
+.retour .agent summary, .retour .retour-content summary { font-weight: 600; font-size: 13px; }
 
 /* Kanban et Quoi de neuf : mêmes cartes */
 .kb-col { border-radius: var(--radius); border-width: var(--line); }
@@ -665,23 +696,23 @@ a[data-ticket]:hover { color: var(--accent); }
 tr[data-ticket-card]:hover td { background: color-mix(in srgb, var(--accent-soft) 35%, transparent); }
 
 /* « Lancer un agent » : bouton plein bien visible (liste des retours et fenêtre de détail) ; ouvert, il passe en secondaire */
-.ticket details.agent > summary {
+.retour details.agent > summary, .ticket details.agent > summary {
   display: inline-flex; align-items: center; gap: 8px; width: max-content; list-style: none; cursor: pointer;
   margin: 12px 0 2px; padding: 8px 18px 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 700; color: var(--on-accent);
   background: linear-gradient(100deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, var(--cyan)) 100%);
   border: var(--line) solid transparent; box-shadow: 0 2px 6px -1px color-mix(in srgb, var(--accent) 45%, transparent);
   transition: transform .15s var(--ease), box-shadow .15s var(--ease), filter .15s; }
-.ticket details.agent > summary::-webkit-details-marker { display: none; }
-.ticket details.agent > summary .ic { width: 18px; height: 18px; }
-.ticket details.agent > summary::after { content: "→"; font-weight: 700; transition: transform .15s var(--ease); }
-.ticket details.agent > summary:hover {
+.retour details.agent > summary::-webkit-details-marker, .ticket details.agent > summary::-webkit-details-marker { display: none; }
+.retour details.agent > summary .ic, .ticket details.agent > summary .ic { width: 18px; height: 18px; }
+.retour details.agent > summary::after, .ticket details.agent > summary::after { content: "→"; font-weight: 700; transition: transform .15s var(--ease); }
+.retour details.agent > summary:hover, .ticket details.agent > summary:hover {
   transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 8px 18px -6px color-mix(in srgb, var(--accent) 60%, transparent); }
-.ticket details.agent > summary:hover::after { transform: translateX(3px); }
-.ticket details.agent > summary:focus-visible { outline: none; box-shadow: var(--ring); }
-.ticket details.agent[open] > summary {
+.retour details.agent > summary:hover::after, .ticket details.agent > summary:hover::after { transform: translateX(3px); }
+.retour details.agent > summary:focus-visible, .ticket details.agent > summary:focus-visible { outline: none; box-shadow: var(--ring); }
+.retour details.agent[open] > summary, .ticket details.agent[open] > summary {
   background: var(--surface); color: var(--text); border-color: var(--border); box-shadow: var(--shadow-card); filter: none; }
-.ticket details.agent[open] > summary::after { content: "▴"; }
-.ticket details.agent[open] { background: color-mix(in srgb, var(--accent-soft) 30%, transparent);
+.retour details.agent[open] > summary::after, .ticket details.agent[open] > summary::after { content: "▴"; }
+.retour details.agent[open], .ticket details.agent[open] { background: color-mix(in srgb, var(--accent-soft) 30%, transparent);
   border-radius: 14px; padding: 2px 12px 12px; margin-top: 8px; }
 .ticket-agent-btn { background: linear-gradient(100deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, var(--cyan)) 100%); border-color: transparent; }
 .ticket-agent-btn .ic { width: 17px; height: 17px; }
@@ -934,7 +965,7 @@ img.client-icon { width: 1em; height: 1em; object-fit: contain; vertical-align: 
 .tool-launch button:hover:not(:disabled) { color: var(--text); }
 .tool-launch .ic { width: 16px; height: 16px; margin: 0; }
 .tool-launch-ext { margin-left: -4px; font-size: 12px; line-height: 1; }
-.tool-launch-label, .tool-launch-ext { display: none; }  /* icône seule : le nom est dans l'infobulle */
+@media (max-width: 1440px) { .tool-launch-label { display: none; } }
 .tool-error { display: flex; gap: 8px; align-items: flex-start; color: var(--st-ko); }
 .tool-error .ic { flex: none; width: 18px; height: 18px; margin-top: 2px; }
 
@@ -1029,6 +1060,10 @@ button.pal-open.search-wide { flex: 1 1 220px; max-width: 460px; min-width: 0; j
 @media (max-width: 700px) { .settings-save { position: static; } }  /* petit écran : la barre ne masque pas les champs */
 
 /* Accueil cliquable : compteurs, phrase de Jarvis et titres de blocs mènent aux tickets comptés */
+a.stat-link { color: inherit; text-decoration: none; cursor: pointer; transition: border-color .15s, transform .15s, box-shadow .15s; }
+a.stat-link:hover, a.stat-link:focus-visible { border-color: var(--accent); transform: translateY(-1px); }
+a.stat-link .stat-go { opacity: 0; transition: opacity .15s; }
+a.stat-link:hover .stat-go, a.stat-link:focus-visible .stat-go { opacity: 1; }
 .jarvis-line a.count-link { color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
 .jarvis-line a.count-link:hover { color: var(--accent); }
 .list-title a, .panel h2 a { color: inherit; text-decoration: none; }
@@ -1082,7 +1117,7 @@ button.pal-open.search-wide { flex: 1 1 220px; max-width: 460px; min-width: 0; j
    Pas de rebond de défilement (Mac) : sinon la page rebondit et le dock, fixe, a l'air décroché. */
 html { overscroll-behavior-y: none; }
 .dock-wrap { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); z-index: 45; display: flex; flex-direction: column; align-items: center; gap: 12px; }
-.dock-envs, .dock-links { display: flex; flex-direction: column; gap: 8px;
+.dock, .dock-envs { display: flex; flex-direction: column; gap: 8px;
   padding: 8px; background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--border); border-radius: 99px;
   box-shadow: var(--shadow); backdrop-filter: blur(8px); }
 .dock-btn { position: relative; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--border);
@@ -1110,6 +1145,7 @@ html { overscroll-behavior-y: none; }
   .dock-pop > * { transition: transform .22s var(--ease, ease) calc(var(--i) * 35ms), opacity .16s calc(var(--i) * 35ms), visibility 0s .22s; }
   .dock-envs:hover .dock-pop > *, .dock-envs:focus-within .dock-pop > * { transition-delay: calc(var(--i) * 35ms), calc(var(--i) * 35ms), 0s; }
 }
+.dock-add { border-style: dashed; color: var(--muted); }
 .dock-btn::after { content: attr(data-tip); position: absolute; right: calc(100% + 12px); top: 50%; transform: translate(4px, -50%); white-space: nowrap;
   padding: 6px 10px; border-radius: 8px; background: var(--text); color: var(--surface); font-size: 12.5px; font-weight: 600;
   opacity: 0; pointer-events: none; transition: opacity .12s, transform .12s; }
@@ -1224,7 +1260,13 @@ html.palette-open .notes, html.drawer-open .notes, html.term-open .notes { displ
 .card-facts strong { color: var(--text); }
 .grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
 
+/* Accueil : coup d'œil sur le client en cours. */
+.glance { display: grid; grid-template-columns: minmax(220px, 1fr) 1.4fr 1.4fr; gap: 4px 16px; align-items: start; padding: 16px 18px; }
+.glance-title { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px; font-size: 14px; }
+.glance .chart { background: none; border: 0; box-shadow: none; padding: 0; margin: 0; }
+@media (max-width: 900px) { .glance { grid-template-columns: 1fr; } }
 .panel.whats-new-panel #whats-new-body { max-height: 560px; overflow-y: auto; }
+.glance-title a { color: var(--text); }
 /* Graphiques cliquables : au-dessus du lien qui couvre la carte, retour visuel au survol. */
 .card-linked .card-charts [data-filter-set], .card-linked .card-charts .segbar, .card-linked .gauge-link { position: relative; z-index: 1; }
 a.gauge-link { display: block; color: inherit; text-decoration: none; border-radius: 10px; padding: 6px 8px; margin: -6px -8px; transition: background .15s; }
@@ -1241,8 +1283,8 @@ a.tl-mark:hover, a.tl-mark:focus-visible { transform: scale(1.3); }
 .chart.slim .seg { border-radius: 0; } .chart.slim .seg:first-child { border-radius: 99px 0 0 99px; } .chart.slim .seg:last-child { border-radius: 0 99px 99px 0; } .chart.slim .seg:only-child { border-radius: 99px; }
 .legend-slim { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 12.5px; color: var(--muted); }
 .legend-slim li { display: inline-flex; align-items: center; gap: 4px; }
-.legend-slim .key, .counts .key { width: 8px; height: 8px; border-radius: 50%; margin: 0 2px 0 0; }
-.legend-slim strong, .counts strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.legend-slim .key { width: 8px; height: 8px; border-radius: 50%; margin: 0 2px 0 0; }
+.legend-slim strong { color: var(--text); font-variant-numeric: tabular-nums; }
 .legend-slim li[data-filter-set] { border-radius: 4px; padding: 1px 4px; margin: -1px -4px; }
 .legend-slim li[data-filter-set]:hover { background: var(--bg); color: var(--text); }
 .card .chart.slim { margin: 0; border: 0; box-shadow: none; background: none; padding: 0; }
@@ -1283,6 +1325,7 @@ td:has(> .badge.example) { white-space: nowrap; }
 .flow-lane header { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; border-top: 3px solid var(--lane); margin: -14px -18px 12px; padding: 11px 18px 0; }
 .flow-lane:first-child header { border-top-left-radius: 9px; } .flow-lane:last-child header { border-top-right-radius: 9px; }
 .flow-lane header strong { font-size: 26px; line-height: 1; font-variant-numeric: tabular-nums; }
+.flow-lane header small { grid-column: 1 / -1; font-size: 12px; margin-top: 3px; }
 .flow-lane.is-empty header strong { color: var(--muted); }
 .flow-nodes { display: flex; flex-wrap: wrap; gap: 8px; min-height: 34px; }
 .flow-node { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px 5px 9px; border-radius: 99px; font-size: 13px; font-weight: 600;
@@ -1373,55 +1416,3 @@ tr.is-hot > td { background: color-mix(in srgb, var(--accent) 9%, transparent); 
   .flow-bot, .flow-bot *, .bot-wrap::after { animation: none !important; }
   .flow-in_progress .flow-nodes { display: flex; height: auto; } .flow-in_progress .flow-bot { position: relative; bottom: auto; }
 }
-
-/* Interface allégée : moins de tuiles et de blocs vides, ce qui sert rarement est replié ou passe dans un volet */
-/* Fiche : les liens du client sont dans le dock (bord droit) ; les puces de l'en-tête ne restent que là où le dock est masqué */
-@media (min-width: 641px) { .head-links { display: none; } }
-.head-side .refresh { gap: 6px 10px; }
-.small-note { font-size: 12.5px; }
-p.small-note { margin: 8px 2px 2px; }
-/* Bloc replié : une ligne discrète qui s'ouvre sur un formulaire ou un détail */
-details.fold > summary { width: max-content; margin: 6px 0 4px; font-weight: 600; }
-details.fold > summary:hover { color: var(--accent); }
-details.fold[open] > summary { color: var(--text); }
-details.fold > .chart { margin-top: 6px; }
-/* Section entière repliée (bilan des agents) : le résumé a le poids d'un titre de section */
-details.fold-section { margin-top: 18px; }
-details.fold-section > summary { font-size: 15px; color: var(--text); }
-details.fold-section > summary .muted { font-weight: 400; font-size: 13px; }
-/* Compteurs en ligne (Actions, Deadlines) : une phrase discrète à la place des tuiles ; les zéros ne s'affichent pas */
-.counts { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 10px 2px 12px; font-size: 13.5px; color: var(--muted); }
-.counts .key { margin-right: 6px; }
-/* Lignes de tableau : boutons d'action compacts et discrets, sur une ligne ; le rouge de la prod reste plein */
-td.actions { white-space: nowrap; }
-td.actions > .dag-form { display: inline-flex; vertical-align: middle; margin-right: 4px; }
-td.actions button { min-height: 0; padding: 3px 12px; font-size: 12.5px; margin: 0; }
-button.refresh-btn { min-height: 0; padding: 6px; }
-button.refresh-btn .ic { margin: 0; }
-/* En-tête de fiche : l'avancement attendu, seulement quand on est en retard sur le calendrier */
-.behind-note { margin-left: 6px; padding: 1px 8px; border-radius: 99px; background: var(--pa-todo); color: var(--text); font-size: 12px; font-weight: 600; }
-.behind-note.is-late { background: var(--pa-ko); }
-/* Listes : recherche et bouton « Filtres » ; les menus déroulants dans un panneau qu'il ouvre */
-.toolbar .filters-toggle { min-height: 0; padding: 4px 12px; font-size: 13px; }
-.toolbar .filters-toggle.is-on { border-color: var(--accent); color: var(--accent); }
-.filter-panel { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px; }
-.filter-panel[hidden] { display: none; }
-/* Boutons de ligne (lancer un DAG, Claude) : visibles au survol ou au clavier ; toujours visibles sur écran tactile */
-@media (hover: hover) {
-  td.actions > .dag-form, td.actions > button { transition: opacity .12s; }
-  tr:not(:hover):not(:focus-within) > td.actions > .dag-form, tr:not(:hover):not(:focus-within) > td.actions > button { opacity: 0; }
-}
-/* Dock : un bouton « Liens » (nombre en pastille), la liste nommée à gauche à l'ouverture */
-.dock-links { position: relative; }
-.dock-links > summary { list-style: none; cursor: pointer; }
-.dock-links > summary::-webkit-details-marker { display: none; }
-.dock-links[open] > summary::after { display: none; }
-.dock-n { position: absolute; top: -4px; right: -4px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 99px; background: var(--accent);
-  color: var(--on-accent); font-size: 10.5px; font-weight: 700; line-height: 17px; text-align: center; }
-.dock-list { position: absolute; right: calc(100% + 10px); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 2px;
-  min-width: 230px; max-width: 340px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lift); }
-.dock-list a { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 8px; color: var(--text); font-size: 13px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dock-list a:hover, .dock-list a:focus-visible { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); color: var(--accent); text-decoration: none; }
-.dock-list svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.dock-list .dock-add { margin-top: 2px; border-top: 1px solid var(--border); border-radius: 0 0 8px 8px; color: var(--muted); }

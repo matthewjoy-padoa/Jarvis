@@ -5,24 +5,17 @@
 <div class="page-head">
   <div>
     <h1>{{ ic.health(d, "lg") }} {{ ic.client_emoji(d) }}{{ d.client }} <span class="badge">{{ d.software }}</span></h1>
-    {# Une ligne : date de déploiement, avancement et, s'il est en retard, l'attendu à cette date. Plus de tuiles sur la synthèse. #}
-    {% set gap = (d.progress - d.expected_progress) if d.expected_progress is not none else 0 %}
     <p class="muted">
-      {% if d.go_live %}Déploiement le <strong class="text">{{ d.go_live.strftime("%d/%m/%Y") }}</strong> <span class="badge {{ 'g-ko' if 0 <= d.days_left < 14 }}">J{{ '%+d' % (-d.days_left) }}</span> · {% endif %}
-      <strong class="text">{{ d.progress }} %</strong> intégré
-      {%- if gap < -5 %} <span class="behind-note{{ ' is-late' if gap < -15 }}" title="Avancement attendu à cette date d'après le calendrier">attendu {{ d.expected_progress }} %</span>{% endif %}
-      {%- if d.days_to_freeze is not none and d.days_to_freeze >= 0 %} · freeze J{{ '%+d' % (-d.days_to_freeze) }}{% endif %}
+      {% if d.go_live %}Déploiement le <strong class="text">{{ d.go_live.strftime("%d/%m/%Y") }}</strong> <span class="badge {{ 'g-ko' if 0 <= d.days_left < 14 }}">J{{ '%+d' % (-d.days_left) }}</span> · {% endif %}{{ d.progress }} % intégré{% if d.synced_at %} · <span title="Dernière synchro Notion">{{ ic.icon("sync", "", "ic-muted") }} {{ d.synced_at }}</span>{% endif %}
     </p>
   </div>
   <div class="head-side">
-    {# Liens du client : dans le dock au bord droit. Ces puces ne s'affichent que sur téléphone, où le dock est masqué. #}
-    <div class="head-links">{% include "_stacks.html" %}</div>
+    {% include "_stacks.html" %}
     <div class="refresh">
-      <button type="button" class="secondary refresh-btn" hx-post="/actions/rafraichir/{{ d.slug }}" hx-target="next .refresh-out" hx-indicator="closest .refresh" hx-disabled-elt="this" aria-label="Rafraîchir depuis Notion"
-              {%- if not notion_ready %} disabled title="Jeton Notion absent : voir README"{% else %} title="Rafraîchir depuis Notion{{ ' · dernière synchro ' ~ d.synced_at if d.synced_at }}"{% endif %}>{{ ic.icon("sync") }}</button>
-      <span class="refresh-wait muted">Jarvis interroge Notion…</span>
-      <div class="refresh-out"></div>
-    </div>
+  <button type="button" class="secondary" hx-post="/actions/rafraichir/{{ d.slug }}" hx-target="next .refresh-out" hx-indicator="closest .refresh" hx-disabled-elt="this"{% if not notion_ready %} disabled title="Jeton Notion absent : voir README"{% endif %}>{{ ic.icon("sync") }} Rafraîchir depuis Notion</button>
+  <span class="refresh-wait muted">Jarvis interroge Notion…</span>
+  <div class="refresh-out"></div>
+</div>
   </div>
 </div>
 <nav class="tabs" aria-label="Onglets">

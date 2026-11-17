@@ -228,7 +228,7 @@ def _in_period(item: dict, periode: str, today: date) -> bool:
             "semaine": today < item["date"] <= today + timedelta(days=7)}[periode]
 
 
-def _count_link(items: list, list_url: str, ticket_of=lambda i: i.get("url")) -> dict | None:
+def _tile_link(items: list, list_url: str, ticket_of=lambda i: i.get("url")) -> dict | None:
     """Où mène un compteur : le ticket lui-même s'il n'y en a qu'un (ouvert dans le panneau), sinon la liste filtrée."""
     if not items:
         return None
@@ -248,8 +248,8 @@ def today_page(request: Request):
     by_period = {p: [i for i in items if _in_period(i, p, today)] for p in PERIODS}
     ko = [(d, a) for d in deployments for a in d.injection_cards if a.injection_group == "ko"]
     ko_url = f"/deploiements/{current.slug}/injections?vue=liste#groupe=ko" if current else ""
-    links = {p: _count_link(found, f"/deadlines?periode={p}") for p, found in by_period.items()}
-    links["ko"] = _count_link(ko, ko_url, lambda da: ticket_url(da[0].slug, "action", da[1].ref) if da[1].ref else None)
+    links = {p: _tile_link(found, f"/deadlines?periode={p}") for p, found in by_period.items()}
+    links["ko"] = _tile_link(ko, ko_url, lambda da: ticket_url(da[0].slug, "action", da[1].ref) if da[1].ref else None)
     return _render(
         request,
         "today.html",
