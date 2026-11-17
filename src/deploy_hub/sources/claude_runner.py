@@ -11,6 +11,7 @@ import json
 import os
 import re
 import signal
+import shutil
 import subprocess
 import threading
 import unicodedata
@@ -261,15 +262,14 @@ def retour_prompt(d: Deployment, r: RetourRecette, description: str = "") -> str
 
 
 class ClaudeRunner:
-    """Agents Claude : simulés (mode demo) ou réels (mode live). L'historique survit aux redémarrages de Jarvis."""
+    """Agents Claude, lancés pour de vrai (claude -p). L'historique survit aux redémarrages de Jarvis."""
 
-    def __init__(self, orchestrator_dir: Path, state_dir: Path, live: bool = False, notifications=None,
+    def __init__(self, orchestrator_dir: Path, state_dir: Path, notifications=None,
                  worktrees_dir: Path | None = None, claude_bin: str = "claude", add_dirs: tuple[Path, ...] = (),
                  allowed_tools: tuple[str, ...] = DEFAULT_TOOLS, permission_mode: str = "acceptEdits",
                  timeout_min: int = 90, max_running: int = 2, model: str = "", fallback_model: str = "", effort: str = "",
                  max_turns: int = 0, max_budget_usd: int = 0):
         self.orchestrator_dir = orchestrator_dir
-        self.live = live
         self.notifications = notifications  # NotificationStore : « agent terminé »
         self.state_dir = state_dir
         self.state_file = state_dir / "agents.json"
@@ -312,8 +312,8 @@ class ClaudeRunner:
         return {k: v for k, v in kw.items() if v}
 
     @classmethod
-    def from_env(cls, orchestrator_dir: Path, live: bool, notifications, state_dir: Path) -> "ClaudeRunner":
-        return cls(orchestrator_dir, state_dir, live, notifications, **cls._env_options())
+    def from_env(cls, orchestrator_dir: Path, notifications, state_dir: Path) -> "ClaudeRunner":
+        return cls(orchestrator_dir, state_dir, notifications, **cls._env_options())
 
     def reconfigure(self) -> None:
         """Réglages relus (page Réglages) : appliqués aux prochains agents ; historique et agents en cours gardés.
@@ -386,20 +386,27 @@ class ClaudeRunner:
             cmd += ["--add-dir", str(d)]
         return cmd + ["--allowedTools", *self.allowed_tools]  # en dernier : l'option prend tous les arguments qui suivent
 
+    def problem(self) -> str | None:
+        """Ce qui empêche de lancer un agent (None : rien) : dit quoi régler, au lieu de faire semblant."""
+        if not shutil.which(self.claude_bin):
+            return f"Claude Code en ligne de commande introuvable ({self.claude_bin}) : installe-le ou renseigne CLAUDE_BIN dans Réglages."
+        if not (self.orchestrator_dir / ".git").exists():
+            return f"Clone de integration-orchestrator introuvable ({self.orchestrator_dir}) : renseigne ORCHESTRATOR_DIR dans Réglages."
+        return None
+
     def _launch(self, d: Deployment, subject: str, branch: str, prompt: str, category: str = "") -> ActionResult:
+        if (problem := self.problem()):
+            return ActionResult(False, problem, False)
         with self._lock:
             if any(r.running and r.branch == branch for r in self.runs):
-                return ActionResult(False, f"Un agent travaille déjà sur la branche {branch} : attends sa fin ou arrête-le (Agents).", not self.live)
-            if self.live and sum(r.running for r in self.runs) >= self.max_running:
+                return ActionResult(False, f"Un agent travaille déjà sur la branche {branch} : attends sa fin ou arrête-le (Agents).", False)
+            if sum(r.running for r in self.runs) >= self.max_running:
                 return ActionResult(False, f"Déjà {self.max_running} agent(s) en cours : attends qu'un se termine.", False)
             run = AgentRun(max((r.id for r in self.runs), default=0) + 1, d.slug, d.client, subject, branch, prompt,
-                           datetime.now(), "préparation", simulated=not self.live, category=category)
+                           datetime.now(), "préparation", category=category)
             self.runs.insert(0, run)
-        if not self.live:
-            self.finished(run, "terminé")
-            return ActionResult(True, f"Simulation : agent #{run.id} sur {subject}, branche {branch}, dans {self.orchestrator_dir}")
         self._save()
-        threading.Thread(target=self._work, args=(run,), name=f"agent-{run.id}", daemon=True).start()
+        self._start(run)
         return ActionResult(True, f"Agent #{run.id} lancé sur {subject}, branche {branch}. Suivi dans Agents.", False)
 
     def _git(self, *args: str, check: bool = True) -> subprocess.CompletedProcess:
@@ -419,6 +426,9 @@ class ClaudeRunner:
         else:
             self._git("worktree", "add", "-b", branch, str(path), "origin/main")
         return path
+
+    def _start(self, run: AgentRun) -> None:
+        threading.Thread(target=self._work, args=(run,), name=f"agent-{run.id}", daemon=True).start()
 
     def _env(self) -> dict[str, str]:
         """Environnement du service, sans les secrets ni les réglages venus du .env de Jarvis."""

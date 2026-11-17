@@ -1,8 +1,7 @@
 {# Suivi d'un run (air.py) : état, dernière notification, journal brut, rapport de fin. Attend : w, log, report. #}
 <div id="watch-log"{% if w.running %} hx-get="/agents/suivis/{{ w.id }}/journal" hx-trigger="every 10s" hx-swap="outerHTML"{% endif %}>
   <p><span class="badge g-{{ w.group }}">{{ w.status }}</span>{% if w.summary %} <span class="muted">· {{ w.summary }}</span>{% endif %}</p>
-  {% if is_example(w) %}<p class="muted"><span class="badge example">exemple</span> Suivi fictif du mode démo : journal et rapport sont inventés.</p>{% endif %}
-  {% if w.running and not is_example(w) %}
+  {% if w.running %}
   <form method="post" action="/agents/suivis/{{ w.id }}/arreter" onsubmit="return confirm('Arrêter le suivi #{{ w.id }} ? Le run continue dans Airflow, sans relances automatiques.')">
     <button type="submit" class="secondary">Arrêter le suivi</button></form>
   {% endif %}

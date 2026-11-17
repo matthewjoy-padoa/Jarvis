@@ -147,7 +147,7 @@ def test_retour_prompt_carries_my_description():
 def test_agent_on_open_retour_uses_my_description_and_is_listed():
     claude.runs.clear()
     r = client.post("/actions/agent-retour/client-demo/R-02", data={"description": "Conclusion absente"})
-    assert r.status_code == 200 and "Simulation : agent #" in r.text and "fix-client-demo-r-02" in r.text
+    assert r.status_code == 200 and "Agent #" in r.text and "lancé sur" in r.text and "fix-client-demo-r-02" in r.text
     assert claude.runs[0].subject == "retour R-02" and "Conclusion absente" in claude.runs[0].prompt
     assert "fix-client-demo-r-02" in client.get("/agents").text
 
@@ -165,9 +165,9 @@ def test_agent_refused_on_closed_or_unknown_retour():
     assert client.post("/actions/agent-retour/client-demo/R-99", data={"description": "x"}).status_code == 404
 
 
-def test_dag_and_resource_actions_are_simulated():
+def test_dag_and_resource_actions(fake_airflow):
     r = client.post("/actions/dag/demo_client_firm", data={"padoa_env": "snap"})  # la stack est toujours choisie
-    assert r.status_code == 200 and "Simulation" in r.text and "demo_client_firm sur snap" in r.text
+    assert r.status_code == 200 and "demo_client_firm lancé sur snap" in r.text and "Simulation" not in r.text
     r = client.post("/actions/claude/client-demo/visit_histo")
     assert r.status_code == 200 and "branche client-demo-visit_histo" in r.text
 
@@ -304,7 +304,7 @@ def test_retour_content_is_shown_and_given_to_the_agent():
     assert "Voir le retour" in html and "Texte fictif : filtre trop strict." in html
     claude.runs.clear()
     r = client.post("/actions/agent-retour/client-demo/R-03", data={"description": ""})  # descriptif facultatif
-    assert "Simulation : agent #" in r.text
+    assert "Agent #" in r.text and "lancé sur" in r.text
     prompt = claude.runs[0].prompt
     assert "<commentaire_client>\nTexte fictif : il manque des examens.\n</commentaire_client>" in prompt and "<analyse_padoa>" in prompt
 
@@ -326,7 +326,7 @@ def test_agent_brief_is_prefilled_and_sent_as_edited():
     assert 'name="prompt"' in form and "&lt;commentaire_client&gt;" in form and "&lt;contrat&gt;" in form
     claude.runs.clear()
     r = client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief relu et modifié"})
-    assert "Simulation : agent #" in r.text and claude.runs[0].prompt == "Brief relu et modifié"
+    assert "Agent #" in r.text and "lancé sur" in r.text and claude.runs[0].prompt == "Brief relu et modifié"
 
 
 def test_agent_brief_without_content_must_be_completed():
@@ -387,7 +387,7 @@ def test_agent_page_shows_status_brief_and_log():
     run = claude.runs[0]
     assert f'href="/agents/{run.id}"' in client.get("/agents").text
     page = client.get(f"/agents/{run.id}")
-    assert page.status_code == 200 and "Brief de la page agent" in page.text and "terminé (simulé)" in page.text
+    assert page.status_code == 200 and "Brief de la page agent" in page.text and "terminé" in page.text and "(simulé)" not in page.text
     assert "every 5s" not in page.text  # fini : plus de rafraîchissement
     assert client.get(f"/agents/{run.id}/journal").status_code == 200
     assert client.get("/agents/9999").status_code == 404
@@ -428,31 +428,8 @@ def test_charts_are_readable_and_lead_to_the_tickets_they_count():
     assert "Prochain :" in synthese and synthese.count("tl-mark next") == 1  # prochain jalon mis en avant
 
 
-def test_demo_agents_page_shows_fictional_examples():
-    """Mode démo : la page Agents montre des exemples fictifs, avec leurs pages de détail, sans rien écrire dans l'historique."""
-    from deploy_hub import main
-    client = TestClient(main.app)
-    before = list(main.claude.runs)
-    page = client.get("/agents").text
-    assert 'class="badge example"' in page and "Tokens et durée" in page
-    for run in main.examples.runs:
-        assert f'href="/agents/{run.id}"' in page and client.get(f"/agents/{run.id}/journal").status_code == 200
-    done = client.get(f"/agents/{main.examples.runs[-2].id}").text  # terminé avec PR : relecture guidée tirée du journal d'exemple
-    assert "Relecture guidée" in done and "Dernier lancement de tests passé (12 passed in 4.0s)" in done and "Un test a été ajouté" in done
-    running = client.get(f"/agents/{main.examples.runs[0].id}").text
-    assert "Arrêter l'agent" not in running
-    for w in main.examples.watches:
-        assert client.get(f"/agents/suivis/{w.id}").status_code == 200
-    assert "Rapport de fin" in client.get(f"/agents/suivis/{main.examples.watches[1].id}").text
-    assert main.claude.runs == before and not (main.claude.state_dir / f"{main.examples.runs[0].id}.jsonl").exists()
 
 
-def test_examples_are_never_shown_in_live_mode(monkeypatch):
-    from deploy_hub import main
-    monkeypatch.setattr(main, "examples", None)
-    client = TestClient(main.app)
-    assert 'class="badge example"' not in client.get("/agents").text.split("</p>", 2)[-1]
-    assert client.get("/agents/901").status_code == 404 and client.get("/agents/suivis/901").status_code == 404
 
 
 def test_agent_tokens_are_read_from_the_result_event_and_shown(tmp_path):
@@ -472,27 +449,27 @@ def test_agent_tokens_are_read_from_the_result_event_and_shown(tmp_path):
     assert run.tokens is None and usage([run])["total"]["tokens"] is None
 
 
-def test_demo_agents_page_shows_tokens_chart_and_full_brief(monkeypatch):
+def test_agents_page_shows_tokens_chart(monkeypatch):
+    """Page Agents : bilan des tokens (un seul anneau), schéma des agents par état, onglet DAG ; ni coût en argent ni exemples."""
     import deploy_hub.main as main
-    from deploy_hub.sources.examples import Examples
+    from deploy_hub.sources.claude_runner import AgentRun, read_tokens
 
-    monkeypatch.setattr(main, "examples", Examples())
-    client = TestClient(main.app)
-    page = client.get("/agents").text
-    assert "Coût" not in page and "<th>Contexte</th>" not in page  # ni coût en argent, ni anneau par agent
-    assert page.count('<svg class="ring') == 1 and "ring-cell" not in page  # un seul anneau : le bilan, à la place des tuiles de tokens
-    assert "<strong>49 %</strong> du contexte utilisé" in page and "au plus 86 %" in page  # 172 k, 86 k et 38 k sur 200 k
-    assert "<strong>5,3 M</strong> tokens au total" in page and "Cache relu" in page
+    def agent(n, status, tokens, pr=""):
+        run = AgentRun(n, "client-demo", "Client Démo", f"retour R-0{n}", f"fix-r-0{n}", "brief", datetime(2026, 11, 17, 9), status,
+                       ended_at=None if status == "en cours" else datetime(2026, 11, 17, 9, 20), category="Adhérents", pr_url=pr)
+        read_tokens(run, {"usage": {"input_tokens": 1_000, "output_tokens": 20_000, "cache_read_input_tokens": tokens,
+                                    "cache_creation_input_tokens": 0}})
+        return run
+
+    monkeypatch.setattr(main.claude, "runs", [agent(3, "en cours", 100_000), agent(2, "terminé", 3_400_000, "https://github.com/a/b/pull/2"),
+                                              agent(1, "terminé", 1_200_000)])
+    page = TestClient(main.app).get("/agents").text
+    assert "Coût" not in page and "badge example" not in page  # ni coût en argent, ni agents fictifs
+    assert page.count('<svg class="ring') <= 1 and "ring-cell" not in page  # au plus un anneau : le bilan
+    assert "Tokens et durée" in page and "Cache relu" in page and "4,6 M" in page  # 2 agents finis : 3 421 000 + 1 221 000
     assert 'href="#dags" data-pane="pane-dags"' in page and page.index('id="pane-dags"') < page.index("<h2>Suivis de DAG</h2>")  # onglet DAG
-    assert 'class="flow-lane flow-in_progress"' in page and 'class="stats"' not in page  # schéma des agents à la place des tuiles
-    assert page.count('<a class="flow-node') >= 5 and '<tr data-agent="902">' in page  # un nœud par agent, lié à sa ligne
-    assert "3,6 M" in page  # agent 902 : 1 840 + 21 600 + 3 420 000 + 186 000
-    detail = client.get("/agents/902").text
-    assert "86 %</strong> du contexte" in detail and "172 k sur 200 k tokens" in detail
-    assert "<strong>3,6 M</strong> tokens au total" in detail and "Cache relu" in detail and "coût estimé" not in detail
-    for part in ("&lt;contexte&gt;", "&lt;retour&gt;", "&lt;demarche&gt;", "&lt;contrat&gt;", "&lt;compte_rendu&gt;", "Retour de recette : R-02"):
-        assert part in detail
-    assert "À COMPLÉTER" not in detail
+    assert 'class="flow-lane flow-in_progress"' in page and page.count('<a class="flow-node') == 3 and '<tr data-agent="2">' in page
+
 
 
 def test_context_is_read_from_the_journal_even_while_the_agent_runs():

@@ -36,14 +36,28 @@ def test_the_routine_queries_exactly_the_clients_configured_in_the_app(tmp_path)
     assert "a" * 32 in sql and "b" * 32 in sql and sql.count("UNION ALL") == 1  # deux clients, une requête
 
 
-def test_without_token_the_refresh_button_runs_the_routine_in_demo(monkeypatch):
+def test_without_token_the_refresh_button_runs_the_routine(monkeypatch, tmp_path):
+    """Pas de mode démo : sans jeton, le bouton lance vraiment la routine (ici, un faux claude)."""
     from deploy_hub import main
     monkeypatch.setattr(notion_api, "load_token", lambda root=None: None)
-    for path in ("/actions/rafraichir", "/actions/rafraichir/client-demo"):
-        r = TestClient(main.app).post(path)
-        assert r.status_code == 200 and "Simulation : la routine de synchro Notion" in r.text and "HX-Refresh" not in r.headers
+    claude = fake_claude(tmp_path, "print('client-demo : inchangé')")
+    routine = SyncRoutine(folder=tmp_path / "notion", claude_bin=str(claude))
+    monkeypatch.setattr(main, "sync_routine", routine)
+    r = TestClient(main.app).post("/actions/rafraichir/client-demo")
+    assert "Synchro Notion lancée" in r.text and 'hx-get="/actions/rafraichir/etat"' in r.text and "Simulation" not in r.text
+    assert wait(routine)["ok"]
     page = TestClient(main.app).get("/deploiements/client-demo/synthese").text
     assert 'hx-post="/actions/rafraichir/client-demo"' in page and "Ni jeton Notion ni Claude Code" not in page  # bouton actif
+
+
+def test_without_token_nor_claude_the_button_says_what_to_do(monkeypatch, tmp_path):
+    from deploy_hub import main
+    monkeypatch.setattr(notion_api, "load_token", lambda root=None: None)
+    monkeypatch.setattr(main, "sync_routine", SyncRoutine(folder=tmp_path / "notion", claude_bin=str(tmp_path / "absent")))
+    page = TestClient(main.app).get("/deploiements/client-demo/synthese").text
+    assert "Ni jeton Notion ni Claude Code" in page  # bouton grisé, l'infobulle dit pourquoi
+    r = TestClient(main.app).post("/actions/rafraichir")
+    assert "CLAUDE_BIN" in r.text and "Simulation" not in r.text
 
 
 def fake_claude(tmp_path: Path, body: str) -> Path:
@@ -70,7 +84,7 @@ def wait(routine: SyncRoutine) -> dict:
 def test_live_routine_runs_claude_in_the_app_folder_with_the_app_environment(tmp_path, monkeypatch):
     monkeypatch.setenv("JARVIS_CONFIG_DIR", str(tmp_path / "ma-config"))  # dossier de clients de l'app : transmis tel quel
     claude = fake_claude(tmp_path, "print('client-demo : inchangé')")
-    routine = SyncRoutine(True, folder=tmp_path / "notion", claude_bin=str(claude))
+    routine = SyncRoutine(folder=tmp_path / "notion", claude_bin=str(claude))
     r = routine.start()
     assert r.ok and not r.simulated
     state = wait(routine)
@@ -89,7 +103,7 @@ def test_live_routine_failure_is_reported_and_notified(tmp_path):
             self.added.append(args)
     notes = Notes()
     claude = fake_claude(tmp_path, "print('ÉCHEC tous : preparer : connecteur Notion absent'); sys.exit(0)")
-    routine = SyncRoutine(True, notes, folder=tmp_path / "notion", claude_bin=str(claude))
+    routine = SyncRoutine(notes, folder=tmp_path / "notion", claude_bin=str(claude))
     assert routine.start().ok
     state = wait(routine)
     assert not state["ok"] and "connecteur Notion absent" in state["summary"] and notes.added  # « ÉCHEC » dans le compte rendu
@@ -97,7 +111,7 @@ def test_live_routine_failure_is_reported_and_notified(tmp_path):
 
 def test_one_routine_at_a_time(tmp_path):
     claude = fake_claude(tmp_path, "import time; time.sleep(1)")
-    routine = SyncRoutine(True, folder=tmp_path / "notion", claude_bin=str(claude))
+    routine = SyncRoutine(folder=tmp_path / "notion", claude_bin=str(claude))
     assert routine.start().ok
     second = routine.start()
     assert not second.ok and "déjà en cours" in second.message
@@ -105,14 +119,14 @@ def test_one_routine_at_a_time(tmp_path):
 
 
 def test_live_routine_without_claude_cli_says_what_to_do(tmp_path):
-    routine = SyncRoutine(True, folder=tmp_path / "notion", claude_bin=str(tmp_path / "absent"))
+    routine = SyncRoutine(folder=tmp_path / "notion", claude_bin=str(tmp_path / "absent"))
     r = routine.start()
     assert not r.ok and not r.simulated and "CLAUDE_BIN" in r.message
 
 
 def test_status_reloads_the_page_only_when_a_live_sync_ends_well(monkeypatch, tmp_path):
     from deploy_hub import main
-    routine = SyncRoutine(True, folder=tmp_path / "notion")
+    routine = SyncRoutine(folder=tmp_path / "notion")
     monkeypatch.setattr(main, "sync_routine", routine)
     routine._save(running=False, finished="2026-11-17T16:00:00", ok=True, summary="client-demo : inchangé")
     r = TestClient(main.app).get("/actions/rafraichir/etat")

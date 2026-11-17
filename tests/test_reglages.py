@@ -16,7 +16,7 @@ SAME = {"origin": "http://testserver"}
 def env(tmp_path, monkeypatch):
     """.env de test, requêtes du client de test considérées comme locales, réglages remis à zéro après le test."""
     file = tmp_path / ".env"
-    file.write_text("# réglages\nJARVIS_MODE=demo  # garde-moi\nAIRFLOW_PASSWORD=mdp-en-clair\n")
+    file.write_text("# réglages\nCLAUDE_BIN=claude  # garde-moi\nAIRFLOW_PASSWORD=mdp-en-clair\n")
     file.chmod(0o644)
     monkeypatch.setenv("JARVIS_ENV_FILE", str(file))
     monkeypatch.setattr(shell, "LOCAL_HOSTS", shell.LOCAL_HOSTS | {"testclient"})
@@ -67,7 +67,7 @@ def test_saving_keeps_other_lines_and_untyped_secrets_and_restricts_the_file(env
     r = TestClient(main.app).post("/reglages", data=form, headers=SAME)
     assert r.status_code == 200 and "Enregistré dans .env : AIRFLOW_BASE_URL, AIRFLOW_USER" in r.text
     text = env.read_text()
-    assert "# réglages" in text and "JARVIS_MODE=demo  # garde-moi" in text  # le reste du fichier est intact
+    assert "# réglages" in text and "CLAUDE_BIN=claude  # garde-moi" in text  # le reste du fichier est intact
     assert "AIRFLOW_PASSWORD=mdp-en-clair" in text  # secret laissé vide : inchangé
     assert "AIRFLOW_USER=op://Coffre/Airflow/username" in text
     assert stat.S_IMODE(env.stat().st_mode) == 0o600
@@ -169,7 +169,6 @@ def test_claude_settings_are_in_the_page_and_applied_to_the_next_agents(env):
     ("JARVIS_AGENT_TIMEOUT_MIN", "0", "un nombre entier, 1 au moins"),
     ("JARVIS_DAG_INTERVAL_S", "5", "un nombre entier, 10 au moins"),
     ("JARVIS_AGENT_PERMISSION_MODE", "bypassPermissions", "acceptEdits ou plan ou default"),
-    ("JARVIS_MODE", "prod", "demo ou live"),
     ("JARVIS_AGENT_EFFORT", "extreme", "low ou medium ou high ou xhigh ou max"),
     ("JARVIS_AGENT_MAX_TURNS", "0", "un nombre entier, 1 au moins"),
 ])
@@ -179,11 +178,13 @@ def test_invalid_claude_settings_write_nothing(env, key, value, why):
     assert why in r.text and env.read_text() == before
 
 
-def test_the_mode_waits_for_a_restart(env):
-    r = TestClient(main.app).post("/reglages", data={"JARVIS_MODE": "live"}, headers=SAME)
-    assert "Au prochain démarrage de Jarvis : Mode" in r.text
-    assert not main.claude.live  # pas de vrais agents sans redémarrage
-    os.environ.pop("JARVIS_MODE", None)
+def test_there_is_no_demo_mode_setting_anymore(env, tmp_path):
+    """Plus de mode démo : pas de réglage « Mode » ; un réglage lu au démarrage (dossier de l'orchestrator) attend toujours."""
+    page = TestClient(main.app).get("/reglages").text
+    assert 'name="JARVIS_MODE"' not in page
+    r = TestClient(main.app).post("/reglages", data={"ORCHESTRATOR_DIR": str(tmp_path)}, headers=SAME)
+    assert "Au prochain démarrage de Jarvis : Dossier de integration-orchestrator" in r.text
+    os.environ.pop("ORCHESTRATOR_DIR", None)
 
 
 def test_dag_watch_settings_go_to_the_next_watches(env):

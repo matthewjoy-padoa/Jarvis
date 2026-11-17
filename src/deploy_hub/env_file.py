@@ -38,7 +38,7 @@ class Section:
 
 AIRFLOW, NOTION, FOLDERS, CLAUDE, DAGS = "Airflow", "Notion", "Dossiers et liens", "Agents Claude", "Suivi des DAG"
 SECTIONS = {
-    AIRFLOW: Section("airflow", "play", "Où Jarvis lance et suit les DAG. Sans adresse, les lancements sont simulés."),
+    AIRFLOW: Section("airflow", "play", "Où Jarvis lance et suit les DAG. Sans adresse, aucun DAG n'est lancé."),
     NOTION: Section("notion", "note", "Pour relire les tickets à la demande (bouton « Rafraîchir depuis Notion »)."),
     FOLDERS: Section("dossiers", "folder", "Où sont les dépôts sur cette machine, et l'adresse des environnements Padoa."),
     CLAUDE: Section("agents", "bot", "Avec quel modèle les agents travaillent, jusqu'où ils vont et ce qu'ils ont le droit de faire."),
@@ -58,8 +58,6 @@ FIELDS = (
     Field("PADOA_ENV_URL", "Adresse des environnements Padoa", "text",
           "Bouton Environnements du dock. Modèle avec [stack] et [client] ; vide : https://[stack]-[client].aodap-staging.fr/support",
           section=FOLDERS),
-    Field("JARVIS_MODE", "Mode", "choice", "demo : agents simulés ; live : vrais agents (claude -p)", live=False, section=CLAUDE,
-          choices=("", "demo", "live"), group=ENGINE),
     Field("CLAUDE_BIN", "Programme claude", "bin", "Vide : « claude » dans le PATH", section=CLAUDE, group=ENGINE),
     Field("JARVIS_AGENT_MODEL", "Modèle", "text", "Vide : modèle par défaut de Claude Code. Un alias (opus, sonnet, haiku) ou un nom complet",
           section=CLAUDE, group=ENGINE),

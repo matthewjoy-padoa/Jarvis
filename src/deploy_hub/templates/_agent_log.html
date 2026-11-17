@@ -24,8 +24,7 @@
     {% endif %}
   </section>
   {% endif %}
-  {% if is_example(run) %}<p class="muted"><span class="badge example">exemple</span> Agent fictif du mode démo : journal, relecture et PR sont inventés.</p>{% endif %}
-  {% if run.running and not run.simulated and not is_example(run) %}
+  {% if run.running and not run.simulated %}
   <form method="post" action="/agents/{{ run.id }}/arreter" onsubmit="return confirm('Arrêter l\'agent #{{ run.id }} ?')"><button type="submit" class="secondary">Arrêter l'agent</button></form>
   {% endif %}
   {% if run.summary %}<section class="panel"><h2>Compte rendu</h2><pre class="agent-summary">{{ run.summary }}</pre></section>{% endif %}

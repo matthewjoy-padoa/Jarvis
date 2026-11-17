@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from deploy_hub import main
 from deploy_hub.sources import review
 from deploy_hub.sources.claude_runner import AgentRun, duration_text, usage
+from conftest import instant_agents
 
 T0 = datetime(2026, 11, 13, 9, 0)
 
@@ -114,11 +115,9 @@ def test_agents_page_shows_duration_cost_and_the_summary(monkeypatch):
     page = TestClient(main.app).get("/agents").text
     assert "<th>Durée</th><th>Tokens</th>" in page and "12 min" in page and "1 h 10" in page
     assert "Tokens et durée" in page and "Visites historiques" in page and "0.50 $" not in page and "2.00 $" not in page  # pas de coût en argent
-    assert "bilan des agents d'exemple" not in page  # de vrais agents ont fini : le bilan ne compte qu'eux
+    assert "badge example" not in page  # plus d'agents fictifs : la page ne montre que de vrais agents
     monkeypatch.setattr(main.claude, "runs", [])
-    assert "bilan des agents d'exemple" in TestClient(main.app).get("/agents").text  # mode démo, rien de réel : exemples
-    monkeypatch.setattr(main, "examples", None)
-    assert "Tokens et durée" not in TestClient(main.app).get("/agents").text
+    assert "Tokens et durée" not in TestClient(main.app).get("/agents").text  # aucun agent fini : pas de bilan
 
 
 def test_the_ticket_type_is_kept_at_launch(tmp_path):
@@ -130,7 +129,7 @@ def test_the_ticket_type_is_kept_at_launch(tmp_path):
     class R:
         id, software, status, data_type, type_retour, resource, due, notion_url, content = "R-7", "", "Ouvert", "AMT", "", "amt", None, "", []
 
-    runner = ClaudeRunner(tmp_path, tmp_path / "agents")  # simulation
+    runner = instant_agents(ClaudeRunner(tmp_path, tmp_path / "agents"))  # doublure : l'agent finit aussitôt
     runner.launch_retour(D, R, prompt="Brief")
     runner.launch(D, "visit_histo")
     assert [r.category for r in runner.runs] == ["visit_histo", "AMT"]

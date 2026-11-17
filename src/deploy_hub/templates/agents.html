@@ -27,7 +27,7 @@
   <a href="#dags" data-pane="pane-dags">DAG <span class="count" title="Suivis de DAG en cours">{{ watches | selectattr("running") | list | length }}</span></a>
 </nav>
 <div id="pane-agents" data-tab-pane>
-<p class="muted">{% if live %}Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.{% else %}Mode démo : les lancements sont simulés (<code>JARVIS_MODE=live</code> pour de vrais agents). Les lignes marquées <span class="badge example">exemple</span> sont fictives : elles montrent la page telle qu'elle se remplit en mode live, et n'entrent jamais dans l'historique.{% endif %}</p>
+<p class="muted">Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.</p>
 {% if runs %}
 {% set lanes = [
   ("in_progress", "En cours", "L'agent travaille dans son worktree", runs | selectattr("running") | list),
@@ -70,7 +70,7 @@
   <tbody>
   {% for r in runs %}
     <tr data-agent="{{ r.id }}">
-      <td><a href="/agents/{{ r.id }}">#{{ r.id }}</a> {% if is_example(r) %}<span class="badge example">exemple</span>{% endif %}</td><td class="muted">{{ r.started_at.strftime("%d/%m %H:%M") }}</td>
+      <td><a href="/agents/{{ r.id }}">#{{ r.id }}</a></td><td class="muted">{{ r.started_at.strftime("%d/%m %H:%M") }}</td>
       <td><a href="/deploiements/{{ r.slug }}/recette">{{ r.client }}</a></td>
       <td><a href="/agents/{{ r.id }}">{{ r.subject }}</a></td>
       <td><code>{{ r.branch }}</code></td>
@@ -86,7 +86,7 @@
 {% if usage %}
 {% set t = usage.total %}
 <h2 id="bilan">Tokens et durée</h2>
-<p class="muted">Agents réels terminés (ni simulés ni en cours).{% if usage_from_examples %} Ici : le bilan des agents d'exemple, tant qu'aucun agent réel n'a fini.{% endif %} Les tokens sont ceux que Claude Code annonce à la fin de l'agent ; un agent arrêté n'en a pas toujours.</p>
+<p class="muted">Agents réels terminés (ni simulés ni en cours). Les tokens sont ceux que Claude Code annonce à la fin de l'agent ; un agent arrêté n'en a pas toujours.</p>
 <p class="flow-times"><strong>{{ t.count }}</strong> agent(s) terminé(s) · <strong>{{ t.prs }}</strong> PR · durée médiane <strong>{{ t.median | duree }}</strong> · temps cumulé <strong>{{ t.time | duree }}</strong></p>
 {% if t.tokens is not none %}
 <section class="panel token-panel" id="tokens">
@@ -130,7 +130,7 @@
   <tbody>
   {% for w in watches %}
     <tr>
-      <td><a href="/agents/suivis/{{ w.id }}">#{{ w.id }}</a> {% if is_example(w) %}<span class="badge example">exemple</span>{% endif %}</td><td class="muted">{{ w.started_at.strftime("%d/%m %H:%M") }}</td>
+      <td><a href="/agents/suivis/{{ w.id }}">#{{ w.id }}</a></td><td class="muted">{{ w.started_at.strftime("%d/%m %H:%M") }}</td>
       <td>{{ w.client }}</td><td><a href="/agents/suivis/{{ w.id }}"><code>{{ w.dag_id }}</code></a></td>
       <td><span class="badge">{{ w.padoa_env }}</span></td><td><span class="badge g-{{ w.group }}">{{ w.status }}</span></td>
       <td class="muted">{{ w.summary | truncate(120) }}</td>
@@ -146,12 +146,12 @@
   <tbody>
   {% for c in chains %}
     <tr>
-      <td>#{{ c.id }} {% if is_example(c) %}<span class="badge example">exemple</span>{% endif %}</td><td class="muted">{{ c.started_at.strftime("%d/%m %H:%M") }}</td><td>{{ c.client }}</td>
+      <td>#{{ c.id }}</td><td class="muted">{{ c.started_at.strftime("%d/%m %H:%M") }}</td><td>{{ c.client }}</td>
       <td><span class="badge">{{ c.padoa_env }}</span></td>
       <td><ol class="chain-steps">{% for s in c.steps %}<li>{% if s.watch_id %}<a href="/agents/suivis/{{ s.watch_id }}"><code>{{ s.dag_id }}</code></a>{% else %}<code>{{ s.dag_id }}</code>{% endif %}
         <span class="badge g-{{ s.group }}"{% if s.message %} title="{{ s.message }}"{% endif %}>{{ s.status }}</span></li>{% endfor %}</ol></td>
       <td><span class="badge g-{{ c.group }}">{{ c.status }}</span>{% if c.simulated %} {{ ic.icon("flask", "Simulation", "ic-muted") }}{% endif %}</td>
-      <td>{% if c.running and not is_example(c) %}<form method="post" action="/agents/chaines/{{ c.id }}/arreter"><button type="submit" class="secondary" title="Le run en cours continue ; les DAG suivants ne partent pas">Arrêter</button></form>{% endif %}</td>
+      <td>{% if c.running %}<form method="post" action="/agents/chaines/{{ c.id }}/arreter"><button type="submit" class="secondary" title="Le run en cours continue ; les DAG suivants ne partent pas">Arrêter</button></form>{% endif %}</td>
     </tr>
   {% else %}<tr><td colspan="7" class="muted">Aucun enchaînement lancé.</td></tr>{% endfor %}
   </tbody>
@@ -165,7 +165,7 @@
     <tr>
       <td class="muted">{{ r.started_at.strftime("%d/%m %H:%M") }}</td><td>{{ r.client }}</td><td>{{ r.card }}</td>
       <td><code>{{ r.dag_id }}</code></td><td><span class="badge {{ 'g-ko' if r.padoa_env == 'prod' }}">{{ r.padoa_env }}</span></td>
-      <td class="muted">{% if r.simulated %}{{ ic.icon("flask", "Simulation", "ic-muted") }} {% endif %}{{ r.result }} {% if is_example(r) %}<span class="badge example">exemple</span>{% endif %}</td>
+      <td class="muted">{% if r.simulated %}{{ ic.icon("flask", "Simulation", "ic-muted") }} {% endif %}{{ r.result }}</td>
     </tr>
   {% else %}<tr><td colspan="6" class="muted">Aucun DAG lancé (cette exécution de l'app).</td></tr>{% endfor %}
   </tbody>

@@ -28,7 +28,6 @@ from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
 from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, duration_text, read_log, retour_prompt, tokens_text, usage
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_watch import DagWatcher
-from deploy_hub.sources.examples import Examples
 from deploy_hub.sources.sync_routine import SyncRoutine
 from deploy_hub.sources import connections, flow_digger, notion_api
 from deploy_hub.sources.external import external_statuses
@@ -45,14 +44,12 @@ HERE = Path(__file__).parent
 
 ensure_private_dirs()  # données et configuration des clients jamais dans un dossier que git pourrait pousser
 settings = load_settings()
-live = settings.mode == "live"
 fiches = FicheSource(settings.deployments_dir, clients_dir())
 airflow = AirflowSource.from_env()
 notifications = NotificationStore(Path(os.getenv("DEPLOY_HUB_NOTIFICATIONS") or settings.deployments_dir.parent / "notifications.json"))
-claude = ClaudeRunner.from_env(settings.orchestrator_dir, live, notifications, data_dir() / "agents")
+claude = ClaudeRunner.from_env(settings.orchestrator_dir, notifications, data_dir() / "agents")
 # Synchro Notion sans jeton : le bouton « Rafraîchir depuis Notion » fait suivre sync/routine.md à Claude Code (claude -p).
-sync_routine = SyncRoutine(live, notifications)
-examples = None if live else Examples()  # page Agents du mode démo : exemples fictifs, en mémoire, jamais dans l'historique
+sync_routine = SyncRoutine(notifications)
 pulls = PullRequests(settings.orchestrator_dir)  # PR ouvertes de l'orchestrator (gh), gardées cinq minutes
 # Suivi des runs lancés (air.py d'Arthur) ; les suivis en cours au démarrage reprennent si Airflow est configuré.
 dag_watch = DagWatcher(data_dir() / "airflow", notifications, {"AIRFLOW_URL": airflow.base_url, "AIRFLOW_USER": airflow.user,
@@ -189,7 +186,7 @@ def _render(request: Request, template: str, active: str, **context) -> HTMLResp
             "cross_pages": CROSS_PAGES,
             "clients": _deployments(request),
             "active": active,
-            "mode": settings.mode,
+            "claude_problem": claude.problem(),
             "airflow": airflow,
             "dags_for": dag_catalogue.dags_for,
             "ced_for": dag_catalogue.ced_for,
@@ -488,36 +485,24 @@ def deadlines(request: Request, tous: bool = False, client: str = "", periode: s
 
 @app.get("/agents", response_class=HTMLResponse)
 def agents(request: Request):
-    """Historique des lancements ; en mode démo, suivi des exemples fictifs (sources/examples.py), marqués « exemple »."""
-    ex = examples
+    """Historique des lancements : agents, suivis de DAG, enchaînements, DAGs lancés."""
     for run in claude.runs:
         claude.refresh_context(run)  # agents en cours : où en est leur contexte
-    runs = claude.runs + (ex.runs if ex else [])
-    own = usage(claude.runs)  # le bilan ne mélange jamais vrais agents et exemples
-    return _render(request, "agents.html", "/agents", runs=runs, dag_runs=airflow.runs + (ex.dag_runs if ex else []),
-                   watches=dag_watch.watches + (ex.watches if ex else []), chains=dag_chains.chains + (ex.chains if ex else []),
-                   live=claude.live, usage=own or (ex and usage(ex.runs)), usage_from_examples=bool(ex and not own))
-
-
-def _is_example(item) -> bool:
-    return examples is not None and item in examples
-
-
-templates.env.globals["is_example"] = _is_example
+    return _render(request, "agents.html", "/agents", runs=claude.runs, dag_runs=airflow.runs, watches=dag_watch.watches,
+                   chains=dag_chains.chains, usage=usage(claude.runs))
 
 
 def _run_or_404(run_id: int):
-    run = claude.get(run_id) or (examples and examples.run(run_id))
+    run = claude.get(run_id)
     if not run:
         raise HTTPException(404, f"Agent #{run_id} inconnu")
     return run
 
 
 def _agent_context(run) -> dict:
-    """Journal de l'agent, et sa relecture guidée dès qu'il a fini (un agent simulé n'a rien à relire)."""
-    path = examples.agent_log(run) if _is_example(run) else claude.log_path(run)
-    if not _is_example(run):
-        claude.refresh_context(run)
+    """Journal de l'agent, et sa relecture guidée dès qu'il a fini (un agent simulé, d'un ancien historique, n'a rien à relire)."""
+    path = claude.log_path(run)
+    claude.refresh_context(run)
     return {"run": run, "log": read_log(path), "review": None if run.running or run.simulated else agent_review.build(run, path)}
 
 
@@ -542,7 +527,7 @@ def agent_stop(run_id: int):
 
 
 def _watch_or_404(watch_id: int):
-    w = dag_watch.get(watch_id) or (examples and examples.watch(watch_id))
+    w = dag_watch.get(watch_id)
     if not w:
         raise HTTPException(404, f"Suivi #{watch_id} inconnu")
     return w
@@ -550,9 +535,6 @@ def _watch_or_404(watch_id: int):
 
 def _watch_context(watch_id: int) -> dict:
     w = _watch_or_404(watch_id)
-    if _is_example(w):
-        log, report = examples.watch_log(w), examples.watch_report(w)
-        return {"w": w, "log": log.read_text(encoding="utf-8"), "report": report.read_text(encoding="utf-8") if report.is_file() else ""}
     return {"w": w, "log": dag_watch.log(w), "report": dag_watch.report(w)}
 
 
@@ -807,9 +789,8 @@ def chain_start(request: Request, slug: str, padoa_env: str = Form(...), dag_id:
     first = chain.steps[0]
     if chain.group == "ko":
         return _result(request, ActionResult(False, f"Enchaînement #{chain.id} {chain.status} · {first.dag_id} : {first.message}", simulated=False))
-    how = "simulé de bout en bout (Airflow non configuré)" if chain.simulated else f"lancé sur {padoa_env} : chaque DAG part quand le précédent finit vert"
-    return _result(request, ActionResult(True, f"Enchaînement #{chain.id} {how} · {' → '.join(dag_ids)} · à suivre dans Agents → Enchaînements",
-                                         simulated=chain.simulated))
+    return _result(request, ActionResult(True, f"Enchaînement #{chain.id} lancé sur {padoa_env} : chaque DAG part quand le précédent finit vert"
+                                               f" · {' → '.join(dag_ids)} · à suivre dans Agents → Enchaînements", simulated=False))
 
 
 @app.post("/agents/chaines/{chain_id}/arreter")

@@ -12,5 +12,5 @@
   <dt>Lancé</dt><dd>{{ run.started_at.strftime("%d/%m/%Y %H:%M") }}{% if run.ended_at %} · fini à {{ run.ended_at.strftime("%H:%M") }}{% endif %}</dd>
 </dl>
 {% include "_agent_log.html" %}
-<details class="panel" id="brief"{% if is_example(run) %} open{% endif %}><summary>Brief envoyé à l'agent</summary><pre class="agent-brief">{{ run.prompt }}</pre></details>
+<details class="panel" id="brief"><summary>Brief envoyé à l'agent</summary><pre class="agent-brief">{{ run.prompt }}</pre></details>
 {% endblock %}
