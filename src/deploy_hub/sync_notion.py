@@ -402,6 +402,21 @@ def _query(sql: Path, out: Path, params: list) -> dict:
             "sources": sorted(set(re.findall(r"collection://[0-9a-f-]+", sql.read_text(encoding="utf-8")))) if sql.is_file() else []}
 
 
+VERIFICATIONS = "verifications.json"  # data/notion/verifications.json : dernière vérification de chaque client
+
+
+def mark_checked(slugs: list[str], root: Path = PROJECT_ROOT) -> None:
+    """Note l'heure à laquelle ces clients ont été vérifiés dans Notion, même s'il n'y avait rien de neuf : la fiche n'est
+    réécrite (et synced_at mis à jour) que quand quelque chose change, la « dernière synchro » affichée ne doit pas dater."""
+    if not slugs:
+        return
+    path = data_dir(root) / "notion" / VERIFICATIONS
+    seen = _load_json(path, {})
+    seen.update({slug: datetime.now().strftime("%d/%m/%Y %H:%M") for slug in slugs})
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(seen, ensure_ascii=False), encoding="utf-8")
+
+
 def plan_all(root: Path = PROJECT_ROOT) -> dict:
     """Plan de tous les clients d'après data/notion/empreintes.json : requêtes à exécuter, clients inchangés."""
     from deploy_hub import client_config
@@ -428,6 +443,7 @@ def plan_all(root: Path = PROJECT_ROOT) -> dict:
         out["requetes"] += [{"client": slug, **_query(raw / "requetes" / f"{q}.sql", raw / f"{name}.json", params)}
                             for q, name, params in p["requetes"]]
         out["raisons"][slug] = p["raisons"]
+    mark_checked(out["inchanges"], root)  # vérifiés, rien de neuf
     return out
 
 
@@ -442,6 +458,7 @@ def merge_all(root: Path = PROJECT_ROOT) -> dict:
             results[slug] = sync(slug, root)
         except (SyncError, ConfigError, OSError, KeyError, ValueError) as e:
             results[slug] = {"erreur": str(e)}
+    mark_checked([slug for slug, r in results.items() if "erreur" not in r], root)
     return results
 
 

@@ -1491,4 +1491,7 @@ p.small-note { margin: 10px 2px 0; }
 /* Barre du haut sans client : à la place du sélecteur, un bouton pour en ajouter un */
 .topbar .client-chip.client-add { border-style: dashed; color: var(--accent); text-decoration: none; }
 .topbar .client-chip.client-add:hover { border-color: var(--accent); }
+/* Dernière synchro Notion d'un client : à côté du bouton Rafraîchir (fiche) et sur sa carte (Clients) */
+.last-sync { font-size: 12.5px; white-space: nowrap; }
+p.last-sync { margin: 4px 0 6px; }
 

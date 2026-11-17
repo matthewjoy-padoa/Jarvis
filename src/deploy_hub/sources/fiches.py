@@ -40,6 +40,19 @@ def _users(path: Path) -> dict[str, str]:
     return json.loads(file.read_text(encoding="utf-8")) if file.is_file() else {}
 
 
+def _checks_path(path: Path) -> Path:
+    """Heure de la dernière vérification de chaque client (data/notion/verifications.json), écrite par la synchro."""
+    return path.parent.parent / "notion" / "verifications.json"
+
+
+def _checked_at(path: Path) -> str:
+    file = _checks_path(path)
+    try:
+        return str(json.loads(file.read_text(encoding="utf-8")).get(path.stem, "")) if file.is_file() else ""
+    except (OSError, ValueError):
+        return ""
+
+
 def _names(ids: list[str], users: dict[str, str]) -> list[str]:
     """Noms des personnes ; une personne absente de l'annuaire reste visible sous un nom provisoire."""
     return [users.get(i) or f"Inconnu ({i[:8]})" for i in ids or []]
@@ -62,6 +75,7 @@ def parse_deployment(path: Path, clients_dir: Path | None = None) -> Deployment:
         icone=str(data.get("icone") or ""),
         notion_url=(cfg.notion_url if cfg else "") or data.get("notion_url", ""),
         synced_at=str(data.get("synced_at", "")),
+        checked_at=_checked_at(path),
         injection_counts=data.get("injection_counts") or {},
         milestones=data.get("milestones") or {},
         links=[Link(**l) for l in data.get("links", [])],
@@ -95,7 +109,7 @@ class FicheSource:
         """Fiche analysée, gardée en mémoire tant que ni elle, ni son contenu de recette, ni la config du client, ni l'annuaire n'ont changé
         (le menu et chaque page relisent toutes les fiches)."""
         stamps = (self._stamp(path), self._stamp(_content_path(path)), self._stamp(_config_path(self.clients_dir, path.stem)),
-                  self._stamp(_users_path(path)))
+                  self._stamp(_users_path(path)), self._stamp(_checks_path(path)))
         cached = self._cache.get(path)
         if cached and cached[0] == stamps:
             return cached[1]

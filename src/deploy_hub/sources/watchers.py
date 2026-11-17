@@ -35,10 +35,8 @@ def deadline_notes(items: list[dict], today: date) -> list[dict]:
 
 
 def last_sync(d: Deployment) -> datetime | None:
-    try:
-        return datetime.strptime(d.synced_at, "%d/%m/%Y %H:%M") if d.synced_at else None
-    except ValueError:
-        return None
+    """Dernière synchro du client, vérification sans changement comprise (sinon un client calme paraîtrait en retard)."""
+    return d.last_sync
 
 
 def sync_late_notes(deployments: list[Deployment], now: datetime) -> list[dict]:
