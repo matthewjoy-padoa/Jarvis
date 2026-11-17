@@ -12,6 +12,8 @@ os.environ.setdefault("DEPLOY_HUB_DEPLOYMENTS_DIR", str(PROJECT_ROOT / "demo" / 
 os.environ.setdefault("DEPLOY_HUB_NOTIFICATIONS", str(__import__("pathlib").Path(tempfile.mkdtemp()) / "notifications.json"))
 # Données écrites par l'app (historique et journaux des agents…) : dossier temporaire, jamais data/.
 os.environ.setdefault("JARVIS_DATA_DIR", tempfile.mkdtemp())
+# Configuration des clients : dossier temporaire vide, jamais config/ (les vrais clients du développeur).
+os.environ.setdefault("JARVIS_CONFIG_DIR", tempfile.mkdtemp())
 
 import httpx  # noqa: E402
 import pytest  # noqa: E402

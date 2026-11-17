@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from deploy_hub.client_config import read_file
+from deploy_hub.client_config import ConfigError, read_file
 from deploy_hub.models import notion_link, Action, Deployment, Link, Regle, Remontee, ResourceInjection, RetourRecette, Stack
 
 
@@ -103,13 +103,32 @@ class FicheSource:
         self._cache[path] = (stamps, deployment)
         return deployment
 
+    def _configured(self) -> list[str]:
+        """Clients configurés dans l'app (config/clients/<slug>.yaml)."""
+        return sorted(p.stem for p in self.clients_dir.glob("*.yaml")) if self.clients_dir and self.clients_dir.is_dir() else []
+
+    def _pending(self, slug: str) -> Deployment | None:
+        """Client ajouté dans l'app mais pas encore synchronisé : fiche vide tirée de sa configuration, pour qu'il apparaisse
+        tout de suite (sélecteur, fiche, bouton Rafraîchir) au lieu d'attendre la première synchro."""
+        try:
+            cfg = read_file(_config_path(self.clients_dir, slug)) if self.clients_dir else None
+        except (ConfigError, ValueError, OSError):  # configuration illisible : la page Clients le signale, le reste s'affiche
+            return None
+        if not cfg:
+            return None
+        return Deployment(slug=slug, client=cfg.client, software=cfg.software or "?", status=cfg.status, notion_url=cfg.notion_url,
+                          stacks=[Stack(**s) for s in cfg.stacks], drive=[Link(**l) for l in cfg.drive], orchestrator=cfg.orchestrator,
+                          pending=True)
+
     def list_deployments(self) -> list[Deployment]:
-        if not self.deployments_dir.is_dir():
-            return []
-        paths = sorted(self.deployments_dir.glob("*.md"))
+        """Fiches synchronisées, et les clients configurés qui n'en ont pas encore (fiche vide, « pending »)."""
+        paths = sorted(self.deployments_dir.glob("*.md")) if self.deployments_dir.is_dir() else []
         self._cache = {p: v for p, v in self._cache.items() if p in paths}  # fiches retirées ou supprimées : oubliées
-        return [self._parse(p) for p in paths]
+        synced = [self._parse(p) for p in paths]
+        have = {d.slug for d in synced}
+        waiting = [d for slug in self._configured() if slug not in have and (d := self._pending(slug))]
+        return sorted(synced + waiting, key=lambda d: d.slug)
 
     def get_deployment(self, slug: str) -> Deployment | None:
         path = self.deployments_dir / f"{slug}.md"
-        return self._parse(path) if path.is_file() else None
+        return self._parse(path) if path.is_file() else self._pending(slug)
