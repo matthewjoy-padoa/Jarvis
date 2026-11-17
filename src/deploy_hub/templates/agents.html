@@ -4,6 +4,11 @@
 {% block title %}Agents · Jarvis{% endblock %}
 {% block content %}
 <h1>Agents lancés</h1>
+<nav class="tabs" aria-label="Onglets" data-page-tabs>
+  <a href="#agents" class="active" data-pane="pane-agents">Agents <span class="count" title="Agents en cours">{{ runs | selectattr("running") | list | length }}</span></a>
+  <a href="#dags" data-pane="pane-dags">DAG <span class="count" title="Suivis de DAG en cours">{{ watches | selectattr("running") | list | length }}</span></a>
+</nav>
+<div id="pane-agents" data-tab-pane>
 <p class="muted">{% if live %}Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.{% else %}Mode démo : les lancements sont simulés (<code>JARVIS_MODE=live</code> pour de vrais agents). Les lignes marquées <span class="badge example">exemple</span> sont fictives : elles montrent la page telle qu'elle se remplit en mode live, et n'entrent jamais dans l'historique.{% endif %}</p>
 {% if runs %}
 {% set lanes = [
@@ -96,7 +101,9 @@
   </tbody>
 </table>
 {% endif %}
+</div>
 
+<div id="pane-dags" data-tab-pane>
 <h2>Suivis de DAG</h2>
 <p class="muted">Après chaque lancement réel, <code>air.py</code> suit le run : relances automatiques des erreurs passagères, notifications, rapport à la fin.</p>
 <table data-filterable>
@@ -144,4 +151,21 @@
   {% else %}<tr><td colspan="6" class="muted">Aucun DAG lancé (cette exécution de l'app).</td></tr>{% endfor %}
   </tbody>
 </table>
+</div>
+<script>
+  (() => {  // onglets Agents / DAG : l'ancre choisit l'onglet (#dags, ou une ancre située dans l'onglet, comme #chaines)
+    const links = [...document.querySelectorAll("[data-page-tabs] a")], panes = [...document.querySelectorAll("[data-tab-pane]")];
+    const show = () => {
+      const id = decodeURIComponent(location.hash.slice(1));
+      const target = id && document.getElementById(id);
+      const pane = (target && target.closest("[data-tab-pane]")) || (id === "dags" ? panes[1] : panes[0]);
+      panes.forEach((p) => { p.hidden = p !== pane; });
+      links.forEach((a) => a.classList.toggle("active", a.dataset.pane === pane.id));
+      if (target) target.scrollIntoView();
+    };
+    links.forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); history.replaceState(null, "", a.hash); show(); }));
+    window.addEventListener("hashchange", show);
+    show();
+  })();
+</script>
 {% endblock %}
