@@ -10,7 +10,8 @@
   <div>
     <h1>{{ "Bonsoir" if hour >= 18 or hour < 5 else "Bonjour" }}. <span class="muted">{{ days[today.weekday()] | capitalize }} {{ today.day }} {{ months[today.month - 1] }}</span></h1>
     <p class="jarvis-line">
-      {% if late or ko or due_today %}Jarvis a relevé
+      {% if not deployments %}Aucun client suivi pour l'instant.
+      {% elif late or ko or due_today %}Jarvis a relevé
         {%- if late %} <a class="count-link" href="{{ links.retard.href }}"{% if links.retard.ticket %} data-ticket{% endif %}><strong>{{ late | length }}</strong> élément(s) en retard</a>{% endif %}
         {%- if due_today %}{{ "," if late }} <a class="count-link" href="{{ links.aujourdhui.href }}"{% if links.aujourdhui.ticket %} data-ticket{% endif %}><strong>{{ due_today | length }}</strong> échéance(s) aujourd'hui</a>{% endif %}
         {%- if ko %}{{ " et" if late or due_today }} <a class="count-link" href="{{ links.ko.href }}"{% if links.ko.ticket %} data-ticket{% endif %}><strong>{{ ko | length }}</strong> injection(s) KO</a>{% endif %}. Par quoi commence-t-on ?
@@ -19,6 +20,13 @@
   </div>
   <div class="head-side"><a class="btn-primary" href="/brief" title="Le résumé du jour en texte, à copier pour Slack ou le daily">{{ ic.icon("sun") }} Brief du matin</a></div>
 </div>
+{% if not deployments %}
+<section class="panel empty-state">
+  <h2>Ajoute ton premier client</h2>
+  <p>Il suffit de son nom et du lien de sa fiche dans la base Notion « Clients en déploiement ». Les clients déjà ajoutés et pas encore synchronisés sont dans <a href="/clients">Clients</a>.</p>
+  <a class="btn-primary" href="/clients/nouveau">+ Ajouter un client</a>
+</section>
+{% endif %}
 {{ charts.stats([("En retard", late | length, "ko", links.retard), ("À échéance aujourd'hui", due_today | length, "todo", links.aujourdhui), ("Dans les 7 jours", due_week | length, "", links.semaine), ("Injections KO", ko | length, "ko", links.ko)]) }}
 
 {# Mes tickets épinglés : tout en haut, juste sous les compteurs. #}

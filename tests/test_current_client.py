@@ -109,3 +109,16 @@ def test_the_dock_gives_the_padoa_environments_of_the_current_client(monkeypatch
     assert hosts == ["snap-client-exemple", "snap-recette-client-exemple", "integration-client-exemple"]  # le slug Jarvis
     monkeypatch.setenv("PADOA_ENV_URL", "javascript:alert(1)//[stack]")
     assert "javascript:" not in dock() and 'href="/reglages"' in dock()  # modèle refusé : renvoi vers les Réglages
+
+
+def test_without_any_client_every_page_offers_to_add_one(monkeypatch):
+    """Sans client, pas de sélecteur (il portait le seul lien vers Clients) : la barre et l'accueil proposent d'en ajouter un."""
+    from deploy_hub import main
+    monkeypatch.setattr(main.fiches, "list_deployments", lambda: [])
+    c = TestClient(app)
+    for path in ("/", "/deadlines", "/agents"):
+        bar = c.get(path).text.split("<main>", 1)[0]
+        assert 'class="client-switch"' not in bar and 'class="client-chip client-add" href="/clients/nouveau"' in bar, path
+    home = c.get("/").text.split("<main>", 1)[1]
+    assert "Ajoute ton premier client" in home and 'href="/clients/nouveau"' in home
+    assert c.get("/clients/nouveau").status_code == 200

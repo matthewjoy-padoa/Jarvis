@@ -1478,4 +1478,7 @@ p.small-note { margin: 10px 2px 0; }
 .home-grid > .panel { margin: 0; }
 .home-grid + .whats-new-panel { margin-top: 16px; }
 @media (max-width: 700px) { .home-grid { grid-template-columns: minmax(0, 1fr); } }
+/* Barre du haut sans client : à la place du sélecteur, un bouton pour en ajouter un */
+.topbar .client-chip.client-add { border-style: dashed; color: var(--accent); text-decoration: none; }
+.topbar .client-chip.client-add:hover { border-color: var(--accent); }
 
