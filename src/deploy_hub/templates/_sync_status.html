@@ -1,9 +1,12 @@
-{# État de la routine de synchro Notion (bouton « Rafraîchir depuis Notion » sans jeton). Attend : running, ok, message, simulated. #}
+{# État de la routine de synchro Notion (bouton « Rafraîchir depuis Notion » sans jeton), dans l'encart sous le bouton.
+   Attend : running, ok, message, simulated, progress ({"pct", "label"} pendant qu'elle tourne). #}
 {% import "_icons.html" as ic %}
+{% import "_charts.html" as charts %}
 {% if running %}
-<div class="sync-status" hx-get="/actions/rafraichir/etat" hx-trigger="every 4s" hx-swap="outerHTML">
-  <p class="result ok">{{ ic.icon("sync") }} {{ message }}</p>
+<div class="sync-status" hx-get="/actions/rafraichir/etat" hx-trigger="every 3s" hx-swap="outerHTML">
+  <p class="result ok sync-progress" role="status">{{ charts.ring(progress.pct, 22, "Synchro : " ~ progress.pct ~ " %", alert=none) }}
+    <span><strong>{{ progress.pct }} %</strong> · {{ progress.label }}</span></p>
 </div>
 {% else %}
-<p class="result {{ 'ok' if ok else 'ko' }}">{% if simulated %}{{ ic.icon("flask", "Simulation", "ic-muted") }} {% endif %}{{ message }}</p>
+<p class="result {{ 'ok' if ok else 'ko' }}" title="Cliquer pour fermer">{% if simulated %}{{ ic.icon("flask", "Simulation", "ic-muted") }} {% endif %}{{ message }}</p>
 {% endif %}
