@@ -528,7 +528,12 @@ def _events(text: str):
 
 
 def find_pr(text: str) -> str:
-    found = PR_URL.findall(text or "")
+    """Dernier lien de PR cité par l'agent (ses messages, la sortie de ses outils, son compte rendu). Les évènements
+    « system » (démarrage, réponses des hooks) sont ignorés : un hook de la session peut y injecter les liens d'autres PR."""
+    found = []
+    for e in _events(text or ""):
+        if e.get("type") != "system":
+            found += PR_URL.findall(e["text"] if e.get("type") == "raw" else json.dumps(e, ensure_ascii=False))
     return found[-1] if found else ""
 
 
