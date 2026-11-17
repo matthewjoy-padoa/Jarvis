@@ -2,7 +2,8 @@
   <p><span class="badge g-{{ run.group }}">{{ run.status }}{{ " (simulé)" if run.simulated }}</span>
     {% if run.pr_url %} · <a href="{{ run.pr_url }}" target="_blank" rel="noopener">Pull request ↗</a>{% endif %}
     {% if run.cost_usd is not none %} <span class="muted">· coût estimé {{ '%.2f' % run.cost_usd }} $</span>{% endif %}
-    <span class="muted">· {{ "depuis" if run.running else "durée" }} {{ run.duration | duree }}{% if run.num_turns %} · {{ run.num_turns }} tours{% endif %}</span></p>
+    <span class="muted">· {{ "depuis" if run.running else "durée" }} {{ run.duration | duree }}{% if run.num_turns %} · {{ run.num_turns }} tours{% endif %}</span>
+    {% if run.tokens is not none %}<span class="muted">· {{ run.tokens | tokens }} tokens ({% for label, n in run.token_parts %}{{ label | lower }} {{ n | tokens }}{{ ', ' if not loop.last }}{% endfor %})</span>{% endif %}</p>
   {% if is_example(run) %}<p class="muted"><span class="badge example">exemple</span> Agent fictif du mode démo : journal, relecture et PR sont inventés.</p>{% endif %}
   {% if run.running and not run.simulated and not is_example(run) %}
   <form method="post" action="/agents/{{ run.id }}/arreter" onsubmit="return confirm('Arrêter l\'agent #{{ run.id }} ?')"><button type="submit" class="secondary">Arrêter l'agent</button></form>

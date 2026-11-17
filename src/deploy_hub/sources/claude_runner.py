@@ -42,6 +42,21 @@ class AgentRun:
     summary: str = ""  # dernier message de l'agent (son compte rendu) ou cause de l'échec
     num_turns: int | None = None
     category: str = ""  # type de ticket (type de données du retour, ou ressource) : sert au bilan par type
+    # tokens annoncés par Claude Code à la fin de l'agent (None : pas annoncés, agent arrêté ou lancé avant leur relevé)
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
+
+    @property
+    def token_parts(self) -> list[tuple[str, int]]:
+        """(nature, nombre) des tokens relevés, dans l'ordre de TOKEN_KINDS."""
+        return [(label, getattr(self, name)) for name, label, _ in TOKEN_KINDS if getattr(self, name) is not None]
+
+    @property
+    def tokens(self) -> int | None:
+        parts = self.token_parts
+        return sum(n for _, n in parts) if parts else None
 
     @property
     def duration(self) -> timedelta:
@@ -55,6 +70,31 @@ class AgentRun:
     @property
     def running(self) -> bool:
         return self.group == IN_PROGRESS
+
+
+# (champ d'AgentRun, libellé, clé dans « usage » de l'évènement « result » de Claude Code)
+TOKEN_KINDS = (("input_tokens", "Entrée", "input_tokens"), ("output_tokens", "Sortie", "output_tokens"),
+               ("cache_read_tokens", "Cache relu", "cache_read_input_tokens"),
+               ("cache_write_tokens", "Cache écrit", "cache_creation_input_tokens"))
+
+
+def tokens_text(n: int | None) -> str:
+    """« 950 », « 412 k », « 3,6 M »."""
+    if n is None:
+        return ""
+    if n < 1000:
+        return str(n)
+    if n < 999_500:
+        return f"{n / 1000:.0f} k"
+    return f"{n / 1_000_000:.1f} M".replace(".", ",")
+
+
+def read_tokens(run: "AgentRun", result: dict) -> None:
+    """Relève les tokens de l'évènement « result » ; rien à lire : les champs restent à None."""
+    spent = result.get("usage")
+    for name, _, key in TOKEN_KINDS:
+        value = spent.get(key) if isinstance(spent, dict) else None
+        setattr(run, name, value if isinstance(value, int) and not isinstance(value, bool) else None)
 
 
 AGENT_STATUSES = {"préparation": IN_PROGRESS, "en cours": IN_PROGRESS, "terminé": DONE,
@@ -93,15 +133,20 @@ def usage(runs: list[AgentRun]) -> dict | None:
 
     def line(label: str, group: list[AgentRun]) -> dict:
         costs = [r.cost_usd for r in group if r.cost_usd is not None]
+        spent = [r.tokens for r in group if r.tokens is not None]
+        kinds = [(label, sum(getattr(r, name) or 0 for r in group)) for name, label, _ in TOKEN_KINDS] if spent else []
         return {"label": label, "count": len(group), "prs": sum(bool(r.pr_url) for r in group),
                 "time": sum((r.duration for r in group), timedelta()), "median": median(r.duration for r in group),
-                "cost": sum(costs) if costs else None, "mean_cost": sum(costs) / len(costs) if costs else None}
+                "cost": sum(costs) if costs else None, "mean_cost": sum(costs) / len(costs) if costs else None,
+                "tokens": sum(spent) if spent else None, "mean_tokens": round(sum(spent) / len(spent)) if spent else None,
+                "token_kinds": kinds}
 
     groups: dict[str, list[AgentRun]] = {}
     for r in ended:
         groups.setdefault(r.category or UNSORTED, []).append(r)
     rows = sorted((line(label, group) for label, group in groups.items()), key=lambda row: (-(row["cost"] or 0), -row["count"], row["label"]))
-    return {"total": line("Tous", ended), "rows": rows}
+    by_agent = [(f"#{r.id} · {r.subject}", r.tokens) for r in sorted(ended, key=lambda r: -(r.tokens or 0)) if r.tokens]
+    return {"total": line("Tous", ended), "rows": rows, "tokens_by_agent": by_agent}
 
 
 def agent_branch(*parts: str) -> str:
@@ -378,6 +423,7 @@ class ClaudeRunner:
         result = next((e for e in reversed(list(_events(text))) if e.get("type") == "result"), {})
         run.cost_usd = result.get("total_cost_usd")
         run.num_turns = result.get("num_turns")
+        read_tokens(run, result)
         run.summary = (result.get("result") or "").strip()
         run.pr_url = find_pr(text)
         if run.id in self._stopped:

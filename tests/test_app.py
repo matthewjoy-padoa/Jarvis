@@ -1,6 +1,6 @@
 import os
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -413,7 +413,7 @@ def test_demo_agents_page_shows_fictional_examples():
     client = TestClient(main.app)
     before = list(main.claude.runs)
     page = client.get("/agents").text
-    assert 'class="badge example"' in page and "Coût et durée" in page
+    assert 'class="badge example"' in page and "Coût, tokens et durée" in page
     for run in main.examples.runs:
         assert f'href="/agents/{run.id}"' in page and client.get(f"/agents/{run.id}/journal").status_code == 200
     done = client.get(f"/agents/{main.examples.runs[-2].id}").text  # terminé avec PR : relecture guidée tirée du journal d'exemple
@@ -432,3 +432,36 @@ def test_examples_are_never_shown_in_live_mode(monkeypatch):
     client = TestClient(main.app)
     assert 'class="badge example"' not in client.get("/agents").text.split("</p>", 2)[-1]
     assert client.get("/agents/901").status_code == 404 and client.get("/agents/suivis/901").status_code == 404
+
+
+def test_agent_tokens_are_read_from_the_result_event_and_shown(tmp_path):
+    from deploy_hub.sources.claude_runner import AgentRun, read_tokens, tokens_text, usage
+
+    run = AgentRun(1, "client-demo", "Client Démo", "retour R-01", "fix-r-01", "brief", datetime(2026, 11, 17, 9), "terminé",
+                   ended_at=datetime(2026, 11, 17, 9, 10), category="Adhérents")
+    assert run.tokens is None
+    read_tokens(run, {"usage": {"input_tokens": 900, "output_tokens": 8_100, "cache_read_input_tokens": 1_200_000,
+                                "cache_creation_input_tokens": 70_000, "service_tier": "standard"}})
+    assert (run.input_tokens, run.output_tokens, run.cache_read_tokens, run.cache_write_tokens) == (900, 8_100, 1_200_000, 70_000)
+    assert run.tokens == 1_279_000 and tokens_text(run.tokens) == "1,3 M"
+    assert [tokens_text(n) for n in (0, 950, 412_300, 999_600)] == ["0", "950", "412 k", "1,0 M"]
+    total = usage([run])["total"]
+    assert total["tokens"] == 1_279_000 and total["token_kinds"][2] == ("Cache relu", 1_200_000)
+    read_tokens(run, {})  # agent arrêté : Claude Code n'annonce rien
+    assert run.tokens is None and usage([run])["total"]["tokens"] is None
+
+
+def test_demo_agents_page_shows_tokens_chart_and_full_brief(monkeypatch):
+    import deploy_hub.main as main
+    from deploy_hub.sources.examples import Examples
+
+    monkeypatch.setattr(main, "examples", Examples())
+    client = TestClient(main.app)
+    page = client.get("/agents").text
+    assert "Tokens par agent" in page and "Tokens par nature" in page and "Cache relu" in page
+    assert "3,6 M" in page  # agent 902 : 1 840 + 21 600 + 3 420 000 + 186 000
+    detail = client.get("/agents/902").text
+    assert "3,6 M tokens" in detail
+    for part in ("&lt;contexte&gt;", "&lt;retour&gt;", "&lt;demarche&gt;", "&lt;contrat&gt;", "&lt;compte_rendu&gt;", "Retour de recette : R-02"):
+        assert part in detail
+    assert "À COMPLÉTER" not in detail

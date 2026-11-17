@@ -11,7 +11,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from deploy_hub.sources.airflow import DagRun
-from deploy_hub.sources.claude_runner import AgentRun
+from deploy_hub.models import Deployment, RetourRecette
+from deploy_hub.sources.claude_runner import TOKEN_KINDS, AgentRun, read_tokens, retour_prompt
 from deploy_hub.sources.dag_chain import GREEN, RUNNING, SKIPPED, WAITING, DagChain, Step
 from deploy_hub.sources.dag_watch import DagWatch, report_name
 
@@ -19,7 +20,26 @@ FIRST_ID = 901  # loin des numéros de l'historique : un exemple ne prend jamais
 DEMO, DEMO_SLUG, OTHER, OTHER_SLUG = "Client Démo", "client-demo", "Client Exemple", "client-exemple"
 PR = "https://github.com/exemple-org/orchestrator-demo/pull/"
 STACK, INTEGRATION = "snap-recette", "integration"
-BRIEF = "Brief fictif : le retour {ref} de la recette, la ressource concernée, les fichiers à lire et les tests à lancer avant la PR."
+SOFTWARES = {DEMO_SLUG: "Preventiel", OTHER_SLUG: "Kenora"}  # logiciels des fiches de demo/
+# Retours de recette fictifs : (ressource, ligne du cahier, commentaire du client, exemple, analyse). Le brief d'un exemple est
+# le vrai brief de Jarvis (retour_prompt) rempli avec ce contenu inventé.
+RETOURS = {
+    "R-01": ("firm", "Adhérents : un adhérent par SIRET", "Certains adhérents apparaissent deux fois dans Padoa après la reprise.",
+             "Adhérent fictif « Entreprise Exemple », SIRET 000 000 000 00000 : deux fiches.",
+             "Le doublon apparaît après le nettoyage : le SIRET est saisi avec et sans espaces dans la source."),
+    "R-02": ("visit_histo", "Visites historiques : type de visite repris", "Des visites historiques arrivent sans type de visite.",
+             "Dossier fictif n° 0042 : visite du 12/03/2021 sans type dans Padoa, « VP » dans le logiciel d'origine.",
+             "Le code « VP » n'a sans doute pas de correspondance dans le mapping des types de visite."),
+    "R-03": ("additional_exam", "Examens complémentaires : tous les examens repris", "Il manque des examens complémentaires dans la reprise.",
+             "Dossier fictif n° 0108 : 3 examens dans le logiciel d'origine, 1 seul dans Padoa.",
+             "Les examens manquants semblent être ceux saisis hors visite."),
+    "R-04": ("vaccine_injection", "Vaccins : un rappel par injection", "Les rappels de vaccin semblent en double.",
+             "Dossier fictif n° 0077 : deux rappels à trois semaines d'écart.", ""),
+    "R-07": ("firm", "Adhérents : adresse complète", "Les adresses des adhérents sont tronquées.",
+             "Adhérent fictif « Société Exemple » : l'adresse s'arrête au 38e caractère.", ""),
+}
+# Tokens fictifs annoncés à la fin de chaque agent d'exemple : (entrée, sortie, cache relu, cache écrit), dans l'ordre de TOKEN_KINDS
+TOKENS = {"visit_histo": (1_840, 21_600, 3_420_000, 186_000), "firm": (920, 8_400, 1_180_000, 74_000), "vaccine": (410, 2_900, 402_000, 31_000)}
 
 
 def _say(text: str) -> dict:
@@ -34,8 +54,10 @@ def _result(key: str, text: str, error: bool = False) -> dict:
     return {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": key, "content": text, "is_error": error}]}}
 
 
-def _end(turns: int, cost: float) -> dict:
-    return {"type": "result", "subtype": "success", "num_turns": turns, "total_cost_usd": cost}
+def _end(log: str, turns: int, cost: float) -> dict:
+    """Dernier évènement du journal, comme Claude Code l'écrit : tours, coût et tokens."""
+    return {"type": "result", "subtype": "success", "num_turns": turns, "total_cost_usd": cost,
+            "usage": {key: n for (_, _, key), n in zip(TOKEN_KINDS, TOKENS[log])}}
 
 
 MAPPING = "src/mappings/client/client_demo/mappings_visit_histo.py"
@@ -57,7 +79,7 @@ AGENT_LOGS = {
         _call("a7", "Bash", command="git commit -am '[FIX](client_demo) visit_histo : type de visite VP'"), _result("a7", "2 files changed"),
         _call("a8", "Bash", command="gh pr create --title '[FIX](client_demo) visit_histo : type de visite VP'"), _result("a8", PR + "412"),
         _say(f"PR ouverte : {PR}412. Le code « VP » est mappé, la casse est normalisée, 12 tests passent."),
-        _end(58, 2.38),
+        _end("visit_histo", 58, 2.38),
     ],
     "firm": [
         _say("Retour R-01 : des adhérents sortent en double après le nettoyage. Je regarde l'étape clean de firm."),
@@ -69,7 +91,7 @@ AGENT_LOGS = {
         _call("b5", "Bash", command="uv run pytest tests/src/lib/steps/clean -q"), _result("b5", "34 passed in 9.8s"),
         _call("b6", "Bash", command="gh pr create --title '[FIX](client_demo) firm : dédoublonnage sur SIRET normalisé'"), _result("b6", PR + "398"),
         _say(f"PR ouverte : {PR}398. Attention : le correctif touche l'étape clean, commune à tous les clients."),
-        _end(24, 0.84),
+        _end("firm", 24, 0.84),
     ],
     "vaccine": [
         _say("Retour R-04 : « les rappels de vaccin semblent en double ». Je cherche d'où viennent les deux lignes."),
@@ -78,7 +100,7 @@ AGENT_LOGS = {
         _say("Les deux lignes ont des dates différentes dans l'extract : ce sont peut-être deux injections réelles. Le code ne dit pas "
              "laquelle garder : c'est une question métier, je ne tranche pas."),
         _say("Je n'ai rien modifié. Question pour le client : deux rappels à moins de 30 jours sont-ils une erreur de saisie ou deux injections ?"),
-        _end(11, 0.31),
+        _end("vaccine", 11, 0.31),
     ],
     "running": [
         _say("Je lis le retour R-03 : il manque des examens complémentaires dans la reprise."),
@@ -113,8 +135,14 @@ class Examples:
             return now - timedelta(**delta)
 
         def agent(n, slug, client, ref, subject, category, log, start, minutes=None, status="terminé", **more) -> AgentRun:
-            run = AgentRun(FIRST_ID + n, slug, client, f"{ref} · {subject}", f"fix-{slug}-{ref.lower()}", BRIEF.format(ref=ref), start, status,
+            resource, line, comment, example, analysis = RETOURS[ref]
+            retour = RetourRecette(ref, "En cours", category, SOFTWARES[slug], resource=resource, ligne=line, type_retour="Écart de données",
+                                   commentaire_client=comment, exemple=example, analyse=analysis)
+            brief = retour_prompt(Deployment(slug, client, SOFTWARES[slug]), retour)
+            run = AgentRun(FIRST_ID + n, slug, client, f"{ref} · {subject}", f"fix-{slug}-{ref.lower()}", brief, start, status,
                            ended_at=start + timedelta(minutes=minutes) if minutes else None, category=category, **more)
+            if log in TOKENS:  # relevés comme pour un vrai agent, dans le dernier évènement de son journal
+                read_tokens(run, AGENT_LOGS[log][-1])
             if log:
                 self.agent_log(run).write_text("\n".join(json.dumps(e, ensure_ascii=False) for e in AGENT_LOGS[log]), encoding="utf-8")
             return run

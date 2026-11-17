@@ -24,7 +24,7 @@ from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
-from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, duration_text, read_log, retour_prompt, usage
+from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, duration_text, read_log, retour_prompt, tokens_text, usage
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_watch import DagWatcher
 from deploy_hub.sources.examples import Examples
@@ -107,6 +107,7 @@ app = FastAPI(title="Jarvis", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
 templates.env.filters["duree"] = duration_text
+templates.env.filters["tokens"] = tokens_text
 templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STATUSES)
 templates.env.globals["kanban_columns"] = kanban_columns
 templates.env.globals["ACTION_STATUSES"] = ACTION_STATUSES

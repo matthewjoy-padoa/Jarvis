@@ -64,8 +64,9 @@
 {{ segbar("Recette", d.retour_groups, "retours", slim=true, filter_key="groupe", href=base ~ "/recette", hrefs={"done": base ~ "/recette?tous=true"}) }}
 {% endmacro %}
 
-{# Barres horizontales : classement d'une seule mesure, valeur au bout de la barre. filter_key, scope, href : comme segbar. #}
-{% macro hbars(title, items, limit=6, filter_key=None, scope={}, href=None) %}
+{# Barres horizontales : classement d'une seule mesure, valeur au bout de la barre. filter_key, scope, href : comme segbar.
+   as_tokens : valeurs écrites en nombre de tokens (« 412 k », « 3,6 M »). #}
+{% macro hbars(title, items, limit=6, filter_key=None, scope={}, href=None, as_tokens=false) %}
 {% set shown = items[:limit] %}
 {% set top = (shown | map(attribute=1) | max) if shown else 0 %}
 <figure class="chart"{% if filter_key %} data-filterable-chart title="Clique sur une barre pour filtrer"{% endif %}>
@@ -73,10 +74,10 @@
   {% if shown %}
   <ul class="hbars">
     {% for label, n in shown %}
-    <li title="{{ label }} : {{ n }}"{{ _clickable(filter_key, label if label != "Non précisé" else "", scope, href) }}>
+    <li title="{{ label }} : {{ '{:,}'.format(n).replace(',', ' ') ~ ' tokens' if as_tokens else n }}"{{ _clickable(filter_key, label if label != "Non précisé" else "", scope, href) }}>
       <span class="hbar-label">{{ label }}</span>
       <span class="hbar-track"><span class="hbar" style="width: {{ (100 * n / top) | round(1) }}%"></span></span>
-      <span class="hbar-value">{{ n }}</span>
+      <span class="hbar-value">{{ n | tokens if as_tokens else n }}</span>
     </li>
     {% endfor %}
   </ul>
