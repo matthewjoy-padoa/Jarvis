@@ -212,7 +212,7 @@
       </form>
     </div>
   </section>
-  <footer class="footer muted">Jarvis · <em>Just A Rather Very Intelligent System</em>, au service de l'équipe Integration · <a href="/sources">État des systèmes</a></footer>
+  <footer class="footer muted">Jarvis · <em>Just A Rather Very Intelligent System</em>, au service de l'équipe Integration · <a href="/sources">État des systèmes</a>{% if jarvis_version %} · <a href="https://github.com/matthewjoy-padoa/Jarvis/blob/main/CHANGELOG.md" title="Historique des versions">v{{ jarvis_version }}</a>{% endif %}</footer>
   {# Raccourcis du client en cours : dock de boutons ronds au bord droit, nom du lien en bulle au survol.
      Liens ouverts dans le navigateur : Jarvis ne lit jamais leur contenu. #}
   {% if current %}

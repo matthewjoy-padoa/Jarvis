@@ -6,6 +6,7 @@ import os
 import re
 from contextlib import asynccontextmanager
 import threading
+from importlib.metadata import PackageNotFoundError, version as package_version
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -112,6 +113,10 @@ templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STAT
 templates.env.globals["kanban_columns"] = kanban_columns
 templates.env.globals["ACTION_STATUSES"] = ACTION_STATUSES
 templates.env.globals["RETOUR_STATUSES"] = RETOUR_STATUSES
+try:
+    templates.env.globals["jarvis_version"] = package_version("deploy-hub")  # pyproject.toml ; historique dans CHANGELOG.md
+except PackageNotFoundError:
+    templates.env.globals["jarvis_version"] = ""
 templates.env.globals["console_commands"] = list(console.COMMANDS)  # complétion par Tab dans la console
 
 # Pages globales et onglets d'une fiche, calqués sur les blocs du dashboard Notion.
