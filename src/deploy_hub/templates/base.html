@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=135">
+  <link rel="stylesheet" href="/static/style.css?v=136">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=8" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
@@ -129,6 +129,29 @@
     document.addEventListener("htmx:afterSwap", () => document.querySelectorAll("[data-reload-after]:not([data-armed])").forEach((el) => {
       el.dataset.armed = "1";
       setTimeout(() => location.reload(), Number(el.dataset.reloadAfter) * 1000);
+    }));
+    // Bouton « Rafraîchir » : il se remplit avec l'avancement de la synchro (état posé par _sync_status.html sous le bouton),
+    // affiche « ✓ Synchro terminée » à la fin, et revient à la normale après un échec (le message reste dessous).
+    document.addEventListener("htmx:afterSwap", () => document.querySelectorAll(".refresh").forEach((box) => {
+      const btn = box.querySelector(".sync-btn"), busy = btn && btn.querySelector(".btn-busy");
+      if (!busy) return;
+      const s = box.querySelector(".refresh-out [data-sync-state]"), state = s ? s.dataset.syncState : "";
+      btn.dataset.idleTitle ??= btn.title;
+      btn.classList.toggle("is-syncing", state === "running");
+      btn.classList.toggle("is-done", state === "ok");
+      btn.setAttribute("aria-disabled", String(state === "running" || state === "ok"));
+      if (state === "running") {
+        btn.style.setProperty("--pct", `${s.dataset.syncPct}%`);
+        busy.textContent = `Synchro… ${s.dataset.syncPct} %`;
+        btn.title = s.dataset.syncLabel;
+      } else if (state === "ok") {
+        btn.style.setProperty("--pct", "100%");
+        busy.textContent = "✓ Synchro terminée";
+      } else {
+        btn.style.removeProperty("--pct");
+        busy.textContent = "Synchro…";
+        btn.title = btn.dataset.idleTitle;
+      }
     }));
     // Résultat d'un rafraîchissement (encart sous le bouton) : un clic le ferme.
     document.addEventListener("click", (e) => { const r = e.target.closest(".refresh-out > .result"); if (r) r.remove(); });

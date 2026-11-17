@@ -44,7 +44,7 @@ def test_without_token_the_refresh_button_runs_the_routine(monkeypatch, tmp_path
     routine = SyncRoutine(folder=tmp_path / "notion", claude_bin=str(claude))
     monkeypatch.setattr(main, "sync_routine", routine)
     r = TestClient(main.app).post("/actions/rafraichir/client-demo")
-    assert '<svg class="ring' in r.text and 'hx-get="/actions/rafraichir/etat"' in r.text and "Simulation" not in r.text  # cercle d'avancement
+    assert 'data-sync-state="running"' in r.text and 'data-sync-pct="' in r.text and 'hx-get="/actions/rafraichir/etat"' in r.text  # le bouton se remplit
     assert wait(routine)["ok"]
     page = TestClient(main.app).get("/deploiements/client-demo/synthese").text
     assert 'hx-post="/actions/rafraichir/client-demo"' in page and "Ni jeton Notion ni Claude Code" not in page  # bouton actif
@@ -164,7 +164,7 @@ def test_progress_follows_the_files_the_routine_drops(tmp_path):
 def test_refresh_button_does_not_move_when_clicked():
     """Attente, avancement et résultat vont dans un encart posé sous le bouton (position absolue), jamais à côté de lui."""
     css = (PROJECT_ROOT / "src" / "deploy_hub" / "static" / "style.css").read_text(encoding="utf-8")
-    assert ".refresh .refresh-wait, .refresh .refresh-out { position: absolute; top: calc(100% + 6px)" in css
+    assert ".refresh .refresh-out { position: absolute; top: calc(100% + 6px)" in css
 
 
 def test_a_failure_buried_in_a_long_report_is_still_a_failure(tmp_path):
@@ -201,4 +201,16 @@ def test_plan_writes_its_errors_for_jarvis(tmp_path):
     out = sync_notion.plan_all(tmp_path)
     written = json.loads((tmp_path / "data" / "notion" / "plan-erreurs.json").read_text(encoding="utf-8"))
     assert written == out["erreurs"] and "acme" in written
+
+
+def test_the_refresh_button_fills_up_instead_of_a_box():
+    """Le bouton porte l'avancement : deux libellés superposés (largeur fixe), plus d'encart d'attente à côté."""
+    from deploy_hub import main as app_module
+    client = TestClient(app_module.app)
+    for path in ("/deploiements/client-demo/synthese", "/clients"):
+        html = client.get(path).text
+        assert 'class="secondary sync-btn"' in html and 'class="btn-idle"' in html and 'class="btn-busy"' in html
+        assert "Jarvis interroge Notion" not in html  # plus d'encart d'attente
+    page = client.get("/").text
+    assert "is-syncing" in page and "✓ Synchro terminée" in page  # script du bouton dans base.html
 
