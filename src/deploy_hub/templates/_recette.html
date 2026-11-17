@@ -6,9 +6,13 @@
 {% for d in deployments if d.retours %}
 {% set scope = {"client": d.client} if show_client else {} %}
 <section class="chart-row">
-  {{ charts.segbar((d.client ~ " · retours") if show_client else "Statut des retours", d.retour_groups, "retours", filter_key="groupe", scope=scope, hrefs={} if show_all else {"done": base ~ "?tous=true"}) }}
-  {{ charts.hbars("Retours ouverts par type de données", d.open_retours_by_type, 6, filter_key="type", scope=scope) }}
+  {{ charts.segbar((d.client ~ " · retours") if show_client else "Statut des retours", d.retour_groups, "retours", slim=true, filter_key="groupe", scope=scope, hrefs={} if show_all else {"done": base ~ "?tous=true"}) }}
 </section>
+{# Répartition par type : repliée sous la barre, une ligne qui s'ouvre au clic. #}
+{% set by_type = d.open_retours_by_type %}
+{% if by_type %}<details class="fold"><summary>Retours ouverts par type de données <span class="muted">· {{ by_type | length }} type(s){% if show_client %} · {{ d.client }}{% endif %}</span></summary>
+  {{ charts.hbars("Retours ouverts par type de données", by_type, 6, filter_key="type", scope=scope) }}
+</details>{% endif %}
 {% endfor %}
 {% set kanban = vue == "kanban" %}
 <div class="view-bar">
@@ -18,7 +22,6 @@
 <div class="segmented" role="group" aria-label="Retours affichés">
   <a href="{{ base }}{{ '?vue=kanban' if kanban }}" class="{{ 'active' if not show_all }}">Ouverts</a><a href="{{ base }}?tous=true{{ '&vue=kanban' if kanban }}" class="{{ 'active' if show_all }}">Tous</a>
 </div>
-<span class="muted note" title="Le contenu des retours (commentaire, exemple, analyse…) est gardé sur cette machine : il n'est jamais versionné dans git.">Contenu des retours gardé en local, hors GitHub</span>
 </div>
 {% if kanban %}
 {% set ns_kb = namespace(cards=[]) %}
@@ -34,7 +37,7 @@
 </article>
 {% endcall %}
 {% else %}
-<div data-filterable data-items=".retour" data-filters="Statut:statut,Responsable:responsable,Type de données:type,Logiciel:logiciel{{ ',Client:client' if show_client }}" data-sorts="Deadline:deadline,Création:cree,Statut:statut" data-out-label="terminé(s)">
+<div data-filterable data-fold-filters data-items=".retour" data-filters="Statut:statut,Responsable:responsable,Type de données:type,Logiciel:logiciel{{ ',Client:client' if show_client }}" data-sorts="Deadline:deadline,Création:cree,Statut:statut" data-out-label="terminé(s)">
 {# Tous les retours sont envoyés : en vue « Ouverts », les terminés sont masqués (data-out) et la recherche propose de les afficher. #}
 {% for d in deployments %}{% for r in d.retours %}
 <article id="{{ r.id }}" data-ticket-card class="retour {{ 'done' if not r.is_open }}"{% if not show_all and not r.is_open %} hidden data-out{% endif %} data-group="{{ r.group }}" data-statut="{{ r.status }}" data-type="{{ r.data_type }}" data-logiciel="{{ r.software or d.software }}" data-responsable="{{ r.owners | join('|') if r.owners else 'Sans responsable' }}" data-client="{{ d.client }}" data-deadline="{{ r.due.isoformat() if r.due else '' }}" data-cree="{{ r.created.isoformat() if r.created else '' }}">
@@ -49,6 +52,8 @@
   <div class="retour-actions">
     {% if r.notion_url %}<a class="btn-link" href="{{ r.notion_url }}" target="_blank" rel="noopener">Notion ↗</a>{% endif %}
   </div>
+  {# Contenu et agent : deux liens sur une ligne ; celui qu'on ouvre se déplie en pleine largeur dessous. #}
+  {% if r.content or r.is_open %}<div class="retour-more">{% endif %}
   {% if r.content %}
   <details class="retour-content">
     <summary>Voir le retour</summary>
@@ -61,8 +66,11 @@
     <div class="agent-body"><p class="muted">Jarvis prépare le brief…</p></div>
   </details>
   {% endif %}
+  {% if r.content or r.is_open %}</div>{% endif %}
 </article>
 {% endfor %}{% endfor %}
 </div>
+<p class="muted small-note" title="Le contenu des retours (commentaire, exemple, analyse…) est gardé sur cette machine : il n'est jamais versionné dans git.">Contenu des retours gardé en local, hors GitHub.</p>
+
 {% endif %}
 {% if not deployments | map(attribute="retours") | sum(start=[]) %}<p class="muted">Aucun retour de recette.</p>{% endif %}

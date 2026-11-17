@@ -9,10 +9,10 @@
   <script>try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=120">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/static/style.css?v=129">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
-  <script src="/static/filters.js?v=7" defer></script>
+  <script src="/static/filters.js?v=8" defer></script>
   <script src="/static/dag.js?v=2" defer></script>
   <script src="/static/limit.js?v=1" defer></script>
   <script src="/static/notify.js?v=4" defer></script>
@@ -58,6 +58,8 @@
         <a role="menuitem" class="client-menu-all" href="/clients">Tous les clients et réglages</a>
       </div>
     </details>
+    {% else %}{# Aucun client : le sélecteur (et son lien vers Clients) n'existe pas ; on garde un chemin pour en ajouter un. #}
+    <a class="client-chip client-add" href="/clients/nouveau" title="Ajouter un client à suivre">+ Ajouter un client</a>
     {% endif %}
     <nav class="nav" aria-label="Navigation">
       <div class="nav-group">

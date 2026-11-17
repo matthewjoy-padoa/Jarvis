@@ -1,6 +1,7 @@
 """Journal des changements, page « Aujourd'hui », « Quoi de neuf » et injections regroupées par ressource."""
 
 import json
+import re
 from datetime import date, datetime, timedelta
 
 import pytest
@@ -228,3 +229,13 @@ def test_deadlines_calendar_and_client_choice(app, acme):
     nav = app.get(f"/deadlines?vue=calendrier&client=globex&mois={month}").text
     assert "client=globex" in nav.split('aria-label="Mois suivant"')[0].rsplit("<a", 1)[1]  # navigation : client gardé
     assert app.get("/deadlines?vue=calendrier&mois=nimporte").status_code == 200  # mois illisible : mois en cours
+
+
+def test_a_traiter_shows_one_period_at_a_time_without_dropping_any():
+    """« À traiter » : une période visible (la plus urgente), les autres dans la page derrière leur onglet, rien de retiré."""
+    from deploy_hub.main import app
+    html = TestClient(app).get("/").text
+    panes = re.findall(r'<div class="todo-pane" id="todo-(\w+)"[^>]*?( hidden)?>', html)
+    assert panes and panes[0][1] == "" and all(h == " hidden" for _, h in panes[1:])  # la première visible, les autres masquées
+    for periode, _ in panes:
+        assert f'data-todo-tab="{periode}"' in html and f'href="/deadlines?periode={periode}"' in html

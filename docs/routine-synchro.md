@@ -1,8 +1,12 @@
 # Routine de synchro Notion → Jarvis
 
 Jarvis lit Notion de deux façons :
-- **le bouton « Rafraîchir depuis Notion »**, si un jeton d'intégration Notion est configuré (`NOTION_TOKEN`, voir le README) ;
-- **cette routine**, une tâche planifiée de Claude Code qui exécute les requêtes SQL avec le connecteur Notion. Elle ne demande pas de jeton.
+- **avec un jeton d'intégration Notion** (`NOTION_TOKEN`, voir le README) : le bouton « Rafraîchir depuis Notion » appelle l'API ;
+- **sans jeton, avec cette routine** : Claude Code exécute les requêtes SQL avec son connecteur Notion.
+
+La consigne de la routine est dans le dépôt : [`sync/routine.md`](../sync/routine.md). C'est la seule source ; il n'y a rien à recopier ni à compléter (le dossier est celui où on la lance).
+
+**Clients synchronisés** : ceux configurés dans l'app (`config/clients/`, ou `JARVIS_CONFIG_DIR`), lus par `sync_notion preparer`. Un client ajouté depuis « Clients → Ajouter un client » est pris au passage suivant ; un client retiré ne l'est plus.
 
 ## Ce que fait un passage
 1. **Une seule requête d'empreinte pour tous les clients** : nombre de lignes et dernière modification des actions et des retours, signature des règles et des dates de la fiche.
@@ -13,44 +17,22 @@ Jarvis lit Notion de deux façons :
    - Relecture complète : pas de cache, colonnes des actions modifiées, ou actions relues il y a 7 jours ou plus (leurs ressources et types viennent des cartes Bible).
 3. La routine exécute ces requêtes et dépose les résultats ; `sync_notion fusionner` met à jour les caches et les fiches.
 
-## Mise en place
-1. Dans Claude Code, ouvrir les tâches planifiées (« Scheduled tasks ») et créer une tâche, par exemple `jarvis-sync`, toutes les 2 heures de 8h à 18h en semaine (`0 8-18/2 * * 1-5`).
-2. Coller comme consigne le texte de la section suivante, en remplaçant :
-   - `<DOSSIER_JARVIS>` par le chemin du dépôt (ex. `~/Documents/Jarvis`) ;
-   - `<CANAL_SLACK>` par le canal où signaler un échec (nom et id), ou supprimer le paragraphe Slack.
-3. Le connecteur Notion doit être activé pour la tâche, et le dossier du dépôt autorisé.
+## Lancer la routine
+Trois façons, la même consigne :
 
-## Consigne de la tâche (à copier)
+1. **Bouton « Rafraîchir depuis Notion »** (fiche d'un client) ou **« Tout rafraîchir »** (page Clients), quand l'app n'a pas de jeton Notion.
+   Jarvis lance `claude -p` dans son dossier, avec son propre environnement (donc ses clients), et affiche l'état sous le bouton ; la page se recharge à la fin.
+   - Il faut `JARVIS_MODE=live` (en `demo`, le bouton simule), Claude Code en ligne de commande (`claude` dans le PATH, ou `CLAUDE_BIN` dans Réglages) et le connecteur Notion disponible en ligne de commande.
+   - Outils permis : les commandes `sync_notion`, `cp`, l'écriture dans le dossier de données, le connecteur Notion. Pour un connecteur au nom inhabituel : `JARVIS_SYNC_ALLOWED_TOOLS` (séparés par « ; »).
+   - Une seule synchro à la fois ; compte rendu dans `data/notion/routine.log`, échec signalé dans les notifications.
+2. **Commande `/jarvis-sync`** : dans Claude Code (app ou terminal) ouvert sur le dossier de Jarvis, taper `/jarvis-sync`, ou `/jarvis-sync #mon-canal` pour signaler un échec sur Slack.
+3. **Tâche planifiée** : dans Claude Code, « Scheduled tasks », créer une tâche (par exemple `jarvis-sync`, `0 8-18/2 * * 1-5`) avec pour consigne :
 
-```text
-Tu mets à jour l'app Jarvis à partir de Notion. Dossier de l'app : <DOSSIER_JARVIS>. Réponds en français. Va vite : Python décide de tout, tu exécutes.
+   ```text
+   Tu mets à jour l'app Jarvis à partir de Notion. Dossier de Jarvis : ~/Documents/Jarvis. Réponds en français.
+   1. Lis ~/Documents/Jarvis/sync/routine.md et suis sa consigne à la lettre. Lance chaque commande depuis le dossier de Jarvis : préfixe-la par « cd ~/Documents/Jarvis && ».
+   2. Canal Slack où signaler un échec : #mon-canal (id), ou aucun. Rien sur Slack en cas de succès.
+   ```
+   (Remplace le dossier s'il est ailleurs, et le canal.)
+   Le connecteur Notion doit être activé pour la tâche, et le dossier autorisé. La consigne suit le dépôt : un `git pull` suffit à la mettre à jour.
 
-RÈGLES
-- Tu n'exécutes que les requêtes listées par les commandes ci-dessous (fichiers .sql recopiés à l'identique), avec pour seuls ajouts un « LIMIT 100 OFFSET n » final pour paginer et la valeur de « ? » dans `params`.
-- Les résultats de la base Retours Recette contiennent le contenu des retours : écris-les tels quels dans les fichiers indiqués, ne les recopie jamais dans ton compte rendu ni sur Slack.
-- Tu ne lis jamais les logs Airflow. Tu n'écris que dans <DOSSIER_JARVIS>/data/.
-- Tu ne modifies jamais le code, les tests, les modèles .sql ni la configuration. Si une commande échoue, tu t'arrêtes pour ce client, tu signales l'échec et tu décris le défaut en une phrase.
-- Aucune ligne de résultat dans ton compte rendu : seulement des comptes.
-
-EXÉCUTER UNE REQUÊTE (objet {"sql", "sortie", "params", "sources"})
-- Outil Notion `notion-query-data-sources`, mode sql : contenu du fichier "sql" à l'identique, `data_source_urls` = "sources", `params` = "params" s'il n'est pas vide. Erreur 5xx ou délai dépassé : réessaie jusqu'à 2 fois.
-- Pagination : si la réponse a 100 lignes, relance la requête suivie de « LIMIT 100 OFFSET 100 », puis 200, etc., jusqu'à une page de MOINS de 100 lignes (écris-la aussi, même vide). Au plus 20 pages.
-- Écrire : page 1 dans "sortie", page 2 dans le même nom suffixé -2 (ex. actions_delta-2.json), etc. Si l'outil a rangé sa réponse dans un fichier (« Output has been saved to <chemin> »), copie ce fichier avec `cp "<chemin>" "<sortie>"` sans le lire. Sinon, écris l'objet JSON renvoyé (celui qui contient "results") tel quel, sans rien ajouter ni retirer.
-
-ÉTAPES
-1. cd <DOSSIER_JARVIS> && uv run python -m deploy_hub.sync_notion preparer
-   → une requête : exécute-la (empreinte de tous les clients, une ligne par client).
-2. cd <DOSSIER_JARVIS> && uv run python -m deploy_hub.sync_notion plan
-   → {"requetes": [...], "inchanges": [...], "raisons": {...}, "erreurs": {...}}. Si "requetes" est vide : va à l'étape 4.
-3. Exécute chaque requête de "requetes", dans l'ordre (chacune porte son "client").
-4. cd <DOSSIER_JARVIS> && uv run python -m deploy_hub.sync_notion fusionner
-   → un résumé par client fusionné, ou {"erreur": …}.
-5. cd <DOSSIER_JARVIS> && uv run python -m deploy_hub.sync_notion utilisateurs
-   → identifiants de responsables sans nom (souvent aucun). Pour chacun, outil Notion `notion-get-users` avec `user_id` ; garde seulement son nom. Puis une seule fois : uv run python -m deploy_hub.sync_notion utilisateurs '{"<identifiant>": "<nom>", ...}'. Ni e-mail ni autre information.
-
-SI UNE ÉTAPE ÉCHOUE
-Message Slack court dans le canal <CANAL_SLACK> : « jarvis-sync ÉCHEC <client ou tous> : <étape> : <raison en une phrase> ». Rien en cas de succès.
-
-FIN
-Une ligne par client : « inchangé », le mode appliqué par base (d'après le résumé de fusionner) et le nombre de requêtes exécutées, ou la raison de l'échec.
-```

@@ -200,7 +200,8 @@ def test_actions_show_active_by_default_and_all_on_demand():
 def test_filters_script_searches_without_accents_and_offers_hidden_matches():
     js = client.get("/static/filters.js").text
     assert 'normalize("NFD")' in js and "data-out" in js and "more-out" in js
-    assert "filters.js?v=7" in client.get("/actions").text
+    assert "filters-toggle" in js and "data-fold-filters" in js  # menus déroulants derrière « Filtres » sur la fiche
+    assert "filters.js?v=8" in client.get("/actions").text
 
 
 @pytest.mark.parametrize(
@@ -210,7 +211,7 @@ def test_filters_script_searches_without_accents_and_offers_hidden_matches():
         ("/deploiements/client-demo/injections", ["Répartition des injections", 'class="segbar"']),
         ("/deploiements/client-demo/recette", ["Statut des retours", "Retours ouverts par type de données"]),
         ("/deploiements/client-demo/regles", ["Règles par type"]),
-        ("/actions", ["En retard", "Points de vigilance"]),
+        ("/actions", ['class="counts"', "en retard", "point(s) de vigilance", "date(s) clé(s) à venir"]),
         ("/deadlines", ["Dans les 7 jours"]),
         ("/clients", ['class="segbar"']),
     ],
@@ -220,6 +221,26 @@ def test_summaries_are_rendered(path, expected):
     assert r.status_code == 200
     for text in expected:
         assert text in r.text, text
+
+
+@pytest.mark.parametrize("tab", ["actions", "recette", "regles", "accompagnement", "injections?vue=liste"])
+def test_fiche_lists_fold_their_filters_without_dropping_any(tab):
+    """Listes de la fiche : les menus déroulants passent derrière « Filtres », la liste et ses colonnes restent entières."""
+    html = client.get(f"/deploiements/client-demo/{tab}").text
+    assert "data-fold-filters" in html
+
+
+def test_secondary_blocks_are_folded_not_removed():
+    """Rien n'est retiré : le détail est dans la page, replié."""
+    syn = client.get("/deploiements/client-demo/synthese").text
+    assert 'class="fold tl-fold"' in syn and 'class="tl-legend"' in syn  # liste des jalons repliée sous la frise
+    assert 'class="panel fold-panel my-notes"' in syn and 'name="texte"' in syn  # notes repliées, toujours éditables
+    rec = client.get("/deploiements/client-demo/recette?tous=true").text
+    assert "Retours ouverts par type de données" in rec and 'class="hbars"' in rec
+    assert "Voir le retour" in rec and "Lancer un agent" in rec and 'class="retour-more"' in rec
+    assert "Contenu des retours gardé en local" in rec
+    inj = client.get("/deploiements/client-demo/injections?vue=liste").text
+    assert "Lancer le DAG" in inj and "Lancer Claude" in inj  # boutons de ligne toujours là (montrés au survol)
 
 
 def test_segbar_counts_match_the_retours():

@@ -10,13 +10,17 @@ Jarvis suit une numérotation `0.MINEUR.CORRECTIF` tant qu'il n'est pas stable :
 
 ## [0.1.0] · 2026-11-17
 
-Première version suivie : tout ce qui a été fusionné jusqu'à la PR #46.
+Première version suivie : tout ce qui a été fusionné jusqu'à la PR #50.
 
 ### Suivi des clients
 - Fiches de déploiement par client, accueil, synthèse (« Où ça coince »), Deadlines en liste et en calendrier (#1, #10, #11, #27).
 - Synchro Notion des retours de recette et des actions, filtres, vue kanban, détail d'un ticket (#3, #5, #6, #41).
 - Fiche client : icône, liens Google Drive, dock de raccourcis, tickets épinglés (#16, #28 à #31, #36, #38).
 - Graphiques lisibles et cliquables (#25, #39).
+- Sans aucun client, bouton « + Ajouter un client » dans la barre du haut et sur l'accueil (#49).
+
+### Synchro Notion
+- Routine de synchro embarquée dans le dépôt (`sync/routine.md`) : commande `/jarvis-sync`, bouton « Rafraîchir depuis Notion » sans jeton (`claude -p`), tâche planifiée ; clients pris dans la configuration de l'app (#50).
 
 ### Airflow
 - Lancement de DAGs, suivi automatique des runs, enchaînement de DAGs (#8, #33).
@@ -40,6 +44,8 @@ Première version suivie : tout ce qui a été fusionné jusqu'à la PR #46.
 
 ### Interface
 - Logo, couleurs, audit du style et des contrastes (#4, #9, #14, #15, #17).
+- Pages client plus légères sans rien retirer (contenu secondaire replié, filtres derrière un bouton), typo Inter ; accueil en rangées alignées, « À traiter » par période (#48).
 
 ### Corrections
 - Agents : un lien de PR injecté par les hooks n'est plus pris pour la PR de l'agent (#46).
+- Jauge d'avancement en retard sans pastille isolée ; séparateur en double dans les barres de la vue tous clients ; texte du bouton de lancement en prod lisible (#48).
