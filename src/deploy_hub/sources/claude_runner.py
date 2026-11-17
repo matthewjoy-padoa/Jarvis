@@ -42,6 +42,30 @@ class AgentRun:
     summary: str = ""  # dernier message de l'agent (son compte rendu) ou cause de l'échec
     num_turns: int | None = None
     category: str = ""  # type de ticket (type de données du retour, ou ressource) : sert au bilan par type
+    # tokens annoncés par Claude Code à la fin de l'agent (None : pas annoncés, agent arrêté ou lancé avant leur relevé)
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
+    # remplissage du contexte au dernier tour (ce que l'agent relit à chaque tour) et taille de la fenêtre du modèle
+    context_tokens: int | None = None
+    context_window: int | None = None
+
+    @property
+    def context_pct(self) -> int | None:
+        if not self.context_tokens or not self.context_window:
+            return None
+        return min(round(100 * self.context_tokens / self.context_window), 100)
+
+    @property
+    def token_parts(self) -> list[tuple[str, int]]:
+        """(nature, nombre) des tokens relevés, dans l'ordre de TOKEN_KINDS."""
+        return [(label, getattr(self, name)) for name, label, _ in TOKEN_KINDS if getattr(self, name) is not None]
+
+    @property
+    def tokens(self) -> int | None:
+        parts = self.token_parts
+        return sum(n for _, n in parts) if parts else None
 
     @property
     def duration(self) -> timedelta:
@@ -55,6 +79,51 @@ class AgentRun:
     @property
     def running(self) -> bool:
         return self.group == IN_PROGRESS
+
+
+# (champ d'AgentRun, libellé, clé dans « usage » de l'évènement « result » de Claude Code)
+TOKEN_KINDS = (("input_tokens", "Entrée", "input_tokens"), ("output_tokens", "Sortie", "output_tokens"),
+               ("cache_read_tokens", "Cache relu", "cache_read_input_tokens"),
+               ("cache_write_tokens", "Cache écrit", "cache_creation_input_tokens"))
+
+
+def tokens_text(n: int | None) -> str:
+    """« 950 », « 412 k », « 3,6 M »."""
+    if n is None:
+        return ""
+    if n < 1000:
+        return str(n)
+    if n < 999_500:
+        return f"{n / 1000:.0f} k"
+    return f"{n / 1_000_000:.1f} M".replace(".", ",")
+
+
+CONTEXT_WINDOW = 200_000  # fenêtre supposée tant que Claude Code n'a pas annoncé celle du modèle (à la fin de l'agent)
+
+
+def read_context(run: "AgentRun", text: str) -> None:
+    """Remplissage du contexte, lu dans le journal : ce que le dernier tour de l'agent a envoyé au modèle (entrée et cache).
+    Marche aussi pendant que l'agent tourne. Les tours des sous-agents ne comptent pas : ils ont leur propre contexte."""
+    spent, window = None, None
+    for e in _events(text):
+        if e.get("type") == "assistant" and not e.get("parent_tool_use_id"):
+            found = (e.get("message") or {}).get("usage")
+            spent = found if isinstance(found, dict) else spent
+        elif e.get("type") == "result":
+            sizes = [m.get("contextWindow") for m in (e.get("modelUsage") or {}).values() if isinstance(m, dict)]
+            window = max((s for s in sizes if isinstance(s, int)), default=None)
+    if spent:
+        keys = ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+        run.context_tokens = sum(spent.get(k) or 0 for k in keys)
+        run.context_window = window or run.context_window or CONTEXT_WINDOW
+
+
+def read_tokens(run: "AgentRun", result: dict) -> None:
+    """Relève les tokens de l'évènement « result » ; rien à lire : les champs restent à None."""
+    spent = result.get("usage")
+    for name, _, key in TOKEN_KINDS:
+        value = spent.get(key) if isinstance(spent, dict) else None
+        setattr(run, name, value if isinstance(value, int) and not isinstance(value, bool) else None)
 
 
 AGENT_STATUSES = {"préparation": IN_PROGRESS, "en cours": IN_PROGRESS, "terminé": DONE,
@@ -86,21 +155,27 @@ UNSORTED = "non précisé"
 
 
 def usage(runs: list[AgentRun]) -> dict | None:
-    """Bilan des agents réels terminés (ni simulés ni en cours) : total, et une ligne par type de ticket, le plus coûteux d'abord."""
+    """Bilan des agents réels terminés (ni simulés ni en cours) : total, et une ligne par type de ticket, le plus gourmand en tokens d'abord."""
     ended = [r for r in runs if not r.simulated and not r.running and r.ended_at]
     if not ended:
         return None
 
     def line(label: str, group: list[AgentRun]) -> dict:
         costs = [r.cost_usd for r in group if r.cost_usd is not None]
+        spent = [r.tokens for r in group if r.tokens is not None]
+        filled = [r.context_pct for r in group if r.context_pct is not None]
+        kinds = [(label, sum(getattr(r, name) or 0 for r in group)) for name, label, _ in TOKEN_KINDS] if spent else []
         return {"label": label, "count": len(group), "prs": sum(bool(r.pr_url) for r in group),
                 "time": sum((r.duration for r in group), timedelta()), "median": median(r.duration for r in group),
-                "cost": sum(costs) if costs else None, "mean_cost": sum(costs) / len(costs) if costs else None}
+                "cost": sum(costs) if costs else None, "mean_cost": sum(costs) / len(costs) if costs else None,
+                "tokens": sum(spent) if spent else None, "mean_tokens": round(sum(spent) / len(spent)) if spent else None,
+                "token_kinds": kinds, "context_pct": round(sum(filled) / len(filled)) if filled else None,
+                "context_max": max(filled) if filled else None}
 
     groups: dict[str, list[AgentRun]] = {}
     for r in ended:
         groups.setdefault(r.category or UNSORTED, []).append(r)
-    rows = sorted((line(label, group) for label, group in groups.items()), key=lambda row: (-(row["cost"] or 0), -row["count"], row["label"]))
+    rows = sorted((line(label, group) for label, group in groups.items()), key=lambda row: (-(row["tokens"] or 0), -row["count"], row["label"]))
     return {"total": line("Tous", ended), "rows": rows}
 
 
@@ -287,6 +362,12 @@ class ClaudeRunner:
     def log_path(self, run: AgentRun) -> Path:
         return self.state_dir / f"{run.id}.jsonl"
 
+    def refresh_context(self, run: AgentRun) -> None:
+        """Agent en cours : relit dans son journal où en est son contexte (à la fin, _work l'enregistre)."""
+        log = self.log_path(run)
+        if run.running and not run.simulated and log.is_file():
+            read_context(run, log.read_text(encoding="utf-8", errors="replace"))
+
     def log(self, run: AgentRun) -> list[tuple[str, str]]:
         return read_log(self.log_path(run))
 
@@ -378,6 +459,8 @@ class ClaudeRunner:
         result = next((e for e in reversed(list(_events(text))) if e.get("type") == "result"), {})
         run.cost_usd = result.get("total_cost_usd")
         run.num_turns = result.get("num_turns")
+        read_tokens(run, result)
+        read_context(run, text)
         run.summary = (result.get("result") or "").strip()
         run.pr_url = find_pr(text)
         if run.id in self._stopped:
@@ -474,8 +557,7 @@ def read_log(log: Path) -> list[tuple[str, str]]:
                     text = content if isinstance(content, str) else " ".join(c.get("text", "") for c in content or [] if isinstance(c, dict))
                     lines.append(("refus", text.strip()[:400]))
         elif kind == "result":
-            lines.append(("fin", f"{e.get('subtype', '')} · {e.get('num_turns', '?')} tours"
-                                 + (f" · {e['total_cost_usd']:.2f} $" if isinstance(e.get("total_cost_usd"), (int, float)) else "")))
+            lines.append(("fin", f"{e.get('subtype', '')} · {e.get('num_turns', '?')} tours"))
         elif kind == "raw":
             lines.append(("brut", e["text"][:400]))
     return lines

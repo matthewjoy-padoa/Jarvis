@@ -3,44 +3,126 @@
 {% import "_charts.html" as charts %}
 {% block title %}Agents · Jarvis{% endblock %}
 {% block content %}
+{# Petit robot d'un agent : il marche tant que l'agent tourne, dort quand il a fini, brandit un fanion quand la PR est ouverte,
+   et finit sur le dos quand l'agent a échoué. Décoratif : le numéro et la bulle de détail portent l'information. #}
+{% macro bot() %}
+<svg class="bot" viewBox="0 0 48 46" width="48" height="46" aria-hidden="true">
+  <g class="bot-flag"><line x1="37" y1="9" x2="37" y2="31"/><path d="M37 9l10 4-10 4z"/></g>
+  <line class="bot-antenna" x1="20" y1="3" x2="20" y2="9"/><circle class="bot-led" cx="20" cy="3" r="2.6"/>
+  <rect class="bot-skin" x="7" y="8" width="26" height="17" rx="6"/>
+  <rect class="bot-face" x="11" y="11" width="20" height="11" rx="4"/>
+  <g class="bot-eyes eyes-open"><circle cx="19" cy="16.5" r="2.1"/><circle cx="26.5" cy="16.5" r="2.1"/></g>
+  <g class="bot-eyes eyes-closed"><path d="M16.5 17q2.5 2 5 0M24 17q2.5 2 5 0"/></g>
+  <g class="bot-eyes eyes-x"><path d="M17 14.5l4 4m0-4l-4 4M24.5 14.5l4 4m0-4l-4 4"/></g>
+  <rect class="bot-skin bot-arm-l" x="5" y="27" width="4.5" height="9" rx="2.2"/>
+  <rect class="bot-skin bot-arm-r" x="30.5" y="27" width="4.5" height="9" rx="2.2"/>
+  <rect class="bot-skin bot-body" x="11" y="26.5" width="18" height="11" rx="4"/>
+  <rect class="bot-skin bot-leg-a" x="13.5" y="37" width="4.5" height="7" rx="2.2"/>
+  <rect class="bot-skin bot-leg-b" x="22" y="37" width="4.5" height="7" rx="2.2"/>
+</svg>
+{% endmacro %}
 <h1>Agents lancés</h1>
-<p class="muted">{% if live %}Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.{% else %}Mode démo : les lancements sont simulés (<code>JARVIS_MODE=live</code> pour de vrais agents).{% endif %}</p>
+<nav class="tabs" aria-label="Onglets" data-page-tabs>
+  <a href="#agents" class="active" data-pane="pane-agents">Agents <span class="count" title="Agents en cours">{{ runs | selectattr("running") | list | length }}</span></a>
+  <a href="#dags" data-pane="pane-dags">DAG <span class="count" title="Suivis de DAG en cours">{{ watches | selectattr("running") | list | length }}</span></a>
+</nav>
+<div id="pane-agents" data-tab-pane>
+<p class="muted">{% if live %}Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.{% else %}Mode démo : les lancements sont simulés (<code>JARVIS_MODE=live</code> pour de vrais agents). Les lignes marquées <span class="badge example">exemple</span> sont fictives : elles montrent la page telle qu'elle se remplit en mode live, et n'entrent jamais dans l'historique.{% endif %}</p>
+{% if runs %}
+{% set lanes = [
+  ("in_progress", "En cours", "L'agent travaille dans son worktree", runs | selectattr("running") | list),
+  ("done", "Terminés", "Fini, sans PR", runs | selectattr("group", "equalto", "done") | rejectattr("pr_url") | list),
+  ("pr", "PR ouverte", "À relire sur GitHub", runs | selectattr("pr_url") | list),
+  ("ko", "Arrêtés ou en échec", "Échec, arrêt, délai dépassé", runs | selectattr("group", "equalto", "ko") | rejectattr("pr_url") | list),
+] %}
+<section class="panel agent-flow" id="schema" aria-label="Où en sont les agents">
+  {% for key, title, hint, found in lanes %}
+  <div class="flow-lane flow-{{ key }}{{ ' is-empty' if not found }}">
+    <header><strong>{{ found | length }}</strong><span>{{ title }}</span><small class="muted">{{ hint }}</small></header>
+    <div class="flow-nodes">
+      {% for r in found[:24] %}
+      <a class="flow-node flow-bot{{ ' is-sim' if r.simulated }}" href="/agents/{{ r.id }}" data-agent="{{ r.id }}" style="--i: {{ loop.index0 }}">
+        <span class="bot-wrap">{{ bot() }}</span><span class="bot-id">#{{ r.id }}</span>
+        <span class="flow-tip" role="tooltip"><strong>{{ r.subject }}</strong>
+          <span>{{ r.client }} · {{ r.status }}{{ " (simulé)" if r.simulated }}</span>
+          <span>Lancé le {{ r.started_at.strftime("%d/%m à %H:%M") }}{% if not r.simulated %} · {{ r.duration | duree }}{% endif %}</span>
+          {% if r.tokens is not none %}<span>{{ r.tokens | tokens }} tokens{% if r.context_pct is not none %} · contexte {{ r.context_pct }} %{% endif %}</span>
+          {% elif r.context_pct is not none %}<span>Contexte {{ r.context_pct }} %</span>{% endif %}
+        </span></a>
+      {% endfor %}
+      {% if found | length > 24 %}<span class="flow-more muted">+ {{ found | length - 24 }}</span>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</section>
+<script>
+  document.querySelectorAll("[data-agent]").forEach((el) => {
+    const mark = (on) => document.querySelectorAll(`[data-agent="${el.dataset.agent}"]`).forEach((other) => other.classList.toggle("is-hot", on));
+    el.addEventListener("mouseenter", () => mark(true));
+    el.addEventListener("mouseleave", () => mark(false));
+    el.addEventListener("focusin", () => mark(true));
+    el.addEventListener("focusout", () => mark(false));
+  });
+</script>
+{% endif %}
 <table data-filterable>
-  <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>Sujet</th><th>Branche</th><th data-filter>État</th><th>Durée</th><th>Coût</th><th>PR</th></tr></thead>
+  <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>Sujet</th><th>Branche</th><th data-filter>État</th><th>Durée</th><th>Tokens</th><th>PR</th></tr></thead>
   <tbody>
   {% for r in runs %}
-    <tr>
-      <td><a href="/agents/{{ r.id }}">#{{ r.id }}</a></td><td class="muted">{{ r.started_at.strftime("%d/%m %H:%M") }}</td>
+    <tr data-agent="{{ r.id }}">
+      <td><a href="/agents/{{ r.id }}">#{{ r.id }}</a> {% if is_example(r) %}<span class="badge example">exemple</span>{% endif %}</td><td class="muted">{{ r.started_at.strftime("%d/%m %H:%M") }}</td>
       <td><a href="/deploiements/{{ r.slug }}/recette">{{ r.client }}</a></td>
       <td><a href="/agents/{{ r.id }}">{{ r.subject }}</a></td>
       <td><code>{{ r.branch }}</code></td>
       <td><span class="badge g-{{ r.group }}">{{ r.status }}</span>{% if r.simulated %} {{ ic.icon("flask", "Simulation", "ic-muted") }}{% endif %}</td>
       <td data-sort="{{ r.duration.total_seconds() | int }}">{% if not r.simulated %}{{ r.duration | duree }}{% endif %}</td>
-      <td data-sort="{{ r.cost_usd or 0 }}">{% if r.cost_usd is not none %}{{ '%.2f' % r.cost_usd }} ${% endif %}</td>
+      <td data-sort="{{ r.tokens or 0 }}"{% if r.tokens is not none %} title="{% for label, n in r.token_parts %}{{ label }} {{ n | tokens }}{{ ' · ' if not loop.last }}{% endfor %}"{% endif %}>{{ r.tokens | tokens }}</td>
       <td>{% if r.pr_url %}<a href="{{ r.pr_url }}" target="_blank" rel="noopener">PR ↗</a>{% endif %}</td>
     </tr>
-  {% else %}<tr><td colspan="9" class="muted">Aucun agent lancé.</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="10" class="muted">Aucun agent lancé.</td></tr>{% endfor %}
   </tbody>
 </table>
 
 {% if usage %}
 {% set t = usage.total %}
-<h2 id="bilan">Coût et durée</h2>
-<p class="muted">Agents réels terminés (ni simulés ni en cours). Le coût est celui que Claude Code annonce à la fin de l'agent ; un agent arrêté n'en a pas toujours.</p>
-{{ charts.stats([("Agents terminés", t.count, ""), ("PR ouvertes", t.prs, ""), ("Durée médiane", t.median | duree, ""), ("Temps cumulé", t.time | duree, ""), ("Coût moyen", ('%.2f $' % t.mean_cost) if t.mean_cost is not none else "—", ""), ("Coût total", ('%.2f $' % t.cost) if t.cost is not none else "—", "")]) }}
+<h2 id="bilan">Tokens et durée</h2>
+<p class="muted">Agents réels terminés (ni simulés ni en cours).{% if usage_from_examples %} Ici : le bilan des agents d'exemple, tant qu'aucun agent réel n'a fini.{% endif %} Les tokens sont ceux que Claude Code annonce à la fin de l'agent ; un agent arrêté n'en a pas toujours.</p>
+<p class="flow-times"><strong>{{ t.count }}</strong> agent(s) terminé(s) · <strong>{{ t.prs }}</strong> PR · durée médiane <strong>{{ t.median | duree }}</strong> · temps cumulé <strong>{{ t.time | duree }}</strong></p>
+{% if t.tokens is not none %}
+<section class="panel token-panel" id="tokens">
+  <div class="token-ring">
+    {% if t.context_pct is not none %}{{ charts.ring(t.context_pct, 72, "Contexte utilisé en moyenne : " ~ t.context_pct ~ " %") }}
+    <div><strong>{{ t.context_pct }} %</strong> du contexte utilisé<br><span class="muted">en moyenne à la fin d'un agent · au plus {{ t.context_max }} %</span></div>
+    {% else %}<div><strong>{{ t.tokens | tokens }}</strong> tokens<br><span class="muted">contexte non relevé</span></div>{% endif %}
+  </div>
+  <div class="token-kinds">
+    <p><strong>{{ t.tokens | tokens }}</strong> tokens au total <span class="muted">· {{ t.mean_tokens | tokens }} par agent</span></p>
+    <ul class="hbars">
+      {% for label, n in t.token_kinds %}
+      <li title="{{ label }} : {{ '{:,}'.format(n).replace(',', ' ') }} tokens"><span class="hbar-label">{{ label }}</span>
+        <span class="hbar-track"><span class="hbar" style="width: {{ (100 * n / t.tokens) | round(1) }}%"></span></span>
+        <span class="hbar-value">{{ n | tokens }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}
+
 <table>
-  <thead><tr><th>Type de ticket</th><th>Agents</th><th>PR</th><th>Durée médiane</th><th>Temps cumulé</th><th>Coût moyen</th><th>Coût total</th></tr></thead>
+  <thead><tr><th>Type de ticket</th><th>Agents</th><th>PR</th><th>Durée médiane</th><th>Temps cumulé</th><th>Tokens par agent</th><th>Tokens au total</th></tr></thead>
   <tbody>
   {% for row in usage.rows %}
     <tr><td>{{ row.label }}</td><td>{{ row.count }}</td><td>{{ row.prs }}</td>
       <td data-sort="{{ row.median.total_seconds() | int }}">{{ row.median | duree }}</td><td data-sort="{{ row.time.total_seconds() | int }}">{{ row.time | duree }}</td>
-      <td data-sort="{{ row.mean_cost or 0 }}">{% if row.mean_cost is not none %}{{ '%.2f' % row.mean_cost }} ${% else %}—{% endif %}</td>
-      <td data-sort="{{ row.cost or 0 }}">{% if row.cost is not none %}{{ '%.2f' % row.cost }} ${% else %}—{% endif %}</td></tr>
+      <td data-sort="{{ row.mean_tokens or 0 }}">{{ (row.mean_tokens | tokens) if row.mean_tokens is not none else "—" }}</td>
+      <td data-sort="{{ row.tokens or 0 }}">{{ (row.tokens | tokens) if row.tokens is not none else "—" }}</td></tr>
   {% endfor %}
   </tbody>
 </table>
 {% endif %}
+</div>
 
+<div id="pane-dags" data-tab-pane>
 <h2>Suivis de DAG</h2>
 <p class="muted">Après chaque lancement réel, <code>air.py</code> suit le run : relances automatiques des erreurs passagères, notifications, rapport à la fin.</p>
 <table data-filterable>
@@ -48,7 +130,7 @@
   <tbody>
   {% for w in watches %}
     <tr>
-      <td><a href="/agents/suivis/{{ w.id }}">#{{ w.id }}</a></td><td class="muted">{{ w.started_at.strftime("%d/%m %H:%M") }}</td>
+      <td><a href="/agents/suivis/{{ w.id }}">#{{ w.id }}</a> {% if is_example(w) %}<span class="badge example">exemple</span>{% endif %}</td><td class="muted">{{ w.started_at.strftime("%d/%m %H:%M") }}</td>
       <td>{{ w.client }}</td><td><a href="/agents/suivis/{{ w.id }}"><code>{{ w.dag_id }}</code></a></td>
       <td><span class="badge">{{ w.padoa_env }}</span></td><td><span class="badge g-{{ w.group }}">{{ w.status }}</span></td>
       <td class="muted">{{ w.summary | truncate(120) }}</td>
@@ -64,12 +146,12 @@
   <tbody>
   {% for c in chains %}
     <tr>
-      <td>#{{ c.id }}</td><td class="muted">{{ c.started_at.strftime("%d/%m %H:%M") }}</td><td>{{ c.client }}</td>
+      <td>#{{ c.id }} {% if is_example(c) %}<span class="badge example">exemple</span>{% endif %}</td><td class="muted">{{ c.started_at.strftime("%d/%m %H:%M") }}</td><td>{{ c.client }}</td>
       <td><span class="badge">{{ c.padoa_env }}</span></td>
       <td><ol class="chain-steps">{% for s in c.steps %}<li>{% if s.watch_id %}<a href="/agents/suivis/{{ s.watch_id }}"><code>{{ s.dag_id }}</code></a>{% else %}<code>{{ s.dag_id }}</code>{% endif %}
         <span class="badge g-{{ s.group }}"{% if s.message %} title="{{ s.message }}"{% endif %}>{{ s.status }}</span></li>{% endfor %}</ol></td>
       <td><span class="badge g-{{ c.group }}">{{ c.status }}</span>{% if c.simulated %} {{ ic.icon("flask", "Simulation", "ic-muted") }}{% endif %}</td>
-      <td>{% if c.running %}<form method="post" action="/agents/chaines/{{ c.id }}/arreter"><button type="submit" class="secondary" title="Le run en cours continue ; les DAG suivants ne partent pas">Arrêter</button></form>{% endif %}</td>
+      <td>{% if c.running and not is_example(c) %}<form method="post" action="/agents/chaines/{{ c.id }}/arreter"><button type="submit" class="secondary" title="Le run en cours continue ; les DAG suivants ne partent pas">Arrêter</button></form>{% endif %}</td>
     </tr>
   {% else %}<tr><td colspan="7" class="muted">Aucun enchaînement lancé.</td></tr>{% endfor %}
   </tbody>
@@ -83,9 +165,26 @@
     <tr>
       <td class="muted">{{ r.started_at.strftime("%d/%m %H:%M") }}</td><td>{{ r.client }}</td><td>{{ r.card }}</td>
       <td><code>{{ r.dag_id }}</code></td><td><span class="badge {{ 'g-ko' if r.padoa_env == 'prod' }}">{{ r.padoa_env }}</span></td>
-      <td class="muted">{% if r.simulated %}{{ ic.icon("flask", "Simulation", "ic-muted") }} {% endif %}{{ r.result }}</td>
+      <td class="muted">{% if r.simulated %}{{ ic.icon("flask", "Simulation", "ic-muted") }} {% endif %}{{ r.result }} {% if is_example(r) %}<span class="badge example">exemple</span>{% endif %}</td>
     </tr>
   {% else %}<tr><td colspan="6" class="muted">Aucun DAG lancé (cette exécution de l'app).</td></tr>{% endfor %}
   </tbody>
 </table>
+</div>
+<script>
+  (() => {  // onglets Agents / DAG : l'ancre choisit l'onglet (#dags, ou une ancre située dans l'onglet, comme #chaines)
+    const links = [...document.querySelectorAll("[data-page-tabs] a")], panes = [...document.querySelectorAll("[data-tab-pane]")];
+    const show = () => {
+      const id = decodeURIComponent(location.hash.slice(1));
+      const target = id && document.getElementById(id);
+      const pane = (target && target.closest("[data-tab-pane]")) || (id === "dags" ? panes[1] : panes[0]);
+      panes.forEach((p) => { p.hidden = p !== pane; });
+      links.forEach((a) => a.classList.toggle("active", a.dataset.pane === pane.id));
+      if (target) target.scrollIntoView();
+    };
+    links.forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); history.replaceState(null, "", a.hash); show(); }));
+    window.addEventListener("hashchange", show);
+    show();
+  })();
+</script>
 {% endblock %}
