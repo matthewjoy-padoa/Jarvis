@@ -8,7 +8,7 @@
   <h1>Clients</h1>
   <a class="btn-primary" href="/clients/nouveau">+ Ajouter un client</a>
 <div class="refresh">
-  <button type="button" class="secondary" hx-post="/actions/rafraichir" hx-target="next .refresh-out" hx-indicator="closest .refresh" hx-disabled-elt="this"{% if not notion_ready %} disabled title="Jeton Notion absent : voir README"{% endif %}>{{ ic.icon("sync") }} Tout rafraîchir</button>
+  <button type="button" class="secondary" hx-post="/actions/rafraichir" hx-target="next .refresh-out" hx-indicator="closest .refresh" hx-disabled-elt="this"{% if not notion_ready %} disabled title="Ni jeton Notion ni Claude Code en ligne de commande : voir docs/routine-synchro.md"{% endif %}>{{ ic.icon("sync") }} Tout rafraîchir</button>
   <span class="refresh-wait muted">Jarvis interroge Notion…</span>
   <div class="refresh-out"></div>
 </div>

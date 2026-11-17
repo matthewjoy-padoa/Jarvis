@@ -25,7 +25,7 @@ Ouvre http://localhost:8765, puis **Clients → Ajouter un client** : son nom et
 ## Synchroniser avec Notion
 
 Synchro incrémentale (seulement ce qui a changé), au choix ou ensemble :
-- **Routine Claude Code** avec le connecteur Notion, toutes les 2 h en semaine : [`docs/routine-synchro.md`](docs/routine-synchro.md).
+- **Routine Claude Code** avec le connecteur Notion, sans jeton : consigne dans [`sync/routine.md`](sync/routine.md), lancée par le bouton « Rafraîchir depuis Notion », par la commande `/jarvis-sync` ou par une tâche planifiée ([`docs/routine-synchro.md`](docs/routine-synchro.md)).
 - **Bouton « Rafraîchir depuis Notion »** : jeton d'une intégration Notion interne en lecture seule (`NOTION_TOKEN` dans `.env`), connectée aux bases Clients en déploiement, Actions de déploiement, Retours Recette, Catalogue RDD, Bible déploiement et Resources.
 
 ## Lancer des DAGs
