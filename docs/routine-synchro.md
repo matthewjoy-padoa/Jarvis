@@ -22,15 +22,17 @@ Trois façons, la même consigne :
 
 1. **Bouton « Rafraîchir depuis Notion »** (fiche d'un client) ou **« Tout rafraîchir »** (page Clients), quand l'app n'a pas de jeton Notion.
    Jarvis lance `claude -p` dans son dossier, avec son propre environnement (donc ses clients), et affiche l'état sous le bouton ; la page se recharge à la fin.
-   - Il faut Claude Code en ligne de commande (`claude` dans le PATH, ou `CLAUDE_BIN` dans Réglages) et le connecteur Notion disponible en ligne de commande.
+   - Il faut `JARVIS_MODE=live` (en `demo`, le bouton simule), Claude Code en ligne de commande (`claude` dans le PATH, ou `CLAUDE_BIN` dans Réglages) et le connecteur Notion disponible en ligne de commande.
    - Outils permis : les commandes `sync_notion`, `cp`, l'écriture dans le dossier de données, le connecteur Notion. Pour un connecteur au nom inhabituel : `JARVIS_SYNC_ALLOWED_TOOLS` (séparés par « ; »).
    - Une seule synchro à la fois ; compte rendu dans `data/notion/routine.log`, échec signalé dans les notifications.
 2. **Commande `/jarvis-sync`** : dans Claude Code (app ou terminal) ouvert sur le dossier de Jarvis, taper `/jarvis-sync`, ou `/jarvis-sync #mon-canal` pour signaler un échec sur Slack.
 3. **Tâche planifiée** : dans Claude Code, « Scheduled tasks », créer une tâche (par exemple `jarvis-sync`, `0 8-18/2 * * 1-5`) avec pour consigne :
 
    ```text
-   Dans le dossier <dossier de Jarvis>, lis sync/routine.md et suis sa consigne à la lettre.
-   Canal Slack où signaler un échec : <canal et id>, ou aucun.
+   Tu mets à jour l'app Jarvis à partir de Notion. Dossier de Jarvis : ~/Documents/Jarvis. Réponds en français.
+   1. Lis ~/Documents/Jarvis/sync/routine.md et suis sa consigne à la lettre. Lance chaque commande depuis le dossier de Jarvis : préfixe-la par « cd ~/Documents/Jarvis && ».
+   2. Canal Slack où signaler un échec : #mon-canal (id), ou aucun. Rien sur Slack en cas de succès.
    ```
+   (Remplace le dossier s'il est ailleurs, et le canal.)
    Le connecteur Notion doit être activé pour la tâche, et le dossier autorisé. La consigne suit le dépôt : un `git pull` suffit à la mettre à jour.
 

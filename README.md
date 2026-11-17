@@ -22,11 +22,36 @@ uv run uvicorn deploy_hub.main:app --port 8765
 
 Ouvre http://localhost:8765, puis **Clients → Ajouter un client** : son nom et le lien de sa fiche dans la base Notion « Clients en déploiement » (••• → Copier le lien). Facultatif : son dashboard intégration, ses clés orchestrator (pour proposer les bons DAGs), ses stacks. La configuration va dans `config/clients/<slug>.yaml` (modèle : [`config.example/clients/exemple.yaml`](config.example/clients/exemple.yaml)).
 
+Le client apparaît alors comme « pas encore synchronisé » : lance une première synchro (section suivante) pour charger ses données.
+
 ## Synchroniser avec Notion
 
-Synchro incrémentale (seulement ce qui a changé), au choix ou ensemble :
-- **Routine Claude Code** avec le connecteur Notion, sans jeton : consigne dans [`sync/routine.md`](sync/routine.md), lancée par le bouton « Rafraîchir depuis Notion », par la commande `/jarvis-sync` ou par une tâche planifiée ([`docs/routine-synchro.md`](docs/routine-synchro.md)).
-- **Bouton « Rafraîchir depuis Notion »** : jeton d'une intégration Notion interne en lecture seule (`NOTION_TOKEN` dans `.env`), connectée aux bases Clients en déploiement, Actions de déploiement, Retours Recette, Catalogue RDD, Bible déploiement et Resources.
+Synchro incrémentale : une requête d'empreinte pour tous les clients, puis seulement ce qui a changé. **Clients synchronisés : ceux configurés dans ton Jarvis** (`config/clients/`, ou `JARVIS_CONFIG_DIR`) ; un client ajouté est pris au passage suivant, un client retiré ne l'est plus.
+
+Deux façons de lire Notion, au choix :
+
+| | Sans jeton : routine Claude Code (recommandé) | Avec jeton : API Notion |
+|---|---|---|
+| Comment | Claude exécute les requêtes avec son connecteur Notion, en suivant [`sync/routine.md`](sync/routine.md) | Jarvis appelle l'API avec une intégration Notion interne en lecture seule |
+| Prérequis | Connecteur Notion activé dans Claude, avec accès aux bases Notion du déploiement | `NOTION_TOKEN` dans `.env`, intégration connectée aux bases Clients en déploiement, Actions de déploiement, Retours Recette, Catalogue RDD, Bible déploiement et Resources |
+| Bouton « Rafraîchir depuis Notion » | Lance la routine en arrière-plan (`claude -p`) ; il faut aussi `JARVIS_MODE=live` et Claude Code en ligne de commande (`claude` dans le PATH, ou `CLAUDE_BIN`) | Appelle l'API directement |
+
+### Mettre en place la routine
+
+1. **Connecteur Notion** : dans Claude (claude.ai → Réglages → Connecteurs), active Notion et donne-lui accès aux bases du déploiement.
+2. **Première synchro, à la main** : ouvre le dossier de Jarvis dans Claude Code (app ou terminal) et tape `/jarvis-sync`. Le compte rendu donne une ligne par client ; les fiches apparaissent dans Jarvis.
+3. **Synchro automatique** (conseillé) : dans Claude Code, **Scheduled tasks → nouvelle tâche** :
+   - nom : `jarvis-sync` ; horaire : toutes les 2 h de 8 h à 18 h en semaine (`0 8-18/2 * * 1-5`) ;
+   - consigne (remplace le dossier, et le canal ou « aucun ») :
+     ```text
+     Tu mets à jour l'app Jarvis à partir de Notion. Dossier de Jarvis : ~/Documents/Jarvis. Réponds en français.
+     1. Lis ~/Documents/Jarvis/sync/routine.md et suis sa consigne à la lettre. Lance chaque commande depuis le dossier de Jarvis : préfixe-la par « cd ~/Documents/Jarvis && ».
+     2. Canal Slack où signaler un échec : #mon-canal (id), ou aucun. Rien sur Slack en cas de succès.
+     ```
+   - active le connecteur Notion pour la tâche et autorise le dossier de Jarvis ; lance-la une fois (« Run now ») pour vérifier.
+4. **Bouton dans Jarvis** (facultatif) : avec `JARVIS_MODE=live` dans `.env` et Claude Code en ligne de commande installé et connecté, « Rafraîchir depuis Notion » (fiche) et « Tout rafraîchir » (Clients) lancent la routine sans jeton ; l'état s'affiche sous le bouton et la page se recharge à la fin. En mode `demo` (par défaut), le bouton ne fait que simuler, comme pour les agents ; sans jeton ni `claude`, il est grisé.
+
+La consigne vit dans le dépôt : un `git pull` met à jour la tâche planifiée, la commande et le bouton. Détails (déroulé d'un passage, outils permis, journal) : [`docs/routine-synchro.md`](docs/routine-synchro.md).
 
 ## Lancer des DAGs
 
@@ -84,7 +109,8 @@ Tous facultatifs, voir [`.env.example`](.env.example) :
 | Variable | Rôle |
 |---|---|
 | `JARVIS_CONFIG_DIR`, `JARVIS_DATA_DIR` | Emplacement de la configuration et des données |
-| `NOTION_TOKEN` | Bouton « Rafraîchir depuis Notion » |
+| `NOTION_TOKEN` | Synchro par l'API Notion ; vide : le bouton « Rafraîchir depuis Notion » lance la routine Claude Code |
+| `CLAUDE_BIN`, `JARVIS_SYNC_ALLOWED_TOOLS` | Routine lancée par le bouton : binaire `claude`, outils permis (vide : liste par défaut) |
 | `AIRFLOW_BASE_URL`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD` | Lancement réel des DAGs |
 | `ORCHESTRATOR_DIR`, `JARVIS_MODE`, `CLAUDE_BIN`, `JARVIS_AGENT_*` | Agents Claude |
 | `FLOW_DIGGER_DIR`, `FLOW_DIGGER_PORT`, `FLOW_DIGGER_URL` | Bouton Flow Digger (dossier, port 4004, adresse si le transfert de port en change) |
@@ -99,7 +125,7 @@ uv run pytest
 uv run uvicorn deploy_hub.main:app --port 8765 --reload --reload-dir src
 ```
 
-Routes dans `src/deploy_hub/main.py`, pages dans `templates/` et `static/`, synchro Notion dans `sync_notion.py`, sources (Notion, Airflow, agents, PR GitHub, perso, notifications) dans `sources/`.
+Routes dans `src/deploy_hub/main.py`, pages dans `templates/` et `static/`, synchro Notion dans `sync_notion.py` (consigne de la routine : `sync/routine.md`, lanceur : `sources/sync_routine.py`), sources (Notion, Airflow, agents, PR GitHub, perso, notifications) dans `sources/`.
 
 ## Limites connues
 
