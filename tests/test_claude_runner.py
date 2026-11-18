@@ -155,8 +155,8 @@ def test_missing_claude_is_refused_with_what_to_do(repo, tmp_path):
 
 def test_worktree_failure_ends_in_failure(tmp_path, fake_claude):
     broken = tmp_path / "pas-un-depot"
-    _git(tmp_path, "init", "-q", str(broken))  # un clone de l'orchestrator, mais sans branche origin/main : le worktree échoue
-    _git(broken, "remote", "add", "origin", "git@github.com:padoa/integration-orchestrator.git")
+    _git(tmp_path, "init", "-q", str(broken))  # se dit clone de l'orchestrator, mais son origin n'existe pas : le worktree échoue
+    _git(broken, "remote", "add", "origin", str(tmp_path / "integration-orchestrator-absent.git"))  # jamais le réseau
     runner = _runner(tmp_path / "pas-un-depot", fake_claude, tmp_path)
     runner.launch_retour(D, R, prompt="x")
     _wait(runner, 1)
