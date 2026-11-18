@@ -17,7 +17,7 @@ import subprocess
 import textwrap
 import threading
 import unicodedata
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from statistics import median
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -57,6 +57,11 @@ class AgentRun:
     reply_to: int | None = None  # agent dont celui-ci reprend le travail après une réponse à ses questions
     resume: str = ""  # session reprise (--resume) ; vide : nouvelle session
     relaunch_of: int | None = None  # agent en erreur que celui-ci relance avec le même brief
+
+    @property
+    def report(self) -> str:
+        """Compte rendu affiché, sans le bloc de questions en JSON."""
+        return report_of(self.summary)
 
     @property
     def context_pct(self) -> int | None:
@@ -175,12 +180,7 @@ def split_questions(summary: str) -> tuple[str, list[str]]:
         q + (f"\n{d}" if (d := textwrap.dedent("\n".join(detail)).strip()) else "") for q, detail in items]
 
 
-def questions_of(summary: str) -> list[str]:
-    """Questions du compte rendu (voir split_questions)."""
-    return split_questions(summary)[1]
-
-
-def answer_text(questions: list[str], answers: list[str], extra: str = "") -> str:
+def answer_text(questions: "list[Question | str]", answers: list[str], extra: str = "") -> str:
     """Réponse envoyée à l'agent : chaque question suivie de sa réponse, puis la précision libre. Vide si rien n'est rempli."""
     answers, extra = [a.strip() for a in answers], extra.strip()
     if not any(answers):  # aucune réponse aux questions : la précision seule (vide : la relance est refusée)
@@ -189,9 +189,73 @@ def answer_text(questions: list[str], answers: list[str], extra: str = "") -> st
     return "\n\n".join(parts + ([f"Précision : {extra}"] if extra else []))
 
 
+QUESTIONS_BLOCK = re.compile(r"<questions>\s*(.*?)\s*</questions>", re.S)  # questions en JSON, à la fin du compte rendu
+
+
+@dataclass
+class Question:
+    """Question d'un agent. Donnée en JSON (bloc <questions>) : options à cocher et recommandation ; en texte : détail Markdown."""
+    text: str
+    detail: str = ""  # contexte, en Markdown
+    options: list[tuple[str, str]] = field(default_factory=list)  # (libellé, conséquence)
+    recommended: int = 0  # numéro (1…) de l'option recommandée ; 0 : aucune
+    why: str = ""
+
+    def __str__(self) -> str:  # la question telle qu'elle repart à l'agent, avec la réponse
+        return self.text + (f"\n{self.detail}" if self.detail else "")
+
+
+def report_of(summary: str | None) -> str:
+    """Compte rendu à afficher : le texte de l'agent, sans le bloc <questions> (données lues à part)."""
+    return QUESTIONS_BLOCK.sub("", summary or "").strip()
+
+
+def _structured_questions(summary: str) -> list[Question]:
+    """Questions du dernier bloc <questions> : {"questions": [{question, contexte, options: [{libelle, consequence}],
+    recommandation (libellé ou numéro), pourquoi}]}. JSON absent, invalide ou sans question : liste vide."""
+    blocks = QUESTIONS_BLOCK.findall(summary or "")
+    try:
+        data = json.loads(re.sub(r"^```(?:json)?|```$", "", blocks[-1].strip()).strip()) if blocks else {}
+    except ValueError:
+        return []
+    items = data.get("questions") if isinstance(data, dict) else None
+
+    def text(value) -> str:
+        return value.strip() if isinstance(value, str) else ""
+
+    questions = []
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict) or not text(item.get("question")):
+            continue
+        options = [(text(o.get("libelle")), text(o.get("consequence"))) for o in item.get("options") or []
+                   if isinstance(o, dict) and text(o.get("libelle"))]
+        reco, labels = item.get("recommandation"), [label for label, _ in options]
+        recommended = (labels.index(text(reco)) + 1 if text(reco) in labels
+                       else reco if type(reco) is int and 0 < reco <= len(options) else 0)
+        questions.append(Question(text(item["question"]), text(item.get("contexte")), options, recommended, text(item.get("pourquoi"))))
+    return questions
+
+
+def agent_questions(summary: str | None) -> tuple[str, list[Question]]:
+    """(contexte, questions) d'un agent en attente : le bloc <questions> s'il est valide (options à cocher), sinon le texte
+    (split_questions). Le contexte est ce que l'agent a écrit hors de ses questions."""
+    report = report_of(summary)
+    if structured := _structured_questions(summary or ""):
+        return report, structured
+    intro, questions = split_questions(report)
+    return intro, [Question(text, detail) for text, _, detail in (q.partition("\n") for q in questions)]
+
+
+def chosen_answer(question: Question, choice: str, text: str) -> str:
+    """Réponse à une question : l'option cochée (son libellé), puis la précision libre."""
+    n = int(choice) if choice.isdigit() else 0
+    picked = [f"option « {question.options[n - 1][0]} »"] if 0 < n <= len(question.options) else []
+    return " · ".join(picked + ([text.strip()] if text.strip() else []))
+
+
 def final_status(run: "AgentRun") -> str:
     """« terminé » sans PR, sur des questions : l'agent attend une réponse, ce n'est pas un succès."""
-    return WAITING if not run.pr_url and questions_of(run.summary) else "terminé"
+    return WAITING if not run.pr_url and agent_questions(run.summary)[1] else "terminé"
 # Outils accordés à l'agent (JARVIS_AGENT_ALLOWED_TOOLS, séparés par « ; ») : lire, modifier, tester, committer, pousser
 # sa branche, ouvrir la PR. Le reste est refusé (pas de question en mode -p). guard.sh bloque push sur main et push forcé.
 # Pas de Read/Edit/Write : sans chemin ils vaudraient partout. acceptEdits autorise déjà les modifications dans le worktree
@@ -319,12 +383,13 @@ def retour_prompt(d: Deployment, r: RetourRecette, description: str = "") -> str
         _tag("compte_rendu", "Termine par : la cause (fichier:ligne), le correctif et son niveau (client ou logiciel), les tests "
                              "(commande et résultat), le lien de la PR, et ce qu'il faudra vérifier en recette. "
                              "Si tu t'arrêtes sur des questions (retour trop flou, choix métier), ne modifie rien, n'ouvre pas de PR et "
-                             "écris d'abord en quelques lignes ce que tu as compris de l'écart et ce que tu as vérifié (fichiers, requêtes), "
-                             "puis une ligne « Questions : » suivie de tes questions numérotées (1., 2., …), chacune en une phrase. "
-                             "Sous chaque question, en retrait : « - **Contexte** : » ce que tu as constaté et où (fichier:ligne, "
-                             "sans donnée client), « - **Options** : » les choix possibles et leur conséquence, « - **Recommandation** : » "
-                             "ton choix et pourquoi. Écris en Markdown (gras, `code`, listes) : c'est mis en forme pour la personne, "
-                             "qui répondra à chaque question ; tu reprendras ensuite là où tu t'es arrêté."),
+                             "écris d'abord en Markdown ce que tu as compris de l'écart et ce que tu as vérifié (fichiers, requêtes, "
+                             "fichier:ligne, sans donnée client), sans lister tes questions. Termine par un bloc <questions>…</questions> "
+                             "qui ne contient que du JSON valide : {\"questions\": [{\"question\": \"en une phrase\", \"contexte\": "
+                             "\"ce que tu as constaté et où, en Markdown\", \"options\": [{\"libelle\": \"court\", \"consequence\": "
+                             "\"ce que ce choix implique\"}], \"recommandation\": \"le libellé de l'option que tu recommandes\", "
+                             "\"pourquoi\": \"en une phrase\"}]}. La personne verra chaque question avec ses options à cocher et ta "
+                             "recommandation pré-cochée ; tu reprendras ensuite là où tu t'es arrêté, avec ses réponses."),
     ]
     return "\n\n".join(parts)
 
@@ -599,7 +664,8 @@ class ClaudeRunner:
         self._save()
         if self.notifications:
             ok = run.group == DONE
-            body = run.pr_url or f"{run.subject} · branche {run.branch}" + ("" if ok or not run.summary else f" · {run.summary[:200]}")
+            report = "" if ok else run.report
+            body = run.pr_url or f"{run.subject} · branche {run.branch}" + (f" · {report[:200]}" if report else "")
             title = f"Agent #{run.id} {status}{' (simulé)' if run.simulated else ''} · {run.client}"
             self.notifications.add(f"agent:{run.id}:{run.started_at.isoformat()}", "agent", "info" if ok else "warning",
                                    title, body, f"/agents/{run.id}", run.client)

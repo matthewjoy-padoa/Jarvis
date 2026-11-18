@@ -412,7 +412,7 @@ def test_an_agent_with_questions_can_be_answered_from_its_page():
     from html import unescape
     page = unescape(client.get(f"/agents/{run.id}").text)
     assert "L'agent a 2 questions" in page and f'hx-post="/agents/{run.id}/repondre"' in page and 'badge g-todo' in page
-    assert 'name="reponse_1"' in page and 'name="reponse_2"' in page and "Client ou logiciel ?</label>" in page
+    assert 'name="reponse_1"' in page and 'name="reponse_2"' in page and "Client ou logiciel ?</p>" in page
     assert "<li>client : apst2607 seul</li>" in page  # détail de la question, sous elle, mis en forme
     assert "Ce que l'agent a constaté" in page and "<p>Rien modifié.</p>" in page  # le contexte écrit avant les questions
     schema = client.get("/agents").text  # dans le schéma : parmi les « en cours », marqué « en attente » (« ? », autre couleur)
@@ -585,5 +585,27 @@ def test_the_agent_summary_is_formatted_and_its_html_is_never_interpreted():
     assert "<script>alert(1)</script>" not in page and "&lt;script&gt;" in page and 'href="javascript:' not in page
     run.status, run.summary = WAITING, "J'ai lu **a.py**.\n\nQuestions :\n1. Corriger côté `client` ?\n   - **Contexte** : a.py:3\n"
     page = client.get(f"/agents/{run.id}").text
-    assert "Corriger côté <code>client</code> ?</label>" in page and "<strong>Contexte</strong> : a.py:3" in page
+    assert "Corriger côté <code>client</code> ?</p>" in page and "<strong>Contexte</strong> : a.py:3" in page
     assert "J'ai lu <strong>a.py</strong>." in page.replace("&#39;", "'")
+
+
+def test_structured_questions_offer_their_options_with_the_recommendation_checked():
+    import json
+    from html import unescape
+    from deploy_hub.sources.claude_runner import WAITING
+    claude.runs.clear()
+    client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief"})
+    run = claude.runs[0]
+    block = {"questions": [{"question": "Corriger côté client ou logiciel ?", "contexte": "Copie client en `a.sql:40`.",
+                            "options": [{"libelle": "client", "consequence": "seul ce client"},
+                                        {"libelle": "logiciel", "consequence": "4 clients à revérifier"}],
+                            "recommandation": "client", "pourquoi": "la copie a une autre raison d'être"}]}
+    run.status, run.summary = WAITING, f"J'ai lu **a.sql**.\n\n<questions>\n{json.dumps(block, ensure_ascii=False)}\n</questions>"
+    page = unescape(client.get(f"/agents/{run.id}").text)
+    assert "L'agent a une question" in page and "<questions>" not in page  # le bloc JSON n'est jamais affiché
+    assert 'name="choix_1" value="1" checked' in page and 'name="choix_1" value="2">' in page and "recommandé" in page
+    assert "4 clients à revérifier" in page and "la copie a une autre raison d'être" in page and "<code>a.sql:40</code>" in page
+    answered = client.post(f"/agents/{run.id}/repondre", data={"choix_1": "1", "reponse_1": ""})  # un clic : la recommandation
+    follow_up = claude.runs[0]
+    assert answered.headers["HX-Redirect"] == f"/agents/{follow_up.id}"
+    assert "Question 1 : Corriger côté client ou logiciel ?\nCopie client en `a.sql:40`.\nRéponse : option « client »" in follow_up.prompt

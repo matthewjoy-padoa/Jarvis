@@ -40,11 +40,26 @@
     <h2>{{ "L'agent a une question" if questions | length == 1 else "L'agent a %d questions" % questions | length }}</h2>
     {% if intro %}<div class="md agent-context"><h3>Ce que l'agent a constaté</h3>{{ intro | md }}</div>{% endif %}
     <form class="agent-reply" hx-post="/agents/{{ run.id }}/repondre" hx-target="#reply-out-{{ run.id }}" hx-disabled-elt="find button">
-      {% for q in questions %}{% set text, _, detail = q.partition("\n") %}
+      {% for q in questions %}{% set n = loop.index %}
       <div class="agent-question">
-        <label for="reponse-{{ run.id }}-{{ loop.index }}"><span class="agent-question-num">{{ loop.index }}</span> {{ text | md_inline }}</label>
-        {% if detail %}<div class="md agent-question-detail">{{ detail | md }}</div>{% endif %}
-        <textarea id="reponse-{{ run.id }}-{{ loop.index }}" name="reponse_{{ loop.index }}" rows="2" placeholder="Ta réponse à la question {{ loop.index }}"></textarea>
+        <p class="agent-question-text"><span class="agent-question-num">{{ n }}</span> {{ q.text | md_inline }}</p>
+        {% if q.detail %}<div class="md agent-question-detail">{{ q.detail | md }}</div>{% endif %}
+        {% if q.options %}
+        <fieldset class="agent-options">
+          <legend class="sr-only">Options de la question {{ n }}</legend>
+          {% for label, consequence in q.options %}{% set reco = loop.index == q.recommended %}
+          <label class="agent-option">
+            <input type="radio" name="choix_{{ n }}" value="{{ loop.index }}"{{ ' checked' if reco }}>
+            <span><span class="agent-option-label">{{ label | md_inline }}</span>{% if reco %} <span class="badge g-done">recommandé</span>{% endif %}
+              {% if consequence %}<span class="agent-option-why">{{ consequence | md_inline }}</span>{% endif %}</span>
+          </label>
+          {% endfor %}
+          <label class="agent-option"><input type="radio" name="choix_{{ n }}" value="0"{{ ' checked' if not q.recommended }}> <span>Aucune : je réponds ci-dessous</span></label>
+          {% if q.why %}<p class="muted agent-reco-why">Pourquoi l'agent recommande ce choix : {{ q.why | md_inline }}</p>{% endif %}
+        </fieldset>
+        {% endif %}
+        <textarea id="reponse-{{ run.id }}-{{ n }}" name="reponse_{{ n }}" rows="2" aria-label="Réponse libre à la question {{ n }}"
+                  placeholder="{{ 'Précision ou autre réponse (facultatif)' if q.options else 'Ta réponse à la question %d' % n }}"></textarea>
       </div>
       {% endfor %}
       <label for="reponse-{{ run.id }}">Autre précision (facultatif)</label>
@@ -54,8 +69,8 @@
       <div id="reply-out-{{ run.id }}"></div>
     </form>
   </section>
-  <details class="panel"><summary>Compte rendu complet de l'agent</summary><div class="md">{{ run.summary | md }}</div></details>
-  {% elif run.summary %}<section class="panel"><h2>Compte rendu</h2><div class="md">{{ run.summary | md }}</div>
+  <details class="panel"><summary>Compte rendu complet de l'agent</summary><div class="md">{{ run.report | md }}</div></details>
+  {% elif run.summary %}<section class="panel"><h2>Compte rendu</h2><div class="md">{{ run.report | md }}</div>
     {% if follow_up %}<p class="muted">Réponse envoyée : suite dans <a href="/agents/{{ follow_up.id }}">l'agent #{{ follow_up.id }}</a>.</p>{% endif %}
   </section>{% endif %}
   {% if review %}
