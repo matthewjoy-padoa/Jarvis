@@ -25,8 +25,9 @@ from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
+from deploy_hub.rendu import md, md_inline
 from deploy_hub.sources.claude_runner import (TO_FILL, WAITING, ClaudeRunner, agent_branch, answer_text, duration_text, questions_of,
-                                              read_log, retour_prompt, tokens_text, usage)
+                                              read_log, retour_prompt, split_questions, tokens_text, usage)
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_source import DagSource
 from deploy_hub.sources.dag_watch import DagWatcher
@@ -129,6 +130,8 @@ def when_text(moment: datetime | None) -> str:
 templates.env.filters["quand"] = when_text
 templates.env.filters["duree"] = duration_text
 templates.env.filters["tokens"] = tokens_text
+templates.env.filters["md"] = md
+templates.env.filters["md_inline"] = md_inline
 templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STATUSES)
 templates.env.globals["kanban_columns"] = kanban_columns
 templates.env.globals["ACTION_STATUSES"] = ACTION_STATUSES
@@ -529,10 +532,11 @@ def _agent_context(run) -> dict:
     claude.refresh_context(run)
     follow_up = None if run.running else claude.follow_up(run.id)
     relaunch = claude.relaunched(run.id) if run.group == KO else None  # seul un agent en erreur peut avoir été relancé
+    waiting = claude.can_reply(run, follow_up)
+    intro, questions = split_questions(run.summary) if waiting else ("", [])  # contexte écrit par l'agent, puis ses questions
     return {"relaunch": relaunch, "relaunchable": run.group == KO and (relaunch is None or relaunch.group == KO),  # relance en échec : on peut réessayer
             "run": run, "log": read_log(path), "review": None if run.running or run.simulated else agent_review.build(run, path),
-            "follow_up": follow_up, "waiting": (waiting := claude.can_reply(run, follow_up)),
-            "questions": questions_of(run.summary) if waiting else []}
+            "follow_up": follow_up, "waiting": waiting, "intro": intro, "questions": questions}
 
 
 @app.get("/agents/{run_id}", response_class=HTMLResponse)
