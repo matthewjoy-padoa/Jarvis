@@ -14,7 +14,7 @@ requêtes CED du composant d'extraction) et écrit sync/dags/catalogue.json, lu 
     AIRFLOW__CORE__DAGS_FOLDER=<dépôt orchestrator> uv run --script sync/dags/generer_catalogue.py <dépôt orchestrator> [--sortie FICHIER]
 
 Python et les paquets viennent de l'en-tête « /// script » ci-dessus (seule liste, lue par uv). Jarvis l'appelle aussi
-lui-même pour une branche locale du clone (sources/dag_source.py) : branche extraite par `git archive`, catalogue dans data/dags/.
+lui-même sur le clone local, tel qu'il est sur le disque (sources/dag_source.py) : catalogue dans data/dags/.
 
 Formats d'identifiant (dags/*.py et dags/dag_builder/dependencies/*.py de l'orchestrator) :
   {client}-etl-{ressource}, {client}-transform_and_load-{ressource},

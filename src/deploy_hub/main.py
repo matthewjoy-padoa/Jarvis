@@ -54,8 +54,8 @@ sync_routine = SyncRoutine(notifications)
 pulls = PullRequests(settings.orchestrator_dir)  # PR ouvertes de l'orchestrator (gh), gardées cinq minutes
 # Suivi des runs lancés (air.py d'Arthur) ; les suivis en cours au démarrage reprennent si Airflow est configuré.
 dag_watch = DagWatcher(data_dir() / "airflow", notifications, airflow.air_env())
-# Catalogue des DAGs : celui de la branche locale choisie du clone orchestrator (par défaut sa branche courante).
-dag_source = DagSource(settings.orchestrator_dir, dag_catalogue.LOCAL.parent)
+# Catalogue des DAGs : celui du clone orchestrator local tel qu'il est sur le disque (comme l'Airflow local).
+dag_source = DagSource(settings.orchestrator_dir, dag_catalogue.LOCAL)
 # Enchaînements de DAG : le suivant part quand le suivi du précédent finit vert. Passe par le dag_watch du moment.
 dag_chains = ChainRunner(data_dir() / "airflow" / "chaines.json",
                          lambda dag_id, padoa_env, slug, card: _launch_watched(dag_id, padoa_env, fiches.get_deployment(slug), card), notifications)
@@ -93,8 +93,11 @@ PUSH_EVERY = 60  # secondes, comme le panneau des notifications
 
 def _push_round() -> None:
     """Un tour : échéances du jour (créées d'habitude à l'ouverture d'une page), puis envoi des nouvelles notifications ;
-    au passage, le catalogue des DAGs est régénéré si la branche locale choisie a avancé."""
-    dag_source.refresh()
+    au passage, le catalogue des DAGs est régénéré si le clone orchestrator local a changé."""
+    try:
+        dag_source.refresh()
+    except Exception:  # noqa: BLE001 : le catalogue des DAGs ne doit pas empêcher l'envoi des notifications
+        log.exception("Catalogue des DAGs : relevé du clone en échec")
     _deadline_notes()
     web_push.pump(notifications)
 
@@ -790,13 +793,12 @@ def dag_source_banner(request: Request):
     return response
 
 
-@app.post("/dags/branche", response_class=HTMLResponse)
-def dag_source_choose(request: Request, branche: str = Form(...), regenerer: str = Form("")):
-    """Branche locale du clone orchestrator dont viennent les DAGs proposés ; « Régénérer » force une nouvelle génération."""
+@app.post("/dags/regenerer", response_class=HTMLResponse)
+def dag_source_regenerate(request: Request):
+    """« Régénérer » : catalogue des DAGs refait depuis le clone local, même si sa version est déjà générée ou en échec."""
     if not _from_jarvis(request):
         raise HTTPException(403, "Source des DAGs : la demande ne vient pas de Jarvis.")
-    if not dag_source.choose(branche, force=bool(regenerer)):
-        raise HTTPException(404, f"Branche locale inconnue : {branche}")
+    dag_source.refresh(force=True)
     return dag_source_banner(request)
 
 

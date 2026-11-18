@@ -1,24 +1,13 @@
-{# Source des DAGs proposés (sources/dag_source.py) : branche locale du clone orchestrator, ou catalogue versionné (main figé).
-   Attend : s (dag_source.status). Pendant une génération, se relit toutes les 3 s ; à la fin, la page se recharge. #}
+{# Source des DAGs proposés (sources/dag_source.py) : le clone orchestrator local tel qu'il est sur le disque (comme
+   l'Airflow local), ou le catalogue versionné (main figé). Attend : s (dag_source.status).
+   Pendant une génération, se relit toutes les 3 s ; à la fin, la page se recharge. #}
 <div id="dag-source" class="dag-source muted"{% if s.running %} hx-get="/dags/source" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
-  {% if s.branches %}
-  <form class="dag-source-form" hx-post="/dags/branche" hx-target="#dag-source" hx-swap="outerHTML" hx-trigger="change">
-    <label>DAGs de la branche
-      <select name="branche" aria-label="Branche locale de l'orchestrator">
-        {% if not s.chosen %}<option value="" selected disabled>HEAD détachée : choisis une branche</option>{% endif %}
-        {% for b in s.branches %}<option value="{{ b.name }}"{% if s.chosen and b.name == s.chosen.name %} selected{% endif %}>{{ b.name }}{% if b.current %} (courante){% endif %}</option>{% endfor %}
-      </select>
-    </label>
-    <button type="button" class="secondary" hx-post="/dags/branche" hx-include="closest form" hx-vals='{"regenerer": "1"}'
-            hx-target="#dag-source" hx-swap="outerHTML"{% if s.running %} disabled{% endif %}>Régénérer</button>
-  </form>
-  {% endif %}
   <span>
-    {% if s.running %}Génération du catalogue depuis <code>{{ s.running }}</code>…
-    {% elif s.from_branch %}<code>{{ s.chosen.name }}</code> au commit <code>{{ s.commit }}</code>{% if s.made %}, généré {{ s.made | quand }}{% endif %}{% if s.outdated %} · la branche a avancé{% endif %}
-    {% else %}Catalogue du dépôt Jarvis (copie figée de main, <code>{{ s.commit }}</code>){% if not s.branches %} : clone orchestrator introuvable dans <code>{{ s.repo }}</code> (ORCHESTRATOR_DIR, page Réglages){% endif %}
+    {% if s.running %}DAGs : génération du catalogue depuis ton clone local (<code>{{ s.running }}</code>)…
+    {% elif s.local %}DAGs de ton clone local : <code>{{ s.label }}</code> (<code>{{ s.commit }}</code>){% if s.made %}, générés {{ s.made | quand }}{% endif %}{% if s.outdated %} · le clone a changé depuis{% endif %}
+    {% else %}DAGs du catalogue du dépôt Jarvis (copie figée de main, <code>{{ s.commit }}</code>){% if s.missing_clone %} : clone orchestrator introuvable dans <code>{{ s.repo }}</code> (ORCHESTRATOR_DIR, page Réglages){% endif %}
     {% endif %}
-    · un DAG absent de l'Airflow de la VM est signalé par l'aperçu avant lancement.
   </span>
+  {% if s.checkout %}<button type="button" class="secondary" hx-post="/dags/regenerer" hx-target="#dag-source" hx-swap="outerHTML"{% if s.running %} disabled{% endif %}>Régénérer</button>{% endif %}
   {% if s.error %}<span class="dag-source-error">Échec de la génération : {{ s.error }}</span>{% endif %}
 </div>

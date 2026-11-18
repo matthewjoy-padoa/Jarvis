@@ -1,22 +1,21 @@
-"""Source du catalogue des DAGs : une branche locale du clone orchestrator (ORCHESTRATOR_DIR), par défaut sa branche
-courante, lue telle que commitée (les modifications non commitées ne comptent pas).
+"""Source du catalogue des DAGs : le clone orchestrator local (ORCHESTRATOR_DIR) tel qu'il est sur le disque, comme le
+lit l'Airflow local (checkout en cours, modifications non commitées comprises). Pour changer de DAGs, on change de
+branche ou on modifie le clone : Jarvis suit.
 
-La branche est extraite par `git archive` (tout le dépôt : la config importe aussi tests/) dans un dossier temporaire : jamais
-de checkout, le clone n'est pas touché. sync/dags/generer_catalogue.py en tire un catalogue par branche dans data/dags/,
-et celui de la branche choisie est copié dans data/dags/catalogue.json, que sources/dags.py lit avant le catalogue
-versionné (sync/dags/catalogue.json, copie figée de main). Sans clone ou sans génération réussie : le catalogue versionné.
+sync/dags/generer_catalogue.py lit le clone sans le modifier (PYTHONDONTWRITEBYTECODE : pas de __pycache__ écrit) et
+écrit data/dags/catalogue.json, marqué de la version du clone ; sources/dags.py le lit avant le catalogue versionné
+(sync/dags/catalogue.json, copie figée de main), qui sert sans clone ou tant que rien n'a été généré.
 
-La génération part au démarrage, au choix d'une branche, sur « Régénérer », et quand la branche avance (vérifié chaque
-minute par main._push_round) ; jamais pendant l'affichage d'une page. Un commit en échec n'est retenté que par « Régénérer ».
-Lancer un DAG qui n'existe que sur la branche suppose que l'Airflow de la VM charge cette branche : l'aperçu d'air.py le dit.
+Version du clone = dernier commit + empreinte des modifications non commitées (toute modification compte : une
+génération prend quelques secondes, en tâche de fond). Régénéré au démarrage, sur « Régénérer », et quand la version
+change (relevé chaque minute par main._push_round) ; jamais pendant l'affichage d'une page, qui montre le dernier relevé.
+Une version en échec n'est retentée que par « Régénérer ».
 """
 
 import hashlib
 import json
 import os
-import re
 import subprocess
-import tarfile
 import tempfile
 import threading
 from dataclasses import dataclass
@@ -24,178 +23,146 @@ from datetime import datetime
 from pathlib import Path
 
 from deploy_hub.config import PROJECT_ROOT, child_environment
+from deploy_hub.sources import dags as dag_catalogue
 
 GENERATOR = PROJECT_ROOT / "sync" / "dags" / "generer_catalogue.py"  # Python et paquets : son en-tête « /// script »
 GENERATE_TIMEOUT_S = 15 * 60  # premier passage : uv télécharge Python 3.12 et les paquets
 
 
 @dataclass(frozen=True)
-class Branch:
-    name: str
-    commit: str  # « hash date », comme commit_orchestrator du catalogue
-    current: bool  # branche extraite dans le clone
+class Checkout:
+    label: str  # branche extraite, ou « HEAD détachée »
+    version: str  # « hash date », plus « + modifs <empreinte> » s'il y a des modifications non commitées
 
 
-def _git(repo: Path, *args: str) -> subprocess.CompletedProcess | None:
-    """git sans invite (identifiants, éditeur) ; None si git est absent ou trop lent."""
+def _git(repo: Path, *args: str) -> bytes | None:
+    """Sortie de git (sans invite) ; None en cas d'échec, si git est absent ou trop lent."""
     try:
-        return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, timeout=300, check=False,
-                              stdin=subprocess.DEVNULL, env={**child_environment(), "GIT_TERMINAL_PROMPT": "0"})
+        out = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, timeout=60, check=False,
+                             stdin=subprocess.DEVNULL, env={**child_environment(), "GIT_TERMINAL_PROMPT": "0"})
     except (OSError, subprocess.SubprocessError):
         return None
-
-
-def _write_json(path: Path, data: dict) -> None:
-    """Écriture atomique : un lecteur voit l'ancien fichier ou le nouveau, jamais un fichier à moitié écrit."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-    os.replace(tmp, path)
+    return out.stdout if out.returncode == 0 else None
 
 
 def _meta(path: Path) -> dict:
-    """En-tête d'un catalogue (sans la liste des clients)."""
+    """En-tête d'un catalogue (sans la liste des clients), par le cache de sources/dags.py (relu seulement s'il a changé)."""
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        return {k: v for k, v in dag_catalogue.catalogue(path).items() if k != "clients"}
     except (OSError, ValueError):
         return {}
-    return {k: v for k, v in data.items() if k != "clients"}
 
 
 class DagSource:
-    def __init__(self, repo: Path, state_dir: Path, generator: list[str] | None = None):
-        """generator : commande du générateur (remplacée dans les tests) ; reçoit le dossier extrait et --sortie."""
-        self.repo, self.state_dir = repo, state_dir
-        self.active = state_dir / "catalogue.json"  # copie du catalogue de la branche choisie, lue par sources/dags.py
+    def __init__(self, repo: Path, target: Path, generator: list[str] | None = None):
+        """target : catalogue écrit (data/dags/catalogue.json, lu par sources/dags.py).
+        generator : commande du générateur (remplacée dans les tests) ; reçoit le dossier du clone et --sortie."""
+        self.repo, self.target = repo, target
         self.generator = generator or ["uv", "run", "--script", str(GENERATOR)]
         self._lock = threading.Lock()
-        self.running = ""  # branche en cours de génération (vide : rien en cours)
-        self._failed: dict[tuple[str, str], str] = {}  # (branche, commit) → message : pas de nouvel essai seul
-        try:
-            self._wanted = json.loads((state_dir / "source.json").read_text(encoding="utf-8")).get("branche", "")
-        except (OSError, ValueError):
-            self._wanted = ""
+        self.running = ""  # checkout en cours de génération (vide : rien en cours)
+        self._failed: dict[str, str] = {}  # version → message : pas de nouvel essai seul
+        # Dernier relevé du clone (refresh : démarrage, chaque minute, « Régénérer ») : l'affichage ne relance pas git,
+        # qui coûte ~300 ms sur le clone (diff et nouveaux fichiers parmi ~13 000).
+        self.seen: Checkout | None = None
+        self.checked = False
 
-    # --- branches -------------------------------------------------------------------------------------------------
-    def branches(self) -> list[Branch]:
-        """Branches locales du clone, la courante d'abord ; vide sans clone git."""
-        head = _git(self.repo, "symbolic-ref", "--short", "-q", "HEAD")
-        refs = _git(self.repo, "for-each-ref", "refs/heads", "--format=%(refname:short)\t%(objectname:short)\t%(committerdate:short)")
-        if not refs or refs.returncode:
-            return []
-        current = head.stdout.decode().strip() if head and head.returncode == 0 else ""
-        out = [Branch(name, f"{sha} {day}", name == current)
-               for name, sha, day in (line.split("\t") for line in refs.stdout.decode().splitlines())]
-        return sorted(out, key=lambda b: (not b.current, b.name))
+    def is_clone(self) -> bool:
+        return (self.repo / ".git").exists()  # même règle que ClaudeRunner.problem()
 
-    def chosen(self) -> Branch | None:
-        """Branche choisie dans Jarvis si elle existe encore, sinon la branche courante du clone."""
-        branches = self.branches()
-        return next((b for b in branches if b.name == self._wanted), None) or next((b for b in branches if b.current), None)
+    def current(self) -> Checkout | None:
+        """Checkout du clone et sa version ; None sans clone."""
+        commit = (_git(self.repo, "log", "-1", "--format=%h %cs") or b"").decode().strip() if self.is_clone() else ""
+        if not commit:
+            return None
+        label = (_git(self.repo, "symbolic-ref", "--short", "-q", "HEAD") or b"").decode().strip() or "HEAD détachée"
+        # Modifications non commitées : l'Airflow local les lit, le catalogue aussi. Fichiers suivis : leur diff ;
+        # fichiers nouveaux (absents du diff) : chemin, taille et date de modification, pour voir chaque nouvelle édition.
+        digest, changed = hashlib.sha1(), False
+        diff = _git(self.repo, "diff", "HEAD") or b""
+        if diff:
+            digest.update(diff)
+            changed = True
+        for new in filter(None, (_git(self.repo, "ls-files", "--others", "--exclude-standard", "-z") or b"").split(b"\0")):
+            try:
+                st = (self.repo / new.decode()).stat()
+            except OSError:
+                continue
+            digest.update(new + f":{st.st_size}:{st.st_mtime_ns}".encode())
+            changed = True
+        return Checkout(label, f"{commit} + modifs {digest.hexdigest()[:8]}" if changed else commit)
 
-    def path(self, branch: str) -> Path:
-        """Un fichier par branche : nom lisible, plus une empreinte (feat/x et feat_x ne partagent pas le même fichier)."""
-        return self.state_dir / f"catalogue-{re.sub(r'[^\w.-]', '_', branch)}-{hashlib.sha1(branch.encode()).hexdigest()[:8]}.json"
-
-    def _publish(self, branch: Branch | None) -> None:
-        """catalogue.json = celui de la branche s'il a été généré ; sinon retiré (le catalogue versionné sert)."""
-        source = self.path(branch.name) if branch else None
-        if source and source.is_file():
-            tmp = self.active.with_suffix(".tmp")
-            tmp.write_bytes(source.read_bytes())
-            os.replace(tmp, self.active)
-        else:
-            self.active.unlink(missing_ok=True)
-
-    # --- actions --------------------------------------------------------------------------------------------------
-    def choose(self, name: str, force: bool = False) -> bool:
-        """Retient la branche (une branche locale du clone), publie son catalogue s'il existe et le (re)génère si besoin.
-        force : « Régénérer », même si le commit est déjà généré ou en échec. False si la branche n'existe pas."""
-        branch = next((b for b in self.branches() if b.name == name), None)
-        if not branch:
-            return False
-        _write_json(self.state_dir / "source.json", {"branche": name})
-        self._wanted = name
-        self._publish(branch)
-        self.refresh(force)
-        return True
+    def _ready(self, checkout: Checkout) -> bool:
+        """Rien à générer : version déjà générée, ou déjà en échec (seul « Régénérer » la retente)."""
+        return checkout.version in self._failed or _meta(self.target).get("commit_orchestrator") == checkout.version
 
     def refresh(self, force: bool = False) -> None:
-        """Génère en tâche de fond le catalogue de la branche choisie s'il manque ou date d'un autre commit.
-        Un commit en échec n'est pas regénéré seul (sinon : génération et rechargement en boucle) ; force le fait."""
-        branch = self.chosen()
-        if not branch:
+        """Relève le clone et génère le catalogue en tâche de fond s'il date d'une autre version.
+        force (« Régénérer ») : même si cette version est déjà générée ou en échec."""
+        checkout = self.seen = self.current()
+        self.checked = True
+        if not checkout:
             return
-        key = (branch.name, branch.commit)
         if force:
-            self._failed.pop(key, None)
-        elif key in self._failed or _meta(self.path(branch.name)).get("commit_orchestrator") == branch.commit:
+            self._failed.pop(checkout.version, None)
+        elif self._ready(checkout):
             return
         with self._lock:
             if self.running:
                 return
-            self.running = branch.name
-        threading.Thread(target=self._generate_while_needed, args=(branch,), name="catalogue-dags", daemon=True).start()
+            self.running = checkout.label
+        threading.Thread(target=self._generate_while_needed, args=(checkout,), name="catalogue-dags", daemon=True).start()
 
-    def _generate_while_needed(self, branch: Branch) -> None:
-        """Génère, puis enchaîne tant que la branche choisie (qui a pu changer entre-temps) n'est pas à jour.
+    def _generate_while_needed(self, checkout: Checkout) -> None:
+        """Génère, puis recommence tant que le clone a changé entre-temps (autre branche, nouvelles modifications).
         `running` reste posé jusqu'à la fin : vide veut dire qu'il n'y a vraiment plus rien à faire."""
-        while branch:
-            self._generate(branch)
-            nxt = self.chosen()
-            ready = nxt and ((nxt.name, nxt.commit) in self._failed
-                             or _meta(self.path(nxt.name)).get("commit_orchestrator") == nxt.commit)
-            if not nxt or ready:
-                self._publish(nxt)  # avant de libérer `running` : qui voit « fini » voit le nouveau catalogue
+        nxt: Checkout | None = checkout
+        while nxt:
+            self._generate(nxt)
+            nxt = self.seen = self.current()
             with self._lock:
-                branch = None if not nxt or ready else nxt
-                self.running = branch.name if branch else ""
+                nxt = None if not nxt or self._ready(nxt) else nxt
+                self.running = nxt.label if nxt else ""
 
-    def _generate(self, branch: Branch) -> None:
-        key = (branch.name, branch.commit)
+    def _generate(self, checkout: Checkout) -> None:
         try:
-            with tempfile.TemporaryDirectory(prefix="jarvis-orchestrator-") as tmp:
-                tree, archive = Path(tmp) / "orchestrator", Path(tmp) / "branche.tar"
-                out = _git(self.repo, "archive", "--format=tar", "-o", str(archive), branch.name)
-                if not out or out.returncode:
-                    raise RuntimeError(f"git archive : {out.stderr.decode().strip()[-300:] if out else 'git introuvable'}")
-                with tarfile.open(archive) as tar:
-                    tar.extractall(tree, filter="data")
+            with tempfile.TemporaryDirectory(prefix="jarvis-catalogue-") as tmp:
                 partial = Path(tmp) / "catalogue.json"
-                env = {**child_environment(), "AIRFLOW__CORE__DAGS_FOLDER": str(tree)}
-                run = subprocess.run([*self.generator, str(tree), "--sortie", str(partial)], capture_output=True, text=True,
+                env = {**child_environment(), "AIRFLOW__CORE__DAGS_FOLDER": str(self.repo), "PYTHONDONTWRITEBYTECODE": "1"}
+                run = subprocess.run([*self.generator, str(self.repo), "--sortie", str(partial)], capture_output=True, text=True,
                                      env=env, timeout=GENERATE_TIMEOUT_S, check=False, cwd=PROJECT_ROOT)
                 if run.returncode or not partial.is_file():
                     lines = [line for line in (run.stderr or run.stdout).splitlines() if line.strip()]
                     raise RuntimeError(lines[-1][:300] if lines else f"code de sortie {run.returncode}")
-                # L'arbre extrait n'a pas de .git : Jarvis note lui-même d'où vient le catalogue.
-                catalogue = {**json.loads(partial.read_text(encoding="utf-8")), "commit_orchestrator": branch.commit,
-                             "branche": branch.name}
-                _write_json(self.path(branch.name), catalogue)
-                self._failed.pop(key, None)
-        except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired, tarfile.TarError) as e:
-            self._failed[key] = f"{branch.name} : {e}"
+                # Jarvis note lui-même la version : le générateur ne voit que le commit, pas les modifications.
+                catalogue = {**json.loads(partial.read_text(encoding="utf-8")), "commit_orchestrator": checkout.version,
+                             "branche": checkout.label}
+                self.target.parent.mkdir(parents=True, exist_ok=True)
+                staged = self.target.with_suffix(".tmp")
+                staged.write_text(json.dumps(catalogue, ensure_ascii=False), encoding="utf-8")
+                os.replace(staged, self.target)  # atomique : un lecteur voit l'ancien catalogue ou le nouveau
+                self._failed.pop(checkout.version, None)
+        except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as e:
+            self._failed[checkout.version] = f"{checkout.label} : {e}"
 
-    # --- affichage ------------------------------------------------------------------------------------------------
     def status(self, versioned: Path) -> dict:
-        """Ce qu'affiche l'onglet Injections (lecture seule : ne lance rien)."""
-        branches = self.branches()
-        branch = next((b for b in branches if b.name == self._wanted), None) or next((b for b in branches if b.current), None)
-        meta = _meta(self.active) if self.active.is_file() else {}
-        from_branch = bool(branch and meta.get("branche") == branch.name)
-        meta = meta if from_branch else _meta(versioned)
+        """Ce qu'affiche l'onglet Injections, d'après le dernier relevé du clone (lecture seule : ne lance rien, pas de git)."""
+        meta = _meta(self.target)
+        local = bool(meta)
+        meta = meta or _meta(versioned)
         try:
             made = datetime.strptime(meta.get("genere_le", ""), "%Y-%m-%d %H:%M")
         except ValueError:  # absent ou dans un autre format : pas affiché
             made = None
         return {
             "repo": str(self.repo),
-            "branches": branches,
-            "chosen": branch,
-            "from_branch": from_branch,
+            "missing_clone": self.checked and self.seen is None,
+            "checkout": self.seen,
+            "local": local,
+            "label": meta.get("branche", ""),
             "commit": meta.get("commit_orchestrator", ""),
             "made": made,
-            "outdated": from_branch and meta.get("commit_orchestrator") != branch.commit,
+            "outdated": local and self.seen is not None and meta.get("commit_orchestrator") != self.seen.version,
             "running": self.running,
-            "error": self._failed.get((branch.name, branch.commit), "") if branch else "",
+            "error": self._failed.get(self.seen.version, "") if self.seen else "",
         }

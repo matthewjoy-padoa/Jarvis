@@ -1,6 +1,6 @@
 """Catalogue des DAGs d'injection (généré par sync/dags/generer_catalogue.py depuis la config de l'orchestrator) :
-quels DAGs peuvent injecter les ressources d'une carte. Celui de la branche locale choisie (data/dags/catalogue.json,
-publié par sources/dag_source.py) ; à défaut, le catalogue versionné sync/dags/catalogue.json (copie figée de main)."""
+quels DAGs peuvent injecter les ressources d'une carte. Celui du clone orchestrator local (data/dags/catalogue.json,
+généré par sources/dag_source.py) ; à défaut, le catalogue versionné sync/dags/catalogue.json (copie figée de main)."""
 
 import json
 from dataclasses import dataclass
@@ -10,7 +10,7 @@ from pathlib import Path
 from deploy_hub.config import PROJECT_ROOT, data_dir
 
 CATALOGUE = PROJECT_ROOT / "sync" / "dags" / "catalogue.json"
-LOCAL = data_dir() / "dags" / "catalogue.json"  # catalogue de la branche locale choisie, s'il a été généré
+LOCAL = data_dir() / "dags" / "catalogue.json"  # catalogue du clone orchestrator local, s'il a été généré
 # Ordre de proposition : DAG de la ressource seule d'abord, puis DAG du groupe qui la contient.
 TYPE_ORDER = {"etl": 0, "transform_and_load": 1, "etl_group": 2, "transform_and_load-group": 3}
 TYPE_LABELS = {
@@ -41,7 +41,7 @@ def _load(path: str, mtime: float) -> dict:
 
 
 def catalogue(path: Path | None = None) -> dict:
-    """Le catalogue demandé, sinon celui de la branche locale, sinon le versionné (relu seulement s'il a changé)."""
+    """Le catalogue demandé, sinon celui du clone local, sinon le versionné (relu seulement s'il a changé)."""
     for candidate in [path] if path else [LOCAL, CATALOGUE]:
         try:
             return _load(str(candidate), candidate.stat().st_mtime)
