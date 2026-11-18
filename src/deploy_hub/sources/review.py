@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from deploy_hub.models import DONE
-from deploy_hub.sources.claude_runner import AgentRun, _events, _tool_line
+from deploy_hub.sources.claude_runner import AgentRun, _events, _tool_line, message_of
 
 TEST_COMMAND = re.compile(r"\b(pytest|unittest)\b")
 TEST_OUTCOME = re.compile(r"\d+ (?:passed|failed|errors?|skipped|deselected|xfailed|xpassed)[^\n=]*")
@@ -56,7 +56,7 @@ def build(run: AgentRun, log: Path) -> Review:
     order = []
     text = log.read_text(encoding="utf-8", errors="replace") if log.is_file() else ""
     for e in _events(text):
-        for block in (e.get("message") or {}).get("content") or []:
+        for block in message_of(e).get("content") or []:
             if not isinstance(block, dict):
                 continue
             if block.get("type") == "tool_use":
