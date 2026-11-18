@@ -336,6 +336,7 @@ def test_progress_shows_the_page_of_a_long_query(tmp_path):
     p = routine.progress()  # la dernière requête lit encore ses pages : pas « Fusion »
     assert p["label"] == "Requêtes : 3 / 4 · actions, page 7" and p["pct"] < 88
     old = time.time() - 600
-    os.utime(raw / "actions-6.json", (old, old))  # plus de page depuis 10 min : la lecture est finie
+    for page in raw.glob("actions-*.json"):
+        os.utime(page, (old, old))  # plus de page depuis 10 min : la lecture est finie
     assert routine.progress()["label"] == "Fusion…"
 
