@@ -55,6 +55,7 @@ class AgentRun:
     session_id: str = ""  # session Claude Code de l'agent : reprise par « Répondre et relancer »
     reply_to: int | None = None  # agent dont celui-ci reprend le travail après une réponse à ses questions
     resume: str = ""  # session reprise (--resume) ; vide : nouvelle session
+    relaunch_of: int | None = None  # agent en erreur que celui-ci relance avec le même brief
 
     @property
     def context_pct(self) -> int | None:
@@ -566,14 +567,31 @@ class ClaudeRunner:
         return self._launch(d.slug, d.client, f"retour {r.id}", agent_branch("fix", d.slug, r.id),
                             prompt.strip() or retour_prompt(d, r, description), r.data_type or r.resource or "")
 
+    def _child(self, run_id: int, link: str) -> AgentRun | None:
+        """Agent le plus récent qui pointe vers run_id par le champ link (reply_to ou relaunch_of)."""
+        return next((r for r in self.runs if getattr(r, link) == run_id), None)
+
     def follow_up(self, run_id: int) -> AgentRun | None:
-        """Agent relancé avec la réponse aux questions de run_id (le plus récent)."""
-        return next((r for r in self.runs if r.reply_to == run_id), None)
+        """Agent relancé avec la réponse aux questions de run_id."""
+        return self._child(run_id, "reply_to")
 
     @staticmethod
     def can_reply(run: AgentRun, follow_up: AgentRun | None) -> bool:
         """En attente de réponse, et aucune suite en cours (une suite en échec laisse répondre à nouveau)."""
         return run.status == WAITING and not (follow_up and follow_up.running)
+
+    def relaunched(self, run_id: int) -> AgentRun | None:
+        """Agent qui relance run_id après son erreur."""
+        return self._child(run_id, "relaunch_of")
+
+    def relaunch(self, run_id: int) -> ActionResult:
+        """Relance d'un agent fini en erreur (échec, arrêté, délai dépassé, interrompu) : nouvel agent, même branche et même brief,
+        nouvelle session. Le worktree existant est repris, avec ce que l'agent y avait déjà fait."""
+        old = self.get(run_id)
+        if not old or old.group != KO:
+            return ActionResult(False, f"L'agent #{run_id} n'est pas en erreur : rien à relancer.", False)
+        prompt = old.prompt if not old.resume else "\n\n".join([self._brief(old), _tag("reponse", old.prompt)])  # reprise : réponse seule
+        return self._launch(old.slug, old.client, old.subject, old.branch, prompt, old.category, relaunch_of=old.id)
 
     def _brief(self, run: AgentRun) -> str:
         """Brief d'origine : un agent qui a repris une session n'a reçu que la réponse, on remonte à celui qui l'a lancée."""

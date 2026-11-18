@@ -27,6 +27,14 @@
   {% if run.running and not run.simulated %}
   <form method="post" action="/agents/{{ run.id }}/arreter" onsubmit="return confirm('Arrêter l\'agent #{{ run.id }} ?')"><button type="submit" class="secondary">Arrêter l'agent</button></form>
   {% endif %}
+  {% if relaunchable %}
+  <form class="toolbar" hx-post="/agents/{{ run.id }}/relancer" hx-target="#relaunch-out-{{ run.id }}" hx-disabled-elt="find button"
+        hx-confirm="Relancer l'agent #{{ run.id }} avec le même brief, sur la branche {{ run.branch }} ?">
+    <button type="submit">Relancer l'agent</button>
+    <span class="muted">Même brief, même branche : il reprend le worktree là où celui-ci s'est arrêté.</span>
+    <div id="relaunch-out-{{ run.id }}"></div>
+  </form>
+  {% elif relaunch %}<p class="muted">Relancé dans <a href="/agents/{{ relaunch.id }}">l'agent #{{ relaunch.id }}</a>.</p>{% endif %}
   {% if run.summary %}<section class="panel{{ ' agent-waiting' if waiting }}"><h2>{{ "L'agent a des questions" if waiting else "Compte rendu" }}</h2><pre class="agent-summary">{{ run.summary }}</pre>
     {% if waiting %}
     <form class="agent-reply" hx-post="/agents/{{ run.id }}/repondre" hx-target="#reply-out-{{ run.id }}" hx-disabled-elt="find button">

@@ -347,3 +347,30 @@ def test_when_the_resumed_agent_fails_the_answer_can_be_sent_again_from_the_brie
     _wait(runner, 3)
     third = runner.get(3)
     assert third.resume == "" and runner.follow_up(1) is third and third.status == "terminé" and runner.get(1).status == ANSWERED
+
+
+def test_any_agent_ended_in_error_can_be_relaunched_with_the_same_brief(repo, fake_claude, tmp_path, monkeypatch):
+    monkeypatch.setenv("FAKE_MODE", "fail")
+    runner = _runner(repo, fake_claude, tmp_path)
+    runner.launch_retour(D, R, prompt="Brief relu")
+    _wait(runner, 1)
+    monkeypatch.setenv("FAKE_MODE", "ok")
+    result = runner.relaunch(1)
+    assert result.ok and "Agent #2 lancé" in result.message
+    _wait(runner, 2)
+    first, second = runner.get(1), runner.get(2)
+    assert runner.relaunched(1) is second and second.relaunch_of == 1 and second.branch == first.branch
+    assert second.worktree == first.worktree and second.status == "terminé" and second.resume == ""
+    seen = json.loads((Path(second.worktree) / "argv.json").read_text())
+    assert seen["brief"] == "Brief relu" and "--resume" not in seen["argv"]
+    assert not runner.relaunch(2).ok and not runner.relaunch(99).ok  # terminé, puis inconnu
+
+
+@pytest.mark.parametrize("status", ["arrêté", "délai dépassé", "interrompu"])
+def test_every_error_status_is_relaunchable(tmp_path, status):
+    runner = ClaudeRunner(tmp_path, tmp_path / "agents")
+    runner.problem = lambda: None
+    runner._start = lambda run: None
+    runner.runs.append(__import__("deploy_hub.sources.claude_runner", fromlist=["AgentRun"]).AgentRun(
+        1, "acme", "Acme", "retour R-1", "fix-acme-r-1", "Brief", datetime(2026, 11, 18, 9), status))
+    assert runner.relaunch(1).ok and runner.get(2).prompt == "Brief"
