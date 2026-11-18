@@ -14,13 +14,14 @@ import json
 import os
 import re
 import subprocess
-import sys
 import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
+from deploy_hub.config import child_environment
 from deploy_hub.models import DONE, IN_PROGRESS, KO, status_group
+from deploy_hub.sources.airflow import AIR_COMMAND
 
 WATCH_STATUSES = {"suivi en cours": IN_PROGRESS, "vert": DONE, "en échec ou incomplet": KO, "Airflow injoignable": KO,
                   "arrêté": KO, "interrompu": KO}
@@ -76,7 +77,7 @@ class DagWatcher:
         self.state_file = state_dir / "suivis.json"
         self.notifications = notifications
         self.airflow_env = airflow_env or {}
-        self.command = command or [sys.executable, "-m", "deploy_hub.air"]  # remplacé par un faux script dans les tests
+        self.command = command or AIR_COMMAND  # remplacé par un faux script dans les tests
         self.on_end = on_end  # appelé avec le suivi quand il se termine (enchaînements : sources/dag_chain.py)
         self._lock = threading.RLock()
         self._procs: dict[int, subprocess.Popen] = {}
@@ -140,7 +141,7 @@ class DagWatcher:
         return w
 
     def _spawn(self, w: DagWatch) -> None:
-        env = {**os.environ, **self.airflow_env, "AIR_STATE_DIR": str(self.state_dir), "AIR_NOTIFY": "print", "PYTHONUNBUFFERED": "1"}
+        env = {**child_environment(), **self.airflow_env, "AIR_STATE_DIR": str(self.state_dir), "AIR_NOTIFY": "print", "PYTHONUNBUFFERED": "1"}
         cmd = [*self.command, "watch", w.dag_id, w.run_id, "--client", w.customer, *watch_options()]
         threading.Thread(target=self._work, args=(w, cmd, env), name=f"suivi-{w.id}", daemon=True).start()
 

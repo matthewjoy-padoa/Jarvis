@@ -52,8 +52,7 @@ claude = ClaudeRunner.from_env(settings.orchestrator_dir, notifications, data_di
 sync_routine = SyncRoutine(notifications)
 pulls = PullRequests(settings.orchestrator_dir)  # PR ouvertes de l'orchestrator (gh), gardées cinq minutes
 # Suivi des runs lancés (air.py d'Arthur) ; les suivis en cours au démarrage reprennent si Airflow est configuré.
-dag_watch = DagWatcher(data_dir() / "airflow", notifications, {"AIRFLOW_URL": airflow.base_url, "AIRFLOW_USER": airflow.user,
-                                                               "AIRFLOW_PASSWORD": airflow.password} if airflow.live else None)
+dag_watch = DagWatcher(data_dir() / "airflow", notifications, airflow.air_env())
 # Enchaînements de DAG : le suivant part quand le suivi du précédent finit vert. Passe par le dag_watch du moment.
 dag_chains = ChainRunner(data_dir() / "airflow" / "chaines.json",
                          lambda dag_id, padoa_env, slug, card: _launch_watched(dag_id, padoa_env, fiches.get_deployment(slug), card), notifications)
@@ -629,7 +628,7 @@ def _reload_connections() -> None:
     fresh = AirflowSource.from_env()
     fresh.runs = airflow.runs
     airflow = fresh
-    dag_watch.airflow_env = {"AIRFLOW_URL": fresh.base_url, "AIRFLOW_USER": fresh.user, "AIRFLOW_PASSWORD": fresh.password} if fresh.live else {}
+    dag_watch.airflow_env = fresh.air_env()
 
 
 def _guard_settings(request: Request) -> None:
@@ -748,14 +747,14 @@ def deployment_tab(request: Request, slug: str, tab: str, tous: bool = False, vu
     ), slug)
 
 
-def _launch(dag_id: str, padoa_env: str, d: Deployment | None = None, card: str = "") -> ActionResult:
-    return _launch_watched(dag_id, padoa_env, d, card)[0]
+def _launch(dag_id: str, padoa_env: str, d: Deployment | None = None, card: str = "", prod_authorized: bool = False) -> ActionResult:
+    return _launch_watched(dag_id, padoa_env, d, card, prod_authorized)[0]
 
 
-def _launch_watched(dag_id: str, padoa_env: str, d: Deployment | None = None, card: str = ""):
+def _launch_watched(dag_id: str, padoa_env: str, d: Deployment | None = None, card: str = "", prod_authorized: bool = False):
     """Lance le DAG ; si le lancement est réel, air.py suit le run (relances, notifications, rapport).
-    Renvoie le résultat et le suivi (None si rien n'est suivi : échec ou simulation)."""
-    result = airflow.trigger_dag(dag_id, padoa_env, d.client if d else "", card)
+    prod_authorized : seulement quand la personne a tapé PROD. Renvoie le résultat et le suivi (None si rien n'est suivi)."""
+    result = airflow.trigger_dag(dag_id, padoa_env, d.client if d else "", card, prod_authorized)
     w = None
     if result.ok and result.run_id:
         customers = d.orchestrator if d else []
@@ -772,15 +771,23 @@ def trigger_dag(request: Request, dag_id: str, padoa_env: str = Form(...)):
     return _result(request, _launch(dag_id, padoa_env))
 
 
+@app.post("/actions/apercu")
+def dag_preview(dag_id: str = Form(...), padoa_env: str = Form(...)):
+    """Aperçu d'air.py (DAG, stack, ressources, avertissements) montré par dag.js dans la confirmation : ne lance rien."""
+    result = airflow.preview(dag_id, padoa_env)
+    return {"ok": result.ok, "text": result.message}
+
+
 @app.post("/actions/injection/{slug}", response_class=HTMLResponse)
 def trigger_injection(request: Request, slug: str, dag_id: str = Form(...), padoa_env: str = Form(...), card: str = Form("")):
     """Lance le DAG choisi pour une carte d'injection, sur la stack choisie (padoa_env)."""
     d = _get(slug)
     if not dag_catalogue.known_dag(d.orchestrator, dag_id):
         return _result(request, ActionResult(False, f"{dag_id} n'est pas un DAG de {d.client} dans le catalogue.", simulated=False))
-    if padoa_env == "prod" and "prod" in PADOA_ENVS and request.headers.get("HX-Prompt", "").strip() != CONFIRM_PROD:
+    typed_prod = request.headers.get("HX-Prompt", "").strip() == CONFIRM_PROD
+    if padoa_env == "prod" and "prod" in PADOA_ENVS and not typed_prod:
         return _result(request, ActionResult(False, f"Lancement en prod annulé : tape {CONFIRM_PROD} pour confirmer.", simulated=False))
-    return _result(request, _launch(dag_id, padoa_env, d, card))
+    return _result(request, _launch(dag_id, padoa_env, d, card, prod_authorized=padoa_env == "prod" and typed_prod))
 
 
 @app.post("/actions/chaine/{slug}", response_class=HTMLResponse)
