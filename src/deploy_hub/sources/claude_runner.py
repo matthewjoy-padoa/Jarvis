@@ -603,6 +603,10 @@ class ClaudeRunner:
         """Agent le plus récent qui pointe vers run_id par le champ link (reply_to ou relaunch_of)."""
         return next((r for r in self.runs if getattr(r, link) == run_id), None)
 
+    def latest_on(self, branch: str) -> AgentRun | None:
+        """Dernier agent lancé sur cette branche (donc sur ce retour), quel que soit son état."""
+        return next((r for r in self.runs if r.branch == branch), None)
+
     def follow_up(self, run_id: int) -> AgentRun | None:
         """Agent relancé avec la réponse aux questions de run_id."""
         return self._child(run_id, "reply_to")

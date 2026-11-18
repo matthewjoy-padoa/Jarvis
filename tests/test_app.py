@@ -536,3 +536,29 @@ def test_an_agent_in_error_has_a_relaunch_button():
     assert r.headers["HX-Redirect"] == f"/agents/{again.id}" and again.relaunch_of == run.id and again.prompt == "Brief initial"
     page = client.get(f"/agents/{run.id}").text
     assert 'hx-post="/agents/%d/relancer"' % run.id not in page and f'href="/agents/{again.id}"' in page
+
+
+def test_the_agent_form_says_before_the_click_why_no_agent_would_start(monkeypatch):
+    """Vu sur la VM : ORCHESTRATOR_DIR vide, le clic sur « Lancer l'agent » ne lançait rien et le refus passait inaperçu."""
+    from html import unescape
+    claude.runs.clear()
+    monkeypatch.setattr(claude, "problem", lambda: "Clone de integration-orchestrator introuvable (/x) : renseigne ORCHESTRATOR_DIR dans Réglages.")
+    form = unescape(client.get("/deploiements/client-demo/recette/R-03/brief").text)
+    assert "L'agent ne peut pas partir : Clone de integration-orchestrator introuvable" in form and 'href="/reglages"' in form
+    assert "Lancer l'agent" in form and " disabled " in form
+    assert form.index('id="agent-client-demo-R-03"') < form.index("</form>")  # résultat sous le bouton, dans le formulaire
+
+
+def test_the_agent_form_points_to_the_agent_already_on_this_retour():
+    from html import unescape
+    from deploy_hub.sources.claude_runner import WAITING
+    claude.runs.clear()
+    assert "Un agent existe déjà" not in client.get("/deploiements/client-demo/recette/R-03/brief").text
+    client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief"})
+    run = claude.runs[0]
+    run.status = WAITING
+    form = unescape(client.get("/deploiements/client-demo/recette/R-03/brief").text)
+    assert f'href="/agents/{run.id}">agent #{run.id}</a>, question en attente' in form and "réponds-lui sur sa page" in form
+    assert " disabled " not in form  # relancer reste possible
+    run.status = "en cours"
+    assert " disabled " in client.get("/deploiements/client-demo/recette/R-03/brief").text
