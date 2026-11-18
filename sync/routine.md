@@ -14,7 +14,7 @@ RÈGLES
 
 EXÉCUTER UNE REQUÊTE (objet {"sql", "sortie", "params", "sources"})
 - Outil Notion `notion-query-data-sources`, mode sql : contenu du fichier "sql" à l'identique, `data_source_urls` = "sources", `params` = "params" s'il n'est pas vide. Erreur 5xx ou délai dépassé : réessaie jusqu'à 2 fois.
-- Pagination : si la réponse a 100 lignes, relance la requête suivie de « LIMIT 100 OFFSET 100 », puis 200, etc., jusqu'à une page de MOINS de 100 lignes (écris-la aussi, même vide). Au plus 20 pages.
+- Pagination : si la réponse a 100 lignes, relance la requête suivie de « LIMIT 100 OFFSET 100 », puis 200, etc., jusqu'à une page de MOINS de 100 lignes (écris-la aussi, même vide). Au plus 100 pages : si la 100e est encore pleine, arrête-toi et signale « ÉCHEC <client> : <requête> : plus de 10 000 lignes ».
 - Écrire : page 1 dans "sortie", page 2 dans le même nom suffixé -2 (ex. actions_delta-2.json), etc. Si l'outil a rangé sa réponse dans un fichier (« Output has been saved to <chemin> » : c'est le cas courant), ne lis pas ce fichier et ne le copie pas : lance aussitôt `uv run python -m deploy_hub.sync_notion deposer "<sortie>"`, qui le retrouve, le vérifie et le dépose en une fraction de seconde (affiche le nombre de lignes). S'il répond « Aucune réponse Notion rangée », relance-le avec le chemin en second argument. N'écris toi-même que les réponses courtes rendues en ligne ; ne recopie jamais une longue réponse à la main : c'est lent et risqué. Sinon, écris l'objet JSON renvoyé (celui qui contient "results") tel quel, sans rien ajouter ni retirer.
 
 ÉTAPES

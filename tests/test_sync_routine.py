@@ -340,3 +340,18 @@ def test_progress_shows_the_page_of_a_long_query(tmp_path):
         os.utime(page, (old, old))  # plus de page depuis 10 min : la lecture est finie
     assert routine.progress()["label"] == "Fusion…"
 
+
+def test_hitting_the_page_cap_is_an_explicit_failure(tmp_path):
+    """Plafond de 100 pages (10 000 lignes) : au-delà, échec explicite au lieu de données incomplètes."""
+    import json
+    rows = json.dumps({"results": [{"url": f"u{i}"} for i in range(sync_notion.PAGE_SIZE)]})
+    first = tmp_path / "actions.json"
+    first.write_text(rows, encoding="utf-8")
+    for n in range(2, sync_notion.MAX_PAGES + 1):
+        (tmp_path / f"actions-{n}.json").write_text(rows, encoding="utf-8")
+    with pytest.raises(sync_notion.SyncError, match="plafond de 100 pages"):
+        sync_notion._rows(first)
+    (tmp_path / f"actions-{sync_notion.MAX_PAGES + 1}.json").write_text(json.dumps({"results": []}), encoding="utf-8")
+    assert len(sync_notion._rows(first)) == sync_notion.MAX_PAGES * sync_notion.PAGE_SIZE  # page suivante vide : complet
+    assert "Au plus 100 pages" in routine_text()
+

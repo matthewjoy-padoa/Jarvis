@@ -39,6 +39,7 @@ RECETTE_META = {"url", "statut", "type_donnees", "logiciel", "responsables", "de
 RECETTE_CONTENT = {"ligne", "type_retour", "commentaire_client", "exemple", "analyse", "solutions", "discussion", "echanges"}
 RECETTE_COLUMNS = RECETTE_META | RECETTE_CONTENT
 PAGE_SIZE = 100  # lignes par réponse Notion
+MAX_PAGES = 100  # plafond de la routine par requête (sync/routine.md) : 10 000 lignes, contre une pagination sans fin
 FULL_SYNC_DAYS = 7
 BASES = ("actions", "recette")
 MILESTONES = ["kickoff", "reception_donnees", "recette_1", "recette_2", "recette_3", "freeze", "formation", "deploiement", "deploiement_lot2"]
@@ -68,6 +69,9 @@ def _rows(path: Path) -> list[dict]:
     # une dernière page pleine veut dire que la pagination s'est arrêtée trop tôt, y compris quand
     # seule la première page est là (la page suivante, même vide, doit être écrite).
     if len(last) >= PAGE_SIZE:
+        if len(pages) >= MAX_PAGES:
+            raise SyncError(f"{path.stem} : plus de {MAX_PAGES * PAGE_SIZE} lignes, plafond de {MAX_PAGES} pages atteint ; "
+                            "données incomplètes, rien n'est fusionné pour ce client.")
         raise SyncError(f"{path.stem} : la dernière page ({pages[-1].name}) est pleine, des lignes manquent sans doute.")
     return rows
 
