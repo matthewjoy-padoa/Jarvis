@@ -1,0 +1,5 @@
+# Client fictif ajouté mais jamais synchronisé : montre la fiche vide « pas encore synchronisé ».
+client: Client Nouveau
+page_id: 00000000000000000000000000000003
+software: Pulse
+status: démarrage

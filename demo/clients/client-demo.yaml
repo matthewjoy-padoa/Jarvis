@@ -1,0 +1,10 @@
+# Client fictif de l'environnement local (demo/lancer.py) : aucune donnée client.
+client: Client Démo
+page_id: 00000000000000000000000000000001
+software: Preventiel
+status: en cours
+notion_url: https://www.notion.so/
+orchestrator: [demo]
+stacks:
+  - {env: recette, label: Snap recette, url: "https://example.com/recette"}
+  - {env: integration, label: Integration, url: "https://example.com/integration"}

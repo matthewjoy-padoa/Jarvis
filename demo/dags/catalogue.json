@@ -1,0 +1,27 @@
+{
+  "commit_orchestrator": "demo",
+  "genere_le": "2026-11-18 00:00",
+  "branche": "demo (catalogue fictif)",
+  "clients": {
+    "demo": {
+      "logiciel": "preventiel",
+      "ced": {"dag_id": "demo-ced", "ressources": {"employee": [{"niveau": "client", "requete": "query_file_type_employee"}]}},
+      "dags": {
+        "demo-etl_group-administratif": {"groupe": "administratif", "ressources": ["firm", "employer_user"], "type": "etl_group"},
+        "demo-etl_group-medical": {"groupe": "medical", "ressources": ["visit_histo", "vaccine_injection", "amt_task"], "type": "etl_group"},
+        "demo-etl-firm": {"ressources": ["firm"], "type": "etl"},
+        "demo-etl-employer_user": {"ressources": ["employer_user"], "type": "etl"},
+        "demo-etl-visit_histo": {"ressources": ["visit_histo"], "type": "etl"},
+        "demo-etl-vaccine_injection": {"ressources": ["vaccine_injection"], "type": "etl"},
+        "demo-etl-amt_task": {"ressources": ["amt_task"], "type": "etl"}
+      }
+    },
+    "exemple": {
+      "logiciel": "kenora",
+      "dags": {
+        "exemple-etl-firm": {"ressources": ["firm"], "type": "etl"},
+        "exemple-etl-employment_contract_info": {"ressources": ["employment_contract_info"], "type": "etl"}
+      }
+    }
+  }
+}

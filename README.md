@@ -127,6 +127,16 @@ uv run pytest
 uv run uvicorn deploy_hub.main:app --port 8765 --reload --reload-dir src
 ```
 
+### Environnement local fictif
+
+Pour voir un changement de l'interface sur le Mac sans pull ni VM :
+
+```bash
+uv run python demo/lancer.py          # http://localhost:8766 ; --neuf pour repartir des données d'origine
+```
+
+Seulement du faux : trois clients (`demo/clients/`, dont un jamais synchronisé), les fiches des tests (`demo/deploiements/`), un catalogue de DAGs (`demo/dags/`), un faux Airflow HTTP local que le vrai `air.py` appelle (`demo/faux_airflow.py` : un run passe en succès en 26 s), un faux `claude` pour les agents et le bouton « Rafraîchir depuis Notion » (`demo/faux_claude.py` : un agent sur deux pose une question). Ni `.env`, ni `config/`, ni `data/` ne sont lus ; l'état vit dans `demo/.etat/` (ignoré par git). Les tests n'utilisent pas ce lanceur : la validation reste `uv run pytest` et l'app réelle sur la VM.
+
 Versions : numéro dans `pyproject.toml`, historique et règle de numérotation dans [`CHANGELOG.md`](CHANGELOG.md) (une ligne par PR sous « Non publié »).
 
 Routes dans `src/deploy_hub/main.py`, pages dans `templates/` et `static/`, synchro Notion dans `sync_notion.py` (consigne de la routine : `sync/routine.md`, lanceur : `sources/sync_routine.py`), sources (Notion, Airflow, agents, PR GitHub, perso, notifications) dans `sources/`.

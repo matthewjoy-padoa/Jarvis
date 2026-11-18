@@ -12,3 +12,5 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .DS_Store
+# Environnement local fictif (demo/lancer.py) : état recréé à la demande.
+demo/.etat/

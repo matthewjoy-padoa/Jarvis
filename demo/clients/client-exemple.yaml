@@ -1,0 +1,6 @@
+# Client fictif de l'environnement local (demo/lancer.py) : aucune donnée client.
+client: Client Exemple
+page_id: 00000000000000000000000000000002
+software: Kenora
+status: démarrage
+orchestrator: [exemple]

@@ -4,8 +4,24 @@
     {
       "name": "jarvis",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "uvicorn", "deploy_hub.main:app", "--port", "8765"],
+      "runtimeArgs": [
+        "run",
+        "uvicorn",
+        "deploy_hub.main:app",
+        "--port",
+        "8765"
+      ],
       "port": 8765
+    },
+    {
+      "name": "jarvis-local-fictif",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "python",
+        "demo/lancer.py"
+      ],
+      "port": 8766
     }
   ]
 }
