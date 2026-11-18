@@ -8,7 +8,6 @@ import sys
 import textwrap
 import time
 
-import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -176,7 +175,7 @@ def test_notification_keys_survive_a_lost_history(tmp_path):
 
 # ---------------------------------------------------------------- « Lancer » → suivi, pages Agents
 @pytest.fixture
-def live_app(tmp_path, monkeypatch):
+def live_app(tmp_path, monkeypatch, airflow_server):
     # Deux clés orchestrator dont l'une préfixe l'autre : le client du suivi vient du catalogue, pas du préfixe du DAG.
     d = Deployment(slug="acme", client="Acme", software="Uegar", orchestrator=["acme", "acme-uegar"])
     catalogue = tmp_path / "catalogue.json"
@@ -185,12 +184,7 @@ def live_app(tmp_path, monkeypatch):
     monkeypatch.setattr(main.fiches, "get_deployment", lambda slug: d if slug == "acme" else None)
     monkeypatch.setattr(main.fiches, "list_deployments", lambda: [d])
 
-    def handler(request):
-        if request.method == "GET":
-            return httpx.Response(200, json={"dag_id": "acme-uegar-etl-firm", "is_paused": False})
-        return httpx.Response(200, json={"dag_run_id": "manual__1", "state": "queued"})
-
-    monkeypatch.setattr(main, "airflow", AirflowSource("http://airflow.test", "user", "secret", transport=httpx.MockTransport(handler)))
+    monkeypatch.setattr(main, "airflow", airflow_server().source())
     watcher = DagWatcher(tmp_path / "airflow", None, AIRFLOW_ENV, command=fake_air(tmp_path, [notif("✅ etl-firm vert")]))
     monkeypatch.setattr(main, "dag_watch", watcher)
     return TestClient(main.app), watcher

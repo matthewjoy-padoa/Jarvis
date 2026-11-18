@@ -7,13 +7,12 @@ Si `padoa_env` manque dans la conf d'un run, l'orchestrator prend la Variable Ai
 import json
 import sys
 
-import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from deploy_hub import main
 from deploy_hub.models import Action, Deployment, ResourceInjection
-from deploy_hub.sources.airflow import PADOA_ENVS, AirflowSource
+from deploy_hub.sources.airflow import PADOA_ENVS
 from deploy_hub.sources.dag_watch import DagWatcher
 
 STACKS = ("integration", "snap", "recette")
@@ -21,8 +20,8 @@ DAG = "acme-uegar-etl-firm"
 
 
 @pytest.fixture
-def live(tmp_path, monkeypatch):
-    """Airflow « réel » simulé par httpx : chaque requête est notée ; air.py remplacé par un script qui sort aussitôt."""
+def live(tmp_path, monkeypatch, airflow_server):
+    """Faux Airflow HTTP (chaque requête notée) que le vrai air.py lance ; le suivi remplacé par un script qui sort aussitôt."""
     d = Deployment(slug="acme", client="Acme", software="Uegar", orchestrator=["acme-uegar"],
                    actions=[Action(title="Injection des firms", injection=True, injection_status="A faire", resources=["firm"])],
                    resources=[ResourceInjection(name="firm", status="A faire", dag_id=DAG)])
@@ -31,22 +30,11 @@ def live(tmp_path, monkeypatch):
     monkeypatch.setattr(main.dag_catalogue, "CATALOGUE", catalogue)
     monkeypatch.setattr(main.fiches, "get_deployment", lambda slug: d if slug == "acme" else None)
     monkeypatch.setattr(main.fiches, "list_deployments", lambda: [d])
-    sent = []
-
-    def handler(request):
-        sent.append(request)
-        if request.method == "GET":
-            return httpx.Response(200, json={"dag_id": DAG, "is_paused": False})
-        return httpx.Response(200, json={"dag_run_id": f"manual__{len(sent)}", "state": "queued"})
-
-    monkeypatch.setattr(main, "airflow", AirflowSource("http://airflow.test", "user", "secret", transport=httpx.MockTransport(handler)))
+    server = airflow_server()
+    monkeypatch.setattr(main, "airflow", server.source())
     monkeypatch.setattr(main, "dag_watch", DagWatcher(tmp_path / "airflow", None, {"AIRFLOW_URL": "http://airflow.test"},
                                                       command=[sys.executable, "-c", "pass"]))
-    return TestClient(main.app), sent
-
-
-def runs_posted(sent):
-    return [json.loads(r.content) for r in sent if r.method == "POST" and r.url.path == f"/api/v1/dags/{DAG}/dagRuns"]
+    return TestClient(main.app), server
 
 
 ENTRY_POINTS = {  # tous les formulaires de lancement de Jarvis postent vers l'une de ces deux routes
@@ -58,29 +46,29 @@ ENTRY_POINTS = {  # tous les formulaires de lancement de Jarvis postent vers l'u
 @pytest.mark.parametrize("stack", STACKS)
 @pytest.mark.parametrize("entry", ENTRY_POINTS)
 def test_each_stack_reaches_airflow_and_the_watch(live, entry, stack):
-    app, sent = live
+    app, server = live
     url, data = ENTRY_POINTS[entry]
     page = app.post(url, data={**data, "padoa_env": stack})
     assert f"lancé sur {stack}" in page.text
-    assert runs_posted(sent) == [{"conf": {"padoa_env": stack}}]  # exactement un run, sur cette stack
+    assert server.posted_runs(DAG) == [{"conf": {"padoa_env": stack}}]  # exactement un run, sur cette stack
     assert main.dag_watch.watches[0].padoa_env == stack and main.airflow.runs[0].padoa_env == stack
 
 
 @pytest.mark.parametrize("entry", ENTRY_POINTS)
 def test_no_stack_no_launch(live, entry):
     """Sans stack choisie, rien ne part : sinon Airflow prendrait sa stack par défaut (Variable PADOA_ENV)."""
-    app, sent = live
+    app, server = live
     url, data = ENTRY_POINTS[entry]
-    assert app.post(url, data=data).status_code == 422 and runs_posted(sent) == []
+    assert app.post(url, data=data).status_code == 422 and server.posted_runs(DAG) == []
 
 
 @pytest.mark.parametrize("entry", ENTRY_POINTS)
 @pytest.mark.parametrize("stack", ["prod", "demo", "Integration"])
 def test_prod_and_unknown_stacks_never_reach_airflow(live, entry, stack):
-    app, sent = live
+    app, server = live
     url, data = ENTRY_POINTS[entry]
     app.post(url, data={**data, "padoa_env": stack}, headers={"HX-Prompt": "PROD"})
-    assert runs_posted(sent) == [] and main.dag_watch.watches == []
+    assert server.posted_runs(DAG) == [] and main.dag_watch.watches == []
 
 
 def test_every_launch_form_offers_exactly_the_test_stacks(live, monkeypatch):
