@@ -1,0 +1,13 @@
+{# Source des DAGs proposés (sources/dag_source.py) : le clone orchestrator local tel qu'il est sur le disque (comme
+   l'Airflow local), ou le catalogue versionné (main figé). Attend : s (dag_source.status).
+   Pendant une génération, se relit toutes les 3 s ; à la fin, la page se recharge. #}
+<div id="dag-source" class="dag-source muted"{% if s.running %} hx-get="/dags/source" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  <span>
+    {% if s.running %}DAGs : génération du catalogue depuis ton clone local (<code>{{ s.running }}</code>)…
+    {% elif s.local %}DAGs de ton clone local : <code>{{ s.label }}</code> (<code>{{ s.commit }}</code>){% if s.made %}, générés {{ s.made | quand }}{% endif %}{% if s.outdated %} · le clone a changé depuis{% endif %}
+    {% else %}DAGs du catalogue du dépôt Jarvis (copie figée de main, <code>{{ s.commit }}</code>){% if s.missing_clone %} : clone orchestrator introuvable dans <code>{{ s.repo }}</code> (ORCHESTRATOR_DIR, page Réglages){% endif %}
+    {% endif %}
+  </span>
+  {% if s.checkout %}<button type="button" class="secondary" hx-post="/dags/regenerer" hx-target="#dag-source" hx-swap="outerHTML"{% if s.running %} disabled{% endif %}>Régénérer</button>{% endif %}
+  {% if s.error %}<span class="dag-source-error">Échec de la génération : {{ s.error }}</span>{% endif %}
+</div>

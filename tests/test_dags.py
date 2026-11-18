@@ -1,9 +1,9 @@
-"""Lancement d'un DAG depuis une carte d'injection : catalogue, choix de la stack, confirmation prod, appel Airflow."""
+"""Lancement d'un DAG depuis une carte d'injection : catalogue, choix de la stack, confirmation prod, lancement par air.py."""
 
 import json
 
-import httpx
 import pytest
+from conftest import airflow
 from fastapi.testclient import TestClient
 
 from deploy_hub import main
@@ -90,32 +90,97 @@ def test_unknown_dag_or_stack_is_refused(app):
     assert "Environnement inconnu" in app.post("/actions/injection/acme", data={"dag_id": "acme-uegar-etl-firm", "padoa_env": "demo"}).text
 
 
-def airflow_with(handler):
-    return AirflowSource("http://airflow.test", "user", "secret", transport=httpx.MockTransport(handler))
+def test_launch_goes_through_air_py(airflow_server):
+    """Le vrai air.py (sous-processus) contre un faux Airflow HTTP : sortie de pause, run avec padoa_env, identifiants."""
+    server = airflow_server(airflow(dag={"is_paused": True}))
+    result = server.source().trigger_dag("acme-uegar-etl-firm", "recette", "Acme", "carte")
+    assert result.ok and not result.simulated and result.run_id == "manual__1"
+    assert result.message == "acme-uegar-etl-firm lancé sur recette (run manual__1)"
+    patch = next(r for r in server.seen if r.method == "PATCH")  # DAG en pause : sorti de pause, sinon le run attendrait
+    assert patch.params["update_mask"] == ["is_paused"] and patch.body == {"is_paused": False}
+    assert server.posted_runs("acme-uegar-etl-firm") == [{"conf": {"padoa_env": "recette"}}]
+    assert all(r.headers["authorization"].startswith("Basic ") for r in server.seen)
 
 
-def test_live_trigger_sends_padoa_env():
-    seen = []
-
-    def handler(request):
-        seen.append(request)
-        if request.method == "GET":
-            return httpx.Response(200, json={"dag_id": "x", "is_paused": True})
-        return httpx.Response(200, json={"dag_run_id": "manual__1", "state": "queued"})
-
-    result = airflow_with(handler).trigger_dag("acme-uegar-etl-firm", "recette", "Acme", "carte")
-    assert result.ok and not result.simulated and result.run_id == "manual__1" and "sorti de pause" in result.message
-    patch = seen[1]  # DAG en pause : sorti de pause avant le lancement, sinon le run attendrait
-    assert patch.method == "PATCH" and patch.url.params["update_mask"] == "is_paused" and json.loads(patch.content) == {"is_paused": False}
-    post = seen[-1]
-    assert post.url.path == "/api/v1/dags/acme-uegar-etl-firm/dagRuns" and json.loads(post.content) == {"conf": {"padoa_env": "recette"}}
-    assert post.headers["authorization"].startswith("Basic ")
+def test_launch_warns_when_a_run_is_already_going(airflow_server):
+    busy = airflow(runs=[{"dag_run_id": "manual__0", "state": "running"}])
+    result = airflow_server(busy).source().trigger_dag("acme-uegar-etl-firm", "snap")
+    assert result.ok and "⚠️ 1 run(s) déjà en cours pour ce DAG." in result.message
 
 
-@pytest.mark.parametrize(("status", "message"), [(401, "refuse l'accès"), (404, "absent de cet Airflow")])
-def test_live_trigger_errors(status, message):
-    result = airflow_with(lambda request: httpx.Response(status, json={})).trigger_dag("acme-uegar-etl-firm", "integration")
-    assert not result.ok and message in result.message
+def test_inactive_dag_is_refused_before_any_run(airflow_server):
+    server = airflow_server(airflow(dag={"is_active": False}))
+    result = server.source().trigger_dag("acme-uegar-etl-firm", "snap")
+    assert not result.ok and "n'est plus chargé par Airflow" in result.message and server.posted_runs("acme-uegar-etl-firm") == []
+
+
+@pytest.mark.parametrize(("status", "message"), [(401, "refuse l'accès (401)"), (403, "refuse l'accès (403)"), (404, "absent de cet Airflow")])
+def test_launch_errors_in_jarvis_words(airflow_server, status, message):
+    result = airflow_server(lambda request: (status, {})).source().trigger_dag("acme-uegar-etl-firm", "integration")
+    assert not result.ok and message in result.message and ".claude/air.env" not in result.message
+
+
+def test_unpause_refused_is_named(airflow_server):
+    in_pause = airflow(dag={"is_paused": True})
+
+    def no_patch(request):
+        return (403, {}) if request.method == "PATCH" else in_pause(request)
+
+    server = airflow_server(no_patch)
+    result = server.source().trigger_dag("acme-uegar-etl-firm", "snap")
+    assert not result.ok and "refuse de l'en sortir" in result.message and server.posted_runs("acme-uegar-etl-firm") == []
+
+
+def test_unreachable_airflow_is_named():
+    result = AirflowSource("http://127.0.0.1:9", "user", "secret").trigger_dag("acme-uegar-etl-firm", "snap")  # port 9 : rien n'écoute
+    assert not result.ok and "Airflow injoignable (http://127.0.0.1:9)" in result.message
+
+
+def test_credentials_never_on_the_command_line(airflow_server, monkeypatch):
+    monkeypatch.setenv("NOTION_TOKEN", "jeton-test")
+    monkeypatch.setattr("deploy_hub.config.ENV_FILE_KEYS", set())
+    seen = {}
+
+    def spy(args, **kwargs):
+        seen["args"], seen["env"] = args, kwargs["env"]
+        raise OSError("arrêt du test")
+
+    monkeypatch.setattr("deploy_hub.sources.airflow.subprocess.run", spy)
+    airflow_server().source(password="mot-de-passe-test").trigger_dag("acme-uegar-etl-firm", "snap")
+    assert "mot-de-passe-test" not in " ".join(seen["args"]) and seen["env"]["AIRFLOW_PASSWORD"] == "mot-de-passe-test"
+    assert seen["args"][-5:] == ["run", "--yes", "--", "acme-uegar-etl-firm", "snap"]
+    assert "NOTION_TOKEN" not in seen["env"]  # air.py ne reçoit que ce qu'il lui faut, pas les secrets de Jarvis
+
+
+def test_preview_route_shows_resources_and_launches_nothing(app, monkeypatch, airflow_server):
+    server = airflow_server(airflow(tasks=[{"task_id": "transform_and_load_firm.load"}, {"task_id": "extract"}]))
+    monkeypatch.setattr(main, "airflow", server.source())
+    r = app.post("/actions/apercu", data={"dag_id": "acme-uegar-etl-firm", "padoa_env": "recette"}).json()
+    assert r["ok"] and "Ressources : firm" in r["text"] and "Stack : recette" in r["text"] and "--yes" not in r["text"]
+    assert not any(req.method in ("POST", "PATCH") for req in server.seen)
+
+
+def test_prod_needs_the_typed_authorization_down_to_air_py(airflow_server):
+    """Même avec la prod réactivée, seul le formulaire où PROD a été tapé autorise air.py à lancer en prod."""
+    server = airflow_server()
+    source = server.source()
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr("deploy_hub.sources.airflow.PADOA_ENVS", ("integration", "snap", "recette", "prod"))
+        refused = source.trigger_dag("acme-uegar-etl-firm", "prod")
+        allowed = source.trigger_dag("acme-uegar-etl-firm", "prod", prod_authorized=True)
+    assert not refused.ok and "Refusé" in refused.message and allowed.ok
+    assert server.posted_runs("acme-uegar-etl-firm") == [{"conf": {"padoa_env": "prod"}}]  # un seul run : celui autorisé
+
+
+def test_option_like_dag_id_is_not_an_option(airflow_server):
+    result = airflow_server().source().preview("-h", "snap")
+    assert "usage:" not in result.message and "DAG   : -h" in result.message
+
+
+def test_preview_refuses_what_launch_refuses(app):
+    assert app.post("/actions/apercu", data={"dag_id": "acme-uegar-etl-firm", "padoa_env": "snap"}).json() == {
+        "ok": False, "text": "Airflow non configuré : renseigne AIRFLOW_BASE_URL, AIRFLOW_USER et AIRFLOW_PASSWORD dans Réglages."}
+    assert "prod désactivé" in app.post("/actions/apercu", data={"dag_id": "x", "padoa_env": "prod"}).json()["text"]
 
 
 def test_ced_dag_is_known_and_listed(catalogue):
@@ -143,13 +208,3 @@ def test_ced_view_and_launch(app, monkeypatch, fake_airflow):
     r = app.post("/actions/injection/acme", data={"dag_id": "acme-pulse-ced", "padoa_env": "recette", "card": "CED acme-pulse"})
     assert "acme-pulse-ced lancé sur recette" in r.text
     assert "Par ressource" in app.get("/deploiements/acme/injections").text  # vue par défaut : groupée
-
-
-def test_unpause_refused_is_named():
-    def handler(request):
-        if request.method == "GET":
-            return httpx.Response(200, json={"is_paused": True})
-        return httpx.Response(403, json={})
-
-    result = airflow_with(handler).trigger_dag("acme-uegar-etl-firm", "snap")
-    assert not result.ok and "refuse de l'en sortir (403)" in result.message

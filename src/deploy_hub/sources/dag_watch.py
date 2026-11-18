@@ -3,7 +3,8 @@ tourne en tâche de fond. Il relance les tâches en échec passager (3 fois au p
 
 Ses lignes « [notif] {"title", "msg"} » deviennent des notifications de Jarvis ; tout le reste va au journal du suivi.
 État, journaux, rapports : data/airflow (AIR_STATE_DIR), hors de git et jamais dans le vault (valeurs client possibles).
-Le suivi lit les logs des tâches qu'il suit : dérogation décidée par Matthew le 2026-11-12.
+Comme /air, le suivi ne passe que par l'API REST, avec les mêmes identifiants que le lancement : rien à régler pour les logs
+(ceux des tâches viennent de l'API ; aucun fichier de logs, pas de docker exec ni de commande airflow).
 
 Redémarrage de Jarvis (rechargement compris) : shutdown() coupe les process sans changer l'état des suivis, puis le Jarvis
 suivant les relance ; air.py reprend où il en était (son état watch__<dag>__<run>.json garde relances et notifications).
@@ -13,13 +14,14 @@ import json
 import os
 import re
 import subprocess
-import sys
 import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
+from deploy_hub.config import child_environment
 from deploy_hub.models import DONE, IN_PROGRESS, KO, status_group
+from deploy_hub.sources.airflow import AIR_COMMAND
 
 WATCH_STATUSES = {"suivi en cours": IN_PROGRESS, "vert": DONE, "en échec ou incomplet": KO, "Airflow injoignable": KO,
                   "arrêté": KO, "interrompu": KO}
@@ -75,7 +77,7 @@ class DagWatcher:
         self.state_file = state_dir / "suivis.json"
         self.notifications = notifications
         self.airflow_env = airflow_env or {}
-        self.command = command or [sys.executable, "-m", "deploy_hub.air"]  # remplacé par un faux script dans les tests
+        self.command = command or AIR_COMMAND  # remplacé par un faux script dans les tests
         self.on_end = on_end  # appelé avec le suivi quand il se termine (enchaînements : sources/dag_chain.py)
         self._lock = threading.RLock()
         self._procs: dict[int, subprocess.Popen] = {}
@@ -139,7 +141,7 @@ class DagWatcher:
         return w
 
     def _spawn(self, w: DagWatch) -> None:
-        env = {**os.environ, **self.airflow_env, "AIR_STATE_DIR": str(self.state_dir), "AIR_NOTIFY": "print", "PYTHONUNBUFFERED": "1"}
+        env = {**child_environment(), **self.airflow_env, "AIR_STATE_DIR": str(self.state_dir), "AIR_NOTIFY": "print", "PYTHONUNBUFFERED": "1"}
         cmd = [*self.command, "watch", w.dag_id, w.run_id, "--client", w.customer, *watch_options()]
         threading.Thread(target=self._work, args=(w, cmd, env), name=f"suivi-{w.id}", daemon=True).start()
 

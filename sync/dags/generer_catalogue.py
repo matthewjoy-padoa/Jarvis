@@ -1,3 +1,8 @@
+# /// script
+# requires-python = "==3.12.*"
+# dependencies = ["numpy<2", "pandas<2.2", "pendulum", "pydantic", "pyyaml", "python-dateutil", "requests", "phonenumbers",
+#                 "schwifty", "beautifulsoup4", "striprtf"]
+# ///
 """Catalogue des DAGs d'injection de l'orchestrator : pour chaque client, les DAGs, les ressources qu'ils traitent,
 et le contenu de son DAG CED (requêtes de fichiers par ressource).
 
@@ -6,16 +11,17 @@ requêtes CED du composant d'extraction) et écrit sync/dags/catalogue.json, lu 
 (Azure, SFTP, bases…) sont remplacés par des modules vides : le script ne fait que lire des constantes.
 
     cd ~/Documents/Jarvis
-    AIRFLOW__CORE__DAGS_FOLDER=<dépôt orchestrator> uv run --no-project --python 3.12 \\
-        --with 'numpy<2' --with 'pandas<2.2' --with pendulum --with pydantic --with pyyaml --with python-dateutil \\
-        --with requests --with phonenumbers --with schwifty --with beautifulsoup4 --with striprtf \\
-        python sync/dags/generer_catalogue.py <dépôt orchestrator>
+    AIRFLOW__CORE__DAGS_FOLDER=<dépôt orchestrator> uv run --script sync/dags/generer_catalogue.py <dépôt orchestrator> [--sortie FICHIER]
+
+Python et les paquets viennent de l'en-tête « /// script » ci-dessus (seule liste, lue par uv). Jarvis l'appelle aussi
+lui-même sur le clone local, tel qu'il est sur le disque (sources/dag_source.py) : catalogue dans data/dags/.
 
 Formats d'identifiant (dags/*.py et dags/dag_builder/dependencies/*.py de l'orchestrator) :
   {client}-etl-{ressource}, {client}-transform_and_load-{ressource},
   {client}-etl_group-{groupe}, {client}-transform_and_load-group-{groupe}, {client}-ced (dags/dag_ced.py:42)
 """
 
+import argparse
 import importlib.abc
 import importlib.machinery
 import json
@@ -112,13 +118,18 @@ def main(repo: Path) -> dict:
         if dags or entry.get("ced"):
             clients[str(customer)] = entry
 
-    commit = subprocess.run(["git", "-C", str(repo), "log", "-1", "--format=%h %cs"], capture_output=True, text=True).stdout.strip()
+    commit = subprocess.run(["git", "-C", str(repo), "log", "-1", "--format=%h %cs"], capture_output=True, text=True, check=False).stdout.strip()
     return {"genere_le": datetime.now().strftime("%Y-%m-%d %H:%M"), "commit_orchestrator": commit, "clients": clients}
 
 
 if __name__ == "__main__":
-    catalogue = main(Path(sys.argv[1]).resolve())
-    OUT.write_text(json.dumps(catalogue, ensure_ascii=False, indent=1, sort_keys=True), encoding="utf-8")
+    args = argparse.ArgumentParser(description="Catalogue des DAGs d'injection de l'orchestrator")
+    args.add_argument("repo", type=Path)
+    args.add_argument("--sortie", type=Path, default=OUT, help="fichier écrit (défaut : sync/dags/catalogue.json)")
+    a = args.parse_args()
+    catalogue = main(a.repo.resolve())
+    a.sortie.parent.mkdir(parents=True, exist_ok=True)
+    a.sortie.write_text(json.dumps(catalogue, ensure_ascii=False, indent=1, sort_keys=True), encoding="utf-8")
     n = sum(len(c["dags"]) for c in catalogue["clients"].values())
     ced = sum(1 for c in catalogue["clients"].values() if c.get("ced"))
-    print(f"{len(catalogue['clients'])} clients, {n} DAGs, {ced} DAGs CED → {OUT} (orchestrator {catalogue['commit_orchestrator']})")
+    print(f"{len(catalogue['clients'])} clients, {n} DAGs, {ced} DAGs CED → {a.sortie} (orchestrator {catalogue['commit_orchestrator']})")
