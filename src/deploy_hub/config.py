@@ -183,7 +183,8 @@ def load_settings() -> Settings:
     return Settings(
         deployments_dir=deployments_dir(),
         airflow_base_url=os.getenv("AIRFLOW_BASE_URL", "http://localhost:8080"),
-        orchestrator_dir=Path(os.getenv("ORCHESTRATOR_DIR", "~/integration-orchestrator")).expanduser(),
+        # « ORCHESTRATOR_DIR= » (vide, comme dans .env.example) : valeur par défaut, pas « . » (le dossier de Jarvis, vu sur la VM)
+        orchestrator_dir=Path(os.getenv("ORCHESTRATOR_DIR") or "~/integration-orchestrator").expanduser(),
     )
 
 
