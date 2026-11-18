@@ -9,7 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from deploy_hub.sources.claude_runner import INSTRUCTION, ClaudeRunner, agent_branch, find_pr, read_log
+from deploy_hub.sources.claude_runner import (ANSWERED, INSTRUCTION, RESUME_INSTRUCTION, WAITING, ClaudeRunner, agent_branch,
+                                               asks_questions, find_pr, read_log)
 from deploy_hub.sources.notifications import NotificationStore
 
 from conftest import instant_agents
@@ -21,7 +22,7 @@ mode = os.environ.get("FAKE_MODE", "ok")
 open("argv.json", "w").write(json.dumps({"argv": sys.argv[1:], "brief": brief, "cwd": os.getcwd(),
                                          "secret": os.environ.get("AIRFLOW_PASSWORD")}))
 def say(e): print(json.dumps(e), flush=True)
-say({"type": "system", "subtype": "init"})
+say({"type": "system", "subtype": "init", "session_id": "sess-" + os.path.basename(os.getcwd())})
 say({"type": "assistant", "message": {"content": [{"type": "text", "text": "Je lis le brief."},
      {"type": "tool_use", "name": "Bash", "input": {"command": "uv run pytest tests"}}]}})
 say({"type": "user", "message": {"content": [{"type": "tool_result", "is_error": True, "content": "Permission refusée"}]}})
@@ -29,6 +30,10 @@ say({"type": "user", "message": {"content": [{"type": "tool_result", "is_error":
 say({"type": "system", "subtype": "hook_response", "output": "Backlog : https://github.com/padoa/integration-orchestrator/pull/3629"})
 if mode == "slow":
     time.sleep(30)
+if mode == "question":
+    say({"type": "result", "subtype": "success", "num_turns": 2, "session_id": "sess-" + os.path.basename(os.getcwd()),
+         "result": "Je n'ai rien modifié.\n\n**Questions :**\n1. Correctif au niveau client ou logiciel ?"})
+    sys.exit(0)
 if mode == "fail":
     say({"type": "result", "subtype": "error_during_execution", "result": "", "num_turns": 2})
     sys.exit(1)
@@ -251,3 +256,121 @@ def test_log_events_whose_message_is_text_do_not_break_the_agent_page(tmp_path):
     assert message_of({"message": "texte"}) == {} and message_of({"message": {"a": 1}}) == {"a": 1}
     review.build(run, log)  # ne lève plus
 
+
+def test_questions_are_recognised_only_when_the_report_asks_them():
+    assert asks_questions("Rien modifié.\n\nQuestions :\n1. Client ou logiciel")
+    assert asks_questions("Rien modifié. Faut-il corriger au niveau client ou logiciel ?")
+    assert not asks_questions("Cause : mapping.py:12. Tests verts.") and not asks_questions("")
+
+
+def test_an_agent_that_stops_on_questions_waits_for_an_answer(repo, fake_claude, tmp_path, monkeypatch):
+    monkeypatch.setenv("FAKE_MODE", "question")
+    runner = _runner(repo, fake_claude, tmp_path)
+    runner.launch_retour(D, R, prompt="Brief relu")
+    _wait(runner, 1)
+    run = runner.get(1)
+    assert run.status == WAITING and run.group == "todo" and not run.pr_url  # pas un « terminé » vert
+    assert run.session_id == "sess-fix-acme-r-7"
+    notif = runner.notifications.all()[0]
+    assert WAITING in notif.title and notif.level == "warning" and "client ou logiciel" in notif.detail
+
+
+def test_the_answer_resumes_the_same_session_in_the_same_worktree(repo, fake_claude, tmp_path, monkeypatch):
+    monkeypatch.setenv("FAKE_MODE", "question")
+    runner = _runner(repo, fake_claude, tmp_path)
+    runner.launch_retour(D, R, prompt="Brief relu")
+    _wait(runner, 1)
+    monkeypatch.setenv("FAKE_MODE", "ok")
+    result = runner.reply(1, "  Au niveau client.  ")
+    assert result.ok and "Agent #2 lancé" in result.message
+    _wait(runner, 2)
+    first, second = runner.get(1), runner.get(2)
+    assert first.status == ANSWERED and runner.follow_up(1) is second
+    assert second.reply_to == 1 and second.resume == "sess-fix-acme-r-7" and second.branch == first.branch
+    assert second.status == "terminé" and second.pr_url.endswith("/pull/4242") and second.worktree == first.worktree
+    seen = json.loads((Path(second.worktree) / "argv.json").read_text())
+    assert seen["argv"][:2] == ["-p", RESUME_INSTRUCTION] and seen["argv"][seen["argv"].index("--resume") + 1] == "sess-fix-acme-r-7"
+    assert seen["brief"] == "Au niveau client."  # la session a déjà le brief : seule la réponse part
+
+
+def test_without_the_same_worktree_the_answer_restarts_from_the_brief(repo, fake_claude, tmp_path, monkeypatch):
+    """Vu sur la VM : l'agent n°1 a tourné ailleurs (ORCHESTRATOR_DIR vide) ; sa session n'est pas reprenable depuis le bon dépôt."""
+    monkeypatch.setenv("FAKE_MODE", "question")
+    runner = _runner(repo, fake_claude, tmp_path)
+    runner.launch_retour(D, R, prompt="Brief relu")
+    _wait(runner, 1)
+    _git(repo, "worktree", "remove", "--force", runner.get(1).worktree)  # worktree disparu : la session n'est plus reprenable
+    monkeypatch.setenv("FAKE_MODE", "ok")
+    assert runner.reply(1, "Au niveau client.").ok
+    _wait(runner, 2)
+    second = runner.get(2)
+    seen = json.loads((Path(second.worktree) / "argv.json").read_text())
+    assert second.resume == "" and "--resume" not in seen["argv"] and seen["argv"][:2] == ["-p", INSTRUCTION]
+    assert seen["brief"].startswith("Brief relu") and "client ou logiciel ?" in seen["brief"] and "<reponse>\nAu niveau client." in seen["brief"]
+
+
+def test_a_reply_needs_a_waiting_agent_and_an_answer(repo, fake_claude, tmp_path, monkeypatch):
+    runner = _runner(repo, fake_claude, tmp_path)
+    runner.launch_retour(D, R, prompt="x")
+    _wait(runner, 1)
+    assert not runner.reply(1, "oui").ok and not runner.reply(99, "oui").ok  # terminé avec PR, puis inconnu
+    monkeypatch.setenv("FAKE_MODE", "question")
+    runner.launch_retour(D, R, prompt="x")
+    _wait(runner, 2)
+    refused = runner.reply(2, "   ")
+    assert not refused.ok and "Écris ta réponse" in refused.message and runner.get(2).status == WAITING
+
+
+def test_agents_finished_on_questions_before_this_state_are_reclassified(tmp_path):
+    state = tmp_path / "agents"
+    state.mkdir()
+    base = {"slug": "acme", "client": "Acme", "subject": "retour R-1", "branch": "fix-acme-r-1", "prompt": "x",
+            "started_at": "2026-11-18T09:10:00", "ended_at": "2026-11-18T09:11:00", "status": "terminé"}
+    (state / "agents.json").write_text(json.dumps([
+        {**base, "id": 2, "summary": "Cause : a.py:1", "pr_url": "https://github.com/padoa/integration-orchestrator/pull/1"},
+        {**base, "id": 1, "summary": "Rien modifié. Client ou logiciel ?"}]))
+    runner = ClaudeRunner(tmp_path, state)
+    assert runner.get(1).status == WAITING and runner.get(2).status == "terminé"
+
+
+def test_when_the_resumed_agent_fails_the_answer_can_be_sent_again_from_the_brief(repo, fake_claude, tmp_path, monkeypatch):
+    monkeypatch.setenv("FAKE_MODE", "question")
+    runner = _runner(repo, fake_claude, tmp_path)
+    runner.launch_retour(D, R, prompt="Brief relu")
+    _wait(runner, 1)
+    monkeypatch.setenv("FAKE_MODE", "fail")  # ex. session introuvable : --resume échoue
+    assert runner.reply(1, "Au niveau client.").ok
+    _wait(runner, 2)
+    assert runner.get(2).status == "échec" and runner.get(1).status == WAITING
+    monkeypatch.setenv("FAKE_MODE", "ok")
+    assert runner.reply(1, "Au niveau client.").ok
+    _wait(runner, 3)
+    third = runner.get(3)
+    assert third.resume == "" and runner.follow_up(1) is third and third.status == "terminé" and runner.get(1).status == ANSWERED
+
+
+def test_any_agent_ended_in_error_can_be_relaunched_with_the_same_brief(repo, fake_claude, tmp_path, monkeypatch):
+    monkeypatch.setenv("FAKE_MODE", "fail")
+    runner = _runner(repo, fake_claude, tmp_path)
+    runner.launch_retour(D, R, prompt="Brief relu")
+    _wait(runner, 1)
+    monkeypatch.setenv("FAKE_MODE", "ok")
+    result = runner.relaunch(1)
+    assert result.ok and "Agent #2 lancé" in result.message
+    _wait(runner, 2)
+    first, second = runner.get(1), runner.get(2)
+    assert runner.relaunched(1) is second and second.relaunch_of == 1 and second.branch == first.branch
+    assert second.worktree == first.worktree and second.status == "terminé" and second.resume == ""
+    seen = json.loads((Path(second.worktree) / "argv.json").read_text())
+    assert seen["brief"] == "Brief relu" and "--resume" not in seen["argv"]
+    assert not runner.relaunch(2).ok and not runner.relaunch(99).ok  # terminé, puis inconnu
+
+
+@pytest.mark.parametrize("status", ["arrêté", "délai dépassé", "interrompu"])
+def test_every_error_status_is_relaunchable(tmp_path, status):
+    runner = ClaudeRunner(tmp_path, tmp_path / "agents")
+    runner.problem = lambda: None
+    runner._start = lambda run: None
+    runner.runs.append(__import__("deploy_hub.sources.claude_runner", fromlist=["AgentRun"]).AgentRun(
+        1, "acme", "Acme", "retour R-1", "fix-acme-r-1", "Brief", datetime(2026, 11, 18, 9), status))
+    assert runner.relaunch(1).ok and runner.get(2).prompt == "Brief"

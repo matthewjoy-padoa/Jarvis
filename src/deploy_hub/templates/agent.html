@@ -8,6 +8,8 @@
 <dl class="meta-list">
   <dt>Sujet</dt><dd><a href="/deploiements/{{ run.slug }}/recette">{{ run.subject }}</a></dd>
   <dt>Branche</dt><dd><code>{{ run.branch }}</code></dd>
+  {% if run.reply_to %}<dt>Reprend</dt><dd><a href="/agents/{{ run.reply_to }}">l'agent #{{ run.reply_to }}</a>, avec ta réponse{{ " (même session Claude)" if run.resume }}</dd>{% endif %}
+  {% if run.relaunch_of %}<dt>Relance</dt><dd>de <a href="/agents/{{ run.relaunch_of }}">l'agent #{{ run.relaunch_of }}</a>, fini en erreur</dd>{% endif %}
   {% if run.worktree %}<dt>Worktree</dt><dd><code>{{ run.worktree }}</code></dd>{% endif %}
   <dt>Lancé</dt><dd>{{ run.started_at.strftime("%d/%m/%Y %H:%M") }}{% if run.ended_at %} · fini à {{ run.ended_at.strftime("%H:%M") }}{% endif %}</dd>
 </dl>

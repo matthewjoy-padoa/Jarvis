@@ -393,6 +393,24 @@ def test_agent_page_shows_status_brief_and_log():
     assert client.get("/agents/9999").status_code == 404
 
 
+def test_an_agent_with_questions_can_be_answered_from_its_page():
+    from deploy_hub.sources.claude_runner import ANSWERED, WAITING
+    claude.runs.clear()
+    client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief initial"})
+    run = claude.runs[0]
+    run.status, run.summary = WAITING, "Rien modifié.\nQuestions :\n1. Client ou logiciel ?"
+    from html import unescape
+    page = unescape(client.get(f"/agents/{run.id}").text)
+    assert "L'agent a des questions" in page and f'hx-post="/agents/{run.id}/repondre"' in page and 'badge g-todo' in page
+    empty = client.post(f"/agents/{run.id}/repondre", data={"reponse": " "})
+    assert "Écris ta réponse" in empty.text and "HX-Redirect" not in empty.headers
+    answered = client.post(f"/agents/{run.id}/repondre", data={"reponse": "Au niveau client."})
+    follow_up = claude.runs[0]
+    assert answered.headers["HX-Redirect"] == f"/agents/{follow_up.id}" and follow_up.reply_to == run.id
+    assert run.status == ANSWERED and f'href="/agents/{follow_up.id}"' in client.get(f"/agents/{run.id}").text
+    assert f'href="/agents/{run.id}"' in client.get(f"/agents/{follow_up.id}").text  # « Reprend l'agent #… »
+
+
 @pytest.mark.parametrize("path", ["/actions?vue=kanban&tous=true", "/recette?vue=kanban&tous=true",
                                   "/deploiements/client-demo/actions?vue=kanban", "/deploiements/client-demo/recette?vue=kanban&tous=true"])
 def test_kanban_views(path):
@@ -495,3 +513,17 @@ def test_footer_shows_version_from_pyproject():
     import tomllib
     expected = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())["project"]["version"]
     assert f"v{expected}</a></footer>" in client.get("/").text
+
+
+def test_an_agent_in_error_has_a_relaunch_button():
+    claude.runs.clear()
+    client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief initial"})
+    run = claude.runs[0]
+    assert 'hx-post="/agents/%d/relancer"' % run.id not in client.get(f"/agents/{run.id}").text  # terminé : pas de bouton
+    run.status = "échec"
+    assert 'hx-post="/agents/%d/relancer"' % run.id in client.get(f"/agents/{run.id}").text
+    r = client.post(f"/agents/{run.id}/relancer")
+    again = claude.runs[0]
+    assert r.headers["HX-Redirect"] == f"/agents/{again.id}" and again.relaunch_of == run.id and again.prompt == "Brief initial"
+    page = client.get(f"/agents/{run.id}").text
+    assert 'hx-post="/agents/%d/relancer"' % run.id not in page and f'href="/agents/{again.id}"' in page

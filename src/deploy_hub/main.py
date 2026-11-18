@@ -18,7 +18,7 @@ from fastapi.templating import Jinja2Templates
 
 from deploy_hub import client_config
 from deploy_hub.config import PROCESS_KEYS, PROJECT_ROOT, clients_dir, data_dir, ensure_private_dirs, forget_secrets, load_settings, secret_problem
-from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
+from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, KO, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
                                kanban_columns, notion_link, status_group)
 from deploy_hub import brief, console, env_file, onepassword, shell
 from deploy_hub.search import Index
@@ -526,7 +526,11 @@ def _agent_context(run) -> dict:
     """Journal de l'agent, et sa relecture guidée dès qu'il a fini (un agent simulé, d'un ancien historique, n'a rien à relire)."""
     path = claude.log_path(run)
     claude.refresh_context(run)
-    return {"run": run, "log": read_log(path), "review": None if run.running or run.simulated else agent_review.build(run, path)}
+    follow_up = None if run.running else claude.follow_up(run.id)
+    relaunch = claude.relaunched(run.id) if run.group == KO else None  # seul un agent en erreur peut avoir été relancé
+    return {"relaunch": relaunch, "relaunchable": run.group == KO and (relaunch is None or relaunch.group == KO),  # relance en échec : on peut réessayer
+            "run": run, "log": read_log(path), "review": None if run.running or run.simulated else agent_review.build(run, path),
+            "follow_up": follow_up, "waiting": claude.can_reply(run, follow_up)}
 
 
 @app.get("/agents/{run_id}", response_class=HTMLResponse)
@@ -540,6 +544,27 @@ def agent_journal(request: Request, run_id: int):
     """Rafraîchi toutes les 5 s par la page de l'agent tant qu'il travaille."""
     run = _run_or_404(run_id)
     return templates.TemplateResponse(request, "_agent_log.html", _agent_context(run))
+
+
+def _open_new_agent(request: Request, result: ActionResult, new_agent) -> HTMLResponse:
+    """Refus affiché sous le bouton ; sinon la page du nouvel agent s'ouvre."""
+    if not result.ok:
+        return _result(request, result)
+    return HTMLResponse("", headers={"HX-Redirect": f"/agents/{new_agent().id}"})
+
+
+@app.post("/agents/{run_id}/repondre")
+def agent_reply(request: Request, run_id: int, reponse: str = Form("")):
+    """« Répondre et relancer » : la réponse part à un nouvel agent sur la même branche, ouvert dès son lancement."""
+    _run_or_404(run_id)
+    return _open_new_agent(request, claude.reply(run_id, reponse), lambda: claude.follow_up(run_id))
+
+
+@app.post("/agents/{run_id}/relancer")
+def agent_relaunch(request: Request, run_id: int):
+    """Relance d'un agent fini en erreur, quelle qu'elle soit : même branche, même brief."""
+    _run_or_404(run_id)
+    return _open_new_agent(request, claude.relaunch(run_id), lambda: claude.relaunched(run_id))
 
 
 @app.post("/agents/{run_id}/arreter")
