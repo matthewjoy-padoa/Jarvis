@@ -79,8 +79,8 @@ FIELDS = (
     Field("JARVIS_AGENT_ALLOWED_TOOLS", "Outils autorisés", "text", "Vide : liste par défaut (lire, modifier, uv run, git, gh pr create) ; sinon séparés par « ; »",
           section=CLAUDE, group=RIGHTS),
     Field("JARVIS_SYNC_ALLOWED_TOOLS", "Outils de la synchro Notion", "text",
-          "Routine lancée par « Rafraîchir depuis Notion » sans jeton. Vide : commandes sync_notion, cp, écriture dans les données, "
-          "connecteur Notion (mcp__claude_ai_Notion, mcp__notion) ; sinon séparés par « ; »", section=CLAUDE, group=RIGHTS),
+          "Routine lancée par « Rafraîchir depuis Notion » sans jeton. Vide : commandes sync_notion, lecture et écriture dans les données, "
+          "connecteur Notion (mcp__claude_ai_Notion) ; sinon séparés par « ; »", section=CLAUDE, group=RIGHTS),
     Field("JARVIS_AGENT_ADD_DIRS", "Dossiers lisibles en plus", "text", "Séparés par « : » (ex. ~/Documents/Claude_vault)", section=CLAUDE, group=RIGHTS),
     Field("JARVIS_WORKTREES_DIR", "Dossier des worktrees", "path", "Vide : <dossier de l'orchestrator>/.claude/worktrees/jarvis", section=CLAUDE,
           group=RIGHTS),

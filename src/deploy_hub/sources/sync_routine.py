@@ -10,21 +10,30 @@ import os
 import shutil
 import subprocess
 import threading
+import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 
 from deploy_hub.config import ENV_FILE_KEYS, PROJECT_ROOT, data_dir
 from deploy_hub.sources import ActionResult
+from deploy_hub.sync_notion import SESSION_ENV
 
 ROUTINE = PROJECT_ROOT / "sync" / "routine.md"
 INSTRUCTION = "Suis la consigne reçue sur l'entrée standard (routine de synchro Notion de Jarvis)."
-NOTION_SERVERS = ("mcp__claude_ai_Notion", "mcp__notion", "mcp__Notion")  # noms courants du connecteur Notion
+# Seuil (en tokens) au-delà duquel Claude Code range une réponse d'outil dans un fichier au lieu de la rendre à Claude.
+# Bas exprès : chaque page Notion est rangée, puis déposée par « sync_notion deposer » en quelques millisecondes. Sinon
+# Claude recopiait lui-même chaque page de 45 Ko, 2 minutes par page (vu le 2026-11-18 sur la VM).
+MCP_OUTPUT_TOKENS = "2000"
+NOTION_SERVERS = ("mcp__claude_ai_Notion",)  # connecteur Notion de claude.ai (nom vu sur la VM le 2026-11-18)
 
 
 def default_tools(data: Path) -> tuple[str, ...]:
-    """Outils permis : les commandes de synchro, la copie des résultats, l'écriture dans le dossier de données
-    (Edit : seule forme de règle à chemin que Claude Code applique aussi à Write), Notion."""
-    return ("Bash(uv run python -m deploy_hub.sync_notion:*)", "Bash(cp:*)", f"Edit(/{data.resolve()}/**)", *NOTION_SERVERS)
+    """Outils permis : les commandes de synchro (dépôt des grosses réponses compris : plus de « cp », que Claude Code refuse
+    sur ~/.claude), la lecture et l'écriture du dossier de données (Edit : seule forme de règle à chemin que Claude Code
+    applique aussi à Write ; Read pour un dossier de données placé hors du projet), Notion."""
+    folder = f"/{data.resolve()}/**"
+    return ("Bash(uv run python -m deploy_hub.sync_notion:*)", f"Read({folder})", f"Edit({folder})", *NOTION_SERVERS)
 
 
 def routine_text() -> str:
@@ -75,6 +84,17 @@ class SyncRoutine:
         self.folder.mkdir(parents=True, exist_ok=True)
         self.state_path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
 
+    def _other(self) -> dict | None:
+        """Synchro lancée par un autre processus (autre Jarvis, test) et toujours vivante, d'après routine.json."""
+        state = self.state()
+        if not state.get("running") or not state.get("pid"):
+            return None
+        try:
+            os.kill(int(state["pid"]), 0)
+        except (OSError, ValueError):
+            return None
+        return state
+
     @property
     def running(self) -> bool:
         return self._proc is not None and self._proc.poll() is None
@@ -88,8 +108,11 @@ class SyncRoutine:
         return None
 
     # --- lancement ----------------------------------------------------------------------------------------------
-    def command(self) -> list[str]:
-        return [self.claude_bin, "-p", INSTRUCTION, "--output-format", "text", "--allowedTools", *self.allowed_tools]
+    def command(self, session: str = "") -> list[str]:
+        """--session-id : Jarvis connaît la session, donc le dossier où Claude Code range ses grosses réponses (« deposer »).
+        --permission-mode dontAsk : tout ce qui n'est pas permis est refusé, jamais mis en attente."""
+        return [self.claude_bin, "-p", INSTRUCTION, "--output-format", "text", "--permission-mode", "dontAsk",
+                *(["--session-id", session] if session else []), "--allowedTools", *self.allowed_tools]
 
     def _env(self) -> dict:
         """Environnement de l'app (mêmes dossiers, donc mêmes clients), sans les valeurs venues du .env : le processus de
@@ -102,11 +125,17 @@ class SyncRoutine:
         with self._lock:
             if self.running:
                 return ActionResult(False, "Une synchro est déjà en cours.", False)
+            if (other := self._other()):
+                return ActionResult(False, f"Une synchro tourne déjà, lancée à {other.get('started', '?')} par un autre Jarvis : "
+                                           "attends sa fin.", False)
             self.folder.mkdir(parents=True, exist_ok=True)
             log = self.log_path.open("w", encoding="utf-8")
-            self._proc = subprocess.Popen(self.command(), cwd=PROJECT_ROOT, env=self._env(), stdin=subprocess.PIPE,
+            session = str(uuid.uuid4())
+            env = {**self._env(), SESSION_ENV: session, "MAX_MCP_OUTPUT_TOKENS": MCP_OUTPUT_TOKENS}
+            self._proc = subprocess.Popen(self.command(session), cwd=PROJECT_ROOT, env=env,
+                                          stdin=subprocess.PIPE,
                                           stdout=log, stderr=subprocess.STDOUT, text=True)
-            self._save(running=True, started=datetime.now().isoformat(timespec="seconds"))
+            self._save(running=True, started=datetime.now().isoformat(timespec="seconds"), pid=self._proc.pid, session=session)
         self._proc.stdin.write(routine_text())
         self._proc.stdin.close()
         threading.Thread(target=self._wait, args=(self._proc, log), name="jarvis-sync", daemon=True).start()
@@ -144,6 +173,7 @@ class SyncRoutine:
         if not fresh(self.folder / "empreintes.json"):
             return {"pct": 5, "label": "Empreinte de tous les clients…"}
         done = total = merged = 0
+        latest = None  # dernier résultat déposé : on montre sa page quand une requête en a plusieurs
         for raw in (p for p in self.folder.iterdir() if p.is_dir()):
             plan = raw / "plan.json"
             if fresh(plan):
@@ -153,14 +183,23 @@ class SyncRoutine:
                     outputs = []
                 total += len(outputs)
                 done += sum((raw / f"{name}.json").is_file() for name in outputs)
+                for name in outputs:
+                    for page in raw.glob(f"{name}*.json"):
+                        if fresh(page) and (latest is None or page.stat().st_mtime > latest.stat().st_mtime):
+                            latest = page
             elif fresh(raw / "etat-synchro.json"):  # client fusionné : son plan est effacé
                 merged += 1
         if merged:
             return {"pct": 92, "label": f"Fusion : {merged} client(s)…"}
         if not total:
             return {"pct": 15, "label": "Plan des requêtes…"}
-        if done < total:
-            return {"pct": 20 + 65 * done // total, "label": f"Requêtes : {done} / {total}"}
+        number = latest.stem.rsplit("-", 1)[-1] if latest and "-" in latest.stem else ""
+        paging = number.isdigit() and time.time() - latest.stat().st_mtime < 120  # une page vient d'arriver : la lecture continue
+        if done < total or paging:
+            label = f"Requêtes : {min(done, total - 1) if paging else done} / {total}"
+            if paging:  # requête lue page par page (100 lignes) : la page en cours
+                label += f" · {latest.stem.rsplit('-', 1)[0]}, page {int(number) + 1}"
+            return {"pct": 20 + 65 * min(done, total - 1 if paging else done) // total, "label": label}
         return {"pct": 88, "label": "Fusion…"}
 
     def failures(self) -> list[str]:
