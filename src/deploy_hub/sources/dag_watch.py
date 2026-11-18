@@ -3,7 +3,8 @@ tourne en tâche de fond. Il relance les tâches en échec passager (3 fois au p
 
 Ses lignes « [notif] {"title", "msg"} » deviennent des notifications de Jarvis ; tout le reste va au journal du suivi.
 État, journaux, rapports : data/airflow (AIR_STATE_DIR), hors de git et jamais dans le vault (valeurs client possibles).
-Le suivi lit les logs des tâches qu'il suit : dérogation décidée par Matthew le 2026-11-12.
+Comme /air, le suivi ne passe que par l'API REST, avec les mêmes identifiants que le lancement : rien à régler pour les logs
+(ceux des tâches viennent de l'API ; aucun fichier de logs, pas de docker exec ni de commande airflow).
 
 Redémarrage de Jarvis (rechargement compris) : shutdown() coupe les process sans changer l'état des suivis, puis le Jarvis
 suivant les relance ; air.py reprend où il en était (son état watch__<dag>__<run>.json garde relances et notifications).
