@@ -402,8 +402,9 @@ def test_an_agent_with_questions_can_be_answered_from_its_page():
     from html import unescape
     page = unescape(client.get(f"/agents/{run.id}").text)
     assert "L'agent a des questions" in page and f'hx-post="/agents/{run.id}/repondre"' in page and 'badge g-todo' in page
-    schema = client.get("/agents").text  # dans le schéma : parmi les terminés, marqué « en attente » (« ? », autre couleur)
-    assert 'class="flow-lane flow-done"' in schema and schema.count('<a class="flow-node flow-bot is-waiting"') == 1
+    schema = client.get("/agents").text  # dans le schéma : parmi les « en cours », marqué « en attente » (« ? », autre couleur)
+    assert 'class="flow-lane flow-in_progress"' in schema and schema.count('<a class="flow-node flow-bot is-waiting"') == 1
+    assert schema.index("flow-lane flow-in_progress") < schema.index("flow-bot is-waiting") < schema.index("flow-lane flow-done")
     empty = client.post(f"/agents/{run.id}/repondre", data={"reponse": " "})
     assert "Écris ta réponse" in empty.text and "HX-Redirect" not in empty.headers
     answered = client.post(f"/agents/{run.id}/repondre", data={"reponse": "Au niveau client."})

@@ -18,7 +18,7 @@ Jarvis suit une numérotation `0.MINEUR.CORRECTIF` tant qu'il n'est pas stable :
 - Bouton « Lancer » (Injections, CED, ressource de la fiche, console, enchaînements) : lancement par `air.py run`, comme `/air`. La confirmation des formulaires montre l'aperçu (ressources, run déjà en cours ; la commande `lancer` du terminal garde sa question) ; un DAG plus chargé par Airflow est refusé ; le message ne dit plus « DAG sorti de pause ». Tests contre un faux Airflow HTTP local que le vrai `air.py` appelle.
 - DAGs proposés depuis le clone orchestrator local, tel qu'il est sur le disque (branche extraite, modifications non commitées comprises, comme l'Airflow local) : catalogue dans `data/dags/`, régénéré quand le clone change et sur « Régénérer » (onglet Injections) ; repli sur le catalogue versionné sans clone.
 - Page Agents : les petits robots du schéma deviennent des armures, une par état : rouge et or en vol (en cours), argent à l'arrêt (terminé), tout or, répulseur levé (PR ouverte), ferraille grise sur le dos (arrêté ou en échec).
-- Page Agents : l'agent qui attend une réponse apparaît dans le schéma (il n'y était pas), parmi les terminés : armure bleu et argent, main levée, « ? » au-dessus de la tête.
+- Page Agents : l'agent qui attend une réponse apparaît dans le schéma (il n'y était pas), parmi les « en cours » : posé au sol, armure bleu et argent, main levée, « ? » au-dessus de la tête.
 
 ## [0.1.0] · 2026-11-17
 
