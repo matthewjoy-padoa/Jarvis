@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import threading
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -20,6 +21,10 @@ from deploy_hub.sync_notion import SESSION_ENV
 
 ROUTINE = PROJECT_ROOT / "sync" / "routine.md"
 INSTRUCTION = "Suis la consigne reçue sur l'entrée standard (routine de synchro Notion de Jarvis)."
+# Seuil (en tokens) au-delà duquel Claude Code range une réponse d'outil dans un fichier au lieu de la rendre à Claude.
+# Bas exprès : chaque page Notion est rangée, puis déposée par « sync_notion deposer » en quelques millisecondes. Sinon
+# Claude recopiait lui-même chaque page de 45 Ko, 2 minutes par page (vu le 2026-11-18 sur la VM).
+MCP_OUTPUT_TOKENS = "2000"
 NOTION_SERVERS = ("mcp__claude_ai_Notion",)  # connecteur Notion de claude.ai (nom vu sur la VM le 2026-11-18)
 
 
@@ -126,7 +131,8 @@ class SyncRoutine:
             self.folder.mkdir(parents=True, exist_ok=True)
             log = self.log_path.open("w", encoding="utf-8")
             session = str(uuid.uuid4())
-            self._proc = subprocess.Popen(self.command(session), cwd=PROJECT_ROOT, env={**self._env(), SESSION_ENV: session},
+            env = {**self._env(), SESSION_ENV: session, "MAX_MCP_OUTPUT_TOKENS": MCP_OUTPUT_TOKENS}
+            self._proc = subprocess.Popen(self.command(session), cwd=PROJECT_ROOT, env=env,
                                           stdin=subprocess.PIPE,
                                           stdout=log, stderr=subprocess.STDOUT, text=True)
             self._save(running=True, started=datetime.now().isoformat(timespec="seconds"), pid=self._proc.pid, session=session)
@@ -167,6 +173,7 @@ class SyncRoutine:
         if not fresh(self.folder / "empreintes.json"):
             return {"pct": 5, "label": "Empreinte de tous les clients…"}
         done = total = merged = 0
+        latest = None  # dernier résultat déposé : on montre sa page quand une requête en a plusieurs
         for raw in (p for p in self.folder.iterdir() if p.is_dir()):
             plan = raw / "plan.json"
             if fresh(plan):
@@ -176,14 +183,23 @@ class SyncRoutine:
                     outputs = []
                 total += len(outputs)
                 done += sum((raw / f"{name}.json").is_file() for name in outputs)
+                for name in outputs:
+                    for page in raw.glob(f"{name}*.json"):
+                        if fresh(page) and (latest is None or page.stat().st_mtime > latest.stat().st_mtime):
+                            latest = page
             elif fresh(raw / "etat-synchro.json"):  # client fusionné : son plan est effacé
                 merged += 1
         if merged:
             return {"pct": 92, "label": f"Fusion : {merged} client(s)…"}
         if not total:
             return {"pct": 15, "label": "Plan des requêtes…"}
-        if done < total:
-            return {"pct": 20 + 65 * done // total, "label": f"Requêtes : {done} / {total}"}
+        number = latest.stem.rsplit("-", 1)[-1] if latest and "-" in latest.stem else ""
+        paging = number.isdigit() and time.time() - latest.stat().st_mtime < 120  # une page vient d'arriver : la lecture continue
+        if done < total or paging:
+            label = f"Requêtes : {min(done, total - 1) if paging else done} / {total}"
+            if paging:  # requête lue page par page (100 lignes) : la page en cours
+                label += f" · {latest.stem.rsplit('-', 1)[0]}, page {int(number) + 1}"
+            return {"pct": 20 + 65 * min(done, total - 1 if paging else done) // total, "label": label}
         return {"pct": 88, "label": "Fusion…"}
 
     def failures(self) -> list[str]:

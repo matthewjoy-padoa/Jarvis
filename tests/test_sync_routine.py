@@ -282,14 +282,15 @@ def test_the_routine_runs_with_a_known_session_and_never_asks(tmp_path):
     script.write_text(f"""#!{sys.executable}
 import os, sys
 sys.stdin.read()
-open({str(tmp_path / 'vu.txt')!r}, 'w').write(repr((sys.argv[1:], os.environ.get('JARVIS_SYNC_SESSION'))))
+open({str(tmp_path / 'vu.txt')!r}, 'w').write(repr((sys.argv[1:], os.environ.get('JARVIS_SYNC_SESSION'), os.environ.get('MAX_MCP_OUTPUT_TOKENS'))))
 print('acme : inchangé')
 """, encoding="utf-8")
     script.chmod(script.stat().st_mode | stat.S_IEXEC)
     routine = SyncRoutine(folder=tmp_path / "notion", claude_bin=str(script))
     assert routine.start().ok
     wait(routine)
-    args, session = eval((tmp_path / "vu.txt").read_text())
+    args, session, mcp_tokens = eval((tmp_path / "vu.txt").read_text())
+    assert int(mcp_tokens) <= 5000  # chaque page Notion est rangée dans un fichier, puis déposée : Claude ne la recopie pas
     assert args[args.index("--session-id") + 1] == session and session
     assert args[args.index("--permission-mode") + 1] == "dontAsk"
     tools = args[args.index("--allowedTools") + 1:]
@@ -316,4 +317,25 @@ def test_two_syncs_never_run_at_once(tmp_path, monkeypatch):
     assert sync_notion.running_elsewhere(tmp_path) is None
     (folder / "routine.json").write_text(json.dumps({"running": True, "started": "08:06", "pid": 999999999, "session": "x"}))
     assert sync_notion.running_elsewhere(tmp_path) is None  # processus mort : la synchro est finie, on peut relancer
+
+
+def test_progress_shows_the_page_of_a_long_query(tmp_path):
+    """Une requête lue page par page (100 lignes) : le cercle dit laquelle, au lieu de rester figé sur « 3 / 4 »."""
+    import json
+    folder = tmp_path / "notion"
+    routine = SyncRoutine(folder=folder)
+    routine._save(running=True, started="2000-01-01T00:00:00")
+    (folder / "empreintes.json").parent.mkdir(parents=True, exist_ok=True)
+    (folder / "empreintes.json").write_text("{}")
+    raw = folder / "acme"
+    raw.mkdir()
+    (raw / "plan.json").write_text(json.dumps({"sorties": ["client", "regles", "recette", "actions"]}))
+    for name in ("client", "regles", "recette", "actions", "actions-2", "actions-6"):
+        (raw / f"{name}.json").write_text("{}")
+        time.sleep(0.02)
+    p = routine.progress()  # la dernière requête lit encore ses pages : pas « Fusion »
+    assert p["label"] == "Requêtes : 3 / 4 · actions, page 7" and p["pct"] < 88
+    old = time.time() - 600
+    os.utime(raw / "actions-6.json", (old, old))  # plus de page depuis 10 min : la lecture est finie
+    assert routine.progress()["label"] == "Fusion…"
 
