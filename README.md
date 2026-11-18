@@ -14,9 +14,9 @@ Chacun configure **ses propres clients** : configuration et données restent sur
 Prérequis : [uv](https://docs.astral.sh/uv/) et un accès au Notion Padoa.
 
 ```bash
-git clone git@github.com:<organisation>/Jarvis.git && cd Jarvis
+git clone git@github.com:matthewjoy-padoa/Jarvis.git && cd Jarvis
 uv sync
-cp .env.example .env          # facultatif
+cp .env.example .env          # facultatif : tout se règle aussi dans la page Réglages
 uv run uvicorn deploy_hub.main:app --port 8765
 ```
 
@@ -56,12 +56,12 @@ La consigne vit dans le dépôt : un `git pull` met à jour la tâche planifiée
 ## Lancer des DAGs
 
 L'onglet Injections propose les DAGs de l'orchestrator qui traitent chaque ressource, sur integration, snap ou recette (la prod est désactivée).
-- Réglages Airflow dans `.env` (`AIRFLOW_BASE_URL`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD`) ; sans eux, aucun DAG n'est lancé et Jarvis dit quoi régler.
+- Réglages Airflow (page **Réglages** ou `.env`) : `AIRFLOW_BASE_URL`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD` ; sans eux, aucun DAG n'est lancé et Jarvis dit quoi régler. **Sources** dit si Airflow est connecté.
 - **Lancer** passe par [`air.py`](src/deploy_hub/air.py), comme `/air` : la confirmation montre son aperçu (DAG, stack, ressources, « ⚠️ run déjà en cours ») ; un DAG plus chargé par Airflow est refusé, un DAG en pause en est sorti, puis le run part avec `padoa_env`. Un aperçu en échec (Airflow injoignable, DAG absent, accès refusé) s'affiche et rien ne part.
-- Après chaque lancement réel, `air.py` suit aussi le run : il relance les échecs passagers (3 fois au plus), envoie ses alertes en notifications et fait un rapport (**Agents → Suivis de DAG**). Comme `/air`, il ne passe que par l'API REST d'Airflow : rien à régler en plus de `AIRFLOW_BASE_URL`, `AIRFLOW_USER` et `AIRFLOW_PASSWORD` (aucun accès aux fichiers de logs). Ce qu'il écrit reste dans `data/airflow/`.
+- Après chaque lancement réel, `air.py` suit aussi le run : il relance les échecs passagers (3 fois au plus), envoie ses alertes en notifications et fait un rapport (**Agents → Suivis de DAG**). Suivis, rapports et journal sont gardés au redémarrage, et un suivi en cours reprend là où il en était ; relances au plus et intervalle de vérification dans **Réglages** (`JARVIS_DAG_MAX_CLEARS`, `JARVIS_DAG_INTERVAL_S`). Comme `/air`, il ne passe que par l'API REST d'Airflow : rien à régler en plus de `AIRFLOW_BASE_URL`, `AIRFLOW_USER` et `AIRFLOW_PASSWORD` (aucun accès aux fichiers de logs). Ce qu'il écrit reste dans `data/airflow/`.
 - **Enchaînement** : plusieurs DAG cochés partent dans l'ordre ; le suivant ne part que si le suivi du précédent finit vert, sinon la chaîne s'arrête et le dit en notification (**Agents → Enchaînements**, bouton « Arrêter »). Jamais en prod.
 - **Depuis Claude Code** : ouvre le dossier de Jarvis dans Claude Code et tape `/air` (skill [`.claude/skills/air/SKILL.md`](.claude/skills/air/SKILL.md)) : client par défaut, liste des DAGs et des runs, lancement après confirmation, suivi et rapport, avec les mêmes réglages Airflow que l'app (`uv run python -m deploy_hub.air_jarvis <commande>`). Ces runs n'apparaissent pas dans **Agents → Suivis de DAG** ; rapports et journal vont aussi dans `data/airflow/`.
-- **DAGs proposés : ceux de ton clone local**, tel qu'il est sur le disque, comme le lit l'Airflow local (branche extraite dans `ORCHESTRATOR_DIR`, modifications non commitées comprises). Pour changer de DAGs, change de branche dans le clone : Jarvis suit. [`sync/dags/generer_catalogue.py`](sync/dags/generer_catalogue.py) lit le clone sans le modifier et écrit le catalogue dans `data/dags/` (quelques secondes ; le premier passage télécharge Python 3.12 et les paquets du générateur). Régénéré au démarrage, quand le clone change (vérifié chaque minute) et sur « Régénérer » (onglet Injections). Sans clone : le catalogue versionné `sync/dags/catalogue.json` (copie figée de `main`).
+- **DAGs proposés : ceux de ton clone local**, tel qu'il est sur le disque, comme le lit l'Airflow local (branche extraite dans `ORCHESTRATOR_DIR`, modifications non commitées comprises ; ce réglage est lu au démarrage, vide : `~/integration-orchestrator`). Pour changer de DAGs, change de branche dans le clone : Jarvis suit. [`sync/dags/generer_catalogue.py`](sync/dags/generer_catalogue.py) lit le clone sans le modifier et écrit le catalogue dans `data/dags/` (quelques secondes ; le premier passage télécharge Python 3.12 et les paquets du générateur). Régénéré au démarrage, quand le clone change (vérifié chaque minute) et sur « Régénérer » (onglet Injections). Sans clone : le catalogue versionné `sync/dags/catalogue.json` (copie figée de `main`), et le bandeau de l'onglet Injections le dit.
 
 ## Flow Digger
 
@@ -73,6 +73,7 @@ Sur un retour de recette, « Lancer un agent » envoie le brief à Claude Code (
 - dans un **worktree** de l'orchestrator, sur la branche `fix-<client>-<retour>` : ton clone de travail n'est jamais modifié ;
 - outils limités à `JARVIS_AGENT_ALLOWED_TOOLS` (lire, modifier, `uv run`, git sans reset, `gh pr create`), lecture hors worktree limitée à `JARVIS_AGENT_ADD_DIRS`, sans les jetons de Jarvis ;
 - suivi dans **Agents** (journal, compte rendu, PR, bouton « Arrêter ») ;
+- **questions** : un agent qui finit son compte rendu par des questions passe en « question en attente » ; « Répondre et relancer » reprend sa session Claude Code avec ta réponse ;
 - **relecture guidée** sur la page d'un agent terminé : fichiers changés, tests lancés et leur résultat, appels d'outils refusés, contrôles (pas de PR, pas de test, étape commune touchée, fichiers non commités) ;
 - **coût et durée** par agent et par type de ticket, en bas de la page Agents.
 
@@ -104,9 +105,9 @@ Pour que les agents travaillent sans ton poste, avec en plus un shell de la VM d
 - La synchro de la recette n'accepte qu'une liste fixe de colonnes ; le contenu des retours est rangé à part (`data/notion/<client>/contenu-recette.json`).
 - Le brief d'agent interdit toute donnée client dans le code, les tests ou la PR.
 
-## Réglages (`.env`)
+## Réglages (page Réglages, `.env`)
 
-Tous facultatifs, voir [`.env.example`](.env.example) :
+Tous facultatifs. La page **Réglages** (accessible seulement en local, par exemple par le transfert de port de la VM) les modifie et les enregistre dans `.env` ; modèle commenté : [`.env.example`](.env.example). Les réglages lus au démarrage (dossiers, `ORCHESTRATOR_DIR`) s'appliquent au prochain lancement de Jarvis, la page le dit.
 
 | Variable | Rôle |
 |---|---|
@@ -114,11 +115,13 @@ Tous facultatifs, voir [`.env.example`](.env.example) :
 | `NOTION_TOKEN` | Synchro par l'API Notion ; vide : le bouton « Rafraîchir depuis Notion » lance la routine Claude Code |
 | `CLAUDE_BIN`, `JARVIS_SYNC_ALLOWED_TOOLS` | Routine lancée par le bouton : binaire `claude`, outils permis (vide : liste par défaut) |
 | `AIRFLOW_BASE_URL`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD` | Lancement réel des DAGs |
-| `ORCHESTRATOR_DIR`, `CLAUDE_BIN`, `JARVIS_AGENT_*` | Agents Claude |
+| `JARVIS_DAG_MAX_CLEARS`, `JARVIS_DAG_INTERVAL_S` | Suivi des runs : relances automatiques au plus (0 : aucune), secondes entre deux vérifications |
+| `ORCHESTRATOR_DIR` | Clone local de l'orchestrator : DAGs proposés, agents Claude, PR (vide : `~/integration-orchestrator`) |
+| `CLAUDE_BIN`, `JARVIS_AGENT_*` | Agents Claude |
 | `FLOW_DIGGER_DIR`, `FLOW_DIGGER_PORT`, `FLOW_DIGGER_URL` | Bouton Flow Digger (dossier, port 4004, adresse si le transfert de port en change) |
 | `PADOA_ENV_URL` | Bouton Environnements du dock (snap, snap-recette, integration) : modèle d'adresse avec `[stack]` et `[client]`, vide : `https://[stack]-[client].aodap-staging.fr/support` ; `[client]` = nom du client dans Jarvis (son slug) |
 
-**Secrets** (`NOTION_TOKEN`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD`) : de préférence une référence 1Password `op://<coffre>/<élément>/<champ>` (« Copy Secret Reference »), lue par `op read` au démarrage et gardée en mémoire seulement ; connecte-toi d'abord (app 1Password, ou `eval $(op signin)` dans le terminal qui lance Jarvis). `.env` est ramené à `600`, et Jarvis refuse de démarrer si ses données ou sa configuration sont dans un dépôt git sans y être ignorées.
+**Secrets** (`NOTION_TOKEN`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD`) : en clair, ou une référence 1Password `op://<coffre>/<élément>/<champ>` (« Copy Secret Reference »), lue par `op read` à la première demande et gardée en mémoire seulement. Pour une référence, 1Password doit être connecté : **Réglages → 1Password** (ton mot de passe sert une fois à `op signin` et n'est ni gardé ni écrit ; la page relit aussitôt les références), l'app 1Password, ou `eval $(op signin)` dans le terminal qui lance Jarvis. Sur une machine sans session 1Password (VM), **Sources** affiche « référence 1Password illisible ». `.env` est ramené à `600`, et Jarvis refuse de démarrer si ses données ou sa configuration sont dans un dépôt git sans y être ignorées.
 
 ## Développement
 
@@ -133,5 +136,6 @@ Routes dans `src/deploy_hub/main.py`, pages dans `templates/` et `static/`, sync
 
 ## Limites connues
 
-- L'historique des DAGs lancés n'est pas gardé au redémarrage (celui des agents l'est).
+- Après un changement du clone orchestrator, la liste des DAGs est à jour au plus une minute plus tard (ou tout de suite avec « Régénérer ») ; une page Injections déjà ouverte ne se recharge pas seule.
+- Les runs lancés par `/air` n'apparaissent pas dans **Agents → Suivis de DAG** (leurs rapports sont dans `data/airflow/`).
 - Un changement fait seulement sur une carte Bible n'est vu qu'à la synchro complète suivante (7 jours au plus).
