@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from deploy_hub.sources.claude_runner import (ANSWERED, INSTRUCTION, RESUME_INSTRUCTION, WAITING, ClaudeRunner, agent_branch,
-                                               asks_questions, find_pr, read_log)
+                                               answer_text, find_pr, questions_of, read_log)
 from deploy_hub.sources.notifications import NotificationStore
 
 from conftest import instant_agents
@@ -258,9 +258,9 @@ def test_log_events_whose_message_is_text_do_not_break_the_agent_page(tmp_path):
 
 
 def test_questions_are_recognised_only_when_the_report_asks_them():
-    assert asks_questions("Rien modifié.\n\nQuestions :\n1. Client ou logiciel")
-    assert asks_questions("Rien modifié. Faut-il corriger au niveau client ou logiciel ?")
-    assert not asks_questions("Cause : mapping.py:12. Tests verts.") and not asks_questions("")
+    assert questions_of("Rien modifié.\n\nQuestions :\n1. Client ou logiciel")
+    assert questions_of("Rien modifié. Faut-il corriger au niveau client ou logiciel ?")
+    assert not questions_of("Cause : mapping.py:12. Tests verts.") and not questions_of("")
 
 
 def test_an_agent_that_stops_on_questions_waits_for_an_answer(repo, fake_claude, tmp_path, monkeypatch):
@@ -374,3 +374,26 @@ def test_every_error_status_is_relaunchable(tmp_path, status):
     runner.runs.append(__import__("deploy_hub.sources.claude_runner", fromlist=["AgentRun"]).AgentRun(
         1, "acme", "Acme", "retour R-1", "fix-acme-r-1", "Brief", datetime(2026, 11, 18, 9), status))
     assert runner.relaunch(1).ok and runner.get(2).prompt == "Brief"
+
+
+def test_each_question_is_listed_with_its_details():
+    summary = ("Je n'ai rien modifié : choix métier.\n\n**Questions :**\n"
+               "1. **Correctif au niveau client ou logiciel ?**\n   - client : seul ce client\n   - logiciel : tous les clients\n"
+               "2) Faut-il un test de non-régression ?\n")
+    assert questions_of(summary) == ["Correctif au niveau client ou logiciel ?\n- client : seul ce client\n- logiciel : tous les clients",
+                                     "Faut-il un test de non-régression ?"]
+    assert questions_of("Questions :\n- Quelle date ?\n- Quel client ?") == ["Quelle date ?", "Quel client ?"]
+
+
+def test_without_a_questions_line_each_line_ending_with_a_question_mark_is_one():
+    """Agents lancés avant la consigne « Questions : » (ex. l'agent n°1 de la VM)."""
+    assert questions_of("Rien modifié.\n- Faut-il corriger côté client ?\nAutre point.\nEt la date ?") == [
+        "Faut-il corriger côté client ?", "Et la date ?"]
+    assert questions_of("Cause : a.py:12. Tests verts.") == []
+
+
+def test_the_answer_pairs_each_question_with_its_answer():
+    text = answer_text(["Client ou logiciel ?", "Un test ?"], ["Client", ""], "Merci")
+    assert text == "Question 1 : Client ou logiciel ?\nRéponse : Client\n\nQuestion 2 : Un test ?\nRéponse : (pas de réponse)\n\nPrécision : Merci"
+    assert answer_text(["Q ?"], ["  "]) == ""  # rien de rempli : la relance est refusée
+    assert answer_text(["Q ?"], [""], " Merci ") == "Précision : Merci"

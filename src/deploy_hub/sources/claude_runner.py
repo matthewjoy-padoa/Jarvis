@@ -141,15 +141,46 @@ RESUME_INSTRUCTION = "La réponse à tes questions est sur l'entrée standard : 
 QUESTIONS_HEADING = re.compile(r"^\W*questions?\b.*:\s*$", re.IGNORECASE)  # « Questions : », « **Questions ouvertes :** »
 
 
-def asks_questions(summary: str) -> bool:
-    """Compte rendu qui s'arrête sur des questions : section « Questions : » (consigne du brief) ou une ligne qui finit par « ? »."""
-    lines = [line.strip().strip("*_ ") for line in (summary or "").splitlines() if line.strip()]
-    return any(QUESTIONS_HEADING.match(line) or line.endswith("?") for line in lines)
+NUMBERED = re.compile(r"^\s*(?:\*\*)?\d+[.)](?:\*\*)?\s+(.*)$")  # « 1. … », « **2)** … »
+BULLET = re.compile(r"^[-*•]\s+(.*)$")  # puce en début de ligne ; une puce en retrait est un détail de la question
+
+
+def _clean(text: str) -> str:
+    return text.strip().strip("*_ ").strip()
+
+
+def questions_of(summary: str) -> list[str]:
+    """Questions du compte rendu, une par élément : première ligne = la question, lignes suivantes = ses détails (options…).
+    Après une ligne « Questions : » (consigne du brief), chaque élément numéroté ou à puce est une question ; sans cette ligne,
+    chaque ligne qui finit par « ? »."""
+    lines = (summary or "").splitlines()
+    start = next((i for i, line in enumerate(lines) if QUESTIONS_HEADING.match(_clean(line))), None)
+    items: list[str] = []
+    for line in lines[start + 1:] if start is not None else []:
+        if not line.strip():
+            continue
+        item = NUMBERED.match(line) or BULLET.match(line)
+        if item:
+            items.append(_clean(item.group(1)))
+        elif items:
+            items[-1] += "\n" + line.strip()
+        else:
+            items.append(_clean(line))
+    return items or [_clean(BULLET.sub(r"\1", line.strip())) for line in lines if _clean(line).endswith("?")]
+
+
+def answer_text(questions: list[str], answers: list[str], extra: str = "") -> str:
+    """Réponse envoyée à l'agent : chaque question suivie de sa réponse, puis la précision libre. Vide si rien n'est rempli."""
+    answers, extra = [a.strip() for a in answers], extra.strip()
+    if not any(answers):  # aucune réponse aux questions : la précision seule (vide : la relance est refusée)
+        return f"Précision : {extra}" if extra and questions else extra
+    parts = [f"Question {i} : {q}\nRéponse : {a or '(pas de réponse)'}" for i, (q, a) in enumerate(zip(questions, answers), 1)]
+    return "\n\n".join(parts + ([f"Précision : {extra}"] if extra else []))
 
 
 def final_status(run: "AgentRun") -> str:
     """« terminé » sans PR, sur des questions : l'agent attend une réponse, ce n'est pas un succès."""
-    return WAITING if not run.pr_url and asks_questions(run.summary) else "terminé"
+    return WAITING if not run.pr_url and questions_of(run.summary) else "terminé"
 # Outils accordés à l'agent (JARVIS_AGENT_ALLOWED_TOOLS, séparés par « ; ») : lire, modifier, tester, committer, pousser
 # sa branche, ouvrir la PR. Le reste est refusé (pas de question en mode -p). guard.sh bloque push sur main et push forcé.
 # Pas de Read/Edit/Write : sans chemin ils vaudraient partout. acceptEdits autorise déjà les modifications dans le worktree
@@ -277,7 +308,8 @@ def retour_prompt(d: Deployment, r: RetourRecette, description: str = "") -> str
         _tag("compte_rendu", "Termine par : la cause (fichier:ligne), le correctif et son niveau (client ou logiciel), les tests "
                              "(commande et résultat), le lien de la PR, et ce qu'il faudra vérifier en recette. "
                              "Si tu t'arrêtes sur des questions (retour trop flou, choix métier), ne modifie rien, n'ouvre pas de PR et "
-                             "termine par une ligne « Questions : » suivie d'une question par ligne : la personne te répondra "
+                             "termine par une ligne « Questions : » suivie de tes questions numérotées (1., 2., …), une par ligne, avec en dessous, "
+                             "en retrait, les options possibles si tu en vois : la personne répondra à chacune "
                              "et tu reprendras là où tu t'es arrêté."),
     ]
     return "\n\n".join(parts)

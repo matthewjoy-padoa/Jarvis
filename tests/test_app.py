@@ -398,18 +398,24 @@ def test_an_agent_with_questions_can_be_answered_from_its_page():
     claude.runs.clear()
     client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief initial"})
     run = claude.runs[0]
-    run.status, run.summary = WAITING, "Rien modifié.\nQuestions :\n1. Client ou logiciel ?"
+    run.status, run.summary = WAITING, ("Rien modifié.\nQuestions :\n1. Client ou logiciel ?\n   - client : apst2607 seul\n"
+                                        "2. Faut-il un test de non-régression ?")
     from html import unescape
     page = unescape(client.get(f"/agents/{run.id}").text)
-    assert "L'agent a des questions" in page and f'hx-post="/agents/{run.id}/repondre"' in page and 'badge g-todo' in page
+    assert "L'agent a 2 questions" in page and f'hx-post="/agents/{run.id}/repondre"' in page and 'badge g-todo' in page
+    assert 'name="reponse_1"' in page and 'name="reponse_2"' in page and "Client ou logiciel ?</label>" in page
+    assert "- client : apst2607 seul</pre>" in page  # détail de la question, sous elle
     schema = client.get("/agents").text  # dans le schéma : parmi les « en cours », marqué « en attente » (« ? », autre couleur)
     assert 'class="flow-lane flow-in_progress"' in schema and schema.count('<a class="flow-node flow-bot is-waiting"') == 1
     assert schema.index("flow-lane flow-in_progress") < schema.index("flow-bot is-waiting") < schema.index("flow-lane flow-done")
     empty = client.post(f"/agents/{run.id}/repondre", data={"reponse": " "})
     assert "Écris ta réponse" in empty.text and "HX-Redirect" not in empty.headers
-    answered = client.post(f"/agents/{run.id}/repondre", data={"reponse": "Au niveau client."})
+    answered = client.post(f"/agents/{run.id}/repondre", data={"reponse_1": "Au niveau client.", "reponse_2": "", "reponse": "Merci"})
     follow_up = claude.runs[0]
     assert answered.headers["HX-Redirect"] == f"/agents/{follow_up.id}" and follow_up.reply_to == run.id
+    assert "<reponse>\nQuestion 1 : Client ou logiciel ?\n- client : apst2607 seul\nRéponse : Au niveau client." in follow_up.prompt
+    assert "Question 2 : Faut-il un test de non-régression ?\nRéponse : (pas de réponse)" in follow_up.prompt
+    assert "Précision : Merci" in follow_up.prompt
     assert run.status == ANSWERED and f'href="/agents/{follow_up.id}"' in client.get(f"/agents/{run.id}").text
     assert f'href="/agents/{run.id}"' in client.get(f"/agents/{follow_up.id}").text  # « Reprend l'agent #… »
 
