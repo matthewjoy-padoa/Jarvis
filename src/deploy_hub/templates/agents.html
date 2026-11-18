@@ -3,7 +3,8 @@
 {% import "_charts.html" as charts %}
 {% block title %}Agents · Jarvis{% endblock %}
 {% block content %}
-{# Petite armure d'un agent, une par état (colonne du schéma) : en cours = rouge et or, elle vole d'un bord à l'autre, réacteurs
+{# Petite armure d'un agent, une par état (colonne du schéma) : question en attente = bleu et argent, main levée, elle tape du pied ;
+   en cours = rouge et or, elle vole d'un bord à l'autre, réacteurs
    allumés ; terminé = argent, à l'arrêt, elle dort ; PR ouverte = tout or, elle saute, répulseur levé ; échec = ferraille grise
    au casque carré, sur le dos. La macro choisit les pièces de l'armure, le CSS ses couleurs et ses gestes. Décoratif : le numéro et la bulle de détail portent l'information. #}
 {% macro bot(suit) %}
@@ -15,7 +16,7 @@
   <g class="im-arm-r"><rect class="im-b" x="33.5" y="24.4" width="4.8" height="6.4" rx="2.2"/><rect class="im-a" x="33.2" y="29.2" width="5.4" height="6.6" rx="2.4"/><circle class="im-glow" cx="35.9" cy="33.6" r="1.4"/></g>
   <path class="im-a" d="M15.6 26q0-2.3 2.3-2.3h12.2q2.3 0 2.3 2.3l-1.5 7.7q-.4 1.9-2.3 1.9h-9.2q-1.9 0-2.3-1.9z"/>
   <path class="im-b" d="M19.6 31.6h8.8l-1 4h-6.8z"/>
-  {% if suit in ("in_progress", "pr") %}<circle class="im-halo" cx="24" cy="27.4" r="3.7"/>{% endif %}<circle class="im-glow im-core" cx="24" cy="27.4" r="2.1"/>
+  {% if suit in ("waiting", "in_progress", "pr") %}<circle class="im-halo" cx="24" cy="27.4" r="3.7"/>{% endif %}<circle class="im-glow im-core" cx="24" cy="27.4" r="2.1"/>
   {% if suit == "ko" %}
   <rect class="im-a" x="13.5" y="3.5" width="21" height="19.6" rx="4.5"/>
   <path class="im-line" d="M13.5 8.6h21M20.6 17.6v3.2M24 17.6v3.2M27.4 17.6v3.2"/>
@@ -40,6 +41,7 @@
 <p class="muted">Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.</p>
 {% if runs %}
 {% set lanes = [
+  ("waiting", "Question en attente", "L'agent attend ta réponse", runs | selectattr("group", "equalto", "todo") | list),
   ("in_progress", "En cours", "L'agent travaille dans son worktree", runs | selectattr("running") | list),
   ("done", "Terminés", "Fini, sans PR", runs | selectattr("group", "equalto", "done") | rejectattr("pr_url") | list),
   ("pr", "PR ouverte", "À relire sur GitHub", runs | selectattr("pr_url") | list),
