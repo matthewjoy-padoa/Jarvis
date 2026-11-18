@@ -11,6 +11,7 @@ import json
 import os
 import re
 import signal
+import getpass
 import shutil
 import subprocess
 import threading
@@ -392,6 +393,12 @@ class ClaudeRunner:
             return f"Claude Code en ligne de commande introuvable ({self.claude_bin}) : installe-le ou renseigne CLAUDE_BIN dans Réglages."
         if not (self.orchestrator_dir / ".git").exists():
             return f"Clone de integration-orchestrator introuvable ({self.orchestrator_dir}) : renseigne ORCHESTRATOR_DIR dans Réglages."
+        # Les worktrees vont dans <orchestrator>/.claude/worktrees/jarvis : un .claude à root (sudo, conteneur) les bloque.
+        existing = next(p for p in (self.worktrees_dir, *self.worktrees_dir.parents) if p.exists())
+        if not os.access(existing, os.W_OK):
+            owned = self.orchestrator_dir / ".claude" if self.orchestrator_dir / ".claude" in (existing, *existing.parents) else existing
+            user = getpass.getuser()
+            return f"Jarvis ne peut pas écrire dans {existing} (worktrees des agents) : sudo chown -R {user}:{user} {owned}"
         return None
 
     def _launch(self, d: Deployment, subject: str, branch: str, prompt: str, category: str = "") -> ActionResult:

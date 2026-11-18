@@ -19,8 +19,13 @@ Jarvis tourne en service systemd utilisateur sur la VM (les agents travaillent s
    systemctl --user daemon-reload && systemctl --user enable --now jarvis
    loginctl enable-linger $USER   # le service continue après la déconnexion SSH
    ```
-4. **Secrets** : `AIRFLOW_USER`, `AIRFLOW_PASSWORD` et, si besoin, `NOTION_TOKEN` dans le `.env` du dossier de Jarvis, puis `systemctl --user restart jarvis`.
-5. **Ouvrir** : transfert du port 8765 (onglet Ports de VS Code ou `ssh -L 8765:localhost:8765 <vm>`), puis http://localhost:8765.
+4. **Droits sur le `.claude` de l'orchestrator** : les agents créent leurs worktrees dans `<dossier de integration-orchestrator>/.claude/worktrees/jarvis`. Si ce `.claude` appartient à `root` (créé par un `sudo` ou un conteneur), rends-le à ton utilisateur, par exemple :
+   ```bash
+   sudo chown -R padoa:padoa /home/padoa/integration-orchestrator/.claude
+   ```
+   Sans cela, « Lancer un agent » refuse et affiche cette commande.
+5. **Secrets** : `AIRFLOW_USER`, `AIRFLOW_PASSWORD` et, si besoin, `NOTION_TOKEN` dans le `.env` du dossier de Jarvis, puis `systemctl --user restart jarvis`.
+6. **Ouvrir** : transfert du port 8765 (onglet Ports de VS Code ou `ssh -L 8765:localhost:8765 <vm>`), puis http://localhost:8765.
 
 Suivi : `systemctl --user status jarvis`, `journalctl --user -u jarvis -f`. Mise à jour : `git pull && uv sync && systemctl --user restart jarvis`.
 

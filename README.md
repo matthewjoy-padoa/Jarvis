@@ -74,7 +74,7 @@ Sur un retour de recette, « Lancer un agent » envoie le brief à Claude Code (
 - **relecture guidée** sur la page d'un agent terminé : fichiers changés, tests lancés et leur résultat, appels d'outils refusés, contrôles (pas de PR, pas de test, étape commune touchée, fichiers non commités) ;
 - **coût et durée** par agent et par type de ticket, en bas de la page Agents.
 
-Prérequis : Claude Code et `gh` connectés. Les worktrees restent après la PR : `git worktree remove <chemin>`.
+Prérequis : Claude Code et `gh` connectés, et le dossier `.claude` de l'orchestrator à ton utilisateur (sinon : `sudo chown -R $USER:$USER <ORCHESTRATOR_DIR>/.claude`, voir [`docs/vm.md`](docs/vm.md)). Les worktrees restent après la PR : `git worktree remove <chemin>`.
 
 ## Suivre les PR (GitHub)
 

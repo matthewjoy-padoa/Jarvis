@@ -204,3 +204,19 @@ def test_bad_branch_corrupt_history_and_orphan_dir(repo, fake_claude, tmp_path):
     runner.launch_retour(D, R, prompt="x")
     _wait(runner, 1)
     assert runner.get(1).status == "échec" and "pas un worktree git" in runner.get(1).summary
+
+
+def test_a_claude_folder_owned_by_root_is_refused_with_the_chown_to_type(repo, fake_claude, tmp_path):
+    """Vu sur la VM : <orchestrator>/.claude appartenait à root, les worktrees des agents ne pouvaient pas s'y créer."""
+    import os
+    claude_dir = repo / ".claude"
+    claude_dir.mkdir(exist_ok=True)
+    claude_dir.chmod(0o555)  # non inscriptible, comme un dossier à root
+    try:
+        if os.access(claude_dir, os.W_OK):  # root : tout est inscriptible, le cas ne se reproduit pas
+            pytest.skip("lancé en root")
+        result = _runner(repo, fake_claude, tmp_path).launch_retour(D, R, prompt="x")
+        assert not result.ok and "sudo chown -R" in result.message and str(claude_dir) in result.message
+    finally:
+        claude_dir.chmod(0o755)
+
