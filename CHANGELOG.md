@@ -16,6 +16,7 @@ Jarvis suit une numérotation `0.MINEUR.CORRECTIF` tant qu'il n'est pas stable :
 - Suivi des DAG : plus de « dérogation » ni de mention qui laisse croire à un réglage des logs Airflow ; comme `/air`, tout passe par l'API REST avec les trois variables du lancement (page Sources, README, docstrings).
 - Skill `/air` dans le dépôt (`.claude/skills/air/`), adapté à Jarvis : réglages Airflow de l'app (`.env`, références 1Password comprises) via `python -m deploy_hub.air_jarvis`, état, rapports et journal dans `data/airflow/`.
 - Bouton « Lancer » (Injections, CED, ressource de la fiche, console, enchaînements) : lancement par `air.py run`, comme `/air`. La confirmation des formulaires montre l'aperçu (ressources, run déjà en cours ; la commande `lancer` du terminal garde sa question) ; un DAG plus chargé par Airflow est refusé ; le message ne dit plus « DAG sorti de pause ». Tests contre un faux Airflow HTTP local que le vrai `air.py` appelle.
+- DAGs proposés depuis le clone orchestrator local, tel qu'il est sur le disque (branche extraite, modifications non commitées comprises, comme l'Airflow local) : catalogue dans `data/dags/`, régénéré quand le clone change et sur « Régénérer » (onglet Injections) ; repli sur le catalogue versionné sans clone.
 
 ## [0.1.0] · 2026-11-17
 

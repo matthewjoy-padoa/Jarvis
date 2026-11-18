@@ -1505,3 +1505,8 @@ p.small-note { margin: 10px 2px 0; }
 p.last-sync { margin: 4px 0 6px; }
 /* Texte lu par les lecteurs d'écran seulement */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+
+/* Source des DAGs (onglet Injections) : clone orchestrator local */
+.dag-source { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 8px 0 12px; }
+.dag-source-error { color: var(--danger); }

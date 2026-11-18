@@ -27,6 +27,7 @@ from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
 from deploy_hub.sources.claude_runner import TO_FILL, ClaudeRunner, duration_text, read_log, retour_prompt, tokens_text, usage
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
+from deploy_hub.sources.dag_source import DagSource
 from deploy_hub.sources.dag_watch import DagWatcher
 from deploy_hub.sources.sync_routine import SyncRoutine
 from deploy_hub.sources import connections, flow_digger, notion_api
@@ -53,6 +54,8 @@ sync_routine = SyncRoutine(notifications)
 pulls = PullRequests(settings.orchestrator_dir)  # PR ouvertes de l'orchestrator (gh), gardées cinq minutes
 # Suivi des runs lancés (air.py d'Arthur) ; les suivis en cours au démarrage reprennent si Airflow est configuré.
 dag_watch = DagWatcher(data_dir() / "airflow", notifications, airflow.air_env())
+# Catalogue des DAGs : celui du clone orchestrator local tel qu'il est sur le disque (comme l'Airflow local).
+dag_source = DagSource(settings.orchestrator_dir, dag_catalogue.LOCAL)
 # Enchaînements de DAG : le suivant part quand le suivi du précédent finit vert. Passe par le dag_watch du moment.
 dag_chains = ChainRunner(data_dir() / "airflow" / "chaines.json",
                          lambda dag_id, padoa_env, slug, card: _launch_watched(dag_id, padoa_env, fiches.get_deployment(slug), card), notifications)
@@ -78,6 +81,7 @@ async def lifespan(_app):
     for line in connections.lines(*checks):
         log.info(line)
     await asyncio.to_thread(dag_chains.reconcile, lambda watch_id: dag_watch.get(watch_id))
+    await asyncio.to_thread(dag_source.refresh)  # catalogue de la branche à jour (génération en tâche de fond)
     pusher = asyncio.create_task(_push_loop())
     yield
     pusher.cancel()
@@ -88,7 +92,12 @@ PUSH_EVERY = 60  # secondes, comme le panneau des notifications
 
 
 def _push_round() -> None:
-    """Un tour : échéances du jour (créées d'habitude à l'ouverture d'une page), puis envoi des nouvelles notifications."""
+    """Un tour : échéances du jour (créées d'habitude à l'ouverture d'une page), puis envoi des nouvelles notifications ;
+    au passage, le catalogue des DAGs est régénéré si le clone orchestrator local a changé."""
+    try:
+        dag_source.refresh()
+    except Exception:  # noqa: BLE001 : le catalogue des DAGs ne doit pas empêcher l'envoi des notifications
+        log.exception("Catalogue des DAGs : relevé du clone en échec")
     _deadline_notes()
     web_push.pump(notifications)
 
@@ -128,6 +137,9 @@ try:
 except PackageNotFoundError:
     templates.env.globals["jarvis_version"] = ""
 templates.env.globals["console_commands"] = list(console.COMMANDS)  # complétion par Tab dans la console
+
+
+templates.env.globals["dag_source_status"] = lambda: dag_source.status(dag_catalogue.CATALOGUE)  # bandeau Injections
 
 # Pages globales et onglets d'une fiche, calqués sur les blocs du dashboard Notion.
 # On travaille sur un client à la fois : la barre du haut montre le client en cours (sélecteur) et NAV_PAGES ;
@@ -770,6 +782,25 @@ def _launch_watched(dag_id: str, padoa_env: str, d: Deployment | None = None, ca
 def trigger_dag(request: Request, dag_id: str, padoa_env: str = Form(...)):
     """DAG d'une ressource de la fiche, sur la stack choisie : jamais de stack par défaut (Airflow prendrait la sienne)."""
     return _result(request, _launch(dag_id, padoa_env))
+
+
+@app.get("/dags/source", response_class=HTMLResponse)
+def dag_source_banner(request: Request):
+    """Bandeau de la source des DAGs, relu toutes les 3 s pendant une génération (comme _sync_status) ; dès que rien ne
+    tourne, la page se recharge : les listes de DAGs suivent la branche."""
+    response = templates.TemplateResponse(request, "_dag_source.html", {"s": dag_source.status(dag_catalogue.CATALOGUE)})
+    if not dag_source.running:
+        response.headers["HX-Refresh"] = "true"
+    return response
+
+
+@app.post("/dags/regenerer", response_class=HTMLResponse)
+def dag_source_regenerate(request: Request):
+    """« Régénérer » : catalogue des DAGs refait depuis le clone local, même si sa version est déjà générée ou en échec."""
+    if not _from_jarvis(request):
+        raise HTTPException(403, "Source des DAGs : la demande ne vient pas de Jarvis.")
+    dag_source.refresh(force=True)
+    return dag_source_banner(request)
 
 
 @app.post("/actions/apercu")
