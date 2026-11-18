@@ -44,7 +44,7 @@ def _git(cwd: Path, *args: str) -> str:
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
     """Clone de travail d'un « orchestrator » avec son origin, sur une autre branche avec une modif non commitée."""
-    origin = tmp_path / "origin.git"
+    origin = tmp_path / "integration-orchestrator.git"
     _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(origin))
     work = tmp_path / "orchestrator"
     _git(tmp_path, "clone", "-q", str(origin), str(work))
@@ -154,7 +154,9 @@ def test_missing_claude_is_refused_with_what_to_do(repo, tmp_path):
 
 
 def test_worktree_failure_ends_in_failure(tmp_path, fake_claude):
-    (tmp_path / "pas-un-depot" / ".git").mkdir(parents=True)  # ressemble à un clone, mais git échoue
+    broken = tmp_path / "pas-un-depot"
+    _git(tmp_path, "init", "-q", str(broken))  # se dit clone de l'orchestrator, mais son origin n'existe pas : le worktree échoue
+    _git(broken, "remote", "add", "origin", str(tmp_path / "integration-orchestrator-absent.git"))  # jamais le réseau
     runner = _runner(tmp_path / "pas-un-depot", fake_claude, tmp_path)
     runner.launch_retour(D, R, prompt="x")
     _wait(runner, 1)
@@ -204,3 +206,48 @@ def test_bad_branch_corrupt_history_and_orphan_dir(repo, fake_claude, tmp_path):
     runner.launch_retour(D, R, prompt="x")
     _wait(runner, 1)
     assert runner.get(1).status == "échec" and "pas un worktree git" in runner.get(1).summary
+
+
+def test_a_claude_folder_owned_by_root_is_refused_with_the_chown_to_type(repo, fake_claude, tmp_path):
+    """Vu sur la VM : <orchestrator>/.claude appartenait à root, les worktrees des agents ne pouvaient pas s'y créer."""
+    import os
+    claude_dir = repo / ".claude"
+    claude_dir.mkdir(exist_ok=True)
+    claude_dir.chmod(0o555)  # non inscriptible, comme un dossier à root
+    try:
+        if os.access(claude_dir, os.W_OK):  # root : tout est inscriptible, le cas ne se reproduit pas
+            pytest.skip("lancé en root")
+        result = _runner(repo, fake_claude, tmp_path).launch_retour(D, R, prompt="x")
+        assert not result.ok and "sudo chown -R" in result.message and str(claude_dir) in result.message
+    finally:
+        claude_dir.chmod(0o755)
+
+
+def test_jarvis_itself_is_never_taken_for_the_orchestrator(tmp_path, fake_claude):
+    """Vu sur la VM : ORCHESTRATOR_DIR vide valait « . », le dossier de Jarvis ; l'agent a travaillé dans un clone de Jarvis."""
+    from deploy_hub.config import PROJECT_ROOT
+    result = _runner(PROJECT_ROOT, fake_claude, tmp_path).launch_retour(D, R, prompt="x")
+    assert not result.ok and "n'est pas un clone de integration-orchestrator" in result.message
+
+
+def test_an_empty_orchestrator_setting_falls_back_to_the_default(monkeypatch):
+    from deploy_hub.config import load_settings
+    monkeypatch.setenv("ORCHESTRATOR_DIR", "")
+    assert str(load_settings().orchestrator_dir).endswith("integration-orchestrator")
+
+
+def test_log_events_whose_message_is_text_do_not_break_the_agent_page(tmp_path):
+    """Claude Code 2.1.326 écrit des événements où « message » est un texte : la page de l'agent plantait (erreur 500)."""
+    from datetime import datetime
+    from deploy_hub.sources import review
+    from deploy_hub.sources.claude_runner import AgentRun, message_of
+    log = tmp_path / "1.jsonl"
+    log.write_text("\n".join(json.dumps(e) for e in (
+        {"type": "system", "message": "texte simple"},
+        {"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": "ls"}}]}},
+        {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t1", "content": "ok"}]}},
+    )), encoding="utf-8")
+    run = AgentRun(1, "acme", "Acme", "retour R-1", "fix-acme-r-1", "brief", datetime(2026, 11, 18, 9), "terminé")
+    assert message_of({"message": "texte"}) == {} and message_of({"message": {"a": 1}}) == {"a": 1}
+    review.build(run, log)  # ne lève plus
+

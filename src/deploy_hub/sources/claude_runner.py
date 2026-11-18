@@ -11,6 +11,7 @@ import json
 import os
 import re
 import signal
+import getpass
 import shutil
 import subprocess
 import threading
@@ -108,7 +109,7 @@ def read_context(run: "AgentRun", text: str) -> None:
     spent, window = None, None
     for e in _events(text):
         if e.get("type") == "assistant" and not e.get("parent_tool_use_id"):
-            found = (e.get("message") or {}).get("usage")
+            found = message_of(e).get("usage")
             spent = found if isinstance(found, dict) else spent
         elif e.get("type") == "result":
             sizes = [m.get("contextWindow") for m in (e.get("modelUsage") or {}).values() if isinstance(m, dict)]
@@ -392,6 +393,16 @@ class ClaudeRunner:
             return f"Claude Code en ligne de commande introuvable ({self.claude_bin}) : installe-le ou renseigne CLAUDE_BIN dans Réglages."
         if not (self.orchestrator_dir / ".git").exists():
             return f"Clone de integration-orchestrator introuvable ({self.orchestrator_dir}) : renseigne ORCHESTRATOR_DIR dans Réglages."
+        origin = subprocess.run(["git", "-C", str(self.orchestrator_dir), "remote", "get-url", "origin"], capture_output=True, text=True).stdout
+        if "integration-orchestrator" not in origin:  # Jarvis lui-même (ORCHESTRATOR_DIR vide) ou un autre dépôt : vu sur la VM
+            return (f"{self.orchestrator_dir.resolve()} n'est pas un clone de integration-orchestrator (origin : {origin.strip() or 'aucun'}) : "
+                    "renseigne ORCHESTRATOR_DIR dans Réglages, ex. /home/padoa/Dev/integration-orchestrator.")
+        # Les worktrees vont dans <orchestrator>/.claude/worktrees/jarvis : un .claude à root (sudo, conteneur) les bloque.
+        existing = next(p for p in (self.worktrees_dir, *self.worktrees_dir.parents) if p.exists())
+        if not os.access(existing, os.W_OK):
+            owned = self.orchestrator_dir / ".claude" if self.orchestrator_dir / ".claude" in (existing, *existing.parents) else existing
+            user = getpass.getuser()
+            return f"Jarvis ne peut pas écrire dans {existing} (worktrees des agents) : sudo chown -R {user}:{user} {owned}"
         return None
 
     def _launch(self, d: Deployment, subject: str, branch: str, prompt: str, category: str = "") -> ActionResult:
@@ -524,6 +535,13 @@ class ClaudeRunner:
                             r.data_type or r.resource or "")
 
 
+def message_of(event: dict) -> dict:
+    """Message d'un événement du journal de claude -p : un objet en général, mais Claude Code écrit aussi des événements
+    où « message » est un simple texte (vu avec 2.1.326 : la page de l'agent plantait en erreur 500)."""
+    message = event.get("message") if isinstance(event, dict) else None
+    return message if isinstance(message, dict) else {}
+
+
 def _events(text: str):
     for line in text.splitlines():
         if not line.strip():
@@ -560,13 +578,13 @@ def read_log(log: Path) -> list[tuple[str, str]]:
     for e in _events(text):
         kind = e.get("type")
         if kind == "assistant":
-            for block in (e.get("message") or {}).get("content") or []:
+            for block in message_of(e).get("content") or []:
                 if block.get("type") == "text" and block.get("text", "").strip():
                     lines.append(("texte", block["text"].strip()))
                 elif block.get("type") == "tool_use":
                     lines.append(("outil", _tool_line(block)))
         elif kind == "user":
-            for block in (e.get("message") or {}).get("content") or []:
+            for block in message_of(e).get("content") or []:
                 if isinstance(block, dict) and block.get("type") == "tool_result" and block.get("is_error"):
                     content = block.get("content")
                     text = content if isinstance(content, str) else " ".join(c.get("text", "") for c in content or [] if isinstance(c, dict))

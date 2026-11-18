@@ -1,12 +1,15 @@
-{# État de la routine de synchro Notion (bouton « Rafraîchir depuis Notion » sans jeton), dans l'encart sous le bouton.
-   Attend : running, ok, message, simulated, progress ({"pct", "label"} pendant qu'elle tourne). #}
+{# État de la routine de synchro Notion, lu par le bouton « Rafraîchir depuis Notion » (base.html : le bouton se remplit).
+   Attend : running, ok, message, simulated, reload, progress ({"pct", "label"} pendant qu'elle tourne).
+   En cours : rien de visible ici, le bouton porte l'avancement. Réussite : le bouton affiche « ✓ Synchro terminée », la page
+   se recharge. Échec : le message reste affiché sous le bouton (un clic le ferme). #}
 {% import "_icons.html" as ic %}
-{% import "_charts.html" as charts %}
 {% if running %}
-<div class="sync-status" hx-get="/actions/rafraichir/etat" hx-trigger="every 3s" hx-swap="outerHTML">
-  <p class="result ok sync-progress" role="status">{{ charts.ring(progress.pct, 22, "Synchro : " ~ progress.pct ~ " %", alert=none) }}
-    <span><strong>{{ progress.pct }} %</strong> · {{ progress.label }}</span></p>
+<div class="sync-status" data-sync-state="running" data-sync-pct="{{ progress.pct }}" data-sync-label="{{ progress.label }}"
+     hx-get="/actions/rafraichir/etat" hx-trigger="every 3s" hx-swap="outerHTML">
+  <span class="sr-only" role="status">Synchro Notion : {{ progress.pct }} %, {{ progress.label }}</span>
 </div>
+{% elif ok %}
+<p class="result ok" data-sync-state="ok" role="status"{% if not simulated and reload %} data-reload-after="3"{% endif %}{% if reload %} hidden{% endif %}>{% if simulated %}{{ ic.icon("flask", "Simulation", "ic-muted") }} {% endif %}{{ message }}</p>
 {% else %}
-<p class="result {{ 'ok' if ok else 'ko' }}" title="Cliquer pour fermer">{% if simulated %}{{ ic.icon("flask", "Simulation", "ic-muted") }} {% endif %}{{ message }}</p>
+<p class="result ko" data-sync-state="ko" title="Cliquer pour fermer">{{ message }}</p>
 {% endif %}

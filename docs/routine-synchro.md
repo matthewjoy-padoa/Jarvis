@@ -23,7 +23,7 @@ Trois façons, la même consigne :
 1. **Bouton « Rafraîchir depuis Notion »** (fiche d'un client) ou **« Tout rafraîchir »** (page Clients), quand l'app n'a pas de jeton Notion.
    Jarvis lance `claude -p` dans son dossier, avec son propre environnement (donc ses clients), et affiche l'état sous le bouton ; la page se recharge à la fin.
    - Il faut Claude Code en ligne de commande (`claude` dans le PATH, ou `CLAUDE_BIN` dans Réglages) et le connecteur Notion disponible en ligne de commande.
-   - Outils permis : les commandes `sync_notion`, `cp`, l'écriture dans le dossier de données, le connecteur Notion. Pour un connecteur au nom inhabituel : `JARVIS_SYNC_ALLOWED_TOOLS` (séparés par « ; »).
+   - Outils permis : les commandes `sync_notion` (dont `deposer`, qui dépose les grosses réponses que Claude Code range dans `~/.claude/…/tool-results/` : Claude Code refuse un `cp` depuis ce dossier), la lecture et l'écriture du dossier de données, le connecteur Notion `mcp__claude_ai_Notion`, en `--permission-mode dontAsk`. Pour un connecteur au nom inhabituel : `JARVIS_SYNC_ALLOWED_TOOLS` (séparés par « ; »).
    - Une seule synchro à la fois ; compte rendu dans `data/notion/routine.log`, échec signalé dans les notifications.
 2. **Commande `/jarvis-sync`** : dans Claude Code (app ou terminal) ouvert sur le dossier de Jarvis, taper `/jarvis-sync`, ou `/jarvis-sync #mon-canal` pour signaler un échec sur Slack.
 3. **Tâche planifiée** : dans Claude Code, « Scheduled tasks », créer une tâche (par exemple `jarvis-sync`, `0 8-18/2 * * 1-5`) avec pour consigne :

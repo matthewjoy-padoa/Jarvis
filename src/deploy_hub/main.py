@@ -214,6 +214,7 @@ def _render(request: Request, template: str, active: str, **context) -> HTMLResp
             "ced_for": dag_catalogue.ced_for,
             "padoa_envs": PADOA_ENVS,
             "notion_ready": notion_api.load_token() is not None or sync_routine.problem() is None,  # jeton, ou routine via Claude
+            "sync_running": sync_routine.running,  # synchro lancée avant ce chargement : le bouton reprend son avancement
             "today": date.today(),
             **context,
         },
@@ -949,15 +950,12 @@ def _refresh(slugs: list[str]) -> tuple[bool, str]:
         _refresh_lock.release()
 
 
-def _sync_status(request: Request, running: bool, ok: bool, message: str, simulated: bool = False) -> HTMLResponse:
-    """État de la routine sous le bouton : un cercle d'avancement qui se met à jour seul tant qu'elle tourne ;
-    la page se recharge à la fin si tout va bien."""
-    response = templates.TemplateResponse(request, "_sync_status.html", {"running": running, "ok": ok, "message": message,
-                                                                         "simulated": simulated,
-                                                                         "progress": sync_routine.progress() if running else None})
-    if not running and ok and not simulated and request.method == "GET":
-        response.headers["HX-Refresh"] = "true"
-    return response
+def _sync_status(request: Request, running: bool, ok: bool, message: str, simulated: bool = False, reload: bool = False) -> HTMLResponse:
+    """État de la routine sous le bouton : un cercle d'avancement qui se met à jour seul tant qu'elle tourne. À la fin, le
+    message reste affiché ; après une vraie réussite (reload), la page se recharge 3 s plus tard pour montrer les données."""
+    return templates.TemplateResponse(request, "_sync_status.html", {"running": running, "ok": ok, "message": message,
+                                                                     "simulated": simulated, "reload": reload,
+                                                                     "progress": sync_routine.progress() if running else None})
 
 
 def refresh_by_routine(request: Request) -> HTMLResponse | None:
@@ -976,7 +974,9 @@ def refresh_status(request: Request):
     if state.get("running"):  # lancée avant un redémarrage de Jarvis : plus suivie par ce processus
         return _sync_status(request, False, False, "Synchro interrompue : Jarvis a redémarré pendant qu'elle tournait. Relance-la.")
     ok = bool(state.get("ok"))
-    return _sync_status(request, False, ok, ("Synchro terminée. " if ok else "Synchro en échec : ") + (state.get("summary") or ""))
+    if ok:
+        return _sync_status(request, False, True, "Synchro terminée : la page se recharge…", reload=True)
+    return _sync_status(request, False, False, "Synchro en échec · " + (state.get("summary") or "voir data/notion/routine.log"))
 
 
 @app.post("/actions/rafraichir", response_class=HTMLResponse)

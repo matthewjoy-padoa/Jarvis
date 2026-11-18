@@ -183,9 +183,30 @@ def load_settings() -> Settings:
     return Settings(
         deployments_dir=deployments_dir(),
         airflow_base_url=os.getenv("AIRFLOW_BASE_URL", "http://localhost:8080"),
-        orchestrator_dir=Path(os.getenv("ORCHESTRATOR_DIR", "~/integration-orchestrator")).expanduser(),
+        # « ORCHESTRATOR_DIR= » (vide, comme dans .env.example) : valeur par défaut, pas « . » (le dossier de Jarvis, vu sur la VM)
+        orchestrator_dir=Path(os.getenv("ORCHESTRATOR_DIR") or "~/integration-orchestrator").expanduser(),
     )
 
 
-# Lu dès l'import : l'app comme la synchro en ligne de commande (routine) voient les mêmes réglages.
+DEFAULT_TZ = "Europe/Paris"
+
+
+def apply_timezone() -> str:
+    """Heure de Jarvis : Europe/Paris par défaut (JARVIS_TZ pour un autre fuseau), quelle que soit l'heure du serveur.
+    Vu le 2026-11-18 : la VM est en UTC, et tout ce que Jarvis affiche et note (dernière synchro, notifications, agents)
+    avait une heure de retard. Le fuseau vaut pour le processus et ce qu'il lance (claude, suivi des DAG)."""
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+    name = os.getenv("JARVIS_TZ") or DEFAULT_TZ
+    try:
+        ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        name = DEFAULT_TZ  # fuseau inconnu : celui par défaut plutôt que l'heure du serveur
+    os.environ["TZ"] = name
+    if hasattr(time, "tzset"):
+        time.tzset()
+    return name
+
+
+# Lu dès l'import : l'app comme la synchro en ligne de commande (routine) voient les mêmes réglages, et la même heure.
 load_env_file()
+apply_timezone()

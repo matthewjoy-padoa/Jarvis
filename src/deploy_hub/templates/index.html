@@ -8,9 +8,8 @@
   <h1>Clients</h1>
   <a class="btn-primary" href="/clients/nouveau">+ Ajouter un client</a>
 <div class="refresh">
-  <button type="button" class="secondary" hx-post="/actions/rafraichir" hx-target="next .refresh-out" hx-indicator="closest .refresh" hx-disabled-elt="this"{% if not notion_ready %} disabled title="Ni jeton Notion ni Claude Code en ligne de commande : voir docs/routine-synchro.md"{% endif %}>{{ ic.icon("sync") }} Tout rafraîchir</button>
-  <span class="refresh-wait muted" role="status"><svg class="ring ring-spin" width="18" height="18" viewBox="0 0 36 36" aria-hidden="true"><circle class="ring-track" cx="18" cy="18" r="15.915"/><circle class="ring-fill" cx="18" cy="18" r="15.915" stroke-dasharray="25 100"/></svg> Jarvis interroge Notion…</span>
-  <div class="refresh-out"></div>
+  <button type="button" class="secondary sync-btn" hx-post="/actions/rafraichir" hx-target="next .refresh-out" hx-indicator="closest .refresh" hx-disabled-elt="this"{% if not notion_ready %} disabled title="Ni jeton Notion ni Claude Code en ligne de commande : voir docs/routine-synchro.md"{% endif %}><span class="btn-face"><span class="btn-idle">{{ ic.icon("sync") }} Tout rafraîchir</span><span class="btn-busy" aria-hidden="true">Synchro…</span></span></button>
+  <div class="refresh-out">{% if sync_running %}<div hx-get="/actions/rafraichir/etat" hx-trigger="load" hx-swap="outerHTML"></div>{% endif %}</div>
 </div>
   <div class="segmented" aria-label="Vues tous clients"><span class="muted">Tous les clients :</span>{% for path, label in cross_pages %}<a href="{{ path }}">{{ label }}</a>{% endfor %}</div>
 </div>

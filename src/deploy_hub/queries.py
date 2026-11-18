@@ -10,6 +10,7 @@ Les modèles ne diffèrent d'un client à l'autre que par :
 
 import hashlib
 import re
+from urllib.parse import parse_qs, urlsplit
 from functools import lru_cache
 from pathlib import Path
 
@@ -27,8 +28,15 @@ class ConfigError(ValueError):
 
 
 def page_id_of(value: str) -> str:
-    """Id de 32 caractères depuis un id (avec ou sans tirets) ou une adresse Notion (le dernier id de l'adresse)."""
-    ids = [i.replace("-", "") for i in PAGE_ID.findall((value or "").lower())]
+    """Id de 32 caractères depuis un id (avec ou sans tirets) ou une adresse Notion. Dans une adresse, la page est dans le
+    chemin (le dernier id) ; les paramètres sont ignorés (« ?v= » est l'id de la vue d'où le lien a été copié), sauf « p= »,
+    la page ouverte en aperçu depuis une base (« …/<base>?v=<vue>&p=<page> »)."""
+    text = (value or "").strip().lower()
+    if "://" in text:
+        url = urlsplit(text)
+        peek = [i for v in parse_qs(url.query).get("p", []) for i in PAGE_ID.findall(v)]
+        text = peek[-1] if peek else url.path
+    ids = [i.replace("-", "") for i in PAGE_ID.findall(text)]
     if not ids:
         raise ConfigError("Id ou adresse de page Notion attendu (32 caractères hexadécimaux).")
     return ids[-1]
