@@ -297,3 +297,23 @@ print('acme : inchangé')
     assert "mcp__claude_ai_Notion" in tools
     text = routine_text()
     assert "sync_notion deposer" in text and "cp \"" not in text
+
+
+def test_two_syncs_never_run_at_once(tmp_path, monkeypatch):
+    """Vu le 2026-11-18 : un Jarvis et un test lançaient chacun une synchro sur les mêmes données. Le bouton refuse si
+    une synchro d'un autre processus est vivante, et « preparer » s'arrête si ce n'est pas sa propre session."""
+    import json
+    folder = tmp_path / "data" / "notion"
+    folder.mkdir(parents=True)
+    alive = os.getpid()  # un processus vivant à coup sûr
+    (folder / "routine.json").write_text(json.dumps({"running": True, "started": "08:06", "pid": alive, "session": "autre"}))
+    r = SyncRoutine(folder=folder, claude_bin=sys.executable).start()
+    assert not r.ok and "tourne déjà" in r.message
+    monkeypatch.setenv(sync_notion.SESSION_ENV, "la-mienne")
+    with pytest.raises(sync_notion.SyncError, match="tourne déjà"):
+        sync_notion.prepare(tmp_path)
+    monkeypatch.setenv(sync_notion.SESSION_ENV, "autre")  # sa propre session : pas de blocage
+    assert sync_notion.running_elsewhere(tmp_path) is None
+    (folder / "routine.json").write_text(json.dumps({"running": True, "started": "08:06", "pid": 999999999, "session": "x"}))
+    assert sync_notion.running_elsewhere(tmp_path) is None  # processus mort : la synchro est finie, on peut relancer
+

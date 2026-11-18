@@ -79,6 +79,17 @@ class SyncRoutine:
         self.folder.mkdir(parents=True, exist_ok=True)
         self.state_path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
 
+    def _other(self) -> dict | None:
+        """Synchro lancée par un autre processus (autre Jarvis, test) et toujours vivante, d'après routine.json."""
+        state = self.state()
+        if not state.get("running") or not state.get("pid"):
+            return None
+        try:
+            os.kill(int(state["pid"]), 0)
+        except (OSError, ValueError):
+            return None
+        return state
+
     @property
     def running(self) -> bool:
         return self._proc is not None and self._proc.poll() is None
@@ -109,13 +120,16 @@ class SyncRoutine:
         with self._lock:
             if self.running:
                 return ActionResult(False, "Une synchro est déjà en cours.", False)
+            if (other := self._other()):
+                return ActionResult(False, f"Une synchro tourne déjà, lancée à {other.get('started', '?')} par un autre Jarvis : "
+                                           "attends sa fin.", False)
             self.folder.mkdir(parents=True, exist_ok=True)
             log = self.log_path.open("w", encoding="utf-8")
             session = str(uuid.uuid4())
             self._proc = subprocess.Popen(self.command(session), cwd=PROJECT_ROOT, env={**self._env(), SESSION_ENV: session},
                                           stdin=subprocess.PIPE,
                                           stdout=log, stderr=subprocess.STDOUT, text=True)
-            self._save(running=True, started=datetime.now().isoformat(timespec="seconds"))
+            self._save(running=True, started=datetime.now().isoformat(timespec="seconds"), pid=self._proc.pid, session=session)
         self._proc.stdin.write(routine_text())
         self._proc.stdin.close()
         threading.Thread(target=self._wait, args=(self._proc, log), name="jarvis-sync", daemon=True).start()

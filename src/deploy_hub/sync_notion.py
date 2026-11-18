@@ -384,8 +384,25 @@ def _clean(raw: Path, names) -> None:
             page.unlink()
 
 
+def running_elsewhere(root: Path = PROJECT_ROOT) -> dict | None:
+    """Synchro lancée par Jarvis qui tourne encore dans un autre processus (data/notion/routine.json : session et pid de
+    claude vivant), ou None. Sa propre session (JARVIS_SYNC_SESSION) ne compte pas."""
+    state = _load_json(data_dir(root) / "notion" / "routine.json", {})
+    pid, session = state.get("pid"), state.get("session")
+    if not state.get("running") or not pid or session == os.environ.get(SESSION_ENV):
+        return None
+    try:
+        os.kill(int(pid), 0)  # signal 0 : le processus existe-t-il encore ?
+    except (OSError, ValueError):
+        return None
+    return state
+
+
 def prepare(root: Path = PROJECT_ROOT) -> dict:
-    """Écrit les requêtes de chaque client et l'empreinte de tous les clients (une seule requête pour la routine)."""
+    """Écrit les requêtes de chaque client et l'empreinte de tous les clients (une seule requête pour la routine).
+    Refuse si une autre synchro lancée par Jarvis tourne : deux passages écriraient les mêmes fichiers (vu le 2026-11-18)."""
+    if (other := running_elsewhere(root)):
+        raise SyncError(f"Une autre synchro tourne déjà (lancée à {other.get('started', '?')}) : attends sa fin, puis relance")
     from deploy_hub import client_config
     configs = [asdict(c) for c in client_config.all_configs(root)]
     for config in configs:
