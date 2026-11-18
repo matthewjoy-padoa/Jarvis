@@ -515,7 +515,9 @@ def _agent_context(run) -> dict:
     """Journal de l'agent, et sa relecture guidée dès qu'il a fini (un agent simulé, d'un ancien historique, n'a rien à relire)."""
     path = claude.log_path(run)
     claude.refresh_context(run)
-    return {"run": run, "log": read_log(path), "review": None if run.running or run.simulated else agent_review.build(run, path)}
+    follow_up = None if run.running else claude.follow_up(run.id)
+    return {"run": run, "log": read_log(path), "review": None if run.running or run.simulated else agent_review.build(run, path),
+            "follow_up": follow_up, "waiting": claude.can_reply(run, follow_up)}
 
 
 @app.get("/agents/{run_id}", response_class=HTMLResponse)
@@ -529,6 +531,16 @@ def agent_journal(request: Request, run_id: int):
     """Rafraîchi toutes les 5 s par la page de l'agent tant qu'il travaille."""
     run = _run_or_404(run_id)
     return templates.TemplateResponse(request, "_agent_log.html", _agent_context(run))
+
+
+@app.post("/agents/{run_id}/repondre")
+def agent_reply(request: Request, run_id: int, reponse: str = Form("")):
+    """« Répondre et relancer » : la réponse part à un nouvel agent sur la même branche, ouvert dès son lancement."""
+    _run_or_404(run_id)
+    result = claude.reply(run_id, reponse)
+    if not result.ok:
+        return _result(request, result)
+    return HTMLResponse("", headers={"HX-Redirect": f"/agents/{claude.follow_up(run_id).id}"})
 
 
 @app.post("/agents/{run_id}/arreter")

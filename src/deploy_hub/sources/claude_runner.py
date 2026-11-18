@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from deploy_hub.config import child_environment
-from deploy_hub.models import DONE, IN_PROGRESS, KO, Deployment, RetourRecette, status_group
+from deploy_hub.models import DONE, IN_PROGRESS, KO, TODO, Deployment, RetourRecette, status_group
 from deploy_hub.sources import ActionResult
 
 
@@ -52,6 +52,9 @@ class AgentRun:
     # remplissage du contexte au dernier tour (ce que l'agent relit à chaque tour) et taille de la fenêtre du modèle
     context_tokens: int | None = None
     context_window: int | None = None
+    session_id: str = ""  # session Claude Code de l'agent : reprise par « Répondre et relancer »
+    reply_to: int | None = None  # agent dont celui-ci reprend le travail après une réponse à ses questions
+    resume: str = ""  # session reprise (--resume) ; vide : nouvelle session
 
     @property
     def context_pct(self) -> int | None:
@@ -128,10 +131,24 @@ def read_tokens(run: "AgentRun", result: dict) -> None:
         setattr(run, name, value if isinstance(value, int) and not isinstance(value, bool) else None)
 
 
-AGENT_STATUSES = {"préparation": IN_PROGRESS, "en cours": IN_PROGRESS, "terminé": DONE,
+WAITING, ANSWERED = "question en attente", "répondu"
+AGENT_STATUSES = {"préparation": IN_PROGRESS, "en cours": IN_PROGRESS, "terminé": DONE, WAITING: TODO, ANSWERED: DONE,
                   "échec": KO, "arrêté": KO, "délai dépassé": KO, "interrompu": KO}
 PR_URL = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/pull/\d+")
 INSTRUCTION = "Le brief de ta mission est sur l'entrée standard : lis-le en entier et suis-le."
+RESUME_INSTRUCTION = "La réponse à tes questions est sur l'entrée standard : lis-la, puis reprends ta mission là où tu t'es arrêté."
+QUESTIONS_HEADING = re.compile(r"^\W*questions?\b.*:\s*$", re.IGNORECASE)  # « Questions : », « **Questions ouvertes :** »
+
+
+def asks_questions(summary: str) -> bool:
+    """Compte rendu qui s'arrête sur des questions : section « Questions : » (consigne du brief) ou une ligne qui finit par « ? »."""
+    lines = [line.strip().strip("*_ ") for line in (summary or "").splitlines() if line.strip()]
+    return any(QUESTIONS_HEADING.match(line) or line.endswith("?") for line in lines)
+
+
+def final_status(run: "AgentRun") -> str:
+    """« terminé » sans PR, sur des questions : l'agent attend une réponse, ce n'est pas un succès."""
+    return WAITING if not run.pr_url and asks_questions(run.summary) else "terminé"
 # Outils accordés à l'agent (JARVIS_AGENT_ALLOWED_TOOLS, séparés par « ; ») : lire, modifier, tester, committer, pousser
 # sa branche, ouvrir la PR. Le reste est refusé (pas de question en mode -p). guard.sh bloque push sur main et push forcé.
 # Pas de Read/Edit/Write : sans chemin ils vaudraient partout. acceptEdits autorise déjà les modifications dans le worktree
@@ -232,7 +249,7 @@ def retour_prompt(d: Deployment, r: RetourRecette, description: str = "") -> str
         _tag("precisions", description.strip() or "(rien à ajouter)"),
         _tag("demarche", "\n".join([
             "1. Reformule en deux lignes l'écart : ce qui est attendu, ce qui est constaté. Si le retour ne permet pas de le dire, "
-            "arrête-toi et liste tes questions au lieu de deviner.",
+            "arrête-toi et pose tes questions au lieu de deviner (voir <compte_rendu>).",
             "2. Trouve les fichiers qui interviennent pour ce client et cette ressource à chaque étape (extract SQL, mapping, settings, "
             "composant, transform, tests). Le code existe à deux niveaux : logiciel (`src/extract/softwares/<logiciel>/`, "
             "`src/mappings/software/<logiciel>/`, `src/lib/steps/transform/software/<logiciel>/`) et client en surcharge "
@@ -257,7 +274,10 @@ def retour_prompt(d: Deployment, r: RetourRecette, description: str = "") -> str
             "- Résultat : la PR ouverte, ou un rapport qui dit précisément ce qui manque pour corriger.",
         ])),
         _tag("compte_rendu", "Termine par : la cause (fichier:ligne), le correctif et son niveau (client ou logiciel), les tests "
-                             "(commande et résultat), le lien de la PR, et ce qu'il faudra vérifier en recette."),
+                             "(commande et résultat), le lien de la PR, et ce qu'il faudra vérifier en recette. "
+                             "Si tu t'arrêtes sur des questions (retour trop flou, choix métier), ne modifie rien, n'ouvre pas de PR et "
+                             "termine par une ligne « Questions : » suivie d'une question par ligne : la personne te répondra "
+                             "et tu reprendras là où tu t'es arrêté."),
     ]
     return "\n\n".join(parts)
 
@@ -344,6 +364,8 @@ class ClaudeRunner:
             for key in ("started_at", "ended_at"):  # écrites en ISO par _save
                 item[key] = datetime.fromisoformat(item[key]) if item.get(key) else None
             run = AgentRun(**{k: v for k, v in item.items() if k in AgentRun.__dataclass_fields__})
+            if run.status == "terminé":  # agents finis avant l'état « question en attente »
+                run.status = final_status(run)
             if run.running:  # le process est parti avec l'ancienne exécution de Jarvis
                 run.status, run.ended_at = "interrompu", run.ended_at or datetime.now()
                 run.summary = run.summary or "Jarvis a redémarré pendant que l'agent travaillait."
@@ -373,10 +395,13 @@ class ClaudeRunner:
         return read_log(self.log_path(run))
 
     # --- lancement --------------------------------------------------------------------------------------------
-    def build_command(self) -> list[str]:
-        """Le brief n'est pas dans la commande (trop long) : il part sur l'entrée standard."""
-        cmd = [self.claude_bin, "-p", INSTRUCTION, "--output-format", "stream-json", "--verbose",
+    def build_command(self, resume: str = "") -> list[str]:
+        """Le brief n'est pas dans la commande (trop long) : il part sur l'entrée standard. resume : session reprise,
+        l'entrée standard porte alors la réponse aux questions de l'agent."""
+        cmd = [self.claude_bin, "-p", RESUME_INSTRUCTION if resume else INSTRUCTION, "--output-format", "stream-json", "--verbose",
                "--permission-mode", self.permission_mode]
+        if resume:
+            cmd += ["--resume", resume]
         if self.model:
             cmd += ["--model", self.model]
         for option, value in (("--fallback-model", self.fallback_model), ("--effort", self.effort), ("--max-turns", self.max_turns),
@@ -405,7 +430,7 @@ class ClaudeRunner:
             return f"Jarvis ne peut pas écrire dans {existing} (worktrees des agents) : sudo chown -R {user}:{user} {owned}"
         return None
 
-    def _launch(self, d: Deployment, subject: str, branch: str, prompt: str, category: str = "") -> ActionResult:
+    def _launch(self, slug: str, client: str, subject: str, branch: str, prompt: str, category: str = "", **extra) -> ActionResult:
         if (problem := self.problem()):
             return ActionResult(False, problem, False)
         with self._lock:
@@ -413,8 +438,8 @@ class ClaudeRunner:
                 return ActionResult(False, f"Un agent travaille déjà sur la branche {branch} : attends sa fin ou arrête-le (Agents).", False)
             if sum(r.running for r in self.runs) >= self.max_running:
                 return ActionResult(False, f"Déjà {self.max_running} agent(s) en cours : attends qu'un se termine.", False)
-            run = AgentRun(max((r.id for r in self.runs), default=0) + 1, d.slug, d.client, subject, branch, prompt,
-                           datetime.now(), "préparation", category=category)
+            run = AgentRun(max((r.id for r in self.runs), default=0) + 1, slug, client, subject, branch, prompt,
+                           datetime.now(), "préparation", category=category, **extra)
             self.runs.insert(0, run)
         self._save()
         self._start(run)
@@ -423,9 +448,12 @@ class ClaudeRunner:
     def _git(self, *args: str, check: bool = True) -> subprocess.CompletedProcess:
         return subprocess.run(["git", "-C", str(self.orchestrator_dir), *args], capture_output=True, text=True, timeout=300, check=check)
 
+    def worktree_of(self, branch: str) -> Path:
+        return self.worktrees_dir / branch
+
     def prepare_worktree(self, branch: str) -> Path:
         """Worktree de l'agent depuis origin/main ; relancé sur la même branche, il reprend le worktree existant."""
-        path = self.worktrees_dir / branch
+        path = self.worktree_of(branch)
         if path.is_dir():
             if not (path / ".git").exists():
                 raise RuntimeError(f"{path} existe mais n'est pas un worktree git : supprime-le, puis relance.")
@@ -458,7 +486,7 @@ class ClaudeRunner:
         timed_out = False
         try:
             with log.open("w", encoding="utf-8") as out:
-                proc = subprocess.Popen(self.build_command(), cwd=run.worktree, stdin=subprocess.PIPE, stdout=out,
+                proc = subprocess.Popen(self.build_command(run.resume), cwd=run.worktree, stdin=subprocess.PIPE, stdout=out,
                                         stderr=subprocess.STDOUT, text=True, env=self._env())
                 self._procs[run.id] = proc
                 try:
@@ -484,12 +512,13 @@ class ClaudeRunner:
         read_context(run, text)
         run.summary = (result.get("result") or "").strip()
         run.pr_url = find_pr(text)
+        run.session_id = result.get("session_id") or run.session_id
         if run.id in self._stopped:
             status = "arrêté"
         elif timed_out:
             status = "délai dépassé"
         elif code == 0 and result.get("subtype", "success") == "success":
-            status = "terminé"
+            status = final_status(run)
         else:
             status = "échec"
             run.summary = run.summary or f"Code de sortie {code} : voir le journal."
@@ -517,6 +546,9 @@ class ClaudeRunner:
         """Fin d'un agent (summary et pr_url déjà remplis) : met à jour son état, l'enregistre et notifie."""
         run.status = status
         run.ended_at = datetime.now()
+        parent = self.get(run.reply_to) if run.reply_to else None
+        if parent and parent.status == WAITING and run.group != KO:  # la réponse a servi : l'agent d'origine n'attend plus
+            parent.status = ANSWERED
         self._save()
         if self.notifications:
             ok = run.group == DONE
@@ -527,12 +559,47 @@ class ClaudeRunner:
 
     def launch(self, d: Deployment, resource: str) -> ActionResult:
         prompt = f"Ressource {resource} du client {d.client} (logiciel {d.software}) : lis la fiche de déploiement, code, teste, ouvre la PR."
-        return self._launch(d, resource, agent_branch(d.slug, resource), prompt, resource)
+        return self._launch(d.slug, d.client, resource, agent_branch(d.slug, resource), prompt, resource)
 
     def launch_retour(self, d: Deployment, r: RetourRecette, description: str = "", prompt: str = "") -> ActionResult:
         """prompt : le brief relu (et éventuellement modifié) par la personne qui lance l'agent ; sinon il est construit ici."""
-        return self._launch(d, f"retour {r.id}", agent_branch("fix", d.slug, r.id), prompt.strip() or retour_prompt(d, r, description),
-                            r.data_type or r.resource or "")
+        return self._launch(d.slug, d.client, f"retour {r.id}", agent_branch("fix", d.slug, r.id),
+                            prompt.strip() or retour_prompt(d, r, description), r.data_type or r.resource or "")
+
+    def follow_up(self, run_id: int) -> AgentRun | None:
+        """Agent relancé avec la réponse aux questions de run_id (le plus récent)."""
+        return next((r for r in self.runs if r.reply_to == run_id), None)
+
+    @staticmethod
+    def can_reply(run: AgentRun, follow_up: AgentRun | None) -> bool:
+        """En attente de réponse, et aucune suite en cours (une suite en échec laisse répondre à nouveau)."""
+        return run.status == WAITING and not (follow_up and follow_up.running)
+
+    def _brief(self, run: AgentRun) -> str:
+        """Brief d'origine : un agent qui a repris une session n'a reçu que la réponse, on remonte à celui qui l'a lancée."""
+        while run.resume and run.reply_to and (parent := self.get(run.reply_to)):
+            run = parent
+        return run.prompt
+
+    def reply(self, run_id: int, answer: str) -> ActionResult:
+        """Réponse aux questions d'un agent : nouvel agent sur la même branche. Si le worktree n'a pas bougé, il reprend la session
+        Claude (--resume) et garde ce qu'il avait lu ; sinon il repart du brief, avec le compte rendu et la réponse."""
+        old, answer = self.get(run_id), (answer or "").strip()
+        previous = old and self.follow_up(old.id)  # suite déjà tentée, donc en échec : on ne reprend plus sa session
+        if not old or not self.can_reply(old, previous):
+            return ActionResult(False, f"L'agent #{run_id} n'attend pas de réponse.", False)
+        if not answer:
+            return ActionResult(False, "Écris ta réponse avant de relancer l'agent.", False)
+        here = self.worktree_of(old.branch)  # celui que prepare_worktree reprendra
+        same_place = not previous and bool(old.session_id) and old.worktree == str(here) and (here / ".git").exists()
+        prompt = answer if same_place else "\n\n".join([
+            self._brief(old),
+            _tag("echange_precedent", f"Un agent (#{old.id}) a commencé ce travail et s'est arrêté sur des questions. Son compte rendu :\n{old.summary}"),
+            _tag("reponse", answer),
+            "Reprends la mission en tenant compte de cette réponse."])
+        result = self._launch(old.slug, old.client, old.subject, old.branch, prompt, old.category,
+                              reply_to=old.id, resume=old.session_id if same_place else "")
+        return result
 
 
 def message_of(event: dict) -> dict:

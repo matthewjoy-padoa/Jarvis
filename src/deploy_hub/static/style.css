@@ -1505,3 +1505,9 @@ p.small-note { margin: 10px 2px 0; }
 p.last-sync { margin: 4px 0 6px; }
 /* Texte lu par les lecteurs d'écran seulement */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Agent qui attend une réponse : ses questions, puis « Répondre et relancer » */
+.agent-waiting { border-color: var(--warn); }
+.agent-reply { display: grid; gap: 8px; margin-top: 12px; }
+.agent-reply textarea { width: 100%; font: inherit; }
+.agent-reply button { justify-self: start; }
