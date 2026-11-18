@@ -187,5 +187,25 @@ def load_settings() -> Settings:
     )
 
 
-# Lu dès l'import : l'app comme la synchro en ligne de commande (routine) voient les mêmes réglages.
+DEFAULT_TZ = "Europe/Paris"
+
+
+def apply_timezone() -> str:
+    """Heure de Jarvis : Europe/Paris par défaut (JARVIS_TZ pour un autre fuseau), quelle que soit l'heure du serveur.
+    Vu le 2026-11-18 : la VM est en UTC, et tout ce que Jarvis affiche et note (dernière synchro, notifications, agents)
+    avait une heure de retard. Le fuseau vaut pour le processus et ce qu'il lance (claude, suivi des DAG)."""
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+    name = os.getenv("JARVIS_TZ") or DEFAULT_TZ
+    try:
+        ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        name = DEFAULT_TZ  # fuseau inconnu : celui par défaut plutôt que l'heure du serveur
+    os.environ["TZ"] = name
+    if hasattr(time, "tzset"):
+        time.tzset()
+    return name
+
+
+# Lu dès l'import : l'app comme la synchro en ligne de commande (routine) voient les mêmes réglages, et la même heure.
 load_env_file()
+apply_timezone()

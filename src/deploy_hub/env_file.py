@@ -55,6 +55,8 @@ FIELDS = (
           section=NOTION),
     Field("ORCHESTRATOR_DIR", "Dossier de integration-orchestrator", "path", "Pour les agents Claude", live=False, section=FOLDERS),
     Field("FLOW_DIGGER_DIR", "Dossier de Flow Digger", "path", "Vide : cherché aux emplacements habituels", section=FOLDERS),
+    Field("JARVIS_TZ", "Fuseau horaire", "text", "Vide : Europe/Paris, quelle que soit l'heure du serveur (la VM est en UTC). "
+          "Nom IANA, ex. Europe/Paris", live=False, section=FOLDERS),
     Field("PADOA_ENV_URL", "Adresse des environnements Padoa", "text",
           "Bouton Environnements du dock. Modèle avec [stack] et [client] ; vide : https://[stack]-[client].aodap-staging.fr/support",
           section=FOLDERS),
