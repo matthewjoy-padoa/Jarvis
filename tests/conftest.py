@@ -14,6 +14,8 @@ os.environ.setdefault("DEPLOY_HUB_NOTIFICATIONS", str(__import__("pathlib").Path
 os.environ.setdefault("JARVIS_DATA_DIR", tempfile.mkdtemp())
 # Configuration des clients : dossier temporaire vide, jamais config/ (les vrais clients du développeur).
 os.environ.setdefault("JARVIS_CONFIG_DIR", tempfile.mkdtemp())
+# Clone orchestrator : dossier vide, jamais le vrai clone (sa branche servirait au catalogue des DAGs et serait générée).
+os.environ["ORCHESTRATOR_DIR"] = tempfile.mkdtemp()
 
 import json
 import threading

@@ -1495,3 +1495,8 @@ p.small-note { margin: 10px 2px 0; }
 .last-sync { font-size: 12.5px; white-space: nowrap; }
 p.last-sync { margin: 4px 0 6px; }
 
+
+/* Source des DAGs (onglet Injections) : branche locale du clone orchestrator */
+.dag-source { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 8px 0 12px; }
+.dag-source-form { display: flex; gap: 8px; align-items: center; margin: 0; }
+.dag-source-error { color: var(--danger); }

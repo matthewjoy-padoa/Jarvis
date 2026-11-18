@@ -1,14 +1,16 @@
-"""Catalogue des DAGs d'injection (sync/dags/catalogue.json, généré par sync/dags/generer_catalogue.py
-depuis la config de l'orchestrator) : quels DAGs peuvent injecter les ressources d'une carte."""
+"""Catalogue des DAGs d'injection (généré par sync/dags/generer_catalogue.py depuis la config de l'orchestrator) :
+quels DAGs peuvent injecter les ressources d'une carte. Celui de la branche locale choisie (data/dags/catalogue.json,
+publié par sources/dag_source.py) ; à défaut, le catalogue versionné sync/dags/catalogue.json (copie figée de main)."""
 
 import json
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from deploy_hub.config import PROJECT_ROOT
+from deploy_hub.config import PROJECT_ROOT, data_dir
 
 CATALOGUE = PROJECT_ROOT / "sync" / "dags" / "catalogue.json"
+LOCAL = data_dir() / "dags" / "catalogue.json"  # catalogue de la branche locale choisie, s'il a été généré
 # Ordre de proposition : DAG de la ressource seule d'abord, puis DAG du groupe qui la contient.
 TYPE_ORDER = {"etl": 0, "transform_and_load": 1, "etl_group": 2, "transform_and_load-group": 3}
 TYPE_LABELS = {
@@ -39,16 +41,21 @@ def _load(path: str, mtime: float) -> dict:
 
 
 def catalogue(path: Path | None = None) -> dict:
-    path = path or CATALOGUE
-    return _load(str(path), path.stat().st_mtime) if path.is_file() else {"clients": {}}
+    """Le catalogue demandé, sinon celui de la branche locale, sinon le versionné (relu seulement s'il a changé)."""
+    for candidate in [path] if path else [LOCAL, CATALOGUE]:
+        try:
+            return _load(str(candidate), candidate.stat().st_mtime)
+        except FileNotFoundError:
+            continue
+    return {"clients": {}}
 
 
 def dags_for(customers: list[str], resources: list[str] | None = None, path: Path | None = None) -> list[DagChoice]:
     """DAGs des clients orchestrator donnés qui traitent au moins une des ressources de la carte.
     Sans liste de ressources (None) : tous leurs DAGs, pour la commande « >dag » de la palette."""
-    choices = []
+    choices, clients = [], catalogue(path)["clients"]
     for customer in customers:
-        for dag_id, dag in ((catalogue(path)["clients"].get(customer) or {}).get("dags") or {}).items():
+        for dag_id, dag in ((clients.get(customer) or {}).get("dags") or {}).items():
             hit = tuple(dag["ressources"]) if resources is None else tuple(r for r in dag["ressources"] if r in resources)
             if hit:
                 choices.append(DagChoice(dag_id, customer, dag["type"], dag.get("groupe", ""), hit))
@@ -57,9 +64,9 @@ def dags_for(customers: list[str], resources: list[str] | None = None, path: Pat
 
 def ced_for(customers: list[str], path: Path | None = None) -> list[dict]:
     """DAG CED de chaque client orchestrator : {customer, dag_id, ressources: {ressource: [{requete, niveau}]}}."""
-    out = []
+    out, clients = [], catalogue(path)["clients"]
     for customer in customers:
-        ced = (catalogue(path)["clients"].get(customer) or {}).get("ced")
+        ced = (clients.get(customer) or {}).get("ced")
         if ced:
             out.append({"customer": customer, **ced})
     return out
