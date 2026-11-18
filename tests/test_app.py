@@ -201,7 +201,16 @@ def test_filters_script_searches_without_accents_and_offers_hidden_matches():
     js = client.get("/static/filters.js").text
     assert 'normalize("NFD")' in js and "data-out" in js and "more-out" in js
     assert "filters-toggle" in js and "data-fold-filters" in js  # menus déroulants derrière « Filtres » sur la fiche
-    assert "filters.js?v=8" in client.get("/actions").text
+    assert "filters.js?v=9" in client.get("/actions").text
+
+
+def test_each_filter_accepts_several_values():
+    """Un filtre = des cases à cocher : un élément passe s'il a l'une des valeurs cochées, « a|b » dans une ancre coche les deux."""
+    js = client.get("/static/filters.js").text
+    assert 'wrap.className = "filter multi"' in js and 'box.type = "checkbox"' in js
+    assert "matches: (values) => !chosen.size || values.some((v) => chosen.has(v))" in js
+    assert '(v || "").split("|").filter(Boolean).forEach((x) => { ctl.add(x); chosen.add(x); })' in js  # ancre et graphiques : « a|b »
+    assert "details.filter.multi" in client.get("/static/style.css").text
 
 
 @pytest.mark.parametrize(
