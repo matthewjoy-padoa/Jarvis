@@ -35,16 +35,27 @@
     <div id="relaunch-out-{{ run.id }}"></div>
   </form>
   {% elif relaunch %}<p class="muted">Relancé dans <a href="/agents/{{ relaunch.id }}">l'agent #{{ relaunch.id }}</a>.</p>{% endif %}
-  {% if run.summary %}<section class="panel{{ ' agent-waiting' if waiting }}"><h2>{{ "L'agent a des questions" if waiting else "Compte rendu" }}</h2><pre class="agent-summary">{{ run.summary }}</pre>
-    {% if waiting %}
+  {% if waiting %}
+  <section class="panel agent-waiting">
+    <h2>{{ "L'agent a une question" if questions | length == 1 else "L'agent a %d questions" % questions | length }}</h2>
     <form class="agent-reply" hx-post="/agents/{{ run.id }}/repondre" hx-target="#reply-out-{{ run.id }}" hx-disabled-elt="find button">
-      <label for="reponse-{{ run.id }}">Ta réponse</label>
-      <textarea id="reponse-{{ run.id }}" name="reponse" rows="5" required placeholder="Réponds à chaque question, dans l'ordre."></textarea>
+      {% for q in questions %}{% set text, _, detail = q.partition("\n") %}
+      <div class="agent-question">
+        <label for="reponse-{{ run.id }}-{{ loop.index }}"><span class="agent-question-num">{{ loop.index }}</span> {{ text }}</label>
+        {% if detail %}<pre class="agent-question-detail">{{ detail }}</pre>{% endif %}
+        <textarea id="reponse-{{ run.id }}-{{ loop.index }}" name="reponse_{{ loop.index }}" rows="2" placeholder="Ta réponse à la question {{ loop.index }}"></textarea>
+      </div>
+      {% endfor %}
+      <label for="reponse-{{ run.id }}">Autre précision (facultatif)</label>
+      <textarea id="reponse-{{ run.id }}" name="reponse" rows="2"></textarea>
       <p class="muted">Un nouvel agent repart sur la branche <code>{{ run.branch }}</code>. S'il retrouve le même worktree, il reprend la session de celui-ci et garde ce qu'il a déjà lu ; sinon il repart du brief, avec ce compte rendu et ta réponse.</p>
       <button type="submit">Répondre et relancer</button>
       <div id="reply-out-{{ run.id }}"></div>
     </form>
-    {% elif follow_up %}<p class="muted">Réponse envoyée : suite dans <a href="/agents/{{ follow_up.id }}">l'agent #{{ follow_up.id }}</a>.</p>{% endif %}
+  </section>
+  <details class="panel"><summary>Compte rendu complet de l'agent</summary><pre class="agent-summary">{{ run.summary }}</pre></details>
+  {% elif run.summary %}<section class="panel"><h2>Compte rendu</h2><pre class="agent-summary">{{ run.summary }}</pre>
+    {% if follow_up %}<p class="muted">Réponse envoyée : suite dans <a href="/agents/{{ follow_up.id }}">l'agent #{{ follow_up.id }}</a>.</p>{% endif %}
   </section>{% endif %}
   {% if review %}
   <section class="panel review" id="relecture">
