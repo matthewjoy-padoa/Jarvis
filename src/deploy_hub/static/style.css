@@ -1364,7 +1364,12 @@ tr.is-hot > td { background: color-mix(in srgb, var(--accent) 9%, transparent); 
 @media (max-width: 760px) { .agent-flow { grid-template-columns: 1fr 1fr; } .flow-lane::after { display: none; } .flow-lane:nth-child(odd) { border-left: 0; }
   .flow-lane:nth-child(n+3) { border-top: 1px solid var(--border); } .flow-lane header { border-radius: 0 !important; } }
 
-/* Robots des agents (schéma de la page Agents) : en cours = il fait les cent pas, terminé = il dort, PR = il brandit son fanion, KO = sur le dos */
+/* Armures des agents (schéma de la page Agents), une par état : en cours = rouge et or, en vol d'un bord à l'autre ; terminé = argent, à l'arrêt, elle dort ;
+   PR = tout or, répulseur levé ; KO = ferraille grise, sur le dos. Couleurs propres aux armures (pas au thème), lisibles sur fond clair comme sombre. */
+.flow-in_progress { --suit-a: #b3222b; --suit-b: #f0b530; --suit-glow: #e4faff; }
+.flow-done { --suit-a: #a9b3c0; --suit-b: #7b8696; --suit-glow: #414b5a; }
+.flow-pr { --suit-a: #e8b431; --suit-b: #b9861c; --suit-glow: #e4faff; }
+.flow-ko { --suit-a: #7d838c; --suit-b: #565c66; --suit-glow: #ff8a5c; }
 .flow-node.flow-bot { flex-direction: column; gap: 0; padding: 0 2px; background: none; border: 0; border-radius: 8px; font-size: 12px; }
 .flow-node.flow-bot::before { display: none; }
 .flow-node.flow-bot:hover, .flow-node.flow-bot:focus-visible, .flow-node.flow-bot.is-hot { box-shadow: none; transform: none; }
@@ -1374,60 +1379,55 @@ tr.is-hot > td { background: color-mix(in srgb, var(--accent) 9%, transparent); 
 .flow-nodes { min-height: 78px; align-items: flex-end; border-bottom: 2px dashed var(--border); padding-bottom: 6px; }
 .bot-wrap { position: relative; display: block; line-height: 0; }
 .bot { display: block; overflow: visible; transform-origin: 50% 100%; }
-.bot-skin { fill: var(--lane); } .bot-face { fill: var(--surface); } .bot-body { opacity: .8; }
-.bot-antenna, .bot-flag line { stroke: var(--lane); stroke-width: 1.6; stroke-linecap: round; }
-.bot-led { fill: var(--st-todo); }
-.bot-eyes circle { fill: var(--text); } .bot-eyes path { fill: none; stroke: var(--text); stroke-width: 1.6; stroke-linecap: round; }
-.eyes-closed, .eyes-x, .bot-flag { display: none; }
-.bot-flag path { fill: var(--st-todo); }
-.bot-leg-a, .bot-leg-b, .bot-arm-l, .bot-arm-r, .bot-eyes, .bot-flag { transform-box: fill-box; transform-origin: 50% 0; }
+/* im-a : plaques principales, im-b : plaques secondaires, im-glow : yeux, réacteur et paumes (éteints = sombres) */
+.im-a { fill: var(--suit-a); } .im-b { fill: var(--suit-b); } .im-glow { fill: var(--suit-glow); }
+.im-halo { fill: var(--suit-glow); opacity: .35; } .im-slot { fill: rgba(0, 0, 0, .6); }
+.im-line { fill: none; stroke: rgba(0, 0, 0, .4); stroke-width: 1; stroke-linecap: round; }
+.im-fire { fill: #ff9a2e; } .im-spark { fill: #ffe9a8; }
+.im-blast { fill: none; stroke: #2fb6ee; stroke-width: 1.4; }
+.im-leg-a, .im-leg-b, .im-arm-l, .im-arm-r, .im-jets, .im-halo, .im-blast { transform-box: fill-box; transform-origin: 50% 0; }
+.im-halo, .im-blast { transform-origin: 50% 50%; }
 /* bulle de pensée */
 .bot-wrap::after { position: absolute; left: 62%; bottom: 82%; padding: 2px 6px; border-radius: 8px 8px 8px 2px; white-space: nowrap; font-size: 10.5px; font-weight: 600; line-height: 1.3;
   color: var(--text); background: var(--surface); border: 1px solid var(--border); opacity: 0; pointer-events: none; }
-/* en cours : va-et-vient d'un bord à l'autre de la colonne, demi-tour aux extrémités */
-.flow-in_progress .flow-nodes { display: block; position: relative; height: 84px; }
-.flow-in_progress .flow-bot { --t: calc(7s + var(--i) * 1.9s); --d: calc(var(--i) * -3.1s); position: absolute; bottom: 6px; left: 0;
-  animation: bot-walk var(--t) linear var(--d) infinite alternate; }
-.flow-in_progress .bot { animation: bot-turn calc(var(--t) * 2) steps(1) var(--d) infinite, bot-bob .45s ease-in-out infinite alternate; }
-.flow-in_progress .bot-leg-a { animation: bot-step .45s ease-in-out infinite alternate; }
-.flow-in_progress .bot-leg-b { animation: bot-step .45s ease-in-out -.45s infinite alternate; }
-.flow-in_progress .bot-arm-l { animation: bot-swing .45s ease-in-out infinite alternate; }
-.flow-in_progress .bot-arm-r { animation: bot-swing .45s ease-in-out -.45s infinite alternate; }
-.flow-in_progress .bot-led { animation: bot-blink 1s steps(1) infinite; }
-.flow-in_progress .eyes-open { transform-origin: 50% 50%; animation: bot-wink 3.4s ease-in-out infinite; }
+/* en cours : vol d'un bord à l'autre de la colonne, penchée dans le sens du vol, redressée au demi-tour */
+.flow-in_progress .flow-nodes { display: block; position: relative; height: 94px; }
+.flow-in_progress .flow-bot { --t: calc(7s + var(--i) * 1.9s); --d: calc(var(--i) * -3.1s); position: absolute; bottom: 10px; left: 0;
+  animation: bot-fly var(--t) linear var(--d) infinite alternate; }
+.flow-in_progress .bot { transform-origin: 50% 55%; animation: bot-bank calc(var(--t) * 2) linear var(--d) infinite, bot-bob .9s ease-in-out infinite alternate; }
+.flow-in_progress .bot-id { margin-top: 6px; }
+.flow-in_progress .im-jets { animation: bot-flame .13s ease-in-out infinite alternate; }
+.flow-in_progress .im-halo { animation: bot-pulse 1.2s ease-in-out infinite; }
+.flow-in_progress .im-arm-l { transform: rotate(14deg); } .flow-in_progress .im-arm-r { transform: rotate(-14deg); }
 .flow-in_progress .bot-wrap::after { content: "pytest…"; animation: bot-say 9s ease-in-out calc(var(--i) * -2.7s) infinite; }
 .flow-in_progress .flow-bot:nth-child(3n+2) .bot-wrap::after { content: "grep grep grep"; }
 .flow-in_progress .flow-bot:nth-child(3n) .bot-wrap::after { content: "git push ?"; }
 .flow-in_progress .flow-bot:hover, .flow-in_progress .flow-bot:focus-visible, .flow-in_progress .flow-bot:hover *, .flow-in_progress .flow-bot.is-hot { animation-play-state: paused; }
-/* terminé sans PR : il fait la sieste */
-.flow-done .eyes-open { display: none; } .flow-done .eyes-closed { display: block; }
+/* terminé sans PR : armure éteinte, elle fait la sieste */
 .flow-done .bot { animation: bot-snore 2.8s ease-in-out calc(var(--i) * -.9s) infinite; }
-.flow-done .bot-led { fill: var(--border); }
 .flow-done .bot-wrap::after { content: "z z z"; border: 0; background: none; color: var(--muted); animation: bot-zzz 2.8s ease-out calc(var(--i) * -.9s) infinite; }
-/* PR ouverte : il saute en agitant son fanion */
-.flow-pr .bot-flag { display: block; transform-origin: 0 100%; animation: bot-wave .5s ease-in-out infinite alternate; }
+/* PR ouverte : elle saute, bras levé, le répulseur de la paume tire */
+.flow-pr .im-arm-r { transform: rotate(-150deg); }
+.flow-pr .im-blast { animation: bot-blast 1.3s ease-out calc(var(--i) * -.45s) infinite; }
 .flow-pr .bot { animation: bot-hop 1.3s cubic-bezier(.3, 0, .4, 1) calc(var(--i) * -.45s) infinite; }
-.flow-pr .bot-led { fill: var(--st-done); }
 .flow-pr .bot-wrap::after { content: "relis-moi !"; animation: bot-say 7s ease-in-out calc(var(--i) * -3.5s - 1s) infinite; }
-/* KO : sur le dos, les jambes qui gigotent */
-.flow-ko .eyes-open { display: none; } .flow-ko .eyes-x { display: block; }
+/* KO : sur le dos, les jambes qui gigotent, yeux et réacteur qui grésillent */
 .flow-ko .bot { transform: rotate(-90deg); transform-origin: 50% 50%; }
-.flow-ko .bot-leg-a { animation: bot-kick .9s ease-in-out infinite alternate; }
-.flow-ko .bot-leg-b { animation: bot-kick .9s ease-in-out -.5s infinite alternate; }
-.flow-ko .bot-led { animation: bot-blink .35s steps(1) infinite; fill: var(--st-ko); }
+.flow-ko .im-leg-a { animation: bot-kick .9s ease-in-out infinite alternate; }
+.flow-ko .im-leg-b { animation: bot-kick .9s ease-in-out -.5s infinite alternate; }
+.flow-ko .im-eyes, .flow-ko .im-core { animation: bot-flicker 2.4s linear calc(var(--i) * -.7s) infinite; }
 .flow-ko .bot-wrap::after { content: "aïe."; left: 20%; animation: bot-say 6s ease-in-out calc(var(--i) * -2s) infinite; }
-@keyframes bot-walk { from { left: 0; } to { left: calc(100% - 56px); } }
-@keyframes bot-turn { 0% { scale: 1 1; } 50% { scale: -1 1; } }
-@keyframes bot-bob { to { translate: 0 -2px; } }
-@keyframes bot-step { from { transform: translateY(0) rotate(14deg); } to { transform: translateY(-2.5px) rotate(-14deg); } }
-@keyframes bot-swing { from { transform: rotate(-22deg); } to { transform: rotate(22deg); } }
-@keyframes bot-blink { 50% { opacity: .15; } }
-@keyframes bot-wink { 0%, 92%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+@keyframes bot-fly { from { left: 0; } to { left: calc(100% - 56px); } }
+@keyframes bot-bank { 0%, 50%, 100% { rotate: 0deg; } 5%, 45% { rotate: 16deg; } 55%, 95% { rotate: -16deg; } }
+@keyframes bot-bob { to { translate: 0 -3px; } }
+@keyframes bot-flame { from { transform: scaleY(.65); } to { transform: scaleY(1.15); } }
+@keyframes bot-pulse { 50% { transform: scale(1.25); opacity: .15; } }
+@keyframes bot-blast { from { transform: scale(.3); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
+@keyframes bot-flicker { 0%, 12%, 40%, 74%, 100% { opacity: 1; } 8%, 44%, 70% { opacity: .15; } 52% { opacity: .7; } }
 @keyframes bot-say { 0%, 55%, 100% { opacity: 0; transform: translateY(4px) scale(.8); } 62%, 90% { opacity: 1; transform: none; } }
 @keyframes bot-snore { 50% { transform: scale(1.04, .95); } }
 @keyframes bot-zzz { 0% { opacity: 0; transform: translate(-6px, 8px) scale(.6); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(8px, -14px) scale(1.15); } }
 @keyframes bot-hop { 0%, 100% { transform: translateY(0) scale(1.06, .92); } 45% { transform: translateY(-13px) scale(.96, 1.06); } 70% { transform: translateY(0) scale(1.08, .9); } }
-@keyframes bot-wave { from { transform: rotate(-10deg); } to { transform: rotate(14deg); } }
 @keyframes bot-kick { from { transform: rotate(-30deg); } to { transform: rotate(30deg) translateY(-1px); } }
 @media (prefers-reduced-motion: reduce) {
   .flow-bot, .flow-bot *, .bot-wrap::after { animation: none !important; }
