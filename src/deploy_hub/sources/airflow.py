@@ -3,8 +3,8 @@
 Lance un DAG avec le paramètre `padoa_env` (stack cible : integration, snap ou recette ; prod désactivée, contrôlé par
 `handle_padoa_env_coherence` dans dags/dag_params/handle_functions.py de l'orchestrator) et lit l'état des runs.
 Un DAG en pause est d'abord sorti de pause (sinon le run attendrait), et le message le dit.
-Ce module ne lit pas les logs ; le suivi lancé ensuite (dag_watch.py → air.py d'Arthur) les lit pour les runs qu'il suit
-(dérogation décidée par Matthew le 2026-11-12).
+Ce module ne lit pas les logs ; le suivi lancé ensuite (dag_watch.py → air.py d'Arthur, comme /air) lit ceux de ses tâches
+par cette même API REST : rien d'autre à configurer.
 
 Actif dès que AIRFLOW_BASE_URL, AIRFLOW_USER et AIRFLOW_PASSWORD sont renseignés (environnement ou .env de l'app) ;
 sinon aucun DAG n'est lancé et le message dit quoi régler.

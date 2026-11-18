@@ -29,7 +29,8 @@ Jarvis : script d'Arthur repris tel quel, sauf trois adaptations repérées « J
 Jarvis lance `python -m deploy_hub.air watch DAG_ID RUN_ID --client C` après chaque « Lancer » réel
 (sources/dag_watch.py) avec AIRFLOW_URL / AIRFLOW_USER / AIRFLOW_PASSWORD, AIR_STATE_DIR (data/airflow : état,
 rapports, journal, jamais le vault : ils contiennent des valeurs client) et AIR_NOTIFY=print (notifications de Jarvis).
-Ce suivi lit les logs des tâches qu'il suit (classement des erreurs, rapport) : dérogation décidée par Matthew le 2026-11-12.
+Comme /air, ce suivi ne passe que par l'API REST (logs des tâches compris, pour classer les erreurs et faire le rapport) :
+rien à régler en plus de ces trois variables ; aucun fichier de logs, pas de docker exec ni de commande airflow.
 """
 import argparse, ast, base64, html, http.client, http.cookiejar, json, os, re, shutil, subprocess, sys, time, urllib.error, urllib.parse, urllib.request
 from collections import defaultdict

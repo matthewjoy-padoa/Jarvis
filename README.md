@@ -57,7 +57,7 @@ La consigne vit dans le dépôt : un `git pull` met à jour la tâche planifiée
 
 L'onglet Injections propose les DAGs de l'orchestrator qui traitent chaque ressource, sur integration, snap ou recette (la prod est désactivée).
 - Réglages Airflow dans `.env` (`AIRFLOW_BASE_URL`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD`) ; sans eux, aucun DAG n'est lancé et Jarvis dit quoi régler.
-- Après chaque lancement réel, [`air.py`](src/deploy_hub/air.py) (le script d'Arthur) suit le run : il relance les échecs passagers (3 fois au plus), envoie ses alertes en notifications et fait un rapport (**Agents → Suivis de DAG**). Il lit les logs des tâches qu'il suit ; ce qu'il écrit reste dans `data/airflow/`.
+- Après chaque lancement réel, [`air.py`](src/deploy_hub/air.py) (le script d'Arthur) suit le run : il relance les échecs passagers (3 fois au plus), envoie ses alertes en notifications et fait un rapport (**Agents → Suivis de DAG**). Comme `/air`, il ne passe que par l'API REST d'Airflow : rien à régler en plus de `AIRFLOW_BASE_URL`, `AIRFLOW_USER` et `AIRFLOW_PASSWORD` (aucun accès aux fichiers de logs). Ce qu'il écrit reste dans `data/airflow/`.
 - **Enchaînement** : plusieurs DAG cochés partent dans l'ordre ; le suivant ne part que si le suivi du précédent finit vert, sinon la chaîne s'arrête et le dit en notification (**Agents → Enchaînements**, bouton « Arrêter »). Jamais en prod.
 - Catalogue des DAGs : `sync/dags/catalogue.json`, à régénérer quand `dags/config_deployment.py` change ([`sync/dags/generer_catalogue.py`](sync/dags/generer_catalogue.py)).
 
