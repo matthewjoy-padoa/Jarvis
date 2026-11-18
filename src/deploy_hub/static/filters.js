@@ -13,6 +13,8 @@
 //   recherche ou un filtre en trouve, un bouton propose de les afficher (data-out-label sur le bloc : comment les nommer).
 //   S'il n'y a de résultat que parmi eux, ils sont affichés d'office.
 // - Filtre « Client » : présélectionné sur le client du menu en haut (body[data-current-client]), sauf ancre de filtres.
+// - Chaque filtre accepte plusieurs valeurs (cases à cocher) : un élément passe s'il a l'une d'elles ; les filtres entre eux
+//   se cumulent. Dans une ancre ou un data-filter-set, « a|b » coche les deux.
 // - Bloc [data-fold-filters] (listes de la fiche client) : la barre montre la recherche et un bouton « Filtres » (nombre de
 //   filtres actifs) ; les menus déroulants et le tri sont dans un panneau qu'il ouvre. Tous les filtres restent là.
 (function () {
@@ -37,17 +39,52 @@
     return collator.compare(a, b);
   }
 
-  // options : liste de [valeur, libellé]
-  function select(label, options, onChange) {
-    const wrap = document.createElement("label");
-    wrap.className = "filter";
-    const s = document.createElement("select");
-    s.append(new Option(`${label} : tous`, ""));
-    options.forEach(([value, text]) => s.append(new Option(text, value)));
-    s.addEventListener("change", onChange);
-    wrap.append(s);
-    return [wrap, s];
+  // Filtre à choix multiple : un menu (details) de cases à cocher. options : liste de [valeur, libellé].
+  // Le contrôle renvoyé garde l'interface d'un <select> pour le reste du script : value (valeurs cochées jointes par « | »,
+  // "" : aucune), options ; plus add(valeur) et matches(valeurs de l'élément).
+  function multiSelect(label, options, onChange) {
+    const wrap = document.createElement("details");
+    wrap.className = "filter multi";
+    const summary = document.createElement("summary");
+    const list = document.createElement("div");
+    list.className = "multi-list";
+    const all = document.createElement("button");
+    all.type = "button";
+    all.className = "multi-all";
+    all.textContent = "Tous";
+    list.append(all);
+    wrap.append(summary, list);
+    const chosen = new Set();
+    const boxes = new Map(); // valeur -> [case, libellé]
+    const sync = () => {
+      boxes.forEach(([box], v) => (box.checked = chosen.has(v)));
+      const names = [...chosen].map((v) => boxes.get(v)[1]);
+      summary.textContent = !names.length ? `${label} : tous` : names.length <= 2 ? `${label} : ${names.join(", ")}` : `${label} : ${names.length} choisis`;
+      summary.title = names.join(", ");
+      wrap.classList.toggle("is-on", names.length > 0);
+    };
+    const ctl = {
+      get options() { return [...boxes.keys()].map((value) => ({ value })); },
+      get value() { return [...chosen].join("|"); },
+      set value(v) { chosen.clear(); (v || "").split("|").filter(Boolean).forEach((x) => { ctl.add(x); chosen.add(x); }); sync(); }, // « a|b » : les deux ; inconnue : ajoutée
+      matches: (values) => !chosen.size || values.some((v) => chosen.has(v)),
+      add(value, name = value) {
+        if (boxes.has(value)) return;
+        const row = document.createElement("label");
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.addEventListener("change", () => { box.checked ? chosen.add(value) : chosen.delete(value); sync(); onChange(); });
+        row.append(box, ` ${name}`);
+        list.append(row);
+        boxes.set(value, [box, name]);
+      },
+    };
+    all.addEventListener("click", () => { ctl.value = ""; onChange(); });
+    options.forEach(([value, name]) => ctl.add(value, name));
+    sync();
+    return [wrap, ctl];
   }
+
 
   function toolbar(block, onChange) {
     const bar = document.createElement("div");
@@ -90,7 +127,7 @@
   function groupSelect(items, apply) {
     const present = new Set(items.map((it) => it.dataset.group).filter(Boolean));
     if (present.size < 2) return null;
-    return select("Groupe", Object.entries(GROUPS).filter(([k]) => present.has(k)), apply);
+    return multiSelect("Groupe", Object.entries(GROUPS).filter(([k]) => present.has(k)), apply);
   }
 
   function register(tools, keys, apply) {
@@ -158,7 +195,7 @@
         const multi = th.hasAttribute("data-multi");
         const cellValues = (r) => (multi ? (r.cells[i].dataset.values || "").split("|") : [text(r.cells[i])]);
         const values = [...new Set(rows.flatMap(cellValues))].filter((v) => v && v !== "—").sort(compare);
-        const [wrap, s] = select(text(th), values.map((v) => [v, v]), apply);
+        const [wrap, s] = multiSelect(text(th), values.map((v) => [v, v]), apply);
         panel.append(wrap);
         keys[th.dataset.filter || text(th)] = s;
         return { i, s, cellValues };
@@ -170,8 +207,8 @@
     function apply() {
       const found = searcher(search);
       show(entry, rows, (r) => found(r)
-        && filters.every((f) => !f.s.value || f.cellValues(r).includes(f.s.value))
-        && (!keys.groupe || !keys.groupe.value || r.dataset.group === keys.groupe.value));
+        && filters.every((f) => f.s.matches(f.cellValues(r)))
+        && (!keys.groupe || keys.groupe.matches([r.dataset.group])));
     }
 
     headers.forEach((th, i) => {
@@ -205,9 +242,9 @@
     const filters = pairs(block.dataset.filters).map(([label, attr]) => {
       const valuesOf = (it) => (it.dataset[attr] || "").split("|"); // « a|b » : la carte répond aux deux valeurs
       const values = [...new Set(items.flatMap(valuesOf))].filter(Boolean).sort(compare);
-      const [wrap, s] = select(label, values.map((v) => [v, v]), apply);
+      const [wrap, s] = multiSelect(label, values.map((v) => [v, v]), apply);
       return { attr, s, wrap, valuesOf };
-    }).filter((f) => f.s.options.length > 2);
+    }).filter((f) => f.s.options.length > 1); // une seule valeur : rien à filtrer
     filters.forEach((f) => { panel.append(f.wrap); keys[f.attr] = f.s; });
     const group = groupSelect(items, apply);
     if (group) { panel.append(group[0]); keys.groupe = group[1]; }
@@ -230,8 +267,8 @@
     function apply() {
       const found = searcher(search);
       show(entry, items, (it) => found(it)
-        && filters.every((f) => !f.s.value || f.valuesOf(it).includes(f.s.value))
-        && (!keys.groupe || !keys.groupe.value || it.dataset.group === keys.groupe.value));
+        && filters.every((f) => f.s.matches(f.valuesOf(it)))
+        && (!keys.groupe || keys.groupe.matches([it.dataset.group])));
       block.querySelectorAll(".kb-col").forEach((col) => { // kanban : nombre de cartes visibles par colonne
         const n = col.querySelector(".kb-count");
         if (n) n.textContent = col.querySelectorAll(".kb-card:not([hidden])").length;
@@ -249,11 +286,6 @@
     }));
   }
 
-  function setOption(s, value) {
-    if (value && ![...s.options].some((o) => o.value === value)) s.append(new Option(value, value));
-    s.value = value;
-  }
-
   // Applique {clé: valeur} au premier bloc qui a toutes ces clés. Renvoie false si aucun bloc ne convient.
   function applyFilters(wanted, { toggle = false, scroll = true } = {}) {
     const entry = blocks.find((b) => Object.keys(wanted).every((k) => k in b.keys));
@@ -261,7 +293,7 @@
     const already = Object.entries(wanted).every(([k, v]) => entry.keys[k].value === v);
     // Clic sur un graphique de la page (toggle) : le client choisi reste ; ancre venue d'une autre page : elle seule compte.
     Object.entries(entry.keys).forEach(([k, s]) => { if (!(toggle && isClient(k) && !(k in wanted))) s.value = ""; });
-    if (!(toggle && already)) Object.entries(wanted).forEach(([k, v]) => setOption(entry.keys[k], v));
+    if (!(toggle && already)) Object.entries(wanted).forEach(([k, v]) => (entry.keys[k].value = v));
     entry.apply();
     if (scroll) entry.bar.scrollIntoView({ behavior: "smooth", block: "start" });
     return true;
@@ -293,11 +325,15 @@
     }
   }
 
+  // Menu de filtre ouvert : un clic ailleurs ou Échap le ferme (un seul ouvert à la fois).
+  const closeMenus = (keep) => document.querySelectorAll("details.filter.multi[open]").forEach((d) => { if (!d.contains(keep)) d.open = false; });
   document.addEventListener("click", (e) => {
+    closeMenus(e.target);
     const el = e.target.closest("[data-filter-set]");
     if (el) { e.preventDefault(); activate(el); }
   });
   document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeMenus(null);
     const el = e.target.closest && e.target.closest("[data-filter-set]");
     if (el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); activate(el); }
   });
