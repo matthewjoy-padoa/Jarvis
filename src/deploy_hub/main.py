@@ -25,7 +25,8 @@ from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
-from deploy_hub.sources.claude_runner import TO_FILL, WAITING, ClaudeRunner, agent_branch, duration_text, read_log, retour_prompt, tokens_text, usage
+from deploy_hub.sources.claude_runner import (TO_FILL, WAITING, ClaudeRunner, agent_branch, answer_text, duration_text, questions_of,
+                                              read_log, retour_prompt, tokens_text, usage)
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_source import DagSource
 from deploy_hub.sources.dag_watch import DagWatcher
@@ -530,7 +531,8 @@ def _agent_context(run) -> dict:
     relaunch = claude.relaunched(run.id) if run.group == KO else None  # seul un agent en erreur peut avoir été relancé
     return {"relaunch": relaunch, "relaunchable": run.group == KO and (relaunch is None or relaunch.group == KO),  # relance en échec : on peut réessayer
             "run": run, "log": read_log(path), "review": None if run.running or run.simulated else agent_review.build(run, path),
-            "follow_up": follow_up, "waiting": claude.can_reply(run, follow_up)}
+            "follow_up": follow_up, "waiting": (waiting := claude.can_reply(run, follow_up)),
+            "questions": questions_of(run.summary) if waiting else []}
 
 
 @app.get("/agents/{run_id}", response_class=HTMLResponse)
@@ -554,10 +556,15 @@ def _open_new_agent(request: Request, result: ActionResult, new_agent) -> HTMLRe
 
 
 @app.post("/agents/{run_id}/repondre")
-def agent_reply(request: Request, run_id: int, reponse: str = Form("")):
-    """« Répondre et relancer » : la réponse part à un nouvel agent sur la même branche, ouvert dès son lancement."""
-    _run_or_404(run_id)
-    return _open_new_agent(request, claude.reply(run_id, reponse), lambda: claude.follow_up(run_id))
+async def agent_reply(request: Request, run_id: int):
+    """« Répondre et relancer » : une réponse par question (reponse_1, reponse_2…) plus une précision libre (reponse), assemblées
+    question par question ; elles partent à un nouvel agent sur la même branche, ouvert dès son lancement."""
+    run = _run_or_404(run_id)
+    form = await request.form()
+    questions = questions_of(run.summary)
+    answer = answer_text(questions, [str(form.get(f"reponse_{i}", "")) for i in range(1, len(questions) + 1)], str(form.get("reponse", "")))
+    result = await asyncio.to_thread(claude.reply, run_id, answer)  # git (vérifs, worktree) : hors de la boucle
+    return _open_new_agent(request, result, lambda: claude.follow_up(run_id))
 
 
 @app.post("/agents/{run_id}/relancer")
