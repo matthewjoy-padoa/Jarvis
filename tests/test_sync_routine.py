@@ -227,3 +227,73 @@ def test_a_running_sync_is_picked_up_again_when_the_page_loads(monkeypatch, tmp_
     for path in ("/deploiements/client-demo/synthese", "/clients"):
         assert resume in client.get(path).text
 
+
+
+# --- Grosses réponses Notion : Claude Code les range dans ~/.claude/projects/<dossier>/<session>/tool-results/ -----------
+def saved(projects, session, name, payload, minutes_ago=0):
+    folder = projects / "-home-x-Jarvis" / session / "tool-results"
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"mcp-claude_ai_Notion-notion-query-data-sources-{name}.txt"
+    path.write_text(payload, encoding="utf-8")
+    if minutes_ago:
+        stamp = time.time() - minutes_ago * 60
+        os.utime(path, (stamp, stamp))
+    return path
+
+
+def test_deposer_copies_the_saved_response_of_the_routine_session(tmp_path, monkeypatch):
+    """Vu le 2026-11-17 : Claude Code refusait le « cp » depuis ~/.claude. « deposer » retrouve le fichier de la session
+    de la routine (pas celui d'une autre session, même plus récent), le vérifie et le copie tel quel."""
+    projects = tmp_path / "projects"
+    monkeypatch.setattr(sync_notion, "CLAUDE_PROJECTS", projects)
+    mine = saved(projects, "session-routine", "1", '{"results": [{"a": 1}, {"a": 2}], "has_more": false}')
+    saved(projects, "autre-session", "2", '{"results": [], "has_more": false}')  # plus récent, mais pas à nous
+    monkeypatch.setenv(sync_notion.SESSION_ENV, "session-routine")
+    out = tmp_path / "data" / "notion" / "acme" / "recette.json"
+    r = sync_notion.deposit(str(out), root=tmp_path)
+    assert r["lignes"] == 2 and r["source"] == mine.name and out.read_text(encoding="utf-8") == mine.read_text(encoding="utf-8")
+
+
+def test_deposer_refuses_what_is_not_a_fresh_notion_response(tmp_path, monkeypatch):
+    projects = tmp_path / "projects"
+    monkeypatch.setattr(sync_notion, "CLAUDE_PROJECTS", projects)
+    monkeypatch.delenv(sync_notion.SESSION_ENV, raising=False)
+    out = str(tmp_path / "data" / "notion" / "acme" / "recette.json")
+    with pytest.raises(sync_notion.SyncError, match="Aucune réponse"):
+        sync_notion.deposit(out, root=tmp_path)  # rien de rangé
+    old = saved(projects, "s", "vieux", '{"results": []}', minutes_ago=30)
+    with pytest.raises(sync_notion.SyncError, match="Aucune réponse"):
+        sync_notion.deposit(out, root=tmp_path)  # trop ancien pour être celui qu'on attend
+    with pytest.raises(sync_notion.SyncError, match="pas une réponse Notion"):
+        sync_notion.deposit(out, str(saved(projects, "s", "x", '{"autre": 1}')), root=tmp_path)
+    with pytest.raises(sync_notion.SyncError, match="pas du JSON"):
+        sync_notion.deposit(out, str(saved(projects, "s", "y", "Output: tronqué")), root=tmp_path)
+    with pytest.raises(sync_notion.SyncError, match="hors du dossier de données"):
+        sync_notion.deposit(str(tmp_path / "ailleurs.json"), str(old), root=tmp_path)
+    elsewhere = tmp_path / "pas-claude.txt"
+    elsewhere.write_text('{"results": []}', encoding="utf-8")
+    with pytest.raises(sync_notion.SyncError, match="Pas une réponse rangée"):
+        sync_notion.deposit(out, str(elsewhere), root=tmp_path)
+
+
+def test_the_routine_runs_with_a_known_session_and_never_asks(tmp_path):
+    """--session-id (le dépôt retrouve ses fichiers), --permission-mode dontAsk, plus de cp ; la consigne dit « deposer »."""
+    script = tmp_path / "claude"
+    script.write_text(f"""#!{sys.executable}
+import os, sys
+sys.stdin.read()
+open({str(tmp_path / 'vu.txt')!r}, 'w').write(repr((sys.argv[1:], os.environ.get('JARVIS_SYNC_SESSION'))))
+print('acme : inchangé')
+""", encoding="utf-8")
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    routine = SyncRoutine(folder=tmp_path / "notion", claude_bin=str(script))
+    assert routine.start().ok
+    wait(routine)
+    args, session = eval((tmp_path / "vu.txt").read_text())
+    assert args[args.index("--session-id") + 1] == session and session
+    assert args[args.index("--permission-mode") + 1] == "dontAsk"
+    tools = args[args.index("--allowedTools") + 1:]
+    assert not any(t.startswith("Bash(cp") for t in tools) and any(t.startswith("Read(//") for t in tools)
+    assert "mcp__claude_ai_Notion" in tools
+    text = routine_text()
+    assert "sync_notion deposer" in text and "cp \"" not in text

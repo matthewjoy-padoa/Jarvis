@@ -10,21 +10,25 @@ import os
 import shutil
 import subprocess
 import threading
+import uuid
 from datetime import datetime
 from pathlib import Path
 
 from deploy_hub.config import ENV_FILE_KEYS, PROJECT_ROOT, data_dir
 from deploy_hub.sources import ActionResult
+from deploy_hub.sync_notion import SESSION_ENV
 
 ROUTINE = PROJECT_ROOT / "sync" / "routine.md"
 INSTRUCTION = "Suis la consigne reçue sur l'entrée standard (routine de synchro Notion de Jarvis)."
-NOTION_SERVERS = ("mcp__claude_ai_Notion", "mcp__notion", "mcp__Notion")  # noms courants du connecteur Notion
+NOTION_SERVERS = ("mcp__claude_ai_Notion",)  # connecteur Notion de claude.ai (nom vu sur la VM le 2026-11-18)
 
 
 def default_tools(data: Path) -> tuple[str, ...]:
-    """Outils permis : les commandes de synchro, la copie des résultats, l'écriture dans le dossier de données
-    (Edit : seule forme de règle à chemin que Claude Code applique aussi à Write), Notion."""
-    return ("Bash(uv run python -m deploy_hub.sync_notion:*)", "Bash(cp:*)", f"Edit(/{data.resolve()}/**)", *NOTION_SERVERS)
+    """Outils permis : les commandes de synchro (dépôt des grosses réponses compris : plus de « cp », que Claude Code refuse
+    sur ~/.claude), la lecture et l'écriture du dossier de données (Edit : seule forme de règle à chemin que Claude Code
+    applique aussi à Write ; Read pour un dossier de données placé hors du projet), Notion."""
+    folder = f"/{data.resolve()}/**"
+    return ("Bash(uv run python -m deploy_hub.sync_notion:*)", f"Read({folder})", f"Edit({folder})", *NOTION_SERVERS)
 
 
 def routine_text() -> str:
@@ -88,8 +92,11 @@ class SyncRoutine:
         return None
 
     # --- lancement ----------------------------------------------------------------------------------------------
-    def command(self) -> list[str]:
-        return [self.claude_bin, "-p", INSTRUCTION, "--output-format", "text", "--allowedTools", *self.allowed_tools]
+    def command(self, session: str = "") -> list[str]:
+        """--session-id : Jarvis connaît la session, donc le dossier où Claude Code range ses grosses réponses (« deposer »).
+        --permission-mode dontAsk : tout ce qui n'est pas permis est refusé, jamais mis en attente."""
+        return [self.claude_bin, "-p", INSTRUCTION, "--output-format", "text", "--permission-mode", "dontAsk",
+                *(["--session-id", session] if session else []), "--allowedTools", *self.allowed_tools]
 
     def _env(self) -> dict:
         """Environnement de l'app (mêmes dossiers, donc mêmes clients), sans les valeurs venues du .env : le processus de
@@ -104,7 +111,9 @@ class SyncRoutine:
                 return ActionResult(False, "Une synchro est déjà en cours.", False)
             self.folder.mkdir(parents=True, exist_ok=True)
             log = self.log_path.open("w", encoding="utf-8")
-            self._proc = subprocess.Popen(self.command(), cwd=PROJECT_ROOT, env=self._env(), stdin=subprocess.PIPE,
+            session = str(uuid.uuid4())
+            self._proc = subprocess.Popen(self.command(session), cwd=PROJECT_ROOT, env={**self._env(), SESSION_ENV: session},
+                                          stdin=subprocess.PIPE,
                                           stdout=log, stderr=subprocess.STDOUT, text=True)
             self._save(running=True, started=datetime.now().isoformat(timespec="seconds"))
         self._proc.stdin.write(routine_text())
