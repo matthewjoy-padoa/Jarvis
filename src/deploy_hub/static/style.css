@@ -1529,7 +1529,14 @@ p.last-sync { margin: 4px 0 6px; }
 .agent-reply textarea { width: 100%; font: inherit; }
 .agent-reply button { justify-self: start; }
 .agent-question { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
-.agent-question label { font-weight: 600; }
+.agent-question-text { margin: 0; font-weight: 600; }
+.agent-options { display: grid; gap: 6px; margin: 2px 0 0; padding: 0; border: 0; }
+.agent-option { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.agent-option:has(input:checked) { border-color: var(--accent); background: var(--bg); }
+.agent-option input { margin-top: 3px; }
+.agent-option-label { font-weight: 600; }
+.agent-option-why { display: block; color: var(--muted); font-size: 13px; }
+.agent-reco-why { margin: 2px 0 0; font-size: 13px; }
 .agent-question-num { display: inline-grid; place-items: center; width: 1.6em; height: 1.6em; margin-right: 4px; border-radius: 50%;
   background: var(--warn); color: var(--bg); font-size: .85em; }
 .agent-question-detail { font-size: 13.5px; }

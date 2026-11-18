@@ -26,8 +26,8 @@ from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
 from deploy_hub.rendu import md, md_inline
-from deploy_hub.sources.claude_runner import (TO_FILL, WAITING, ClaudeRunner, agent_branch, answer_text, duration_text, questions_of,
-                                              read_log, retour_prompt, split_questions, tokens_text, usage)
+from deploy_hub.sources.claude_runner import (TO_FILL, WAITING, ClaudeRunner, agent_branch, agent_questions, answer_text, chosen_answer,
+                                              duration_text, read_log, retour_prompt, tokens_text, usage)
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_source import DagSource
 from deploy_hub.sources.dag_watch import DagWatcher
@@ -533,7 +533,7 @@ def _agent_context(run) -> dict:
     follow_up = None if run.running else claude.follow_up(run.id)
     relaunch = claude.relaunched(run.id) if run.group == KO else None  # seul un agent en erreur peut avoir été relancé
     waiting = claude.can_reply(run, follow_up)
-    intro, questions = split_questions(run.summary) if waiting else ("", [])  # contexte écrit par l'agent, puis ses questions
+    intro, questions = agent_questions(run.summary) if waiting else ("", [])  # contexte écrit par l'agent, puis ses questions
     return {"relaunch": relaunch, "relaunchable": run.group == KO and (relaunch is None or relaunch.group == KO),  # relance en échec : on peut réessayer
             "run": run, "log": read_log(path), "review": None if run.running or run.simulated else agent_review.build(run, path),
             "follow_up": follow_up, "waiting": waiting, "intro": intro, "questions": questions}
@@ -561,12 +561,14 @@ def _open_new_agent(request: Request, result: ActionResult, new_agent) -> HTMLRe
 
 @app.post("/agents/{run_id}/repondre")
 async def agent_reply(request: Request, run_id: int):
-    """« Répondre et relancer » : une réponse par question (reponse_1, reponse_2…) plus une précision libre (reponse), assemblées
+    """« Répondre et relancer » : par question, l'option cochée (choix_1…) et une réponse libre (reponse_1…), plus une précision
+    libre (reponse), assemblées
     question par question ; elles partent à un nouvel agent sur la même branche, ouvert dès son lancement."""
     run = _run_or_404(run_id)
     form = await request.form()
-    questions = questions_of(run.summary)
-    answer = answer_text(questions, [str(form.get(f"reponse_{i}", "")) for i in range(1, len(questions) + 1)], str(form.get("reponse", "")))
+    _, questions = agent_questions(run.summary)
+    answers = [chosen_answer(q, str(form.get(f"choix_{i}", "")), str(form.get(f"reponse_{i}", ""))) for i, q in enumerate(questions, 1)]
+    answer = answer_text(questions, answers, str(form.get("reponse", "")))
     result = await asyncio.to_thread(claude.reply, run_id, answer)  # git (vérifs, worktree) : hors de la boucle
     return _open_new_agent(request, result, lambda: claude.follow_up(run_id))
 
