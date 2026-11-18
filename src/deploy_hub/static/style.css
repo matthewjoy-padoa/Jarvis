@@ -1365,7 +1365,7 @@ tr.is-hot > td { background: color-mix(in srgb, var(--accent) 9%, transparent); 
   .flow-lane:nth-child(n+3) { border-top: 1px solid var(--border); } .flow-lane header { border-radius: 0 !important; } }
 
 /* Armures des agents (schéma de la page Agents), une par état : en cours = rouge et or, en vol d'un bord à l'autre ; terminé = argent, à l'arrêt, elle dort ;
-   PR = tout or, répulseur levé ; KO = ferraille grise, sur le dos. Couleurs propres aux armures (pas au thème), lisibles sur fond clair comme sombre. */
+   PR = tout or, répulseur levé ; KO = ferraille grise, sur le dos ; question en attente (parmi les « en cours ») = bleu et argent, main levée, « ? ». Couleurs propres aux armures (pas au thème), lisibles sur fond clair comme sombre. */
 .flow-in_progress { --suit-a: #b3222b; --suit-b: #f0b530; --suit-glow: #e4faff; }
 .flow-done { --suit-a: #a9b3c0; --suit-b: #7b8696; --suit-glow: #414b5a; }
 .flow-pr { --suit-a: #e8b431; --suit-b: #b9861c; --suit-glow: #e4faff; }
@@ -1390,8 +1390,9 @@ tr.is-hot > td { background: color-mix(in srgb, var(--accent) 9%, transparent); 
 /* bulle de pensée */
 .bot-wrap::after { position: absolute; left: 62%; bottom: 82%; padding: 2px 6px; border-radius: 8px 8px 8px 2px; white-space: nowrap; font-size: 10.5px; font-weight: 600; line-height: 1.3;
   color: var(--text); background: var(--surface); border: 1px solid var(--border); opacity: 0; pointer-events: none; }
-/* en cours : vol d'un bord à l'autre de la colonne, penchée dans le sens du vol, redressée au demi-tour */
-.flow-in_progress .flow-nodes { display: block; position: relative; height: 94px; }
+/* en cours : vol d'un bord à l'autre de la colonne, penchée dans le sens du vol, redressée au demi-tour ; les armures en vol sont hors flux,
+   celles qui attendent une réponse restent posées côte à côte (la colonne grandit si elles passent à la ligne) */
+.flow-in_progress .flow-nodes { position: relative; min-height: 94px; }
 .flow-in_progress .flow-bot { --t: calc(7s + var(--i) * 1.9s); --d: calc(var(--i) * -3.1s); position: absolute; bottom: 10px; left: 0;
   animation: bot-fly var(--t) linear var(--d) infinite alternate; }
 .flow-in_progress .bot { transform-origin: 50% 55%; animation: bot-bank calc(var(--t) * 2) linear var(--d) infinite, bot-bob .9s ease-in-out infinite alternate; }
@@ -1406,6 +1407,17 @@ tr.is-hot > td { background: color-mix(in srgb, var(--accent) 9%, transparent); 
 /* terminé sans PR : armure éteinte, elle fait la sieste */
 .flow-done .bot { animation: bot-snore 2.8s ease-in-out calc(var(--i) * -.9s) infinite; }
 .flow-done .bot-wrap::after { content: "z z z"; border: 0; background: none; color: var(--muted); animation: bot-zzz 2.8s ease-out calc(var(--i) * -.9s) infinite; }
+/* question en attente : l'agent reste parmi les « en cours », mais posé au sol au lieu de voler : armure bleu et argent, pastille couleur « à faire »,
+   main levée qui s'agite, « ? » au-dessus de la tête, toujours visible ; sans animation, le bras reste levé.
+   Préfixe .flow-lane : ces règles passent devant celles de la colonne (vol, bulles « pytest… »). */
+.flow-lane .flow-bot.is-waiting { --lane: var(--st-todo); --suit-a: #3b6fd4; --suit-b: #aab6c6; --suit-glow: #e4faff;
+  position: relative; bottom: auto; z-index: 1; margin-top: 24px; animation: none; }  /* marge : place du « ? » */
+.flow-lane .flow-bot.is-waiting .bot { animation: none; }
+.flow-lane .flow-bot.is-waiting .im-arm-l { transform: none; }
+.flow-lane .flow-bot.is-waiting .im-arm-r { transform: rotate(-165deg); animation: bot-ask 1.1s ease-in-out calc(var(--i) * -.4s) infinite alternate; }
+.flow-lane .flow-bot.is-waiting .im-halo { animation: bot-pulse 2.4s ease-in-out infinite; }
+.flow-lane .flow-bot.is-waiting .bot-wrap::after { content: "?"; left: 0; right: 0; bottom: 96%; width: max-content; margin: 0 auto; border-radius: 8px; font-size: 13px; color: var(--lane);
+  background: var(--surface); border: 1px solid var(--lane); opacity: 1; animation: bot-bob 1.1s ease-in-out calc(var(--i) * -.6s) infinite alternate; }
 /* PR ouverte : elle saute, bras levé, le répulseur de la paume tire */
 .flow-pr .im-arm-r { transform: rotate(-150deg); }
 .flow-pr .im-blast { animation: bot-blast 1.3s ease-out calc(var(--i) * -.45s) infinite; }
@@ -1417,6 +1429,7 @@ tr.is-hot > td { background: color-mix(in srgb, var(--accent) 9%, transparent); 
 .flow-ko .im-leg-b { animation: bot-kick .9s ease-in-out -.5s infinite alternate; }
 .flow-ko .im-eyes, .flow-ko .im-core { animation: bot-flicker 2.4s linear calc(var(--i) * -.7s) infinite; }
 .flow-ko .bot-wrap::after { content: "aïe."; left: 20%; animation: bot-say 6s ease-in-out calc(var(--i) * -2s) infinite; }
+@keyframes bot-ask { from { transform: rotate(-156deg); } to { transform: rotate(-176deg); } }
 @keyframes bot-fly { from { left: 0; } to { left: calc(100% - 56px); } }
 @keyframes bot-bank { 0%, 50%, 100% { rotate: 0deg; } 5%, 45% { rotate: 16deg; } 55%, 95% { rotate: -16deg; } }
 @keyframes bot-bob { to { translate: 0 -3px; } }
@@ -1431,7 +1444,7 @@ tr.is-hot > td { background: color-mix(in srgb, var(--accent) 9%, transparent); 
 @keyframes bot-kick { from { transform: rotate(-30deg); } to { transform: rotate(30deg) translateY(-1px); } }
 @media (prefers-reduced-motion: reduce) {
   .flow-bot, .flow-bot *, .bot-wrap::after { animation: none !important; }
-  .flow-in_progress .flow-nodes { display: flex; height: auto; } .flow-in_progress .flow-bot { position: relative; bottom: auto; }
+  .flow-in_progress .flow-bot { position: relative; bottom: auto; }
 }
 
 /* Pages client : moins de choses visibles d'un coup, rien de retiré : le détail se déplie au clic */
