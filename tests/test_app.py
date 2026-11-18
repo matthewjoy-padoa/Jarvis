@@ -413,7 +413,8 @@ def test_an_agent_with_questions_can_be_answered_from_its_page():
     page = unescape(client.get(f"/agents/{run.id}").text)
     assert "L'agent a 2 questions" in page and f'hx-post="/agents/{run.id}/repondre"' in page and 'badge g-todo' in page
     assert 'name="reponse_1"' in page and 'name="reponse_2"' in page and "Client ou logiciel ?</label>" in page
-    assert "- client : apst2607 seul</pre>" in page  # détail de la question, sous elle
+    assert "<li>client : apst2607 seul</li>" in page  # détail de la question, sous elle, mis en forme
+    assert "Ce que l'agent a constaté" in page and "<p>Rien modifié.</p>" in page  # le contexte écrit avant les questions
     schema = client.get("/agents").text  # dans le schéma : parmi les « en cours », marqué « en attente » (« ? », autre couleur)
     assert 'class="flow-lane flow-in_progress"' in schema and schema.count('<a class="flow-node flow-bot is-waiting"') == 1
     assert schema.index("flow-lane flow-in_progress") < schema.index("flow-bot is-waiting") < schema.index("flow-lane flow-done")
@@ -571,3 +572,18 @@ def test_the_agent_form_points_to_the_agent_already_on_this_retour():
     assert " disabled " not in form  # relancer reste possible
     run.status = "en cours"
     assert " disabled " in client.get("/deploiements/client-demo/recette/R-03/brief").text
+
+
+def test_the_agent_summary_is_formatted_and_its_html_is_never_interpreted():
+    from deploy_hub.sources.claude_runner import WAITING
+    claude.runs.clear()
+    client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief"})
+    run = claude.runs[0]
+    run.summary = "Cause : **mapping.py:12**, voir `extract.sql`.\n\n- point 1\n- point 2\n\n<script>alert(1)</script> [x](javascript:alert(1))"
+    page = client.get(f"/agents/{run.id}").text
+    assert "<strong>mapping.py:12</strong>" in page and "<code>extract.sql</code>" in page and "<li>point 1</li>" in page
+    assert "<script>alert(1)</script>" not in page and "&lt;script&gt;" in page and 'href="javascript:' not in page
+    run.status, run.summary = WAITING, "J'ai lu **a.py**.\n\nQuestions :\n1. Corriger côté `client` ?\n   - **Contexte** : a.py:3\n"
+    page = client.get(f"/agents/{run.id}").text
+    assert "Corriger côté <code>client</code> ?</label>" in page and "<strong>Contexte</strong> : a.py:3" in page
+    assert "J'ai lu <strong>a.py</strong>." in page.replace("&#39;", "'")

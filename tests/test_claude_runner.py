@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from deploy_hub.sources.claude_runner import (ANSWERED, INSTRUCTION, RESUME_INSTRUCTION, WAITING, ClaudeRunner, agent_branch,
-                                               answer_text, find_pr, questions_of, read_log)
+                                               answer_text, find_pr, questions_of, read_log, split_questions)
 from deploy_hub.sources.notifications import NotificationStore
 
 from conftest import instant_agents
@@ -397,3 +397,15 @@ def test_the_answer_pairs_each_question_with_its_answer():
     assert text == "Question 1 : Client ou logiciel ?\nRéponse : Client\n\nQuestion 2 : Un test ?\nRéponse : (pas de réponse)\n\nPrécision : Merci"
     assert answer_text(["Q ?"], ["  "]) == ""  # rien de rempli : la relance est refusée
     assert answer_text(["Q ?"], [""], " Merci ") == "Précision : Merci"
+
+
+def test_the_context_written_before_the_questions_is_kept_apart():
+    summary = ("J'ai lu `mapping.py`.\nL'écart vient du code NAF.\n\nQuestions :\n"
+               "1. Client ou logiciel ?\n   - **Contexte** : mapping.py:12\n   - **Options** :\n     - client : seul ce client\n"
+               "     - logiciel : tous\n   - **Recommandation** : client\n2. Un test ?")
+    intro, questions = split_questions(summary)
+    assert intro == "J'ai lu `mapping.py`.\nL'écart vient du code NAF."
+    assert questions[0] == ("Client ou logiciel ?\n- **Contexte** : mapping.py:12\n- **Options** :\n  - client : seul ce client\n"
+                            "  - logiciel : tous\n- **Recommandation** : client")  # sous-liste gardée
+    assert questions[1] == "Un test ?"
+    assert split_questions("Rien modifié.\nCôté client ?\nFin.") == ("Rien modifié.\nFin.", ["Côté client ?"])

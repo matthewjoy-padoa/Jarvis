@@ -14,6 +14,7 @@ import signal
 import getpass
 import shutil
 import subprocess
+import textwrap
 import threading
 import unicodedata
 from dataclasses import asdict, dataclass
@@ -149,24 +150,34 @@ def _clean(text: str) -> str:
     return text.strip().strip("*_ ").strip()
 
 
-def questions_of(summary: str) -> list[str]:
-    """Questions du compte rendu, une par élément : première ligne = la question, lignes suivantes = ses détails (options…).
+def split_questions(summary: str) -> tuple[str, list[str]]:
+    """(contexte, questions) du compte rendu. Contexte : ce que l'agent écrit avant ses questions (ce qu'il a compris, vérifié).
+    Question : première ligne = la question, lignes suivantes = ses détails (contexte, options, recommandation), en Markdown.
     Après une ligne « Questions : » (consigne du brief), chaque élément numéroté ou à puce est une question ; sans cette ligne,
-    chaque ligne qui finit par « ? »."""
+    chaque ligne qui finit par « ? », le reste du texte faisant le contexte."""
     lines = (summary or "").splitlines()
     start = next((i for i, line in enumerate(lines) if QUESTIONS_HEADING.match(_clean(line))), None)
-    items: list[str] = []
+    items: list[tuple[str, list[str]]] = []  # (question, lignes de détail telles quelles)
     for line in lines[start + 1:] if start is not None else []:
-        if not line.strip():
-            continue
-        item = NUMBERED.match(line) or BULLET.match(line)
-        if item:
-            items.append(_clean(item.group(1)))
+        if item := NUMBERED.match(line) or BULLET.match(line):
+            items.append((_clean(item.group(1)), []))
         elif items:
-            items[-1] += "\n" + line.strip()
-        else:
-            items.append(_clean(line))
-    return items or [_clean(BULLET.sub(r"\1", line.strip())) for line in lines if _clean(line).endswith("?")]
+            items[-1][1].append(line)
+        elif line.strip():
+            items.append((_clean(line), []))
+    intro = lines[:start] if items else []
+    if not items:  # sans « Questions : » : chaque ligne en « ? », le reste fait le contexte
+        asked = {i for i, line in enumerate(lines) if _clean(line).endswith("?")}
+        items = [(_clean(BULLET.sub(r"\1", lines[i].strip())), []) for i in sorted(asked)]
+        intro = [line for i, line in enumerate(lines) if i not in asked]
+    # détails sans leur retrait commun : les sous-listes restent des sous-listes
+    return "\n".join(intro).strip(), [
+        q + (f"\n{d}" if (d := textwrap.dedent("\n".join(detail)).strip()) else "") for q, detail in items]
+
+
+def questions_of(summary: str) -> list[str]:
+    """Questions du compte rendu (voir split_questions)."""
+    return split_questions(summary)[1]
 
 
 def answer_text(questions: list[str], answers: list[str], extra: str = "") -> str:
@@ -308,9 +319,12 @@ def retour_prompt(d: Deployment, r: RetourRecette, description: str = "") -> str
         _tag("compte_rendu", "Termine par : la cause (fichier:ligne), le correctif et son niveau (client ou logiciel), les tests "
                              "(commande et résultat), le lien de la PR, et ce qu'il faudra vérifier en recette. "
                              "Si tu t'arrêtes sur des questions (retour trop flou, choix métier), ne modifie rien, n'ouvre pas de PR et "
-                             "termine par une ligne « Questions : » suivie de tes questions numérotées (1., 2., …), une par ligne, avec en dessous, "
-                             "en retrait, les options possibles si tu en vois : la personne répondra à chacune "
-                             "et tu reprendras là où tu t'es arrêté."),
+                             "écris d'abord en quelques lignes ce que tu as compris de l'écart et ce que tu as vérifié (fichiers, requêtes), "
+                             "puis une ligne « Questions : » suivie de tes questions numérotées (1., 2., …), chacune en une phrase. "
+                             "Sous chaque question, en retrait : « - **Contexte** : » ce que tu as constaté et où (fichier:ligne, "
+                             "sans donnée client), « - **Options** : » les choix possibles et leur conséquence, « - **Recommandation** : » "
+                             "ton choix et pourquoi. Écris en Markdown (gras, `code`, listes) : c'est mis en forme pour la personne, "
+                             "qui répondra à chaque question ; tu reprendras ensuite là où tu t'es arrêté."),
     ]
     return "\n\n".join(parts)
 
