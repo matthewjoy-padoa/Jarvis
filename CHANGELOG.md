@@ -20,6 +20,15 @@ Jarvis suit une numérotation `0.MINEUR.CORRECTIF` tant qu'il n'est pas stable :
 - Page Agents : les petits robots du schéma deviennent des armures, une par état : rouge et or en vol (en cours), argent à l'arrêt (terminé), tout or, répulseur levé (PR ouverte), ferraille grise sur le dos (arrêté ou en échec).
 - Page Agents : l'agent qui attend une réponse apparaît dans le schéma (il n'y était pas), parmi les « en cours » : posé au sol, armure bleu et argent, main levée, « ? » au-dessus de la tête.
 - README relu et mis à jour : historique des DAGs gardé au redémarrage (la limite annoncée n'existait plus), page Réglages et connexion 1Password, rôle de `ORCHESTRATOR_DIR`, questions des agents, réglages du suivi des runs, adresse du dépôt.
+- Heure française partout dans l'app, même sur un serveur en UTC comme la VM ; réglage `JARVIS_TZ` (#59).
+- Agents Claude : refus clair avant lancement si le dossier `.claude` de l'orchestrator n'est pas à l'utilisateur (commande `chown` donnée) ou si `ORCHESTRATOR_DIR` ne pointe pas vers un clone de integration-orchestrator ; `ORCHESTRATOR_DIR` vide reprend la valeur par défaut ; page d'un agent sans erreur 500 (#64).
+- Agents Claude : état « question en attente » quand l'agent s'arrête sur des questions, « Répondre et relancer » (reprise de sa session Claude dans le même worktree), et « Relancer l'agent » sur tout agent fini en erreur (#66).
+- Agents Claude : une carte et un champ de réponse par question, réponses envoyées question par question (#69).
+- Agents Claude : le bloc agent d'un retour dit avant le clic pourquoi l'agent ne partirait pas (bouton grisé, lien Réglages) et signale l'agent déjà lancé sur ce retour (#70).
+- Filtres : plusieurs valeurs par filtre (cases à cocher), « a|b » dans une ancre ; Échap ou un clic ailleurs ferme le menu (#73).
+- Agents Claude : « Ce que l'agent a constaté » au-dessus de ses questions, contexte, options et recommandation par question, texte de l'agent mis en forme (Markdown, HTML jamais interprété) (#74).
+- Agents Claude : questions rendues en JSON par l'agent, options à cocher et recommandation pré-cochée : on répond en un clic (#75).
+- Ajouter un client : choisi dans une liste, tout se remplit (identifiant comme dans l'orchestrator, « APST 26-07 » → `apst2607`, clés orchestrator, fiche « Clients en déploiement », dashboard intégration et autres dashboards). La liste est l'annuaire des clients, relu chaque jour par Claude Code (lecture seule) depuis la page Notion des dashboards ; réglage `JARVIS_NOTION_DASHBOARDS` ; autres dashboards dans les raccourcis du client (#76).
 
 ## [0.1.0] · 2026-11-17
 
