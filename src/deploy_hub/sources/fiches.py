@@ -58,6 +58,12 @@ def _names(ids: list[str], users: dict[str, str]) -> list[str]:
     return [users.get(i) or f"Inconnu ({i[:8]})" for i in ids or []]
 
 
+def _dashboards(cfg) -> list[Link]:
+    """Autres dashboards Notion du client. Comme son dashboard (notion_link à chaque construction d'une fiche), un lien sans
+    « /p/ », tel que la synchro en renvoie, est réparé : sinon Notion l'ouvre en erreur."""
+    return [Link(l["label"], notion_link(l["url"])) for l in (cfg.dashboards if cfg else [])]
+
+
 def parse_deployment(path: Path, clients_dir: Path | None = None) -> Deployment:
     """Fiche synchronisée, avec par-dessus ce qui appartient à la configuration du client (nom, logiciel, statut,
     dashboard, stacks, clés orchestrator) : une modification dans l'app s'affiche tout de suite, sans attendre la synchro."""
@@ -73,7 +79,7 @@ def parse_deployment(path: Path, clients_dir: Path | None = None) -> Deployment:
         status=cfg.status if cfg else data.get("status", "en cours"),
         emoji=str(data.get("emoji") or ""),
         icone=str(data.get("icone") or ""),
-        notion_url=(cfg.notion_url if cfg else "") or data.get("notion_url", ""),
+        notion_url=notion_link((cfg.notion_url if cfg else "") or data.get("notion_url", "")),
         synced_at=str(data.get("synced_at", "")),
         checked_at=_checked_at(path),
         injection_counts=data.get("injection_counts") or {},
@@ -81,6 +87,7 @@ def parse_deployment(path: Path, clients_dir: Path | None = None) -> Deployment:
         links=[Link(**l) for l in data.get("links", [])],
         stacks=[Stack(**s) for s in (cfg.stacks if cfg else data.get("stacks") or [])],
         drive=[Link(**l) for l in (cfg.drive if cfg else [])],
+        dashboards=_dashboards(cfg),
         orchestrator=cfg.orchestrator if cfg else data.get("orchestrator") or [],
         resources=[ResourceInjection(**r) for r in data.get("resources", [])],
         actions=[Action(**{**a, "notion_url": notion_link(a.get("notion_url", ""))}) for a in data.get("actions", [])],
@@ -130,8 +137,9 @@ class FicheSource:
             return None
         if not cfg:
             return None
-        return Deployment(slug=slug, client=cfg.client, software=cfg.software or "?", status=cfg.status, notion_url=cfg.notion_url,
-                          stacks=[Stack(**s) for s in cfg.stacks], drive=[Link(**l) for l in cfg.drive], orchestrator=cfg.orchestrator,
+        return Deployment(slug=slug, client=cfg.client, software=cfg.software or "?", status=cfg.status, notion_url=notion_link(cfg.notion_url),
+                          stacks=[Stack(**s) for s in cfg.stacks], drive=[Link(**l) for l in cfg.drive],
+                          dashboards=_dashboards(cfg), orchestrator=cfg.orchestrator,
                           pending=True)
 
     def list_deployments(self) -> list[Deployment]:

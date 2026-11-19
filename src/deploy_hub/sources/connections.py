@@ -15,8 +15,8 @@ TIMEOUT = 5
 def airflow_status(airflow: AirflowSource, problem: str = "") -> tuple[bool, str]:
     if not airflow.live:
         if problem:
-            return False, f"non configuré : référence 1Password illisible ({problem})"
-        return False, "non configuré : AIRFLOW_BASE_URL, AIRFLOW_USER ou AIRFLOW_PASSWORD manquant dans .env"
+            return False, f"non configuré : référence 1Password illisible ({problem}) : connecte 1Password dans Réglages"
+        return False, "non configuré : AIRFLOW_BASE_URL, AIRFLOW_USER ou AIRFLOW_PASSWORD à renseigner dans Réglages"
     try:
         r = airflow.http.get("/dags", params={"limit": 1}, timeout=TIMEOUT)
     except httpx.HTTPError as e:

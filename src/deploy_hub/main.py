@@ -11,10 +11,11 @@ from urllib.parse import parse_qsl, quote, urlencode, urlsplit
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from fastapi import FastAPI, Form, HTTPException, Request, WebSocket
+from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup, escape
 
 from deploy_hub import client_config
 from deploy_hub.config import PROCESS_KEYS, PROJECT_ROOT, clients_dir, data_dir, ensure_private_dirs, forget_secrets, load_settings, secret_problem
@@ -25,11 +26,13 @@ from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
-from deploy_hub.sources.claude_runner import (TO_FILL, WAITING, ClaudeRunner, agent_branch, answer_text, duration_text, questions_of,
-                                              read_log, retour_prompt, tokens_text, usage)
+from deploy_hub.rendu import md, md_inline
+from deploy_hub.sources.claude_runner import (TO_FILL, WAITING, ClaudeRunner, agent_branch, agent_questions, answer_text, chosen_answer,
+                                              duration_text, read_log, retour_prompt, tokens_text, usage)
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_source import DagSource
 from deploy_hub.sources.dag_watch import DagWatcher
+from deploy_hub.sources.client_directory import ClientDirectory, form_of, name_key
 from deploy_hub.sources.sync_routine import SyncRoutine
 from deploy_hub.sources import connections, flow_digger, notion_api
 from deploy_hub.sources.external import external_statuses
@@ -52,6 +55,7 @@ notifications = NotificationStore(Path(os.getenv("DEPLOY_HUB_NOTIFICATIONS") or 
 claude = ClaudeRunner.from_env(settings.orchestrator_dir, notifications, data_dir() / "agents")
 # Synchro Notion sans jeton : le bouton « Rafraîchir depuis Notion » fait suivre sync/routine.md à Claude Code (claude -p).
 sync_routine = SyncRoutine(notifications)
+client_directory = ClientDirectory()
 pulls = PullRequests(settings.orchestrator_dir)  # PR ouvertes de l'orchestrator (gh), gardées cinq minutes
 # Suivi des runs lancés (air.py d'Arthur) ; les suivis en cours au démarrage reprennent si Airflow est configuré.
 dag_watch = DagWatcher(data_dir() / "airflow", notifications, airflow.air_env())
@@ -92,19 +96,27 @@ async def lifespan(_app):
 PUSH_EVERY = 60  # secondes, comme le panneau des notifications
 
 
+def _guarded(label: str, job) -> None:
+    """Tâche de fond qui ne doit jamais empêcher les suivantes (ni l'envoi des notifications)."""
+    try:
+        job()
+    except Exception:  # noqa: BLE001
+        log.exception(f"{label} en échec")
+
+
 def _push_round() -> None:
     """Un tour : échéances du jour (créées d'habitude à l'ouverture d'une page), puis envoi des nouvelles notifications ;
-    au passage, le catalogue des DAGs est régénéré si le clone orchestrator local a changé."""
-    try:
-        dag_source.refresh()
-    except Exception:  # noqa: BLE001 : le catalogue des DAGs ne doit pas empêcher l'envoi des notifications
-        log.exception("Catalogue des DAGs : relevé du clone en échec")
+    au passage, le catalogue des DAGs est régénéré si le clone orchestrator local a changé, et l'annuaire des clients est
+    relu s'il a plus d'un jour (au démarrage, puis chaque jour) : « Ajouter un client » l'a déjà, sans attente."""
+    _guarded("Catalogue des DAGs : relevé du clone", dag_source.refresh)
     _deadline_notes()
     web_push.pump(notifications)
+    _guarded("Annuaire des clients : relecture", client_directory.refresh_if_stale)
 
 
 async def _push_loop() -> None:
-    """Toutes les minutes, même sans onglet ouvert : couvre aussi les notifications écrites par la synchro Notion (autre processus)."""
+    """Toutes les minutes, même sans onglet ouvert : couvre aussi les notifications écrites par la synchro Notion (autre processus),
+    et relit l'annuaire des clients quand il a plus d'un jour."""
     while True:
         try:
             await asyncio.to_thread(_push_round)
@@ -127,8 +139,33 @@ def when_text(moment: datetime | None) -> str:
 
 
 templates.env.filters["quand"] = when_text
+# Réglages cités dans un message (« renseigne ORCHESTRATOR_DIR dans Réglages ») → lien vers leur champ de la page Réglages ;
+# « 1Password » → sa section de connexion. Le plus long d'abord : JARVIS_AGENT_MAX ne doit pas couper JARVIS_AGENT_MAX_TURNS.
+SETTING_MENTION = re.compile(r"\b(" + "|".join(sorted(map(re.escape, env_file.BY_KEY), key=len, reverse=True)) + r")\b|\b1Password\b")
+
+
+def settings_links(text) -> Markup:
+    """Message en texte (échappé ici) → même texte, réglages et 1Password en liens vers la page Réglages."""
+    def link(m: re.Match) -> str:
+        href = f"/reglages#reglage-{m.group(1)}" if m.group(1) else "/reglages#1password"
+        return f'<a href="{href}">{m.group(0)}</a>'
+    return Markup(SETTING_MENTION.sub(link, str(escape(text or ""))))
+
+
+templates.env.filters["reglages"] = settings_links
 templates.env.filters["duree"] = duration_text
 templates.env.filters["tokens"] = tokens_text
+def when_iso(iso: str) -> str:
+    """when_text d'une date ISO (fichier d'état) ; vide si elle manque ou est illisible."""
+    try:
+        return when_text(datetime.fromisoformat(iso))
+    except (TypeError, ValueError):
+        return ""
+
+
+templates.env.filters["quand_iso"] = when_iso
+templates.env.filters["md"] = md
+templates.env.filters["md_inline"] = md_inline
 templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STATUSES)
 templates.env.globals["kanban_columns"] = kanban_columns
 templates.env.globals["ACTION_STATUSES"] = ACTION_STATUSES
@@ -368,14 +405,56 @@ def index(request: Request, enregistre: str = "", retire: str = ""):
     return _render(request, "index.html", "/clients", deployments=deployments, pending=pending, saved=enregistre, retired=retire)
 
 
-def _client_form(request: Request, cfg, error: str = "", new: bool = True, form: dict | None = None) -> HTMLResponse:
-    suggestions = sorted(dag_catalogue.catalogue()["clients"])
-    return _render(request, "client_form.html", "/clients", cfg=cfg, error=error, new=new, form=form or {}, suggestions=suggestions)
+def _client_form(request: Request, cfg, error: str = "", new: bool = True, form: dict | None = None, notice: str = "",
+                 chosen: dict | None = None, directory: dict | None = None, keys=None) -> HTMLResponse:
+    """directory, keys : annuaire et clés orchestrator déjà lus par l'appelant (sinon lus ici)."""
+    keys = sorted(keys if keys is not None else dag_catalogue.catalogue()["clients"])
+    chosen = chosen or {}
+    directory = (directory if directory is not None else client_directory.directory()) if new else {}
+    followed = {key for c in client_config.all_configs() for key in (name_key(c.client), name_key(c.slug))} if new else set()
+    fiches = list({f["url"]: f for f in chosen.get("fiches", []) + directory.get("fiches", [])}.values())  # les siennes d'abord
+    return _render(request, "client_form.html", "/clients", cfg=cfg, error=error, new=new, form=form or {}, suggestions=keys,
+                   notice=notice, directory=directory, followed=followed, chosen=chosen, fiches=fiches,
+                   annuaire=client_directory.state() if new else {})
 
 
 @app.get("/clients/nouveau", response_class=HTMLResponse)
-def client_new(request: Request):
-    return _client_form(request, None)
+def client_new(request: Request, client: str = ""):
+    """Choisir le client dans l'annuaire Notion (relu en fond par Jarvis au démarrage, puis chaque jour) : le formulaire se
+    remplit, à relire avant l'ajout. Sans annuaire (pas de Claude Code), le formulaire à la main."""
+    directory = client_directory.refresh_if_stale()  # en secours : Jarvis lancé sans sa boucle de fond, ou annuaire effacé
+    entry = client_directory.entry(directory, client) if client else None
+    if not entry:
+        return _client_form(request, None, directory=directory)
+    keys = dag_catalogue.catalogue()["clients"]
+    form = form_of(entry, keys)
+    missing = [label for key, label in (("page_id", "sa fiche « Clients en déploiement » (choisis-la dans la liste du champ)"),
+                                        ("notion_url", "son dashboard intégration")) if not form[key]]
+    notice = f"{entry['client']} : relis, complète au besoin, puis ajoute." + (f" À compléter : {', '.join(missing)}." if missing else "")
+    return _client_form(request, None, form=form, notice=notice, chosen=entry, directory=directory, keys=keys)
+
+
+@app.post("/clients/annuaire", response_class=HTMLResponse)
+def client_directory_refresh(request: Request, lu: str = Form("")):
+    """« Relire » : la liste des clients est relue dans Notion (une vingtaine de secondes)."""
+    result = client_directory.refresh()
+    return _directory_status(request, lu, "" if result.ok else result.message)
+
+
+@app.get("/clients/annuaire/etat", response_class=HTMLResponse)
+def client_directory_status(request: Request, lu: str = ""):
+    return _directory_status(request, lu)
+
+
+def _directory_status(request: Request, lu: str, error: str = "") -> HTMLResponse:
+    """Suivi de la lecture. Une première liste arrive : la page se recharge pour l'afficher. Une liste plus récente remplace
+    celle affichée (lu) : un lien propose de l'afficher, sans recharger la page sous les doigts de qui remplit le formulaire."""
+    directory = client_directory.directory()
+    newer = not client_directory.running and directory.get("lu", "") != lu  # lecture finie, liste différente de celle affichée
+    if not error and newer and not lu:
+        return HTMLResponse("", headers={"HX-Refresh": "true"})
+    return templates.TemplateResponse(request, "_client_directory.html", {
+        "annuaire": client_directory.state(), "message": error, "directory": directory, "lu": lu, "updated": newer and bool(lu)})
 
 
 def _config_or_fiche(slug: str):
@@ -422,6 +501,7 @@ async def client_links_save(request: Request, slug: str):
         if dashboard and not dashboard.startswith(("http://", "https://")):
             raise client_config.ConfigError("Le lien du dashboard Notion doit être une adresse https://")
         updated = dataclasses.replace(cfg, notion_url=dashboard, drive=client_config.parse_drive(str(form.get("drive") or "")),
+                                      dashboards=client_config.parse_dashboards(str(form.get("dashboards") or "")),
                                       stacks=client_config.parse_stacks(str(form.get("stacks") or "")))
         client_config.save(updated)
     except client_config.ConfigError as e:
@@ -430,7 +510,7 @@ async def client_links_save(request: Request, slug: str):
 
 
 @app.post("/clients/enregistrer", response_class=HTMLResponse)
-async def client_save(request: Request):
+async def client_save(request: Request, background: BackgroundTasks):
     form = dict(await request.form())
     existing = (form.get("existing_slug") or "").strip() or None
     try:
@@ -438,7 +518,20 @@ async def client_save(request: Request):
         client_config.save(cfg, new=existing is None)
     except client_config.ConfigError as e:
         return _client_form(request, _config_or_fiche(existing)[0] if existing else None, str(e), new=existing is None, form=form)
-    return RedirectResponse(f"/clients?enregistre={cfg.slug}", status_code=303)
+    if existing:
+        return RedirectResponse(f"/clients?enregistre={cfg.slug}", status_code=303)
+    _sync_new_client(cfg.slug, background)  # nouveau client : ses données arrivent sans attendre la routine ni « Rafraîchir »
+    return RedirectResponse(f"/deploiements/{cfg.slug}/synthese", status_code=303)
+
+
+def _sync_new_client(slug: str, background: BackgroundTasks) -> None:
+    """Synchro lancée dès l'ajout d'un client, sans la faire attendre : par l'API avec un jeton Notion (juste après la réponse),
+    sinon par la routine Claude Code, qui passe sur tous les clients et dont sa fiche montre l'avancement. Une synchro déjà
+    en cours : il sera pris à la suivante."""
+    if notion_api.load_token():
+        background.add_task(_refresh, [slug])
+    else:
+        sync_routine.start()
 
 
 @app.post("/clients/{slug}/retirer")
@@ -529,10 +622,11 @@ def _agent_context(run) -> dict:
     claude.refresh_context(run)
     follow_up = None if run.running else claude.follow_up(run.id)
     relaunch = claude.relaunched(run.id) if run.group == KO else None  # seul un agent en erreur peut avoir été relancé
+    waiting = claude.can_reply(run, follow_up)
+    intro, questions = agent_questions(run.summary) if waiting else ("", [])  # contexte écrit par l'agent, puis ses questions
     return {"relaunch": relaunch, "relaunchable": run.group == KO and (relaunch is None or relaunch.group == KO),  # relance en échec : on peut réessayer
             "run": run, "log": read_log(path), "review": None if run.running or run.simulated else agent_review.build(run, path),
-            "follow_up": follow_up, "waiting": (waiting := claude.can_reply(run, follow_up)),
-            "questions": questions_of(run.summary) if waiting else []}
+            "follow_up": follow_up, "waiting": waiting, "intro": intro, "questions": questions}
 
 
 @app.get("/agents/{run_id}", response_class=HTMLResponse)
@@ -557,12 +651,14 @@ def _open_new_agent(request: Request, result: ActionResult, new_agent) -> HTMLRe
 
 @app.post("/agents/{run_id}/repondre")
 async def agent_reply(request: Request, run_id: int):
-    """« Répondre et relancer » : une réponse par question (reponse_1, reponse_2…) plus une précision libre (reponse), assemblées
+    """« Répondre et relancer » : par question, l'option cochée (choix_1…) et une réponse libre (reponse_1…), plus une précision
+    libre (reponse), assemblées
     question par question ; elles partent à un nouvel agent sur la même branche, ouvert dès son lancement."""
     run = _run_or_404(run_id)
     form = await request.form()
-    questions = questions_of(run.summary)
-    answer = answer_text(questions, [str(form.get(f"reponse_{i}", "")) for i in range(1, len(questions) + 1)], str(form.get("reponse", "")))
+    _, questions = agent_questions(run.summary)
+    answers = [chosen_answer(q, str(form.get(f"choix_{i}", "")), str(form.get(f"reponse_{i}", ""))) for i, q in enumerate(questions, 1)]
+    answer = answer_text(questions, answers, str(form.get("reponse", "")))
     result = await asyncio.to_thread(claude.reply, run_id, answer)  # git (vérifs, worktree) : hors de la boucle
     return _open_new_agent(request, result, lambda: claude.follow_up(run_id))
 
@@ -616,7 +712,7 @@ def dag_watch_stop(watch_id: int):
 def sources(request: Request):
     return _render(request, "sources.html", "/sources", externals=external_statuses(notion_api.load_token() is not None,
                                                                          secret_problem("NOTION_TOKEN")), settings=settings,
-                   airflow_problem=_airflow_problem())
+                   airflow_message="" if airflow.live else connections.airflow_status(airflow, _airflow_problem())[1])
 
 
 @app.get("/deploiements/{slug}")
@@ -969,7 +1065,7 @@ def launch_agent_on_retour(request: Request, slug: str, retour_id: str, descript
 def _refresh(slugs: list[str]) -> tuple[bool, str]:
     token = notion_api.load_token()
     if not token:  # sans jeton : routine Claude Code, voir refresh_by_routine
-        return False, "Jeton Notion absent : ajoute NOTION_TOKEN dans le fichier .env de l'app (voir README)."
+        return False, "Jeton Notion absent : renseigne NOTION_TOKEN dans Réglages."
     if not _refresh_lock.acquire(blocking=False):
         return False, "Un rafraîchissement est déjà en cours."
     try:

@@ -7,6 +7,9 @@ status: en cours
 page_id: 0123456789abcdef0123456789abcdef
 # Page « Dashboard intégration » du client (lien affiché dans l'app).
 notion_url: https://app.notion.com/p/...
+# Facultatif : ses autres dashboards Notion (déploiement, formation, gestion financière…), dans les raccourcis du client.
+dashboards: []
+#  - {label: Déploiement, url: "https://app.notion.com/p/…"}
 # Facultatif : valeurs du champ « Client » de la base Retours Recette à inclure en plus des retours liés à la fiche.
 recette_clients: []
 # Facultatif : clés client de l'orchestrator (dags/config_deployment.py), pour proposer les DAGs dans l'onglet Injections.

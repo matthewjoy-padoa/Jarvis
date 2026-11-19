@@ -1,0 +1,14 @@
+{# Lecture de l'annuaire des clients Notion (sources/client_directory.py), faite en fond par Jarvis : suivie toutes les 3 s
+   tant qu'elle tourne. Attente seulement s'il n'y a encore aucune liste ; sinon la liste affichée sert pendant ce temps. #}
+{# lu : date de la liste affichée sur la page ("" : aucune). #}
+<div id="client-directory-status"{% if annuaire.running %} hx-get="/clients/annuaire/etat?lu={{ lu | urlencode }}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  {% if message %}<p class="result ko">{{ message | reglages }}</p>{% endif %}
+  {% if annuaire.running %}<p class="muted lookup-wait"><span class="spinner" aria-hidden="true"></span> {{ "Mise à jour de la liste en cours (la liste ci-dessus reste utilisable)." if lu else "Première lecture de la liste des clients dans Notion… (une vingtaine de secondes)" }}</p>
+  {% elif updated %}<p class="result ok">Liste mise à jour. <a href="/clients/nouveau">Afficher la nouvelle liste</a></p>
+  {% elif annuaire.error %}<p class="result ko">Liste des clients non lue : {{ annuaire.error | reglages }}</p>{% endif %}
+  <form class="inline-form" hx-post="/clients/annuaire" hx-target="#client-directory-status" hx-swap="outerHTML" hx-disabled-elt="find button">
+    <input type="hidden" name="lu" value="{{ lu }}">
+    <p class="muted">{% if lu %}Liste lue dans Notion {{ lu | quand_iso }}, relue chaque jour par Jarvis. {% endif %}
+      {% if not annuaire.running %}<button type="submit" class="link-button">Relire maintenant</button>{% endif %}</p>
+  </form>
+</div>

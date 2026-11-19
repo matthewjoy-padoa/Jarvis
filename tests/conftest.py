@@ -16,6 +16,9 @@ os.environ.setdefault("JARVIS_DATA_DIR", tempfile.mkdtemp())
 os.environ.setdefault("JARVIS_CONFIG_DIR", tempfile.mkdtemp())
 # Clone orchestrator : dossier vide, jamais le vrai clone (sa branche servirait au catalogue des DAGs et serait générée).
 os.environ["ORCHESTRATOR_DIR"] = tempfile.mkdtemp()
+# Jamais le vrai Claude Code : la boucle de fond (relecture de l'annuaire des clients) tourne dès qu'un test démarre l'app.
+# Les tests qui lancent claude passent leur faux binaire explicitement.
+os.environ["CLAUDE_BIN"] = os.path.join(tempfile.mkdtemp(), "claude-absent")
 
 import json
 import threading

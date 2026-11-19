@@ -14,5 +14,5 @@
     <input type="date" name="jour" min="{{ today.isoformat() }}" aria-label="Autre date">
     <button type="submit" class="secondary" name="quand" value="date">Ce jour-là</button>
   </form>
-  {% if remind_error %}<p class="result ko">{{ remind_error }}</p>{% endif %}
+  {% if remind_error %}<p class="result ko">{{ remind_error | reglages }}</p>{% endif %}
 </div>

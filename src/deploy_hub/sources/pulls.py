@@ -127,8 +127,12 @@ class PullRequests:
                 prs, error = [], ""
                 try:
                     prs = sorted((PullRequest.from_gh(raw) for raw in json.loads(self.run(self.directory, LIST))), key=lambda p: p.created)
-                except FileNotFoundError:
-                    error = f"`gh` ou le dépôt {self.directory} est introuvable sur cette machine."
+                except FileNotFoundError:  # deux causes possibles : le dossier de travail, ou le programme gh
+                    if not Path(self.directory).is_dir():
+                        error = (f"Clone de integration-orchestrator introuvable ({self.directory}) : renseigne ORCHESTRATOR_DIR "
+                                 "dans Réglages, puis redémarre Jarvis.")
+                    else:
+                        error = "`gh` (GitHub CLI) introuvable sur cette machine : installe-le, puis `gh auth login`."
                 except subprocess.CalledProcessError as e:
                     error = f"`gh pr list` a échoué : {(e.stderr or '').strip()[-300:] or f'code {e.returncode}'}"
                 except subprocess.TimeoutExpired:

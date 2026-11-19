@@ -201,7 +201,16 @@ def test_filters_script_searches_without_accents_and_offers_hidden_matches():
     js = client.get("/static/filters.js").text
     assert 'normalize("NFD")' in js and "data-out" in js and "more-out" in js
     assert "filters-toggle" in js and "data-fold-filters" in js  # menus déroulants derrière « Filtres » sur la fiche
-    assert "filters.js?v=8" in client.get("/actions").text
+    assert "filters.js?v=10" in client.get("/actions").text
+
+
+def test_each_filter_accepts_several_values():
+    """Un filtre = des cases à cocher : un élément passe s'il a l'une des valeurs cochées, « a|b » dans une ancre coche les deux."""
+    js = client.get("/static/filters.js").text
+    assert 'wrap.className = "filter multi"' in js and 'box.type = "checkbox"' in js
+    assert "matches: (values) => !chosen.size || values.some((v) => chosen.has(v))" in js
+    assert '(v || "").split("|").filter(Boolean).forEach((x) => { ctl.add(x); chosen.add(x); })' in js  # ancre et graphiques : « a|b »
+    assert "details.filter.multi" in client.get("/static/style.css").text
 
 
 @pytest.mark.parametrize(
@@ -403,8 +412,9 @@ def test_an_agent_with_questions_can_be_answered_from_its_page():
     from html import unescape
     page = unescape(client.get(f"/agents/{run.id}").text)
     assert "L'agent a 2 questions" in page and f'hx-post="/agents/{run.id}/repondre"' in page and 'badge g-todo' in page
-    assert 'name="reponse_1"' in page and 'name="reponse_2"' in page and "Client ou logiciel ?</label>" in page
-    assert "- client : apst2607 seul</pre>" in page  # détail de la question, sous elle
+    assert 'name="reponse_1"' in page and 'name="reponse_2"' in page and "Client ou logiciel ?</p>" in page
+    assert "<li>client : apst2607 seul</li>" in page  # détail de la question, sous elle, mis en forme
+    assert "Ce que l'agent a constaté" in page and "<p>Rien modifié.</p>" in page  # le contexte écrit avant les questions
     schema = client.get("/agents").text  # dans le schéma : parmi les « en cours », marqué « en attente » (« ? », autre couleur)
     assert 'class="flow-lane flow-in_progress"' in schema and schema.count('<a class="flow-node flow-bot is-waiting"') == 1
     assert schema.index("flow-lane flow-in_progress") < schema.index("flow-bot is-waiting") < schema.index("flow-lane flow-done")
@@ -544,7 +554,7 @@ def test_the_agent_form_says_before_the_click_why_no_agent_would_start(monkeypat
     claude.runs.clear()
     monkeypatch.setattr(claude, "problem", lambda: "Clone de integration-orchestrator introuvable (/x) : renseigne ORCHESTRATOR_DIR dans Réglages.")
     form = unescape(client.get("/deploiements/client-demo/recette/R-03/brief").text)
-    assert "L'agent ne peut pas partir : Clone de integration-orchestrator introuvable" in form and 'href="/reglages"' in form
+    assert "L'agent ne peut pas partir : Clone de integration-orchestrator introuvable" in form and 'href="/reglages#reglage-ORCHESTRATOR_DIR"' in form
     assert "Lancer l'agent" in form and " disabled " in form
     assert form.index('id="agent-client-demo-R-03"') < form.index("</form>")  # résultat sous le bouton, dans le formulaire
 
@@ -562,3 +572,51 @@ def test_the_agent_form_points_to_the_agent_already_on_this_retour():
     assert " disabled " not in form  # relancer reste possible
     run.status = "en cours"
     assert " disabled " in client.get("/deploiements/client-demo/recette/R-03/brief").text
+
+
+def test_the_agent_summary_is_formatted_and_its_html_is_never_interpreted():
+    from deploy_hub.sources.claude_runner import WAITING
+    claude.runs.clear()
+    client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief"})
+    run = claude.runs[0]
+    run.summary = "Cause : **mapping.py:12**, voir `extract.sql`.\n\n- point 1\n- point 2\n\n<script>alert(1)</script> [x](javascript:alert(1))"
+    page = client.get(f"/agents/{run.id}").text
+    assert "<strong>mapping.py:12</strong>" in page and "<code>extract.sql</code>" in page and "<li>point 1</li>" in page
+    assert "<script>alert(1)</script>" not in page and "&lt;script&gt;" in page and 'href="javascript:' not in page
+    run.status, run.summary = WAITING, "J'ai lu **a.py**.\n\nQuestions :\n1. Corriger côté `client` ?\n   - **Contexte** : a.py:3\n"
+    page = client.get(f"/agents/{run.id}").text
+    assert "Corriger côté <code>client</code> ?</p>" in page and "<strong>Contexte</strong> : a.py:3" in page
+    assert "J'ai lu <strong>a.py</strong>." in page.replace("&#39;", "'")
+
+
+def test_structured_questions_offer_their_options_with_the_recommendation_checked():
+    import json
+    from html import unescape
+    from deploy_hub.sources.claude_runner import WAITING
+    claude.runs.clear()
+    client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief"})
+    run = claude.runs[0]
+    block = {"questions": [{"question": "Corriger côté client ou logiciel ?", "contexte": "Copie client en `a.sql:40`.",
+                            "options": [{"libelle": "client", "consequence": "seul ce client"},
+                                        {"libelle": "logiciel", "consequence": "4 clients à revérifier"}],
+                            "recommandation": "client", "pourquoi": "la copie a une autre raison d'être"}]}
+    run.status, run.summary = WAITING, f"J'ai lu **a.sql**.\n\n<questions>\n{json.dumps(block, ensure_ascii=False)}\n</questions>"
+    page = unescape(client.get(f"/agents/{run.id}").text)
+    assert "L'agent a une question" in page and "<questions>" not in page  # le bloc JSON n'est jamais affiché
+    assert 'name="choix_1" value="1" checked' in page and 'name="choix_1" value="2">' in page and "recommandé" in page
+    assert "4 clients à revérifier" in page and "la copie a une autre raison d'être" in page and "<code>a.sql:40</code>" in page
+    answered = client.post(f"/agents/{run.id}/repondre", data={"choix_1": "1", "reponse_1": ""})  # un clic : la recommandation
+    follow_up = claude.runs[0]
+    assert answered.headers["HX-Redirect"] == f"/agents/{follow_up.id}"
+    assert "Question 1 : Corriger côté client ou logiciel ?\nCopie client en `a.sql:40`.\nRéponse : option « client »" in follow_up.prompt
+
+
+def test_retour_statuses_put_the_ball_where_it_is():
+    """« À faire » = ce que l'Inté doit faire ; un statut inconnu (« Autre ») va dans « À classer », plus dans « À faire »."""
+    from deploy_hub.models import DONE, IN_PROGRESS, OTHER, TODO, RetourRecette, group_counts
+    group = lambda s: RetourRecette(id="X", status=s).group
+    assert [group(s) for s in ("À faire", "INTE - En cours", "INTE - Fait > à faire en prod")] == [TODO] * 3
+    assert [group(s) for s in ("INTE - En attente donnée client", "OPS - Validation à faire en SNAP", "Non vérifié par le client")] == [IN_PROGRESS] * 3
+    assert [group(s) for s in ("INTE - Ancien retour - OK", "OPS - Vérifié en SNAP", "terminé")] == [DONE] * 3
+    assert group("Autre") == group("Action identifiée") == OTHER
+    assert OTHER not in group_counts([TODO, DONE]) and group_counts([OTHER])[OTHER] == 1

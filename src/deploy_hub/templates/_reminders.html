@@ -15,5 +15,5 @@
     <select name="quand" aria-label="Quand"><option value="demain">Demain</option><option value="lundi">Lundi</option><option value="semaine">Dans une semaine</option></select>
     <button type="submit" class="secondary">Ajouter</button>
   </form>
-  {% if remind_error %}<p class="result ko">{{ remind_error }}</p>{% endif %}
+  {% if remind_error %}<p class="result ko">{{ remind_error | reglages }}</p>{% endif %}
 </section>

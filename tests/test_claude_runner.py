@@ -10,7 +10,8 @@ from pathlib import Path
 import pytest
 
 from deploy_hub.sources.claude_runner import (ANSWERED, INSTRUCTION, RESUME_INSTRUCTION, WAITING, ClaudeRunner, agent_branch,
-                                               answer_text, find_pr, questions_of, read_log)
+                                               agent_questions, answer_text, chosen_answer, find_pr, final_status, read_log,
+                                               report_of, split_questions)
 from deploy_hub.sources.notifications import NotificationStore
 
 from conftest import instant_agents
@@ -258,9 +259,9 @@ def test_log_events_whose_message_is_text_do_not_break_the_agent_page(tmp_path):
 
 
 def test_questions_are_recognised_only_when_the_report_asks_them():
-    assert questions_of("Rien modifié.\n\nQuestions :\n1. Client ou logiciel")
-    assert questions_of("Rien modifié. Faut-il corriger au niveau client ou logiciel ?")
-    assert not questions_of("Cause : mapping.py:12. Tests verts.") and not questions_of("")
+    assert split_questions("Rien modifié.\n\nQuestions :\n1. Client ou logiciel")[1]
+    assert split_questions("Rien modifié. Faut-il corriger au niveau client ou logiciel ?")[1]
+    assert not split_questions("Cause : mapping.py:12. Tests verts.")[1] and not split_questions("")[1]
 
 
 def test_an_agent_that_stops_on_questions_waits_for_an_answer(repo, fake_claude, tmp_path, monkeypatch):
@@ -380,16 +381,16 @@ def test_each_question_is_listed_with_its_details():
     summary = ("Je n'ai rien modifié : choix métier.\n\n**Questions :**\n"
                "1. **Correctif au niveau client ou logiciel ?**\n   - client : seul ce client\n   - logiciel : tous les clients\n"
                "2) Faut-il un test de non-régression ?\n")
-    assert questions_of(summary) == ["Correctif au niveau client ou logiciel ?\n- client : seul ce client\n- logiciel : tous les clients",
+    assert split_questions(summary)[1] == ["Correctif au niveau client ou logiciel ?\n- client : seul ce client\n- logiciel : tous les clients",
                                      "Faut-il un test de non-régression ?"]
-    assert questions_of("Questions :\n- Quelle date ?\n- Quel client ?") == ["Quelle date ?", "Quel client ?"]
+    assert split_questions("Questions :\n- Quelle date ?\n- Quel client ?")[1] == ["Quelle date ?", "Quel client ?"]
 
 
 def test_without_a_questions_line_each_line_ending_with_a_question_mark_is_one():
     """Agents lancés avant la consigne « Questions : » (ex. l'agent n°1 de la VM)."""
-    assert questions_of("Rien modifié.\n- Faut-il corriger côté client ?\nAutre point.\nEt la date ?") == [
+    assert split_questions("Rien modifié.\n- Faut-il corriger côté client ?\nAutre point.\nEt la date ?")[1] == [
         "Faut-il corriger côté client ?", "Et la date ?"]
-    assert questions_of("Cause : a.py:12. Tests verts.") == []
+    assert split_questions("Cause : a.py:12. Tests verts.")[1] == []
 
 
 def test_the_answer_pairs_each_question_with_its_answer():
@@ -397,3 +398,59 @@ def test_the_answer_pairs_each_question_with_its_answer():
     assert text == "Question 1 : Client ou logiciel ?\nRéponse : Client\n\nQuestion 2 : Un test ?\nRéponse : (pas de réponse)\n\nPrécision : Merci"
     assert answer_text(["Q ?"], ["  "]) == ""  # rien de rempli : la relance est refusée
     assert answer_text(["Q ?"], [""], " Merci ") == "Précision : Merci"
+
+
+def test_the_context_written_before_the_questions_is_kept_apart():
+    summary = ("J'ai lu `mapping.py`.\nL'écart vient du code NAF.\n\nQuestions :\n"
+               "1. Client ou logiciel ?\n   - **Contexte** : mapping.py:12\n   - **Options** :\n     - client : seul ce client\n"
+               "     - logiciel : tous\n   - **Recommandation** : client\n2. Un test ?")
+    intro, questions = split_questions(summary)
+    assert intro == "J'ai lu `mapping.py`.\nL'écart vient du code NAF."
+    assert questions[0] == ("Client ou logiciel ?\n- **Contexte** : mapping.py:12\n- **Options** :\n  - client : seul ce client\n"
+                            "  - logiciel : tous\n- **Recommandation** : client")  # sous-liste gardée
+    assert questions[1] == "Un test ?"
+    assert split_questions("Rien modifié.\nCôté client ?\nFin.") == ("Rien modifié.\nFin.", ["Côté client ?"])
+
+
+def _block(data) -> str:
+    return f"J'ai lu `a.py`.\n\n<questions>\n{json.dumps(data, ensure_ascii=False)}\n</questions>"
+
+
+def test_questions_given_as_json_come_with_their_options_and_recommendation():
+    data = {"questions": [
+        {"question": "Client ou logiciel ?", "contexte": "a.py:12", "options": [{"libelle": "client", "consequence": "un client"},
+         {"libelle": "logiciel", "consequence": "tous"}, {"consequence": "sans libellé : ignorée"}], "recommandation": "logiciel",
+         "pourquoi": "plus simple"},
+        {"question": "Un test ?", "options": [{"libelle": "oui"}, {"libelle": "non"}], "recommandation": 1},
+        {"contexte": "sans question : ignorée"}]}
+    intro, questions = agent_questions(_block(data))
+    assert intro == "J'ai lu `a.py`." and len(questions) == 2
+    first, second = questions
+    assert first.options == [("client", "un client"), ("logiciel", "tous")] and first.recommended == 2 and first.why == "plus simple"
+    assert str(first) == "Client ou logiciel ?\na.py:12" and second.recommended == 1 and second.options[0] == ("oui", "")
+    assert report_of(_block(data)) == "J'ai lu `a.py`."
+    fenced = _block(data).replace("<questions>\n", "<questions>\n```json\n").replace("\n</questions>", "\n```\n</questions>")
+    assert len(agent_questions(fenced)[1]) == 2  # bloc entouré de ``` : lu quand même
+
+
+def test_an_invalid_or_missing_json_block_falls_back_to_the_text():
+    broken = "Rien modifié.\nQuestions :\n1. Côté client ?\n<questions>{pas du json</questions>"
+    intro, questions = agent_questions(broken)
+    assert intro == "Rien modifié." and [q.text for q in questions] == ["Côté client ?"] and not questions[0].options
+    assert agent_questions(_block({"questions": []}))[1] == []  # bloc vide et aucune ligne en « ? » : pas de question
+    assert agent_questions("Cause : a.py:1. Tests verts.") == ("Cause : a.py:1. Tests verts.", [])
+
+
+def test_the_chosen_option_and_the_free_text_make_the_answer():
+    from deploy_hub.sources.claude_runner import Question
+    q = Question("Client ou logiciel ?", options=[("client", ""), ("logiciel", "")])
+    assert chosen_answer(q, "2", "") == "option « logiciel »"
+    assert chosen_answer(q, "1", " et ajoute un test ") == "option « client » · et ajoute un test"
+    assert chosen_answer(q, "0", "autre chose") == "autre chose" and chosen_answer(q, "9", "") == chosen_answer(q, "x", "") == ""
+
+
+def test_an_agent_that_only_gives_json_questions_waits_for_an_answer():
+    from deploy_hub.sources.claude_runner import AgentRun
+    run = AgentRun(1, "acme", "Acme", "retour R-1", "fix-acme-r-1", "x", datetime(2026, 11, 18, 9), "en cours",
+                   summary=_block({"questions": [{"question": "Quelle date de bascule"}]}))  # sans « ? » : seul le JSON la signale
+    assert final_status(run) == "question en attente" and run.report == "J'ai lu `a.py`."
