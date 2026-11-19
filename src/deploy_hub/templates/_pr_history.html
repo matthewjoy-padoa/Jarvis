@@ -12,6 +12,10 @@
     <label><input type="checkbox" name="tous" value="true"{{ " checked" if tous and since }}{{ " disabled" if not since }}>
       communes à tous les clients (<code>all</code>)</label>
   </form>
+  {% if updating %}{# complément en arrière-plan : la section se relit quand il a fini #}
+  <p class="muted" hx-get="/deploiements/{{ d.slug }}/pr/historique?{{ 'logiciel=true&' if logiciel }}{{ 'tous=true' if tous }}"
+     hx-trigger="load delay:2s" hx-target="#pr-history" hx-swap="outerHTML">Recherche des PR fermées depuis la dernière lecture…</p>
+  {% endif %}
   {% if error %}<p class="result ko">{{ error | reglages }}</p>{% endif %}
   <table>
     <thead><tr><th>PR</th><th>Titre</th><th>Auteur</th><th>État</th><th title="Date de fusion ou de fermeture">Le</th></tr></thead>

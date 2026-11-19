@@ -883,9 +883,11 @@ def deployment_pull_history(request: Request, slug: str, logiciel: bool = False,
     (logiciel) et PR communes à tous les clients (tous)."""
     d = _get(slug)
     since, softwares = d.milestones.get("reception_donnees"), _softwares(d)
-    prs, error = pulls.history(d.slug, d.orchestrator, _agent_pr_urls(slug), since, softwares if logiciel else set(), tous, frais)
+    prs, error, updating = pulls.history(d.slug, d.orchestrator, _agent_pr_urls(slug), since, softwares if logiciel else set(), tous,
+                                         frais)
     return templates.TemplateResponse(request, "_pr_history.html", {"d": d, "prs": prs, "error": error, "since": since,
-                                                                    "softwares": sorted(softwares), "logiciel": logiciel, "tous": tous})
+                                                                    "softwares": sorted(softwares), "logiciel": logiciel, "tous": tous,
+                                                                    "updating": updating})
 
 
 @app.get("/deploiements/{slug}/{tab}", response_class=HTMLResponse)

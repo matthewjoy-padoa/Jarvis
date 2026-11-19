@@ -8,28 +8,34 @@ Une PR est rattachée à un client par le scope de son titre (`[FIX](client) …
 
 Historique (PR fusionnées ou fermées) : une recherche GitHub par clé du client (`gh pr list --search`), recoupée par le scope
 du titre ; en option, les PR fusionnées de son logiciel depuis la réception de ses données, qui l'impactent aussi.
+Une PR fermée ne change plus : l'historique est gardé sur disque (data/github/historique-pr.json, métadonnées GitHub
+seulement), affiché tout de suite, et complété en arrière-plan par les seules PR fermées depuis la dernière lecture ; relu en
+entier tous les FULL_DAYS jours (PR rouverte, titre renommé).
 """
 
 import json
+import os
 import re
 import subprocess
+import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
 import time
 from dataclasses import dataclass, field, replace
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from deploy_hub.config import child_environment
+from deploy_hub.config import child_environment, data_dir
 from deploy_hub.models import DONE, IN_PROGRESS, KO, TODO
 
 FIELDS = "number,title,url,author,createdAt,updatedAt,isDraft,headRefName"
 LIST = ("gh", "pr", "list", "--state", "open", "--limit", "300", "--json", FIELDS)
 ENDED = FIELDS + ",state,mergedAt,closedAt"  # PR de l'historique
-SEARCH = ("gh", "pr", "list", "--state", "closed", "--limit", "200", "--json", ENDED, "--search")  # closed : fusionnées comprises
+SEARCH = ("gh", "pr", "list", "--state", "closed", "--json", ENDED, "--limit")  # + nombre, --search … ; closed : fusionnées comprises
+FULL_LIMIT, NEW_LIMIT = "1000", "200"  # lecture complète, puis seulement les PR fermées depuis la dernière lecture
+FULL_DAYS = 7  # au-delà, une clé de l'historique est relue en entier
 DETAILS = "reviewDecision,reviewRequests,statusCheckRollup"  # gh pr view <numéro> --json …
 TTL = 300  # secondes
-OPEN = "PR ouvertes"  # clé de la liste des PR ouvertes parmi les lectures gardées
 SCOPE = re.compile(r"\]\(([^)]+)\)")
 SPLIT = re.compile(r"[,;/+&]")
 COMMON = "all"  # scope des PR qui touchent tous les clients : `[FIX](all) …`
@@ -129,26 +135,79 @@ class PullRequest:
         return (today - self.updated.date()).days
 
 
+def _prs(entry: dict | None) -> list[PullRequest]:
+    return [PullRequest.from_gh(r) for r in (entry or {}).get("prs", {}).values()]
+
+
+class HistoryStore:
+    """Historique des PR gardé sur disque, par recherche : {"depuis", "complet_le", "lu", "prs": {numéro: PR}}. Lu une fois,
+    puis gardé en mémoire ; chaque écriture remplace le fichier d'un bloc (fichier temporaire, comme sources/personal.py)."""
+
+    def __init__(self, path: Path):
+        self.path = path
+        self._lock = threading.Lock()
+        self._data: dict | None = None
+
+    def _loaded(self) -> dict:
+        if self._data is None:
+            try:
+                data = json.loads(self.path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                data = {}
+            self._data = data if isinstance(data, dict) else {}
+        return self._data
+
+    def get(self, key: str) -> dict | None:
+        with self._lock:
+            return self._loaded().get(key)
+
+    def put(self, key: str, entry: dict) -> None:
+        with self._lock:
+            data = self._loaded() | {key: entry}
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp = tempfile.mkstemp(dir=self.path.parent, prefix=".historique-pr.", suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False)
+                os.replace(tmp, self.path)
+            except BaseException:
+                Path(tmp).unlink(missing_ok=True)
+                raise
+            self._data = data
+
+
+def _entry(raw: list[dict], base: dict | None = None, **fields) -> dict:
+    """Entrée de l'historique lue à l'instant : les PR lues s'ajoutent à celles de base (complément) ou les remplacent."""
+    return {**(base or {}), **fields, "lu": datetime.now().isoformat(timespec="seconds"),
+            "prs": {**(base or {}).get("prs", {}), **{str(r["number"]): r for r in raw}}}
+
+
+def _old(entry: dict, ttl: float) -> bool:
+    return (datetime.now() - datetime.fromisoformat(entry["lu"])).total_seconds() > ttl
+
+
 def _gh(directory: Path, command: tuple) -> str:
     return subprocess.run(command, cwd=directory, capture_output=True, text=True, timeout=30, check=True, env=child_environment()).stdout
 
 
 class PullRequests:
-    def __init__(self, directory: Path, run=_gh, ttl: float = TTL):
-        """run(dossier, commande gh) → sortie JSON ; remplaçable dans les tests."""
+    def __init__(self, directory: Path, run=_gh, ttl: float = TTL, store: Path | None = None, background: bool = True):
+        """run(dossier, commande gh) → sortie JSON ; remplaçable dans les tests. store : historique gardé sur disque.
+        background : compléter l'historique en arrière-plan (False dans les tests : tout de suite)."""
         self.directory = directory
         self.run = run
         self.ttl = ttl
+        self.store = HistoryStore(store or data_dir() / "github" / "historique-pr.json")
+        self.background = background
+        self._updating: set[str] = set()  # clés de l'historique en cours de complément
         self._lock = threading.Lock()
-        # Lectures GitHub gardées cinq minutes, par clé (OPEN : les PR ouvertes ; sinon une recherche de l'historique ou
-        # le lien d'une PR d'agent) : (lu à, PR, message d'erreur, heure de lecture).
-        self._reads: dict[str, tuple[float, list[PullRequest], str, datetime]] = {}
+        self._open: tuple[float, list[PullRequest], str, datetime] | None = None  # PR ouvertes : (lu à, PR, erreur, heure)
         self._details: dict[int, tuple[float, dict]] = {}  # par numéro de PR : (lu à, CI et relecture)
 
     @property
     def read_at(self) -> datetime | None:
         """Heure de la dernière lecture des PR ouvertes chez GitHub."""
-        known = self._reads.get(OPEN)
+        known = self._open
         return known[3] if known else None
 
     def _stale(self, read: float) -> bool:
@@ -156,9 +215,17 @@ class PullRequests:
 
     def _list(self, command: tuple) -> tuple[list[PullRequest], str]:
         """`gh pr list …` lu : (PR, les plus anciennes d'abord ; message si GitHub n'a pas pu être lu)."""
+        raw, error = self._raw(command)
+        try:
+            return sorted(map(PullRequest.from_gh, raw), key=lambda p: p.created), error
+        except (ValueError, KeyError, TypeError, AttributeError):
+            return [], "Réponse de `gh pr list` illisible."
+
+    def _raw(self, command: tuple) -> tuple[list[dict], str]:
+        """Réponse JSON de `gh` (une liste ; `gh pr view` : une PR) ; message si GitHub n'a pas pu être lu."""
         try:
             raw = json.loads(self.run(self.directory, command))
-            return sorted((PullRequest.from_gh(r) for r in (raw if isinstance(raw, list) else [raw])), key=lambda p: p.created), ""
+            return (raw if isinstance(raw, list) else [raw]), ""
         except FileNotFoundError:  # deux causes possibles : le dossier de travail, ou le programme gh
             if not Path(self.directory).is_dir():
                 return [], (f"Clone de integration-orchestrator introuvable ({self.directory}) : renseigne ORCHESTRATOR_DIR "
@@ -168,55 +235,102 @@ class PullRequests:
             return [], f"`gh pr list` a échoué : {(e.stderr or '').strip()[-300:] or f'code {e.returncode}'}"
         except subprocess.TimeoutExpired:
             return [], "GitHub n'a pas répondu en 30 s."
-        except (ValueError, KeyError, TypeError, AttributeError):
+        except ValueError:
             return [], "Réponse de `gh pr list` illisible."
 
     def all(self, fresh: bool = False) -> tuple[list[PullRequest], str]:
-        """(PR ouvertes, les plus anciennes d'abord, sans CI ni relecture ; message si GitHub n'a pas pu être lu)."""
-        return self._read(OPEN, LIST, fresh)
-
-    def _read(self, key: str, command: tuple, fresh: bool) -> tuple[list[PullRequest], str]:
-        """Lecture `gh` gardée cinq minutes. `gh` tourne hors du verrou, pour que les PR ouvertes et l'historique, chargés
-        ensemble, ne s'attendent pas : deux pages qui trouvent la même clé périmée au même moment lisent donc chacune
-        GitHub (la dernière lecture gagne), un coût accepté plutôt que de bloquer toutes les lectures derrière une seule."""
+        """(PR ouvertes, les plus anciennes d'abord, sans CI ni relecture ; message si GitHub n'a pas pu être lu), gardées
+        cinq minutes. `gh` tourne hors du verrou, pour que l'historique, chargé en même temps, n'attende pas : deux pages qui
+        trouvent la liste périmée au même moment lisent donc chacune GitHub, un coût accepté plutôt que de les faire attendre."""
         with self._lock:
-            known = self._reads.get(key)
+            known = self._open
         if fresh or not known or self._stale(known[0]):
-            known = (time.monotonic(), *self._list(command), datetime.now())
+            known = (time.monotonic(), *self._list(LIST), datetime.now())
             with self._lock:
-                self._reads = {k: v for k, v in self._reads.items() if not self._stale(v[0])} | {key: known}
+                self._open = known
         return known[1], known[2]
 
-    def search(self, query: str, fresh: bool = False) -> tuple[list[PullRequest], str]:
-        """PR fusionnées ou fermées trouvées par une recherche GitHub."""
-        return self._read(query, (*SEARCH, query), fresh)
+    def _known(self, query: str, since: date | None, fresh: bool) -> tuple[list[PullRequest], str, bool]:
+        """PR fermées d'une recherche, gardées sur disque ; (PR, erreur, complément en cours). Lecture complète la première fois,
+        tous les FULL_DAYS jours, sur « Actualiser » ou pour une date plus ancienne que celle déjà couverte ; sinon, au-delà de
+        cinq minutes, seulement les PR fermées depuis la dernière lecture, en arrière-plan : la page affiche ce qui est gardé."""
+        entry = self.store.get(query)
+        covered = entry and entry.get("depuis")
+        full = (fresh or not entry or (date.today() - date.fromisoformat(entry["complet_le"])).days >= FULL_DAYS
+                or bool(since and covered and since < date.fromisoformat(covered)))
+        if full:
+            raw, error = self._raw((*SEARCH, FULL_LIMIT, "--search", query + (f" merged:>={since.isoformat()}" if since else "")))
+            if error:
+                return _prs(entry), error, False
+            entry = _entry(raw, depuis=since.isoformat() if since else None, complet_le=date.today().isoformat())
+            self.store.put(query, entry)
+        elif _old(entry, self.ttl):
+            entry = self._complete(query, entry)
+        with self._lock:
+            return _prs(entry), "", query in self._updating
 
-    def _agent_pr(self, url: str, fresh: bool) -> tuple[list[PullRequest], str]:
-        """PR d'un agent, lue par son lien : son titre peut ne pas porter la clé du client."""
-        return self._read(url, ("gh", "pr", "view", url, "--json", ENDED), fresh)
+    def _complete(self, query: str, entry: dict) -> dict:
+        """Ajoute à l'historique gardé les PR fermées depuis la veille de sa dernière lecture (marge pour les fuseaux), en
+        arrière-plan ; renvoie l'entrée à afficher (déjà complétée si background est faux)."""
+        with self._lock:
+            if query in self._updating:
+                return entry
+            self._updating.add(query)
+
+        def work() -> dict:
+            try:
+                since = (datetime.fromisoformat(entry["lu"]) - timedelta(days=1)).date().isoformat()
+                raw, error = self._raw((*SEARCH, NEW_LIMIT, "--search", f"{query} closed:>={since}"))
+                if error:  # un échec garde l'historique tel quel : la prochaine ouverture réessaie
+                    return entry
+                done = _entry(raw, self.store.get(query) or entry)
+                self.store.put(query, done)
+                return done
+            finally:
+                with self._lock:
+                    self._updating.discard(query)
+        if self.background:
+            threading.Thread(target=work, name="jarvis-historique-pr", daemon=True).start()
+            return entry
+        return work()
+
+    def _agent_pr(self, url: str, fresh: bool) -> tuple[list[PullRequest], str, bool]:
+        """PR d'un agent, lue par son lien (son titre peut ne pas porter la clé du client) ; gardée sur disque, relue toutes
+        les cinq minutes tant qu'elle est ouverte."""
+        key = f"agent {url}"
+        entry = self.store.get(key)
+        if fresh or not entry or (any(r.get("state") == "OPEN" for r in entry["prs"].values()) and _old(entry, self.ttl)):
+            raw, error = self._raw(("gh", "pr", "view", url, "--json", ENDED))
+            if error:
+                return _prs(entry), error, False
+            entry = _entry(raw)
+            self.store.put(key, entry)
+        return _prs(entry), "", False
 
     def history(self, slug: str, customers: list[str], agent_urls: set[str], since: date | None = None,
-                softwares: set[str] = frozenset(), common: bool = False, fresh: bool = False) -> tuple[list[PullRequest], str]:
-        """PR fusionnées ou fermées du client (scope du titre = sa clé ou son slug, ou PR d'un de ses agents), les plus
-        récentes d'abord. Avec since, en option, les PR fusionnées depuis cette date qui l'impactent aussi : scope = un de ses
-        logiciels (softwares), ou scope `all`, communes à tous les clients (common)."""
+                softwares: set[str] = frozenset(), common: bool = False, fresh: bool = False) -> tuple[list[PullRequest], str, bool]:
+        """(PR, erreur, complément en cours) : PR fusionnées ou fermées du client (scope du titre = sa clé ou son slug, ou PR d'un
+        de ses agents), les plus récentes d'abord. Avec since, en option, les PR fusionnées depuis cette date qui l'impactent
+        aussi : scope = un de ses logiciels (softwares), ou scope `all`, communes à tous les clients (common). Complément en
+        cours : une de ces lectures est complétée en arrière-plan, la page se relira."""
         keys = client_keys(slug, customers)
         impacts = ([(n, "logiciel") for n in sorted(softwares)] + ([(COMMON, "commune")] if common else [])) if since else []
-        reads = ([(lambda k=k: self.search(f"{k} in:title", fresh), lambda p: p.scopes & keys, "client") for k in sorted(keys)]
+        reads = ([(lambda k=k: self._known(f"{k} in:title", None, fresh), lambda p: p.scopes & keys, "client")
+                  for k in sorted(keys)]
                  + [(lambda u=u: self._agent_pr(u, fresh), lambda p: True, "agent") for u in sorted(agent_urls)]
-                 + [(lambda n=n: self.search(f"{n} in:title is:merged merged:>={since.isoformat()}", fresh),
-                     lambda p, n=n: p.state == "MERGED" and n in p.scopes, why)  # seulement les PR de ce scope
+                 + [(lambda n=n: self._known(f"{n} in:title is:merged", since, fresh),
+                     lambda p, n=n: p.state == "MERGED" and n in p.scopes and p.ended and p.ended.date() >= since, why)
                     for n, why in impacts])
-        with ThreadPoolExecutor(max_workers=8) as pool:  # recherches indépendantes, en parallèle
+        with ThreadPoolExecutor(max_workers=8) as pool:  # lectures indépendantes, en parallèle
             results = list(pool.map(lambda read: read[0](), reads))
         found: dict[int, PullRequest] = {}
-        error = ""
-        for (_, keep, why), (prs, failed) in zip(reads, results):  # dans l'ordre : client, agent, logiciel, commune
-            error = error or failed
+        error, updating = "", False
+        for (_, keep, why), (prs, failed, busy) in zip(reads, results):  # dans l'ordre : client, agent, logiciel, commune
+            error, updating = error or failed, updating or busy
             for p in prs:
                 if p.state != "OPEN" and p.number not in found and keep(p):
                     found[p.number] = replace(p, why=why)
-        return sorted(found.values(), key=lambda p: p.ended or p.updated, reverse=True), error
+        return sorted(found.values(), key=lambda p: p.ended or p.updated, reverse=True), error, updating
 
     def _detail(self, number: int, fresh: bool) -> dict:
         known = self._details.get(number)
