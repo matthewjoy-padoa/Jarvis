@@ -375,3 +375,22 @@ def test_icons_written_in_the_answer_cover_small_pages():
                                       "1" * 32: {}, "2" * 32: {}}  # « aucune » ou un mot : lue, sans icône
     from deploy_hub.sources.client_directory import icons_prompt
     assert "ICONE <adresse de la page> <icône>" in icons_prompt([f"https://app.notion.com/p/{DASHBOARD}"])
+
+
+def test_an_image_that_cannot_be_downloaded_is_not_noted_so_it_is_read_again(tmp_path):
+    directory = ClientDirectory(folder=tmp_path / "notion")
+    directory._save_icons({DASHBOARD: {"type": "external", "external": {"url": "https://img.test/a.png"}}}, {DASHBOARD: "acme1234"})
+    assert not (tmp_path / "notion" / "acme1234" / "icone.json").exists()
+
+
+def test_the_icons_task_uses_haiku_unless_an_image_failed(tmp_path, monkeypatch):
+    monkeypatch.setenv("JARVIS_CONFIG_DIR", str(tmp_path / "config"))
+    _follow(tmp_path)
+    directory = ClientDirectory(folder=tmp_path / "notion", claude_bin=str(fake_claude(tmp_path, "print('rien')")))
+    for bad, model in ((set(), ["--model", "haiku"]), ({DASHBOARD}, [])):
+        directory._missed, directory._icons_tried = bad, None
+        assert directory.refresh_icons()
+        directory._icons_thread.join(10)
+        args = eval((tmp_path / "recu.txt").read_text())[0]
+        assert ("--model" in args) == bool(model) and (not model or args[args.index("--model") + 1] == "haiku")
+        assert directory._missed == {DASHBOARD}  # pas de ligne ICONE pour la page : relue avec le modèle par défaut

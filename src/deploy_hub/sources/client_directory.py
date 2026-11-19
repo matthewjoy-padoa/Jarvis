@@ -50,6 +50,7 @@ Pour chacune de ces pages, outil notion-fetch, puis écris une ligne « ICONE <a
 l'adresse de l'image si l'icône en est une, ou « aucune ». Réponds seulement par ces lignes.
 {urls}
 """
+ICONS_MODEL = "haiku"  # 13 s au lieu de 21 s sur 3 pages ; recopie mal les longues adresses d'image signées : voir _missed
 ICON_LINE = re.compile(r"^\s*ICONE\s+(\S+)\s+(\S+)\s*$", re.M)
 
 
@@ -239,6 +240,7 @@ class ClientDirectory:
         self._proc: subprocess.Popen | None = None
         self._icons_thread: threading.Thread | None = None  # lecture des icônes : processus claude, puis enregistrement
         self._icons_tried: datetime | None = None
+        self._missed: set[str] = set()  # pages sans réponse lisible ou à l'image non téléchargée : relues avec le modèle par défaut
 
     @property
     def claude_bin(self) -> str:
@@ -362,8 +364,9 @@ class ClientDirectory:
             if self.icons_running:
                 return False
             self._icons_tried = datetime.now()
+            model = [] if missing.keys() & self._missed else ["--model", ICONS_MODEL]
             proc = subprocess.Popen(
-                [self.claude_bin, "-p", ICONS_INSTRUCTION, "--output-format", "text", "--permission-mode", "dontAsk",
+                [self.claude_bin, "-p", ICONS_INSTRUCTION, *model, "--output-format", "text", "--permission-mode", "dontAsk",
                  "--allowedTools", *NOTION_SERVERS],
                 cwd=PROJECT_ROOT, env=app_env(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             self._icons_thread = threading.Thread(target=self._wait_icons, args=(proc, missing), name="jarvis-icones", daemon=True)
@@ -376,7 +379,9 @@ class ClientDirectory:
         except subprocess.TimeoutExpired:
             proc.kill()
             return
-        self._save_icons(answered_icons(out), {page: slug for page, (slug, _) in missing.items()})
+        icons = answered_icons(out)
+        self._missed |= missing.keys() - icons.keys()  # ligne absente ou coupée (une longue adresse d'image, souvent)
+        self._save_icons(icons, {page: slug for page, (slug, _) in missing.items()})
 
     def _save_icons(self, icons: dict[str, dict], followed: dict) -> None:
         """Icône du dashboard intégration de chaque client suivi, gardée dans data/notion/<slug>/icone.json (emoji, ou image
@@ -384,5 +389,8 @@ class ClientDirectory:
         for page in icons.keys() & followed.keys():
             folder = self.folder / followed[page]
             found = icon_of(icons[page], folder) if icons[page] else {"emoji": "", "icone": ""}
+            if icons[page] and not any(found.values()):  # image non téléchargée (adresse signée mal recopiée) : relue plus tard
+                self._missed.add(page)
+                continue
             folder.mkdir(parents=True, exist_ok=True)
             (folder / ICON_FILE).write_text(json.dumps(found, ensure_ascii=False), encoding="utf-8")
