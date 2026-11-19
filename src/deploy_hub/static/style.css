@@ -1586,3 +1586,7 @@ details.filter.multi { position: relative; font-size: 13px; }
   border-radius: 50%; animation: lookup-spin .8s linear infinite; }
 @keyframes lookup-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+
+/* Réglage visé par un lien d'un message d'erreur (/reglages#reglage-CLE) */
+.settings-key { font-size: 11px; color: var(--muted); }
+.field:target { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }

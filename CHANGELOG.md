@@ -32,6 +32,7 @@ Jarvis suit une numérotation `0.MINEUR.CORRECTIF` tant qu'il n'est pas stable :
 - Ajouter un client sans attendre : l'annuaire est relu en fond par Jarvis (à son démarrage, puis chaque jour) ; une relecture en cours ne bloque ni ne recharge la page, la liste affichée reste utilisable.
 - Ajouter un client : liens complets pré-remplis, comme « Copier le lien » de Notion (`https://app.notion.com/p/padoa/<Titre>-<id>`) pour la fiche, le dashboard intégration et les autres dashboards ; l'annuaire déjà lu est relu aussitôt. Le dashboard d'un client enregistré sans « /p/ » s'ouvre de nouveau (réglage `JARVIS_NOTION_WORKSPACE`).
 - Ajouter un client lance aussitôt sa synchro Notion (API avec un jeton, sinon la routine) et ouvre sa fiche, qui en montre l'avancement ; un client pas encore synchronisé s'ouvre depuis la page Clients.
+- Un problème de réglage mène au réglage : dans les messages (Sources, onglet PR, lancement d'un DAG ou d'un agent, Tester les connexions, synchro), chaque réglage cité (`ORCHESTRATOR_DIR`, `AIRFLOW_USER`…) est un lien vers son champ dans Réglages, centré et encadré, et « 1Password » mène à sa connexion. L'onglet PR distingue enfin « clone introuvable » (`ORCHESTRATOR_DIR`) de « `gh` introuvable ».
 
 ## [0.1.0] · 2026-11-17
 

@@ -117,7 +117,7 @@ def test_the_test_button_reports_both_connections(env, monkeypatch):
     from deploy_hub.sources import connections
     monkeypatch.setattr(connections, "notion_status", lambda token, problem="": (False, "pas de NOTION_TOKEN"))
     r = TestClient(main.app).post("/reglages/tester", headers=SAME)
-    assert "Airflow" in r.text and "Notion" in r.text and "pas de NOTION_TOKEN" in r.text
+    assert "Airflow" in r.text and "Notion" in r.text and 'pas de <a href="/reglages#reglage-NOTION_TOKEN">NOTION_TOKEN</a>' in r.text
 
 
 @pytest.mark.parametrize("path", ["/reglages", "/reglages/tester", "/reglages/1password/connexion", "/reglages/1password/deconnexion"])

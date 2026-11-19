@@ -101,7 +101,7 @@ def _start(wait: float, force: bool = False) -> Launch:
     repo = folder()
     if not repo:
         return Launch(error="Flow Digger introuvable : clone padoa/integration-flow-digger sur la VM "
-                            f"(par exemple dans ~/flow-digger) ou indique son dossier dans FLOW_DIGGER_DIR (.env de Jarvis).")
+                            f"(par exemple dans ~/flow-digger) ou indique son dossier dans FLOW_DIGGER_DIR (Réglages).")
     updated = ""
     if not force:
         ok, detail = update(repo)

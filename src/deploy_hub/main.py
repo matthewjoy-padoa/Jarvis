@@ -15,6 +15,7 @@ from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request, WebS
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup, escape
 
 from deploy_hub import client_config
 from deploy_hub.config import PROCESS_KEYS, PROJECT_ROOT, clients_dir, data_dir, ensure_private_dirs, forget_secrets, load_settings, secret_problem
@@ -138,6 +139,20 @@ def when_text(moment: datetime | None) -> str:
 
 
 templates.env.filters["quand"] = when_text
+# Réglages cités dans un message (« renseigne ORCHESTRATOR_DIR dans Réglages ») → lien vers leur champ de la page Réglages ;
+# « 1Password » → sa section de connexion. Le plus long d'abord : JARVIS_AGENT_MAX ne doit pas couper JARVIS_AGENT_MAX_TURNS.
+SETTING_MENTION = re.compile(r"\b(" + "|".join(sorted(map(re.escape, env_file.BY_KEY), key=len, reverse=True)) + r")\b|\b1Password\b")
+
+
+def settings_links(text) -> Markup:
+    """Message en texte (échappé ici) → même texte, réglages et 1Password en liens vers la page Réglages."""
+    def link(m: re.Match) -> str:
+        href = f"/reglages#reglage-{m.group(1)}" if m.group(1) else "/reglages#1password"
+        return f'<a href="{href}">{m.group(0)}</a>'
+    return Markup(SETTING_MENTION.sub(link, str(escape(text or ""))))
+
+
+templates.env.filters["reglages"] = settings_links
 templates.env.filters["duree"] = duration_text
 templates.env.filters["tokens"] = tokens_text
 def when_iso(iso: str) -> str:
@@ -697,7 +712,7 @@ def dag_watch_stop(watch_id: int):
 def sources(request: Request):
     return _render(request, "sources.html", "/sources", externals=external_statuses(notion_api.load_token() is not None,
                                                                          secret_problem("NOTION_TOKEN")), settings=settings,
-                   airflow_problem=_airflow_problem())
+                   airflow_message="" if airflow.live else connections.airflow_status(airflow, _airflow_problem())[1])
 
 
 @app.get("/deploiements/{slug}")
@@ -1050,7 +1065,7 @@ def launch_agent_on_retour(request: Request, slug: str, retour_id: str, descript
 def _refresh(slugs: list[str]) -> tuple[bool, str]:
     token = notion_api.load_token()
     if not token:  # sans jeton : routine Claude Code, voir refresh_by_routine
-        return False, "Jeton Notion absent : ajoute NOTION_TOKEN dans le fichier .env de l'app (voir README)."
+        return False, "Jeton Notion absent : renseigne NOTION_TOKEN dans Réglages."
     if not _refresh_lock.acquire(blocking=False):
         return False, "Un rafraîchissement est déjà en cours."
     try:
