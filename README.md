@@ -140,7 +140,7 @@ Pour voir un changement de l'interface sur le Mac sans pull ni VM :
 uv run python demo/lancer.py          # http://localhost:8766 ; --neuf pour repartir des données d'origine
 ```
 
-Seulement du faux : trois clients (`demo/clients/`, dont un jamais synchronisé), les fiches des tests (`demo/deploiements/`), un catalogue de DAGs (`demo/dags/`), un faux Airflow HTTP local que le vrai `air.py` appelle (`demo/faux_airflow.py` : un run passe en succès en 26 s), un faux `claude` pour les agents et le bouton « Rafraîchir depuis Notion » (`demo/faux_claude.py` : un agent sur deux pose une question). Ni `.env`, ni `config/`, ni `data/` ne sont lus ; l'état vit dans `demo/.etat/` (ignoré par git). Les tests n'utilisent pas ce lanceur : la validation reste `uv run pytest` et l'app réelle sur la VM.
+Seulement du faux : trois clients (`demo/clients/`, dont un jamais synchronisé), les fiches des tests (`demo/deploiements/`), un catalogue de DAGs (`demo/dags/`), un faux Airflow HTTP local que le vrai `air.py` appelle (`demo/faux_airflow.py` : un run passe en succès en 26 s), un faux `claude` pour les agents, le bouton « Rafraîchir depuis Notion » et l'annuaire des clients Notion (`demo/faux_claude.py` : un agent sur deux pose une question ; « Client Annuaire » à ajouter par la liste). Ni `.env`, ni `config/`, ni `data/` ne sont lus ; l'état vit dans `demo/.etat/` (ignoré par git). Les tests n'utilisent pas ce lanceur : la validation reste `uv run pytest` et l'app réelle sur la VM.
 
 Versions : numéro dans `pyproject.toml`, historique et règle de numérotation dans [`CHANGELOG.md`](CHANGELOG.md) (une ligne par PR sous « Non publié »).
 

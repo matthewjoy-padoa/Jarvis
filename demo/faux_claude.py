@@ -5,6 +5,8 @@
 - Routine de synchro Notion (`--output-format text`) : dépose ses fichiers dans data/notion/ au rythme d'une vraie
   synchro (empreinte, plan, requêtes, fusion) pour faire avancer le cercle d'avancement, met à jour l'heure de dernière
   synchro de chaque client et répond « inchangé ». Les fiches ne changent pas.
+- Annuaire des clients Notion (consigne qui demande `notion-fetch`) : range deux réponses Notion fictives là où Claude Code
+  range les siennes (<projets>/<session>/tool-results/), que Jarvis relit lui-même ; dont « Client Annuaire », pas encore ajouté.
 """
 import json
 import os
@@ -40,6 +42,30 @@ def agent(resume: bool) -> None:
                            "PR : https://github.com/exemple/orchestrator-demo/pull/1")
     say({"type": "result", "subtype": "success", "num_turns": 2 if asks else 4, "session_id": session,
          "total_cost_usd": 0.05 if asks else 0.12, "result": result})
+
+
+DASHBOARDS = """<h1>Delivery</h1>
+<page url="https://www.notion.so/00000000000000000000000000000010">Dashboard de déploiement - Client Démo</page>
+<page url="https://www.notion.so/00000000000000000000000000000011">Dashboard de déploiement - Client Annuaire</page>
+<h1>Intégration</h1>
+<page url="https://www.notion.so/00000000000000000000000000000012">Dashboard intégration - Client Démo</page>
+<page url="https://www.notion.so/00000000000000000000000000000013">Dashboard intégration - Client Annuaire</page>
+<h1>Formation</h1>
+<page url="https://www.notion.so/00000000000000000000000000000014">Dashboard formation - Client Annuaire</page>
+"""
+FICHES = {"results": [
+    {"url": "https://www.notion.so/00000000000000000000000000000001", "Nom": "Déploiement Client Démo", "élément parent": "[]"},
+    {"url": "https://www.notion.so/00000000000000000000000000000004", "Nom": "Déploiement Client Annuaire", "élément parent": "[]"}]}
+
+
+def annuaire(session: str) -> None:
+    """Réponses Notion rangées comme le fait Claude Code ; Jarvis les relit (client_directory.read_session)."""
+    saved = Path(os.environ["FAUX_CLAUDE_ETAT"]) / "claude-projects" / "demo" / session / "tool-results"
+    saved.mkdir(parents=True, exist_ok=True)
+    time.sleep(PAUSE)
+    (saved / "mcp-Notion-notion-fetch-1.txt").write_text(json.dumps({"text": DASHBOARDS}, ensure_ascii=False), encoding="utf-8")
+    (saved / "mcp-Notion-notion-query-data-sources-1.txt").write_text(json.dumps(FICHES, ensure_ascii=False), encoding="utf-8")
+    print("fini")
 
 
 def routine() -> None:
@@ -79,6 +105,7 @@ if __name__ == "__main__":
     elif "stream-json" in args:
         sys.stdin.read()
         agent(resume="--resume" in args)
+    elif "notion-fetch" in sys.stdin.read():  # seule la consigne de l'annuaire lit une page (sync/routine.md : non)
+        annuaire(args[args.index("--session-id") + 1])
     else:
-        sys.stdin.read()
         routine()

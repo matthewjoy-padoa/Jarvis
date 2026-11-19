@@ -7,7 +7,7 @@
 Tout est fictif et local :
 - clients : demo/clients/ (dont un jamais synchronisé), fiches : demo/deploiements/ (celles des tests, recopiées) ;
 - DAGs : demo/dags/catalogue.json, lancés et suivis sur un faux Airflow HTTP local (demo/faux_airflow.py) par le vrai air.py ;
-- agents et synchro Notion : faux binaire `claude` (demo/faux_claude.py), sans modèle ni Notion ;
+- agents, synchro Notion et annuaire des clients : faux binaire `claude` (demo/faux_claude.py), sans modèle ni Notion ;
 - orchestrator : dépôt git jetable (worktrees des agents) ; le catalogue n'est jamais régénéré depuis lui.
 
 Ni le .env, ni config/, ni data/ ne sont lus : l'état vit dans demo/.etat/ (ignoré par git). Aucun appel au vrai Airflow, à
@@ -95,6 +95,8 @@ def main() -> None:
     from deploy_hub.sources.dag_source import DagSource
     # Le catalogue fictif ne doit jamais être régénéré depuis l'orchestrator jetable : source des DAGs sans clone.
     app_main.dag_source = DagSource(ETAT / "pas-de-clone", app_main.dag_source.target)
+    # Annuaire des clients Notion : le faux claude range ses réponses ici, jamais sous ~/.claude/projects.
+    app_main.client_directory.projects = ETAT / "claude-projects"
 
     import uvicorn
     print(f"Jarvis (environnement local fictif) : http://localhost:{args.port}  ·  faux Airflow : {airflow.url}  ·  état : {ETAT}",
