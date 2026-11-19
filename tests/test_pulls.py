@@ -100,8 +100,13 @@ def test_the_pr_tab_loads_the_list_and_shows_ci_reviewer_and_days(monkeypatch):
     tab = client.get("/deploiements/client-demo/pr")
     assert tab.status_code == 200 and 'hx-get="/deploiements/client-demo/pr/liste"' in tab.text
     html = client.get("/deploiements/client-demo/pr/liste").text
-    assert "#7 ↗" in html and "Dates de visite" in html and "Autre client" not in html
+    assert ">#7</a>" in html and "Dates de visite" in html and "Autre client" not in html
     assert 'g-ko">rouge' in html and "relecture demandée" in html and "relectrice" in html and "Actualiser" in html
+    # toute la ligne ouvre la PR (drawer.js : ligne [data-ticket-card] → son lien [data-row-link]), pas seulement « #7 ↗ »
+    assert '<tr data-ticket-card title="Ouvrir la PR #7 dans GitHub">' in html and 'target="_blank" rel="noopener" data-row-link>#7</a>' in html
+    assert 'class="row-link"' in html and "↗" not in html.split("<tbody>")[1]  # plus d'allure de lien : toute la ligne l'est
+    js = client.get("/static/drawer.js").text
+    assert 'card.querySelector("a[data-ticket], a[data-row-link]")' in js and "a.click()" in js
 
 
 def test_the_pr_tab_says_when_github_cannot_be_read(monkeypatch):

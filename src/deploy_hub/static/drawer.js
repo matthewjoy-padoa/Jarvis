@@ -1,5 +1,6 @@
 // Fenêtre de détail des tickets : un lien [data-ticket] s'ouvre dans une fenêtre centrée (htmx) au lieu de changer de page.
-// Toute la carte (ou ligne) [data-ticket-card] est cliquable : elle ouvre le lien [data-ticket] qu'elle contient, sauf si le
+// Toute la carte (ou ligne) [data-ticket-card] est cliquable : elle ouvre le lien [data-ticket] qu'elle contient (ou, à défaut,
+// son lien [data-row-link], ex. une PR GitHub, avec la cible de ce lien : nouvel onglet), sauf si le
 // clic vise un autre élément interactif (lien, bouton, bloc dépliable, champ) ou sélectionne du texte.
 // Ctrl/Cmd-clic : nouvel onglet. Échap, la croix ou le fond ferment la fenêtre.
 (function () {
@@ -40,8 +41,9 @@
     if (!a) {
       const card = e.target.closest("[data-ticket-card]");
       if (!card || e.target.closest(INTERACTIVE) || String(window.getSelection())) return;
-      a = card.querySelector("a[data-ticket]");
+      a = card.querySelector("a[data-ticket], a[data-row-link]");
       if (!a) return;
+      if (!a.hasAttribute("data-ticket")) { a.click(); return; }  // lien externe : le navigateur applique sa cible
       if (e.metaKey || e.ctrlKey) { window.open(a.href, "_blank", "noopener"); return; }
     }
     if (e.metaKey || e.ctrlKey || e.shiftKey || !window.htmx) return;

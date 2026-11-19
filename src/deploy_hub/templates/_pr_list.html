@@ -8,8 +8,8 @@
     <tbody>
     {% for pr in prs %}
       {% set review, group = pr.review %}
-      <tr>
-        <td><a href="{{ pr.url }}" target="_blank" rel="noopener">#{{ pr.number }} ↗</a></td>
+      <tr data-ticket-card title="Ouvrir la PR #{{ pr.number }} dans GitHub">
+        <td><a class="row-link" href="{{ pr.url }}" target="_blank" rel="noopener" data-row-link>#{{ pr.number }}</a></td>
         <td>{{ pr.title }}{% if pr.why != "client" %} <span class="badge" title="{{ 'PR ouverte par un agent lancé pour ce client' if pr.why == 'agent' else 'Le scope du titre est le logiciel du client' }}">{{ pr.why }}</span>{% endif %}<br><code class="muted">{{ pr.branch }}</code></td>
         <td>{{ pr.author }}</td>
         <td><span class="badge g-{{ pr.ci_group }}">{{ pr.ci }}</span></td>
