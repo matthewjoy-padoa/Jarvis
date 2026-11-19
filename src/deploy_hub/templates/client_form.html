@@ -13,14 +13,19 @@
 {% if notice %}<p class="result ok">{{ notice }}</p>{% endif %}
 
 {% if new %}
-<section class="panel client-lookup">
-  <h2>Par son nom</h2>
-  <p class="muted">Claude lit la page Notion « Liste des dashboards pour le déploiement des nouveaux clients » : il retrouve la fiche du client dans « Clients en déploiement » et ses dashboards (déploiement, intégration, formation, gestion financière). Tu relis, puis tu ajoutes.</p>
-  <form class="toolbar" hx-post="/clients/recherche" hx-target="#client-lookup-out" hx-swap="outerHTML" hx-disabled-elt="find button">
-    <input type="search" name="nom" required placeholder="ex. Acme Santé au travail" value="{{ lookup.name or '' }}" aria-label="Nom du client">
-    <button type="submit">Chercher dans Notion</button>
+<section class="panel client-pick">
+  <h2>Choisir le client</h2>
+  {% if directory.clients %}
+  <form method="get" action="/clients/nouveau" class="toolbar">
+    <select name="client" onchange="this.form.submit()" aria-label="Client à ajouter">
+      <option value="">{{ directory.clients | length }} clients dans la liste des dashboards Notion…</option>
+      {% for c in directory.clients %}<option value="{{ c.cle }}"{{ ' selected' if c.cle == chosen.cle }}{{ ' disabled' if c.cle in followed }}>{{ c.client }}{{ ' · déjà suivi' if c.cle in followed }}</option>{% endfor %}
+    </select>
+    <noscript><button type="submit">Choisir</button></noscript>
   </form>
-  {% with state=lookup, message="", ok=true %}{% include "_client_lookup.html" %}{% endwith %}
+  <p class="muted">Sa fiche « Clients en déploiement », son dashboard intégration et ses autres dashboards se remplissent tout seuls. Tu relis, puis tu ajoutes.</p>
+  {% endif %}
+  {% with directory=directory %}{% include "_client_directory.html" %}{% endwith %}
 </section>
 {% endif %}
 
@@ -45,7 +50,8 @@
 
   <h2>Notion</h2>
   <label class="field">Fiche du client dans « Clients en déploiement » <span class="req">obligatoire</span>
-    <input name="page_id" required value="{{ val('page_id', cfg.page_id if cfg else '') }}" placeholder="adresse de la page ou son id (32 caractères)">
+    <input name="page_id" required value="{{ val('page_id', cfg.page_id if cfg else '') }}" placeholder="adresse de la page ou son id (32 caractères)"{% if fiches %} list="fiches-notion"{% endif %}>
+    {% if fiches %}<datalist id="fiches-notion">{% for f in fiches %}<option value="{{ f.url }}" label="{{ f.nom }}">{% endfor %}</datalist>{% endif %}
     <small class="muted">Ouvre la fiche du client dans la base « Clients en déploiement », puis copie son lien (••• → Copier le lien). C'est elle qui relie les actions, la recette et les règles du client.</small></label>
   <label class="field">Dashboard intégration du client
     <input name="notion_url" type="url" value="{{ val('notion_url', cfg.notion_url if cfg else '') }}" placeholder="https://app.notion.com/p/…"></label>
