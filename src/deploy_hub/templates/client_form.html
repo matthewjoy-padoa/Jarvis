@@ -10,8 +10,28 @@
 </div>
 <p class="muted">La configuration est enregistrée sur ta machine (<code>config/clients/</code>, hors git) : chacun suit ses propres clients. Après l'enregistrement, lance la synchro (routine ou « Rafraîchir depuis Notion ») pour charger ses données.</p>
 {% if error %}<p class="result ko">{{ error }}</p>{% endif %}
+{% if notice %}<p class="result ok">{{ notice }}</p>{% endif %}
 
-<form class="panel client-form" method="post" action="/clients/enregistrer">
+{% if new %}
+<section class="panel client-pick">
+  <h2>Choisir le client</h2>
+  {% if directory.clients %}
+  <form method="get" action="/clients/nouveau" class="toolbar">
+    <select name="client" onchange="this.form.submit()" aria-label="Client à ajouter">
+      <option value="">{{ directory.clients | length }} clients dans la liste des dashboards Notion…</option>
+      {% for c in directory.clients %}<option value="{{ c.cle }}"{{ ' selected' if c.cle == chosen.cle }}{{ ' disabled' if c.cle in followed }}>{{ c.client }}{{ ' · déjà suivi' if c.cle in followed }}</option>{% endfor %}
+    </select>
+    <noscript><button type="submit">Choisir</button></noscript>
+  </form>
+  <p class="muted">Sa fiche « Clients en déploiement », son dashboard intégration et ses autres dashboards se remplissent tout seuls. Tu relis, puis tu ajoutes.</p>
+  {% endif %}
+  {% with directory=directory %}{% include "_client_directory.html" %}{% endwith %}
+</section>
+{% endif %}
+
+{% set collapsed = new and not form %}{# ajout sans recherche aboutie : le nom d'abord, le formulaire replié #}
+{% if collapsed %}<details class="panel client-manual"><summary>Ou remplir à la main</summary>{% endif %}
+<form class="{{ '' if collapsed else 'panel ' }}client-form" method="post" action="/clients/enregistrer">
   {% if not new %}<input type="hidden" name="existing_slug" value="{{ cfg.slug }}">{% endif %}
   <h2>Le client</h2>
   <div class="field-row">
@@ -30,10 +50,14 @@
 
   <h2>Notion</h2>
   <label class="field">Fiche du client dans « Clients en déploiement » <span class="req">obligatoire</span>
-    <input name="page_id" required value="{{ val('page_id', cfg.page_id if cfg else '') }}" placeholder="adresse de la page ou son id (32 caractères)">
+    <input name="page_id" required value="{{ val('page_id', cfg.page_id if cfg else '') }}" placeholder="adresse de la page ou son id (32 caractères)"{% if fiches %} list="fiches-notion"{% endif %}>
+    {% if fiches %}<datalist id="fiches-notion">{% for f in fiches %}<option value="{{ f.url }}" label="{{ f.nom }}">{% endfor %}</datalist>{% endif %}
     <small class="muted">Ouvre la fiche du client dans la base « Clients en déploiement », puis copie son lien (••• → Copier le lien). C'est elle qui relie les actions, la recette et les règles du client.</small></label>
   <label class="field">Dashboard intégration du client
     <input name="notion_url" type="url" value="{{ val('notion_url', cfg.notion_url if cfg else '') }}" placeholder="https://app.notion.com/p/…"></label>
+  <label class="field">Autres dashboards Notion
+    <textarea name="dashboards" rows="3" placeholder="un par ligne : libellé | adresse&#10;Déploiement | https://app.notion.com/p/…">{{ val('dashboards', cfg.dashboards_text if cfg else '') }}</textarea>
+    <small class="muted">Déploiement, formation, gestion financière… : affichés dans les raccourcis du client.</small></label>
   <label class="field">Valeurs « Client » supplémentaires de la recette
     <input name="recette_clients" value="{{ val('recette_clients', cfg.recette_clients | join(', ') if cfg else '') }}" placeholder="facultatif, ex. acme_pulse, acme-uegar">
     <small class="muted">Retours de recette à inclure par leur champ « Client », en plus de ceux liés à la fiche.</small></label>
@@ -56,6 +80,7 @@
     <a href="/clients" class="btn-link">Annuler</a>
   </div>
 </form>
+{% if collapsed %}</details>{% endif %}
 
 {% if not new %}
 <form class="panel danger-zone" method="post" action="/clients/{{ cfg.slug }}/retirer" onsubmit="return confirm({{ ('Retirer ' ~ cfg.client ~ ' du suivi ? Sa configuration et sa fiche sont mises de côté (retires/), ses données sont conservées.') | tojson | forceescape }})">

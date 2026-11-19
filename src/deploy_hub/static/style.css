@@ -1570,3 +1570,15 @@ details.filter.multi { position: relative; font-size: 13px; }
 .md table { border-collapse: collapse; margin: .3em 0 .6em; }
 .md th, .md td { border: 1px solid var(--border); padding: 3px 8px; text-align: left; }
 .agent-context code, .agent-context pre { background: var(--surface); }
+
+/* Ajouter un client en le choisissant dans l'annuaire Notion (client_form.html) */
+.client-pick select { flex: 1 1 320px; font: inherit; padding: 6px 10px; border: 2px solid var(--border); border-radius: 10px;
+  background: var(--surface); color: var(--text); }
+.link-button { min-height: 0; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; text-decoration: underline; }
+.lookup-wait { display: flex; align-items: center; gap: 8px; }
+.client-manual > summary { font-size: 14px; color: var(--text); margin: 0; }
+.client-manual[open] > summary { margin-bottom: 12px; }
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: lookup-spin .8s linear infinite; }
+@keyframes lookup-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

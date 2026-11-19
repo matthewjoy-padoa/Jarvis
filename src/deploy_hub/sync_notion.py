@@ -429,11 +429,17 @@ SESSION_ENV = "JARVIS_SYNC_SESSION"  # session de la routine lancée par Jarvis 
 SAVED_NOTION = "mcp-*Notion*-notion-query-data-sources-*.txt"
 
 
+def saved_responses(session: str = "", name: str = SAVED_NOTION, projects: Path | None = None) -> list[Path]:
+    """Réponses d'outils que Claude Code a rangées dans des fichiers (grosses réponses), de la plus ancienne à la plus récente :
+    celles d'une session si on la connaît, sinon de toutes. Seul endroit qui connaît leur emplacement dans ~/.claude."""
+    pattern = f"*/{session or '*'}/tool-results/{name}"
+    return sorted((projects or CLAUDE_PROJECTS).glob(pattern), key=lambda p: p.stat().st_mtime)
+
+
 def saved_response(session: str = "", within: timedelta = timedelta(minutes=10)) -> Path:
     """Dernière réponse Notion rangée par Claude Code dans un fichier : celle de la session de la routine si on la connaît,
     sinon la plus récente des 10 dernières minutes."""
-    pattern = f"*/{session}/tool-results/{SAVED_NOTION}" if session else f"*/*/tool-results/{SAVED_NOTION}"
-    found = sorted(CLAUDE_PROJECTS.glob(pattern), key=lambda p: p.stat().st_mtime)
+    found = saved_responses(session)
     if not found or datetime.now() - datetime.fromtimestamp(found[-1].stat().st_mtime) > within:
         raise SyncError("Aucune réponse Notion rangée par Claude Code dans les 10 dernières minutes")
     return found[-1]

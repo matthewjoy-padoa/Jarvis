@@ -31,6 +31,7 @@ from deploy_hub.sources.claude_runner import (TO_FILL, WAITING, ClaudeRunner, ag
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_source import DagSource
 from deploy_hub.sources.dag_watch import DagWatcher
+from deploy_hub.sources.client_directory import ClientDirectory, form_of, name_key
 from deploy_hub.sources.sync_routine import SyncRoutine
 from deploy_hub.sources import connections, flow_digger, notion_api
 from deploy_hub.sources.external import external_statuses
@@ -53,6 +54,7 @@ notifications = NotificationStore(Path(os.getenv("DEPLOY_HUB_NOTIFICATIONS") or 
 claude = ClaudeRunner.from_env(settings.orchestrator_dir, notifications, data_dir() / "agents")
 # Synchro Notion sans jeton : le bouton « Rafraîchir depuis Notion » fait suivre sync/routine.md à Claude Code (claude -p).
 sync_routine = SyncRoutine(notifications)
+client_directory = ClientDirectory()
 pulls = PullRequests(settings.orchestrator_dir)  # PR ouvertes de l'orchestrator (gh), gardées cinq minutes
 # Suivi des runs lancés (air.py d'Arthur) ; les suivis en cours au démarrage reprennent si Airflow est configuré.
 dag_watch = DagWatcher(data_dir() / "airflow", notifications, airflow.air_env())
@@ -130,6 +132,7 @@ def when_text(moment: datetime | None) -> str:
 templates.env.filters["quand"] = when_text
 templates.env.filters["duree"] = duration_text
 templates.env.filters["tokens"] = tokens_text
+templates.env.filters["quand_iso"] = lambda iso: when_text(datetime.fromisoformat(iso)) if iso else ""
 templates.env.filters["md"] = md
 templates.env.filters["md_inline"] = md_inline
 templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STATUSES)
@@ -371,14 +374,56 @@ def index(request: Request, enregistre: str = "", retire: str = ""):
     return _render(request, "index.html", "/clients", deployments=deployments, pending=pending, saved=enregistre, retired=retire)
 
 
-def _client_form(request: Request, cfg, error: str = "", new: bool = True, form: dict | None = None) -> HTMLResponse:
-    suggestions = sorted(dag_catalogue.catalogue()["clients"])
-    return _render(request, "client_form.html", "/clients", cfg=cfg, error=error, new=new, form=form or {}, suggestions=suggestions)
+def _client_form(request: Request, cfg, error: str = "", new: bool = True, form: dict | None = None, notice: str = "",
+                 chosen: dict | None = None, directory: dict | None = None, keys=None) -> HTMLResponse:
+    """directory, keys : annuaire et clés orchestrator déjà lus par l'appelant (sinon lus ici)."""
+    keys = sorted(keys if keys is not None else dag_catalogue.catalogue()["clients"])
+    chosen = chosen or {}
+    directory = (directory if directory is not None else client_directory.directory()) if new else {}
+    followed = {key for c in client_config.all_configs() for key in (name_key(c.client), name_key(c.slug))} if new else set()
+    fiches = list({f["url"]: f for f in chosen.get("fiches", []) + directory.get("fiches", [])}.values())  # les siennes d'abord
+    return _render(request, "client_form.html", "/clients", cfg=cfg, error=error, new=new, form=form or {}, suggestions=keys,
+                   notice=notice, directory=directory, followed=followed, chosen=chosen, fiches=fiches,
+                   annuaire=client_directory.state() if new else {})
 
 
 @app.get("/clients/nouveau", response_class=HTMLResponse)
-def client_new(request: Request):
-    return _client_form(request, None)
+def client_new(request: Request, client: str = ""):
+    """Choisir le client dans l'annuaire Notion (relu seul en arrière-plan s'il a plus d'un jour) : le formulaire se remplit,
+    à relire avant l'ajout. Sans annuaire (pas de Claude Code), le formulaire à la main."""
+    directory = client_directory.directory()
+    if client_directory.should_refresh(directory):
+        client_directory.refresh()
+    entry = client_directory.entry(directory, client) if client else None
+    if not entry:
+        return _client_form(request, None, directory=directory)
+    keys = dag_catalogue.catalogue()["clients"]
+    form = form_of(entry, keys)
+    missing = [label for key, label in (("page_id", "sa fiche « Clients en déploiement » (choisis-la dans la liste du champ)"),
+                                        ("notion_url", "son dashboard intégration")) if not form[key]]
+    notice = f"{entry['client']} : relis, complète au besoin, puis ajoute." + (f" À compléter : {', '.join(missing)}." if missing else "")
+    return _client_form(request, None, form=form, notice=notice, chosen=entry, directory=directory, keys=keys)
+
+
+@app.post("/clients/annuaire", response_class=HTMLResponse)
+def client_directory_refresh(request: Request, lu: str = Form("")):
+    """« Relire » : la liste des clients est relue dans Notion (une vingtaine de secondes)."""
+    result = client_directory.refresh()
+    return _directory_status(request, lu, "" if result.ok else result.message)
+
+
+@app.get("/clients/annuaire/etat", response_class=HTMLResponse)
+def client_directory_status(request: Request, lu: str = ""):
+    return _directory_status(request, lu)
+
+
+def _directory_status(request: Request, lu: str, error: str = "") -> HTMLResponse:
+    """Suivi de la lecture ; dès que l'annuaire affiché (lu) est remplacé par un plus récent, la page se recharge."""
+    directory = client_directory.directory()
+    if not error and directory.get("lu", "") != lu and not client_directory.running:
+        return HTMLResponse("", headers={"HX-Refresh": "true"})
+    return templates.TemplateResponse(request, "_client_directory.html", {"annuaire": client_directory.state(), "message": error,
+                                                                          "directory": directory})
 
 
 def _config_or_fiche(slug: str):
@@ -425,6 +470,7 @@ async def client_links_save(request: Request, slug: str):
         if dashboard and not dashboard.startswith(("http://", "https://")):
             raise client_config.ConfigError("Le lien du dashboard Notion doit être une adresse https://")
         updated = dataclasses.replace(cfg, notion_url=dashboard, drive=client_config.parse_drive(str(form.get("drive") or "")),
+                                      dashboards=client_config.parse_dashboards(str(form.get("dashboards") or "")),
                                       stacks=client_config.parse_stacks(str(form.get("stacks") or "")))
         client_config.save(updated)
     except client_config.ConfigError as e:

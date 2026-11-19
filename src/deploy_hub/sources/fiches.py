@@ -81,6 +81,7 @@ def parse_deployment(path: Path, clients_dir: Path | None = None) -> Deployment:
         links=[Link(**l) for l in data.get("links", [])],
         stacks=[Stack(**s) for s in (cfg.stacks if cfg else data.get("stacks") or [])],
         drive=[Link(**l) for l in (cfg.drive if cfg else [])],
+        dashboards=[Link(**l) for l in (cfg.dashboards if cfg else [])],
         orchestrator=cfg.orchestrator if cfg else data.get("orchestrator") or [],
         resources=[ResourceInjection(**r) for r in data.get("resources", [])],
         actions=[Action(**{**a, "notion_url": notion_link(a.get("notion_url", ""))}) for a in data.get("actions", [])],
@@ -131,7 +132,8 @@ class FicheSource:
         if not cfg:
             return None
         return Deployment(slug=slug, client=cfg.client, software=cfg.software or "?", status=cfg.status, notion_url=cfg.notion_url,
-                          stacks=[Stack(**s) for s in cfg.stacks], drive=[Link(**l) for l in cfg.drive], orchestrator=cfg.orchestrator,
+                          stacks=[Stack(**s) for s in cfg.stacks], drive=[Link(**l) for l in cfg.drive],
+                          dashboards=[Link(**l) for l in cfg.dashboards], orchestrator=cfg.orchestrator,
                           pending=True)
 
     def list_deployments(self) -> list[Deployment]:

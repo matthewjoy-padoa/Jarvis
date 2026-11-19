@@ -20,7 +20,7 @@ cp .env.example .env          # facultatif : tout se règle aussi dans la page R
 uv run uvicorn deploy_hub.main:app --port 8765
 ```
 
-Ouvre http://localhost:8765, puis **Clients → Ajouter un client** : son nom et le lien de sa fiche dans la base Notion « Clients en déploiement » (••• → Copier le lien). Facultatif : son dashboard intégration, ses clés orchestrator (pour proposer les bons DAGs), ses stacks. La configuration va dans `config/clients/<slug>.yaml` (modèle : [`config.example/clients/exemple.yaml`](config.example/clients/exemple.yaml)).
+Ouvre http://localhost:8765, puis **Clients → Ajouter un client**, et choisis le client dans la liste : son identifiant (lettres et chiffres, comme dans l'orchestrator : « APST 26-07 » → `apst2607`), ses clés orchestrator, sa fiche « Clients en déploiement », son dashboard intégration et ses autres dashboards (déploiement, formation, gestion financière) se remplissent ; tu relis, puis tu ajoutes. Cette liste est l'annuaire des clients, relu chaque jour par Claude Code (connecteur Notion, lecture seule, une vingtaine de secondes) depuis la page « Liste des dashboards pour le déploiement des nouveaux clients » et la base « Clients en déploiement » ; « Relire maintenant » le relit à la demande. Sans Claude Code, « Ou remplir à la main » : le lien de sa fiche (••• → Copier le lien), et au besoin son dashboard intégration. Facultatif : ses stacks. Autre liste de dashboards : `JARVIS_NOTION_DASHBOARDS` (id de la page). La configuration va dans `config/clients/<slug>.yaml` (modèle : [`config.example/clients/exemple.yaml`](config.example/clients/exemple.yaml)).
 
 Le client apparaît alors comme « pas encore synchronisé » : lance une première synchro (section suivante) pour charger ses données.
 
@@ -114,6 +114,7 @@ Tous facultatifs. La page **Réglages** (accessible seulement en local, par exem
 | `JARVIS_CONFIG_DIR`, `JARVIS_DATA_DIR` | Emplacement de la configuration et des données |
 | `NOTION_TOKEN` | Synchro par l'API Notion ; vide : le bouton « Rafraîchir depuis Notion » lance la routine Claude Code |
 | `CLAUDE_BIN`, `JARVIS_SYNC_ALLOWED_TOOLS` | Routine lancée par le bouton : binaire `claude`, outils permis (vide : liste par défaut) |
+| `JARVIS_NOTION_DASHBOARDS` | Page Notion qui liste les dashboards des clients, lue chaque jour pour l'annuaire de « Ajouter un client » (vide : « Liste des dashboards pour le déploiement des nouveaux clients ») |
 | `AIRFLOW_BASE_URL`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD` | Lancement réel des DAGs |
 | `JARVIS_DAG_MAX_CLEARS`, `JARVIS_DAG_INTERVAL_S` | Suivi des runs : relances automatiques au plus (0 : aucune), secondes entre deux vérifications |
 | `ORCHESTRATOR_DIR` | Clone local de l'orchestrator : DAGs proposés, agents Claude, PR (vide : `~/integration-orchestrator`) |
