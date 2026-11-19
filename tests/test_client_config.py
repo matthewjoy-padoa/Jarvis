@@ -202,10 +202,11 @@ def test_a_new_client_is_synced_at_once_without_a_token_by_the_routine(app, monk
     started = []
     monkeypatch.setattr(main.notion_api, "load_token", lambda root=None: None)
     monkeypatch.setattr(main.sync_routine, "start", lambda: started.append("routine"))
+    monkeypatch.setattr(main.client_directory, "refresh_icons", lambda: started.append("icones"))  # son emoji, à part
     r = app.post("/clients/enregistrer", data={"client": "Acme", "page_id": PAGE}, follow_redirects=False)
-    assert r.headers["location"] == "/deploiements/acme/synthese" and started == ["routine"]
+    assert r.headers["location"] == "/deploiements/acme/synthese" and started == ["routine", "icones"]
     app.post("/clients/enregistrer", data={"existing_slug": "acme", "client": "Acme SST", "page_id": PAGE})
-    assert started == ["routine"]  # une modification ne relance pas de synchro
+    assert started == ["routine", "icones"]  # une modification ne relance pas de synchro
 
 
 def test_a_new_client_is_synced_at_once_with_a_token_by_the_api(app, monkeypatch):

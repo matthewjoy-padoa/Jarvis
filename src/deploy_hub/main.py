@@ -532,6 +532,7 @@ def _sync_new_client(slug: str, background: BackgroundTasks) -> None:
         background.add_task(_refresh, [slug])
     else:
         sync_routine.start()
+        client_directory.refresh_icons()  # sans jeton : son emoji (icône de son dashboard) est lu à part, tout de suite
 
 
 @app.post("/clients/{slug}/retirer")

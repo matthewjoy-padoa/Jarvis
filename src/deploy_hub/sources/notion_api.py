@@ -257,32 +257,39 @@ class NotionClient:
             icon = self._call("GET", f"/pages/{_uuid(page_id_of(url))}", params=[("filter_properties[]", "title")]).get("icon") or {}
         except (ConfigError, SyncError):
             icon = {}
-        kind = icon.get("type")
-        if kind in ("file", "external", "custom_emoji"):  # image : Notion la signe pour une heure, on la garde sur disque
-            name = self._download_icon((icon.get(kind) or {}).get("url") or "", folder)
-            return {"emoji": "", "icone": name or _kept_icon(folder)}  # téléchargement raté : l'ancienne image reste
-        for old in folder.glob("icone.*"):
-            old.unlink()
-        return {"emoji": icon.get("emoji", "") if kind == "emoji" else "", "icone": ""}
+        return icon_of(icon, folder, self.transport)
 
-    def _download_icon(self, src: str, folder: Path) -> str:
-        """Image d'icône (PNG, JPEG, GIF, WebP ; 512 Ko au plus) écrite en folder/icone.<ext> ; "" si refusée.
-        Client HTTP à part : le jeton Notion ne part jamais vers l'hébergeur de l'image."""
-        if not src.startswith("https://"):
-            return ""
-        try:
-            with httpx.Client(timeout=10, follow_redirects=True, transport=self.transport) as http:
-                r = http.get(src)
-        except httpx.HTTPError:
-            return ""
-        ext = ICON_TYPES.get(r.headers.get("content-type", "").split(";")[0].strip())
-        if r.status_code != 200 or not ext or len(r.content) > ICON_MAX:
-            return ""
-        folder.mkdir(parents=True, exist_ok=True)
-        for old in folder.glob("icone.*"):
-            old.unlink()
-        (folder / f"icone{ext}").write_bytes(r.content)
-        return f"icone{ext}"
+
+def icon_of(icon: dict, folder: Path, transport: httpx.BaseTransport | None = None) -> dict:
+    """Icône d'une page Notion (objet « icon » de l'API ou de notion-fetch) : {"emoji": "🦖", "icone": ""} ou, pour une
+    image, {"emoji": "", "icone": "icone.png"} téléchargée dans folder. Sert à la synchro avec jeton et à l'annuaire."""
+    kind = (icon or {}).get("type")
+    if kind in ("file", "external", "custom_emoji"):  # image : Notion la signe pour une heure, on la garde sur disque
+        name = _download_icon(((icon or {}).get(kind) or {}).get("url") or "", folder, transport)
+        return {"emoji": "", "icone": name or _kept_icon(folder)}  # téléchargement raté : l'ancienne image reste
+    for old in folder.glob("icone.*"):
+        old.unlink()
+    return {"emoji": icon.get("emoji", "") if kind == "emoji" else "", "icone": ""}
+
+
+def _download_icon(src: str, folder: Path, transport: httpx.BaseTransport | None = None) -> str:
+    """Image d'icône (PNG, JPEG, GIF, WebP ; 512 Ko au plus) écrite en folder/icone.<ext> ; "" si refusée.
+    Client HTTP à part : le jeton Notion ne part jamais vers l'hébergeur de l'image."""
+    if not src.startswith("https://"):
+        return ""
+    try:
+        with httpx.Client(timeout=10, follow_redirects=True, transport=transport) as http:
+            r = http.get(src)
+    except httpx.HTTPError:
+        return ""
+    ext = ICON_TYPES.get(r.headers.get("content-type", "").split(";")[0].strip())
+    if r.status_code != 200 or not ext or len(r.content) > ICON_MAX:
+        return ""
+    folder.mkdir(parents=True, exist_ok=True)
+    for old in folder.glob("icone.*"):
+        old.unlink()
+    (folder / f"icone{ext}").write_bytes(r.content)
+    return f"icone{ext}"
 
 
 def _kept_icon(folder: Path) -> str:

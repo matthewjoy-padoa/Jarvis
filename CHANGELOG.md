@@ -34,6 +34,7 @@ Jarvis suit une numérotation `0.MINEUR.CORRECTIF` tant qu'il n'est pas stable :
 - Ajouter un client lance aussitôt sa synchro Notion (API avec un jeton, sinon la routine) et ouvre sa fiche, qui en montre l'avancement ; un client pas encore synchronisé s'ouvre depuis la page Clients.
 - Un problème de réglage mène au réglage : dans les messages (Sources, onglet PR, lancement d'un DAG ou d'un agent, Tester les connexions, synchro), chaque réglage cité (`ORCHESTRATOR_DIR`, `AIRFLOW_USER`…) est un lien vers son champ dans Réglages, centré et encadré, et « 1Password » mène à sa connexion. L'onglet PR distingue enfin « clone introuvable » (`ORCHESTRATOR_DIR`) de « `gh` introuvable ».
 - Onglet PR : toute la ligne d'une PR ouvre la PR dans GitHub (nouvel onglet), plus seulement le petit lien ; le numéro « #123 » s'affiche comme le reste de la ligne.
+- Emoji des clients sans jeton Notion : une petite lecture à part (l'annuaire n'en est pas ralenti) prend l'icône du dashboard intégration de chaque client suivi qui n'en a pas encore (emoji ou image) ; elle s'affiche aussitôt et la synchro la reporte dans la fiche. Un client ajouté a la sienne dans la minute.
 
 ## [0.1.0] · 2026-11-17
 

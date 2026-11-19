@@ -266,6 +266,23 @@ def build_deployment(config: dict, client: dict, regles_rows: list[dict], caches
     }
 
 
+ICON_FILE = "icone.json"  # data/notion/<slug>/icone.json : icône du client lue par l'annuaire (sans jeton Notion)
+
+
+def icon_fields(data) -> dict:
+    """{"emoji", "icone"} d'une fiche ou d'un icone.json (vides s'ils manquent)."""
+    data = data if isinstance(data, dict) else {}
+    return {k: str(data.get(k) or "") for k in ("emoji", "icone")}
+
+
+def saved_icon(folder: Path) -> dict:
+    """Emoji et image du client lus par l'annuaire (data/notion/<slug>/icone.json) ; vides s'il n'y en a pas."""
+    try:
+        return icon_fields(json.loads((folder / ICON_FILE).read_text(encoding="utf-8")))
+    except (OSError, ValueError):
+        return icon_fields({})
+
+
 def _fiche_icon(fiche: Path) -> dict:
     """Emoji et image de la fiche déjà écrite ; vides si elle manque ou est illisible (décoratif : ne bloque jamais la synchro)."""
     from deploy_hub.sources.fiches import _split_frontmatter
@@ -273,7 +290,7 @@ def _fiche_icon(fiche: Path) -> dict:
         data = _split_frontmatter(fiche.read_text(encoding="utf-8"))
     except (OSError, ValueError, yaml.YAMLError):
         data = {}
-    return {k: str(data.get(k) or "") for k in ("emoji", "icone")}
+    return icon_fields(data)
 
 
 def write_fiche(deployment: dict, out: Path) -> None:
@@ -635,8 +652,9 @@ def publish(slug: str, root: Path, config: dict, client: dict, regles_rows: list
     when = datetime.now().isoformat(timespec="seconds")
     events = [e for base in BASES for e in diff_caches(_load_cache(raw, base), caches[base], base, when)]
     fiche = data_dir(root) / "deploiements" / f"{slug}.md"
-    if "emoji" not in client:  # la routine SQL ne voit pas les icônes : on garde celle de la synchro directe
-        client = {**client, **_fiche_icon(fiche)}
+    if "emoji" not in client:  # la routine SQL ne voit pas les icônes : celle lue par l'annuaire, sinon celle déjà dans la fiche
+        icon = saved_icon(raw)
+        client = {**client, **(icon if any(icon.values()) else _fiche_icon(fiche))}
     deployment = build_deployment(config, client, regles_rows, caches)
     blocked = update_blocklist(deployment["retours"], data_dir(root) / "recette-pages.txt")
     write_fiche(deployment, fiche)

@@ -6,6 +6,7 @@ from pathlib import Path
 import yaml
 
 from deploy_hub.client_config import ConfigError, read_file
+from deploy_hub.sync_notion import ICON_FILE
 from deploy_hub.models import notion_link, Action, Deployment, Link, Regle, Remontee, ResourceInjection, RetourRecette, Stack
 
 
@@ -64,6 +65,19 @@ def _dashboards(cfg) -> list[Link]:
     return [Link(l["label"], notion_link(l["url"])) for l in (cfg.dashboards if cfg else [])]
 
 
+def _icon(fiche_dir: Path, slug: str, data: dict) -> dict:
+    """Emoji et image du client : ceux de la fiche, sinon ceux que l'annuaire a lus (sans jeton Notion, la routine de synchro
+    ne voit pas les icônes). L'image est dans data/notion/<slug>/, où la route /icones/<slug> la cherche."""
+    from deploy_hub.sync_notion import icon_fields, saved_icon
+    own = icon_fields(data)
+    return own if any(own.values()) else saved_icon(_notion_dir(fiche_dir, slug))
+
+
+def _notion_dir(fiche_dir: Path, slug: str) -> Path:
+    """data/notion/<slug>/ à côté du dossier des fiches : icône du client (icone.json, image), où /icones/<slug> la cherche."""
+    return fiche_dir.parent / "notion" / slug
+
+
 def parse_deployment(path: Path, clients_dir: Path | None = None) -> Deployment:
     """Fiche synchronisée, avec par-dessus ce qui appartient à la configuration du client (nom, logiciel, statut,
     dashboard, stacks, clés orchestrator) : une modification dans l'app s'affiche tout de suite, sans attendre la synchro."""
@@ -77,8 +91,7 @@ def parse_deployment(path: Path, clients_dir: Path | None = None) -> Deployment:
         client=cfg.client if cfg else data.get("client", path.stem),
         software=(cfg.software if cfg else "") or data.get("software", "?"),
         status=cfg.status if cfg else data.get("status", "en cours"),
-        emoji=str(data.get("emoji") or ""),
-        icone=str(data.get("icone") or ""),
+        **_icon(path.parent, path.stem, data),
         notion_url=notion_link((cfg.notion_url if cfg else "") or data.get("notion_url", "")),
         synced_at=str(data.get("synced_at", "")),
         checked_at=_checked_at(path),
@@ -116,7 +129,8 @@ class FicheSource:
         """Fiche analysée, gardée en mémoire tant que ni elle, ni son contenu de recette, ni la config du client, ni l'annuaire n'ont changé
         (le menu et chaque page relisent toutes les fiches)."""
         stamps = (self._stamp(path), self._stamp(_content_path(path)), self._stamp(_config_path(self.clients_dir, path.stem)),
-                  self._stamp(_users_path(path)), self._stamp(_checks_path(path)))
+                  self._stamp(_users_path(path)), self._stamp(_checks_path(path)),
+                  self._stamp(_notion_dir(path.parent, path.stem) / ICON_FILE))  # icône lue à part (sans jeton)
         cached = self._cache.get(path)
         if cached and cached[0] == stamps:
             return cached[1]
@@ -140,7 +154,7 @@ class FicheSource:
         return Deployment(slug=slug, client=cfg.client, software=cfg.software or "?", status=cfg.status, notion_url=notion_link(cfg.notion_url),
                           stacks=[Stack(**s) for s in cfg.stacks], drive=[Link(**l) for l in cfg.drive],
                           dashboards=_dashboards(cfg), orchestrator=cfg.orchestrator,
-                          pending=True)
+                          pending=True, **_icon(self.deployments_dir, slug, {}))
 
     def list_deployments(self) -> list[Deployment]:
         """Fiches synchronisées, et les clients configurés qui n'en ont pas encore (fiche vide, « pending »)."""

@@ -16,13 +16,14 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from deploy_hub import client_config
 from deploy_hub.client_config import is_notion, slugify
 from deploy_hub.config import PROJECT_ROOT, data_dir
 from deploy_hub.queries import ConfigError, page_id_of
 from deploy_hub.sources import ActionResult
-from deploy_hub.sources.notion_api import CLIENTS_DS
+from deploy_hub.sources.notion_api import CLIENTS_DS, icon_of
 from deploy_hub.sources.sync_routine import MCP_OUTPUT_TOKENS, NOTION_SERVERS, app_env
-from deploy_hub.sync_notion import CLAUDE_PROJECTS, saved_responses
+from deploy_hub.sync_notion import CLAUDE_PROJECTS, ICON_FILE, saved_responses
 
 DASHBOARDS_PAGE = "daf37a4f4c5b4288b0737f50442504c3"  # « Liste des dashboards pour le déploiement des nouveaux clients »
 MAX_AGE = timedelta(days=1)  # au-delà, l'annuaire est relu en fond par Jarvis
@@ -42,12 +43,48 @@ PROMPT = """Lecture seule : ne modifie rien dans Notion, n'écris aucun fichier,
    Si la réponse a 100 lignes, relance avec OFFSET 100, puis 200, etc., jusqu'à une réponse de moins de 100 lignes.
 3. Réponds seulement « fini » (ou « ÉCHEC : <raison> » si un outil a échoué).
 """
+ICONS_INSTRUCTION = "Suis la consigne reçue sur l'entrée standard (icônes des clients pour Jarvis)."
+ICONS_PROMPT = """Lecture seule : ne modifie rien dans Notion, n'écris aucun fichier.
+
+Pour chacune de ces pages, outil notion-fetch, puis écris une ligne « ICONE <adresse de la page> <icône> » : l'emoji,
+l'adresse de l'image si l'icône en est une, ou « aucune ». Réponds seulement par ces lignes.
+{urls}
+"""
+ICON_LINE = re.compile(r"^\s*ICONE\s+(\S+)\s+(\S+)\s*$", re.M)
+
+
+def answered_icons(answer: str) -> dict[str, dict]:
+    """Icônes que Claude écrit dans sa réponse (« ICONE <page> <emoji ou adresse> »), par id de page, au format de l'API ;
+    {} pour une page lue sans icône (« aucune ») : elle est notée, et pas relue. Une page sans ligne n'a pas été lue."""
+    icons = {}
+    for page, value in ICON_LINE.findall(answer or ""):
+        try:
+            key = page_id_of(page)
+        except ConfigError:
+            continue
+        if value.startswith("https://"):
+            icons[key] = {"type": "external", "external": {"url": value}}
+        elif not value.isascii() and len(value) <= 8:  # un emoji
+            icons[key] = {"type": "emoji", "emoji": value}
+        else:  # « aucune » (ou un mot) : pas d'icône
+            icons[key] = {}
+    return icons
+
+
 PAGE = re.compile(r'<page url="([^"]+)">\s*(.*?)\s*</page>', re.S)
 HEADING = re.compile(r"<h1[^>]*>\s*(.*?)\s*</h1>", re.S)
 
 
+def listing_page() -> str:
+    return os.getenv("JARVIS_NOTION_DASHBOARDS") or DASHBOARDS_PAGE
+
+
 def prompt(page: str = "") -> str:
-    return PROMPT.format(page=page or os.getenv("JARVIS_NOTION_DASHBOARDS") or DASHBOARDS_PAGE, clients=CLIENTS_DS)
+    return PROMPT.format(page=page or listing_page(), clients=CLIENTS_DS)
+
+
+def icons_prompt(urls) -> str:
+    return ICONS_PROMPT.format(urls="\n".join(f"- {u}" for u in urls))
 
 
 def name_key(text: str) -> str:
@@ -200,6 +237,8 @@ class ClientDirectory:
         self.projects = projects
         self._lock = threading.Lock()
         self._proc: subprocess.Popen | None = None
+        self._icons_thread: threading.Thread | None = None  # lecture des icônes : processus claude, puis enregistrement
+        self._icons_tried: datetime | None = None
 
     @property
     def claude_bin(self) -> str:
@@ -244,11 +283,12 @@ class ClientDirectory:
         return tried is None or tried > timedelta(minutes=10)
 
     def refresh_if_stale(self, directory: dict | None = None) -> dict:
-        """Relance la lecture si l'annuaire est à relire (boucle de fond de Jarvis, et page « Ajouter un client » en secours) ;
-        renvoie l'annuaire tel qu'il est."""
+        """Relance la lecture si l'annuaire est à relire (boucle de fond de Jarvis, et page « Ajouter un client » en secours),
+        et celle des icônes qui manquent, à part ; renvoie l'annuaire tel qu'il est."""
         directory = self.directory() if directory is None else directory
         if self.should_refresh(directory):
             self.refresh()
+        self.refresh_icons()
         return directory
 
     def refresh(self) -> ActionResult:
@@ -290,3 +330,59 @@ class ClientDirectory:
                                       "fiches": [f for f in fiches if not f["parent"]]})
         self._write("annuaire-etat.json", {"running": False, "started": started, "ok": True,
                                            "resume": f"{len({name_key(d['client']) for d in dashboards})} clients, {len(fiches)} fiches"})
+
+    # --- icônes des clients suivis : tâche à part, l'annuaire n'en est pas ralenti --------------------------------
+    def missing_icons(self) -> dict[str, tuple[str, str]]:
+        """Clients suivis dont l'icône n'a jamais été lue (pas de data/notion/<slug>/icone.json) : id de leur dashboard
+        intégration → (client, adresse). Une icône lue, même absente (« aucune »), n'est plus relue."""
+        missing = {}
+        for c in client_config.all_configs():
+            try:
+                page = page_id_of(c.notion_url)
+            except ConfigError:
+                continue
+            if not (self.folder / c.slug / ICON_FILE).is_file():
+                missing[page] = (c.slug, c.notion_url)
+        return missing
+
+    @property
+    def icons_running(self) -> bool:
+        """Lecture des icônes en cours, enregistrement compris (une image se télécharge après la réponse de Claude)."""
+        return self._icons_thread is not None and self._icons_thread.is_alive()
+
+    def refresh_icons(self) -> bool:
+        """Lit en parallèle de l'annuaire, et seulement pour les clients qui n'en ont pas, l'icône de leur dashboard
+        intégration (leur emoji : la routine de synchro ne voit pas les icônes). Pas plus d'un essai par 10 minutes."""
+        recent = self._icons_tried and datetime.now() - self._icons_tried < timedelta(minutes=10)
+        if recent or self.icons_running or not shutil.which(self.claude_bin):
+            return False
+        if not (missing := self.missing_icons()):  # lit la configuration des clients : seulement s'il peut y avoir à faire
+            return False
+        with self._lock:
+            if self.icons_running:
+                return False
+            self._icons_tried = datetime.now()
+            proc = subprocess.Popen(
+                [self.claude_bin, "-p", ICONS_INSTRUCTION, "--output-format", "text", "--permission-mode", "dontAsk",
+                 "--allowedTools", *NOTION_SERVERS],
+                cwd=PROJECT_ROOT, env=app_env(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            self._icons_thread = threading.Thread(target=self._wait_icons, args=(proc, missing), name="jarvis-icones", daemon=True)
+            self._icons_thread.start()
+        return True
+
+    def _wait_icons(self, proc: subprocess.Popen, missing: dict[str, tuple[str, str]]) -> None:
+        try:
+            out, _ = proc.communicate(icons_prompt(url for _, url in missing.values()), timeout=self.timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            return
+        self._save_icons(answered_icons(out), {page: slug for page, (slug, _) in missing.items()})
+
+    def _save_icons(self, icons: dict[str, dict], followed: dict) -> None:
+        """Icône du dashboard intégration de chaque client suivi, gardée dans data/notion/<slug>/icone.json (emoji, ou image
+        téléchargée à côté) : les pages l'affichent aussitôt, et la synchro la reporte dans la fiche."""
+        for page in icons.keys() & followed.keys():
+            folder = self.folder / followed[page]
+            found = icon_of(icons[page], folder) if icons[page] else {"emoji": "", "icone": ""}
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / ICON_FILE).write_text(json.dumps(found, ensure_ascii=False), encoding="utf-8")
