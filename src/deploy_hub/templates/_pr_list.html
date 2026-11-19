@@ -20,4 +20,7 @@
     {% else %}<tr><td colspan="7" class="muted">{{ "Liste indisponible." if error else "Aucune PR ouverte pour ce client." }}</td></tr>{% endfor %}
     </tbody>
   </table>
+  <section id="pr-history" hx-get="/deploiements/{{ d.slug }}/pr/historique" hx-trigger="load" hx-swap="outerHTML">
+    <h3>Historique</h3><p class="muted">Jarvis interroge GitHub…</p>
+  </section>
 </div>
