@@ -334,14 +334,16 @@ tbody tr:hover td { background: color-mix(in srgb, var(--bg) 60%, transparent); 
 .badge.g-todo { background: var(--pa-todo); color: var(--text); }
 .badge.g-in_progress { background: var(--pa-progress); color: var(--text); }
 .badge.g-ko { background: var(--pa-ko); color: var(--text); }
+.badge.g-other { background: transparent; color: var(--muted); border: 1px dashed var(--border); }
 .badge.g-done { background: var(--pa-done); color: var(--text); }
 .badge.g-todo::before { content: "○ "; } .badge.g-in_progress::before { content: "◐ "; }
-.badge.g-ko::before { content: "✕ "; } .badge.g-done::before { content: "✓ "; }
+.badge.g-ko::before { content: "✕ "; } .badge.g-other::before { content: "? "; } .badge.g-done::before { content: "✓ "; }
 .count { background: var(--st-ko); }
 /* Graphiques : couleurs vives pour les marques seulement */
 .seg.g-todo, .key.g-todo { background: var(--st-todo); }
 .seg.g-in_progress, .key.g-in_progress, .hbar, .tl-elapsed { background: var(--st-progress); }
 .seg.g-ko, .key.g-ko { background: var(--st-ko); }
+.seg.g-other, .key.g-other { background: var(--muted); }
 .seg.g-done, .key.g-done { background: var(--st-done); }
 .tl-mark { border-color: var(--st-progress); }
 /* Boutons */
@@ -568,6 +570,7 @@ a.wn-title:hover { color: var(--accent); }
 .kb-col.kb-todo { border-top-color: var(--st-todo); }
 .kb-col.kb-in_progress { border-top-color: var(--st-progress); }
 .kb-col.kb-ko { border-top-color: var(--st-ko); }
+.kb-col.kb-other { border-top-color: var(--muted); }
 .kb-col.kb-done { border-top-color: var(--st-done); }
 .kb-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 4px 8px; }
 .kb-head .badge { white-space: normal; }
@@ -661,6 +664,7 @@ button:disabled { opacity: .45; box-shadow: none; transform: none; }
 .retour[data-group="todo"] { border-left-color: var(--st-todo); }
 .retour[data-group="in_progress"] { border-left-color: var(--st-progress); }
 .retour[data-group="ko"] { border-left-color: var(--st-ko); }
+.retour[data-group="other"] { border-left-color: var(--muted); }
 .retour[data-group="done"] { border-left-color: var(--st-done); }
 .retour .agent summary, .retour .retour-content summary { font-weight: 600; font-size: 13px; }
 

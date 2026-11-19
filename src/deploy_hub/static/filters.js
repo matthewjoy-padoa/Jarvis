@@ -4,7 +4,7 @@
 //   sauf [data-nosort]. Une cellule peut porter data-sort (ex. date ISO) pour trier sur autre chose que son texte.
 // - Liste de cartes : data-items (sélecteur des cartes) et data-filters="Libellé:attribut,…" (attributs data-* des cartes),
 //   data-sorts="Libellé:attribut,…" pour un menu de tri. Un attribut « a|b » porte plusieurs valeurs (ex. responsables).
-// - Lignes ou cartes avec data-group (todo, in_progress, ko, done) : filtre « Groupe » ajouté automatiquement.
+// - Lignes ou cartes avec data-group (todo, in_progress, ko, other, done) : filtre « Groupe » ajouté automatiquement.
 // - Graphiques : un élément [data-filter-set="clé=valeur;clé=valeur"] applique ces filtres au clic (re-clic : retire) ;
 //   avec [data-filter-href], il ouvre cette page, filtres passés dans l'ancre (#clé=valeur&clé=valeur).
 // - Recherche : sans accents ni majuscules, tous les mots doivent être présents ; elle lit aussi le groupe (« terminé »),
@@ -20,7 +20,7 @@
 (function () {
   const collator = new Intl.Collator("fr", { numeric: true, sensitivity: "base" });
   const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
-  const GROUPS = { todo: "À faire", in_progress: "En cours", ko: "KO", done: "Terminé" };
+  const GROUPS = { todo: "À faire", in_progress: "En cours", ko: "KO", other: "À classer", done: "Terminé" };
   const blocks = []; // { keys: {clé: <select>}, apply, bar }
   const fold = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const isClient = (k) => k.toLowerCase() === "client"; // « client » ou en-tête « Client »

@@ -84,9 +84,10 @@ REGLES_PROPERTIES = {
 RECETTE_STATUTS = (
     "À faire", "INTE - Prio déploiement", "INTE - En cours", "INTE - Post déploiement", "INTE - En attente donnée client",
     "INTE - Fixed : à réinjecter", "INTE - En attente d'injection", "INTE - Vérifié en INTEGRATION", "INTE - Ancien retour - OK",
+    "INTE - Fait > à faire en prod", "INTE - 🤔 Besoin clarification retour", "INTE - 🪪 Besoin matricule d'exemple", "INTE - 🤷‍♂️ Absence de commentaire de retour",
     "OPS - À vérifier avec le client", "OPS - En attente décision client", "OPS - À faire directement en front Padoa",
-    "OPS - Validation à faire en INTEGRATION", "OPS - Validation à faire en SNAP", "OPS - Vérifié en INTEGRATION",
-    "OPS - Vérifié en SNAP", "OPS - Vérifié et pas OK", "OPS - Paramétrage Admin Panel", "PRODUIT - Demande amélioration",
+    "OPS - Validation à faire en INTEGRATION", "OPS - Validation à faire en SNAP", "OPS - Validation à faire en prod",
+    "OPS - Vérifié en INTEGRATION", "OPS - Vérifié en SNAP", "OPS - Vérifié et pas OK", "OPS - Paramétrage Admin Panel", "PRODUIT - Demande amélioration",
     "Non vérifié", "Non vérifié par le client", "Non vérifié par le client sans motif", "A revoir", "Action identifiée",
     "Validé", "Validé avec commentaire", "terminé", "Abandonné", "Doublon", "Non concerné",
 )

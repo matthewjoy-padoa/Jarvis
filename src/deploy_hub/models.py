@@ -10,6 +10,7 @@ from datetime import date, datetime
 from urllib.parse import quote
 
 TODO, IN_PROGRESS, KO, DONE = "todo", "in_progress", "ko", "done"
+OTHER = "other"  # statut inconnu (retours de recette) : « À classer »
 
 # Notion « Actions de déploiement » → « Statut intégration - Injections ».
 INJECTION_STATUSES = {
@@ -40,34 +41,52 @@ ACTION_STATUSES = {
     "Non concerné": DONE,
 }
 
-# Notion « Retours Recette » → « Statut » (options génériques seulement).
+# Notion « Retours Recette » → « Statut » (options génériques seulement) : la colonne dit chez qui est la balle.
+# À faire : l'Inté doit agir ; en cours : on attend quelqu'un d'autre (OPS, client, produit) ; KO ; terminé.
+# Tout autre statut (« Autre » : texte libre saisi à la place d'un statut) va dans « À classer » (OTHER).
 RETOUR_STATUSES = {
     "À faire": TODO,
     "INTE - Prio déploiement": TODO,
-    "INTE - En cours": IN_PROGRESS,
+    "INTE - En cours": TODO,
+    "INTE - Post déploiement": TODO,
+    "INTE - Fixed : à réinjecter": TODO,
+    "INTE - En attente d'injection": TODO,
+    "INTE - Fait > à faire en prod": TODO,
+    "A revoir": TODO,
+    "INTE - En attente donnée client": IN_PROGRESS,
     "INTE - 🤔 Besoin clarification retour": IN_PROGRESS,
     "INTE - 🪪 Besoin matricule d'exemple": IN_PROGRESS,
-    "INTE - En attente donnée client": IN_PROGRESS,
-    "INTE - Fixed : à réinjecter": IN_PROGRESS,
-    "INTE - En attente d'injection": IN_PROGRESS,
-    "INTE - Post déploiement": TODO,
+    "INTE - 🤷‍♂️ Absence de commentaire de retour": IN_PROGRESS,
     "OPS - À vérifier avec le client": IN_PROGRESS,
+    "OPS - En attente décision client": IN_PROGRESS,
     "OPS - Validation à faire en INTEGRATION": IN_PROGRESS,
+    "OPS - Validation à faire en SNAP": IN_PROGRESS,
+    "OPS - Validation à faire en prod": IN_PROGRESS,
+    "OPS - À faire directement en front Padoa": IN_PROGRESS,
+    "OPS - Paramétrage Admin Panel": IN_PROGRESS,
+    "PRODUIT - Demande amélioration": IN_PROGRESS,
+    "Non vérifié": IN_PROGRESS,
+    "Non vérifié par le client": IN_PROGRESS,
     "OPS - Vérifié et pas OK": KO,
     "INTE - Vérifié en INTEGRATION": DONE,
+    "INTE - Ancien retour - OK": DONE,
     "OPS - Vérifié en INTEGRATION": DONE,
+    "OPS - Vérifié en SNAP": DONE,
     "Validé": DONE,
+    "Validé avec commentaire": DONE,
+    "terminé": DONE,
     "Abandonné": DONE,
     "Doublon": DONE,
     "Non concerné": DONE,
+    "Non vérifié par le client sans motif": DONE,
 }
 
 
-GROUP_LABELS = {TODO: "À faire", IN_PROGRESS: "En cours", KO: "KO", DONE: "Terminé"}
+GROUP_LABELS = {TODO: "À faire", IN_PROGRESS: "En cours", KO: "KO", OTHER: "À classer", DONE: "Terminé"}
 
 
 def kanban_columns(cards: list[tuple], statuses: dict[str, str]) -> list[dict]:
-    """Vue kanban : une colonne par statut présent, (fiche, élément) dedans. Ordre : à faire, en cours, KO, terminé,
+    """Vue kanban : une colonne par statut présent, (fiche, élément) dedans. Ordre : à faire, en cours, KO, à classer, terminé,
     puis l'ordre des options Notion dans chaque groupe ; un statut hors liste va dans son groupe, en fin."""
     order = list(GROUP_LABELS)
     known = list(statuses)
@@ -90,13 +109,14 @@ def notion_link(url: str) -> str:
     return f"https://app.notion.com/p/{match.group(1)}" if match else url
 
 
-def status_group(status: str, statuses: dict[str, str]) -> str:
-    return statuses.get(status, TODO)
+def status_group(status: str, statuses: dict[str, str], unknown: str = TODO) -> str:
+    return statuses.get(status, unknown)
 
 
 def group_counts(groups: list[str]) -> dict[str, int]:
-    """Nombre d'éléments par groupe de statut, dans l'ordre à faire, en cours, KO, terminé."""
-    return {g: groups.count(g) for g in GROUP_LABELS}
+    """Nombre d'éléments par groupe de statut, dans l'ordre à faire, en cours, KO, (à classer,) terminé.
+    « À classer » n'apparaît que s'il compte au moins un élément : seuls les retours en ont."""
+    return {g: groups.count(g) for g in GROUP_LABELS if g != OTHER or OTHER in groups}
 
 
 @dataclass
@@ -195,7 +215,7 @@ class RetourRecette:
 
     @property
     def group(self) -> str:
-        return status_group(self.status, RETOUR_STATUSES)
+        return status_group(self.status, RETOUR_STATUSES, OTHER)
 
     @property
     def is_open(self) -> bool:
@@ -402,7 +422,7 @@ class Deployment:
     @property
     def injection_groups(self) -> dict[str, int]:
         if self.injection_counts:
-            counts = {g: 0 for g in GROUP_LABELS}
+            counts = {g: 0 for g in GROUP_LABELS if g != OTHER}
             for status, n in self.injection_counts.items():
                 counts[status_group(status, INJECTION_STATUSES)] += n
             return counts
