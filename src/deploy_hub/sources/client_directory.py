@@ -25,7 +25,9 @@ from deploy_hub.sources.sync_routine import MCP_OUTPUT_TOKENS, NOTION_SERVERS, a
 from deploy_hub.sync_notion import CLAUDE_PROJECTS, saved_responses
 
 DASHBOARDS_PAGE = "daf37a4f4c5b4288b0737f50442504c3"  # « Liste des dashboards pour le déploiement des nouveaux clients »
-MAX_AGE = timedelta(days=1)  # au-delà, l'annuaire est relu en arrière-plan à l'ouverture de « Ajouter un client »
+MAX_AGE = timedelta(days=1)  # au-delà, l'annuaire est relu en fond par Jarvis
+FORMAT = 2  # version du contenu de annuaire.json : un annuaire d'une autre version est relu aussitôt (2 : liens complets)
+WORKSPACE = os.getenv("JARVIS_NOTION_WORKSPACE") or "padoa"  # espace de travail Notion, dans les liens complets
 FAMILIES = {"deploiement": "Déploiement", "integration": "Intégration", "formation": "Formation",
             "gestion_financiere": "Gestion financière"}
 # Titre de section (h1) de la page → famille ; les sections non listées (tests, refresher) sont ignorées.
@@ -66,6 +68,17 @@ def client_of(title: str) -> str:
     return parts[1].strip() if len(parts) == 2 else ""
 
 
+def full_link(title: str, url: str) -> str:
+    """Lien complet d'une page Notion, comme « Copier le lien » : https://app.notion.com/p/<espace>/<Titre>-<id> (Notion
+    remplace dans le titre tout ce qui n'est pas lettre ou chiffre sans accent par « - »). La lecture ne donne que l'id."""
+    try:
+        page = page_id_of(url)
+    except ConfigError:
+        return url
+    words = re.sub(r"-{2,}", "-", re.sub(r"[^A-Za-z0-9]", "-", title or "")).strip("-")
+    return f"https://app.notion.com/p/{WORKSPACE}/{words}-{page}" if words else f"https://app.notion.com/p/{WORKSPACE}/{page}"
+
+
 def dashboards_of(page_text: str) -> list[dict]:
     """Dashboards de la page, dans l'ordre : {famille, client, titre, url}. Les modèles (« Nom du Client ») sont ignorés."""
     found, family = [], None
@@ -78,7 +91,7 @@ def dashboards_of(page_text: str) -> list[dict]:
         url, title = match.group(1), " ".join(match.group(2).split())
         client = client_of(title)
         if family and client and is_notion(url) and "nom du client" not in client.lower() and name_key(client):
-            found.append({"famille": family, "client": client, "titre": title, "url": url})
+            found.append({"famille": family, "client": client, "titre": title, "url": full_link(title, url)})
     return found
 
 
@@ -94,7 +107,8 @@ def _has_parent(value) -> bool:
 
 def fiches_of(rows: list) -> list[dict]:
     """Lignes de « Clients en déploiement » : {nom, url, parent} (parent : sous-élément d'une autre fiche)."""
-    return [{"nom": str(r.get("Nom") or "").strip(), "url": r["url"], "parent": _has_parent(r.get("élément parent"))}
+    return [{"nom": str(r.get("Nom") or "").strip(), "url": full_link(str(r.get("Nom") or ""), r["url"]),
+             "parent": _has_parent(r.get("élément parent"))}
             for r in rows if isinstance(r, dict) and isinstance(r.get("url"), str) and str(r.get("Nom") or "").strip()]
 
 
@@ -130,10 +144,7 @@ def form_of(entry: dict, orchestrator_keys=()) -> dict:
     main = [f for f in entry.get("fiches", []) if not f["parent"]]
     exact = [f for f in main if fiche_key(f["nom"]) == entry["cle"]]  # « Déploiement Acme » pour « Acme »
     chosen = exact if len(exact) == 1 else main
-    try:
-        page_id = page_id_of(chosen[0]["url"]) if len(chosen) == 1 else ""
-    except ConfigError:
-        page_id = ""
+    page_id = chosen[0]["url"] if len(chosen) == 1 else ""  # lien complet : le formulaire n'en garde que l'id
     keys = [k for k in sorted(orchestrator_keys) if name_key(k).startswith(entry["cle"])]
     return {"client": entry["client"], "slug": entry["cle"][:40], "page_id": page_id, "orchestrator": ", ".join(keys),
             "notion_url": integration[0]["url"] if integration else "",
@@ -226,7 +237,8 @@ class ClientDirectory:
     def should_refresh(self, directory: dict) -> bool:
         """Annuaire absent ou de plus d'un jour, aucune lecture en cours, et pas de tentative dans les 10 dernières minutes
         (une lecture qui échoue, ou Claude Code absent, n'est pas relancée chaque minute)."""
-        if self.running or ((read := _age(directory.get("lu"))) is not None and read <= MAX_AGE):
+        read = _age(directory.get("lu")) if directory.get("format") == FORMAT else None  # autre format : comme jamais lu
+        if self.running or (read is not None and read <= MAX_AGE):
             return False
         tried = _age(self.state().get("started"))  # lu seulement quand l'annuaire est à relire
         return tried is None or tried > timedelta(minutes=10)
@@ -274,7 +286,7 @@ class ClientDirectory:
         if not dashboards:
             return self._write("annuaire-etat.json", {"running": False, "started": started,
                                                       "error": "Aucun dashboard client trouvé sur la page Notion."})
-        self._write("annuaire.json", {"lu": datetime.now().isoformat(timespec="seconds"), "clients": build(dashboards, fiches),
+        self._write("annuaire.json", {"format": FORMAT, "lu": datetime.now().isoformat(timespec="seconds"), "clients": build(dashboards, fiches),
                                       "fiches": [f for f in fiches if not f["parent"]]})
         self._write("annuaire-etat.json", {"running": False, "started": started, "ok": True,
                                            "resume": f"{len({name_key(d['client']) for d in dashboards})} clients, {len(fiches)} fiches"})
