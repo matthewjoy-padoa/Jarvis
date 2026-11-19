@@ -13,23 +13,23 @@
   --brand-grad: linear-gradient(100deg, #3333eb 0%, #2f8fe8 40%, #0b7fb5 70%, #3333eb 100%);
   color-scheme: light;
 }
-/* Mode nuit : le marine du logo en fond, le cyan en accent ; statuts revalidés sur la surface sombre. */
+/* Mode nuit « Marine doux » (2026-11-19) : marine et cyan du logo, désaturés pour ne plus agresser l'œil ; statuts adoucis. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #001235; --surface: #0b1d40; --text: #e6eefb; --muted: #9fb0cc; --border: #1f3561;
-    --accent: #5ce1ff; --accent-soft: #123a5c; --on-accent: #001235; --cyan: #5ce1ff; --on-status: #001235;
-    --st-todo: #e0a422; --st-progress: #5ce1ff; --st-ko: #ff6b81; --st-done: #4cc985;
-    --pa-todo: rgba(224, 164, 34, .22); --pa-progress: rgba(92, 225, 255, .18); --pa-ko: rgba(255, 107, 129, .22); --pa-done: rgba(76, 201, 133, .22);
-    --brand-grad: linear-gradient(100deg, #8fa8ff 0%, #5ce1ff 40%, #b8f2ff 70%, #8fa8ff 100%);
+    --bg: #0f1a2e; --surface: #172440; --text: #d6e0f0; --muted: #8d9bb5; --border: #26365a;
+    --accent: #7cc3dc; --accent-soft: #1d3a55; --on-accent: #0f1a2e; --cyan: #7cc3dc; --on-status: #0f1a2e;
+    --st-todo: #d6aa50; --st-progress: #7cc3dc; --st-ko: #e6808f; --st-done: #6cbf8e;
+    --pa-todo: rgba(214, 170, 80, .2); --pa-progress: rgba(124, 195, 220, .18); --pa-ko: rgba(230, 128, 143, .2); --pa-done: rgba(108, 191, 142, .2);
+    --brand-grad: linear-gradient(100deg, #9aaee8 0%, #7cc3dc 40%, #b4dbe8 70%, #9aaee8 100%);
     --shadow: none; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #001235; --surface: #0b1d40; --text: #e6eefb; --muted: #9fb0cc; --border: #1f3561;
-  --accent: #5ce1ff; --accent-soft: #123a5c; --on-accent: #001235; --cyan: #5ce1ff; --on-status: #001235;
-  --st-todo: #e0a422; --st-progress: #5ce1ff; --st-ko: #ff6b81; --st-done: #4cc985;
-  --pa-todo: rgba(224, 164, 34, .22); --pa-progress: rgba(92, 225, 255, .18); --pa-ko: rgba(255, 107, 129, .22); --pa-done: rgba(76, 201, 133, .22);
-  --brand-grad: linear-gradient(100deg, #8fa8ff 0%, #5ce1ff 40%, #b8f2ff 70%, #8fa8ff 100%);
+  --bg: #0f1a2e; --surface: #172440; --text: #d6e0f0; --muted: #8d9bb5; --border: #26365a;
+  --accent: #7cc3dc; --accent-soft: #1d3a55; --on-accent: #0f1a2e; --cyan: #7cc3dc; --on-status: #0f1a2e;
+  --st-todo: #d6aa50; --st-progress: #7cc3dc; --st-ko: #e6808f; --st-done: #6cbf8e;
+  --pa-todo: rgba(214, 170, 80, .2); --pa-progress: rgba(124, 195, 220, .18); --pa-ko: rgba(230, 128, 143, .2); --pa-done: rgba(108, 191, 142, .2);
+  --brand-grad: linear-gradient(100deg, #9aaee8 0%, #7cc3dc 40%, #b4dbe8 70%, #9aaee8 100%);
   --shadow: none; color-scheme: dark;
 }
 :root[data-theme="light"] { color-scheme: light; }
