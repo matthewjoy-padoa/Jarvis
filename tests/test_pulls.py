@@ -136,7 +136,7 @@ def test_history_lists_the_client_merged_and_closed_prs_newest_first():
         "acme in:title": [done(1, "[FIX](acme) Ancienne", ended="2026-09-01T10:00:00Z"), done(2, "[FEAT](acme) Fermée", "CLOSED"),
                           pr(3, "[FIX](acme) Encore ouverte", state="OPEN"), done(4, "[FIX](acmeplus) Autre client au nom proche")],
         "acme-sst in:title": [done(5, "[FIX](autre, ACME-SST) Deux clients", ended="2026-11-02T10:00:00Z")]})
-    prs, error = store.history("acme", ["acme-sst"], {"uegar"}, set())
+    prs, error = store.history("acme", ["acme-sst"], set(), softwares={"uegar"})
     assert not error and [(p.number, p.why) for p in prs] == [(5, "client"), (2, "client"), (1, "client")]
     assert [p.outcome[0] for p in prs] == ["fusionnée", "fermée sans fusion", "fusionnée"]
     assert queries == ["acme in:title", "acme-sst in:title"]  # sans date : rien sur le logiciel
@@ -147,9 +147,21 @@ def test_history_can_add_the_software_prs_merged_since_the_data_arrived():
         "acme in:title": [done(1, "[FIX](acme) Client")],
         "uegar in:title is:merged merged:>=2026-09-15": [done(2, "[FIX](uegar) Requête commune", ended="2026-11-01T10:00:00Z"),
                                                          done(3, "[FIX](uegar) Fermée", "CLOSED"), done(1, "[FIX](acme) Client")]})
-    prs, _ = store.history("acme", [], {"uegar"}, set(), since=date(2026, 9, 15))
+    prs, _ = store.history("acme", [], set(), since=date(2026, 9, 15), softwares={"uegar"})
     assert [(p.number, p.why) for p in prs] == [(2, "logiciel"), (1, "client")]  # la PR du client reste « client »
     assert "uegar in:title is:merged merged:>=2026-09-15" in queries
+
+
+def test_common_prs_are_a_separate_display_option():
+    store, queries = searching({
+        "acme in:title": [done(1, "[FIX](acme) Client", ended="2026-10-01T10:00:00Z")],
+        "all in:title is:merged merged:>=2026-09-15": [done(2, "[FIX](all) Commune à tous", ended="2026-11-01T10:00:00Z"),
+                                                       done(3, "[FIX](allianz) Autre client au nom proche")]})
+    without = store.history("acme", [], set(), since=date(2026, 9, 15), softwares={"uegar"})[0]
+    assert [p.number for p in without] == [1] and not any(q.startswith("all ") for q in queries)
+    prs = store.history("acme", [], set(), since=date(2026, 9, 15), common=True)[0]
+    assert [(p.number, p.why) for p in prs] == [(2, "commune"), (1, "client")]
+    assert store.history("acme", [], set(), common=True)[0] == [prs[1]]  # sans date de réception : rien de commun
 
 
 def test_history_reads_an_agent_pr_by_its_link_and_reports_a_gh_failure():
@@ -159,10 +171,10 @@ def test_history_reads_an_agent_pr_by_its_link_and_reports_a_gh_failure():
     def gh(directory, command):
         calls.append(command[:3])
         return json.dumps(done(9, "Titre sans la clé du client") if command[2] == "view" else [])
-    prs = PullRequests("/nulle/part", gh).history("acme", [], set(), {agent})[0]
+    prs = PullRequests("/nulle/part", gh).history("acme", [], {agent})[0]
     assert [(p.number, p.why) for p in prs] == [(9, "agent")] and ("gh", "pr", "view") in calls
     failing = PullRequests("/nulle/part", lambda d, c: (_ for _ in ()).throw(subprocess.CalledProcessError(1, "gh", stderr="rate limit")))
-    assert failing.history("acme", [], set(), set()) == ([], "`gh pr list` a échoué : rate limit")
+    assert failing.history("acme", [], set()) == ([], "`gh pr list` a échoué : rate limit")
 
 
 def test_the_software_comes_from_the_fiche_and_the_dag_catalogue(tmp_path):
@@ -181,9 +193,10 @@ def test_the_pr_tab_shows_the_history_and_the_software_switch(monkeypatch):
     assert 'hx-get="/deploiements/client-demo/pr/historique"' in client.get("/deploiements/client-demo/pr/liste").text
     html = client.get("/deploiements/client-demo/pr/historique").text
     assert ">#7</a>" in html and "Codes AMT" not in html and "fusionnée" in html and "05/10/2026" in html
-    assert "Inclure les PR du logiciel (<code>preventiel</code>) fusionnées depuis la réception des données (15/09/2026)" in html
+    assert "Ajouter les PR fusionnées depuis la réception des données (15/09/2026)" in html and "du logiciel (<code>preventiel</code>)" in html
     html = client.get("/deploiements/client-demo/pr/historique?logiciel=true").text
     assert "Codes AMT" in html and ">logiciel</span>" in html and " checked" in html
+    assert 'name="tous"' in html and "communes à tous les clients" in html
 
 
 def test_without_a_data_reception_date_the_software_switch_is_off(monkeypatch):

@@ -1,11 +1,17 @@
+{% set why_titles = {"agent": "PR ouverte par un agent lancé pour ce client",
+                     "logiciel": "PR du logiciel du client, fusionnée depuis la réception de ses données",
+                     "commune": "PR commune à tous les clients (scope all), fusionnée depuis la réception de ses données"} %}
 <section id="pr-history">
   <h3>Historique</h3>
   <p class="muted">PR fusionnées ou fermées de l'orchestrator dont le scope du titre est ce client{% if d.orchestrator %} ({% for c in d.orchestrator %}<code>{{ c }}</code>{{ ", " if not loop.last }}{% endfor %}){% endif %}, ou ouvertes par un de ses agents.
-    <label class="pr-software"{% if not since %} title="Date de réception des données absente de la fiche Notion"{% endif %}>
-      <input type="checkbox" name="logiciel" value="true"{{ " checked" if logiciel }}{{ " disabled" if not since or not softwares }}
-             hx-get="/deploiements/{{ d.slug }}/pr/historique" hx-target="#pr-history" hx-swap="outerHTML">
-      Inclure les PR du logiciel{% if softwares %} ({% for s in softwares %}<code>{{ s }}</code>{{ ", " if not loop.last }}{% endfor %}){% endif %} fusionnées depuis la réception des données{% if since %} ({{ since.strftime("%d/%m/%Y") }}){% else %} (date absente de la fiche){% endif %}
-    </label></p>
+  </p>
+  <form class="pr-options" hx-get="/deploiements/{{ d.slug }}/pr/historique" hx-trigger="change" hx-target="#pr-history" hx-swap="outerHTML">
+    <span class="muted">Ajouter les PR fusionnées depuis la réception des données{% if since %} ({{ since.strftime("%d/%m/%Y") }}){% else %} (date absente de la fiche){% endif %} :</span>
+    <label><input type="checkbox" name="logiciel" value="true"{{ " checked" if logiciel and since }}{{ " disabled" if not since or not softwares }}>
+      du logiciel{% if softwares %} ({% for s in softwares %}<code>{{ s }}</code>{{ ", " if not loop.last }}{% endfor %}){% endif %}</label>
+    <label><input type="checkbox" name="tous" value="true"{{ " checked" if tous and since }}{{ " disabled" if not since }}>
+      communes à tous les clients (<code>all</code>)</label>
+  </form>
   {% if error %}<p class="result ko">{{ error | reglages }}</p>{% endif %}
   <table>
     <thead><tr><th>PR</th><th>Titre</th><th>Auteur</th><th>État</th><th title="Date de fusion ou de fermeture">Le</th></tr></thead>
@@ -14,7 +20,7 @@
       {% set label, group = pr.outcome %}
       <tr data-ticket-card title="Ouvrir la PR #{{ pr.number }} dans GitHub">
         <td><a class="row-link" href="{{ pr.url }}" target="_blank" rel="noopener" data-row-link>#{{ pr.number }}</a></td>
-        <td>{{ pr.title }}{% if pr.why != "client" %} <span class="badge" title="{{ 'PR ouverte par un agent lancé pour ce client' if pr.why == 'agent' else 'PR du logiciel du client, fusionnée depuis la réception de ses données' }}">{{ pr.why }}</span>{% endif %}<br><code class="muted">{{ pr.branch }}</code></td>
+        <td>{{ pr.title }}{% if pr.why != "client" %} <span class="badge" title="{{ why_titles[pr.why] }}">{{ pr.why }}</span>{% endif %}<br><code class="muted">{{ pr.branch }}</code></td>
         <td>{{ pr.author }}</td>
         <td><span class="badge g-{{ group }}">{{ label }}</span></td>
         <td data-sort="{{ pr.ended.isoformat() if pr.ended else '' }}">{{ pr.ended.strftime("%d/%m/%Y") if pr.ended else "" }}</td>

@@ -878,13 +878,14 @@ def deployment_pulls(request: Request, slug: str, frais: bool = False):
 
 
 @app.get("/deploiements/{slug}/pr/historique", response_class=HTMLResponse)
-def deployment_pull_history(request: Request, slug: str, logiciel: bool = False, frais: bool = False):
-    """PR fusionnées ou fermées du client ; logiciel : avec celles de son logiciel fusionnées depuis la réception de ses données."""
+def deployment_pull_history(request: Request, slug: str, logiciel: bool = False, tous: bool = False, frais: bool = False):
+    """PR fusionnées ou fermées du client ; options d'affichage, depuis la réception de ses données : PR de son logiciel
+    (logiciel) et PR communes à tous les clients (tous)."""
     d = _get(slug)
     since, softwares = d.milestones.get("reception_donnees"), _softwares(d)
-    prs, error = pulls.history(d.slug, d.orchestrator, softwares, _agent_pr_urls(slug), since if logiciel else None, frais)
+    prs, error = pulls.history(d.slug, d.orchestrator, _agent_pr_urls(slug), since, softwares if logiciel else set(), tous, frais)
     return templates.TemplateResponse(request, "_pr_history.html", {"d": d, "prs": prs, "error": error, "since": since,
-                                                                    "softwares": sorted(softwares), "logiciel": logiciel and bool(since)})
+                                                                    "softwares": sorted(softwares), "logiciel": logiciel, "tous": tous})
 
 
 @app.get("/deploiements/{slug}/{tab}", response_class=HTMLResponse)

@@ -31,6 +31,7 @@ DETAILS = "reviewDecision,reviewRequests,statusCheckRollup"  # gh pr view <numé
 TTL = 300  # secondes
 SCOPE = re.compile(r"\]\(([^)]+)\)")
 SPLIT = re.compile(r"[,;/+&]")
+COMMON = "all"  # scope des PR qui touchent tous les clients : `[FIX](all) …`
 RED, PENDING, GREEN, NO_CI, UNKNOWN = "rouge", "en cours", "verte", "aucune", "inconnue"
 CI_GROUPS = {RED: KO, PENDING: IN_PROGRESS, GREEN: DONE, NO_CI: TODO, UNKNOWN: TODO}
 FAILED = {"FAILURE", "ERROR", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE"}
@@ -188,21 +189,23 @@ class PullRequests:
         """PR d'un agent, lue par son lien : son titre peut ne pas porter la clé du client."""
         return self._ended(url, ("gh", "pr", "view", url, "--json", ENDED), fresh)
 
-    def history(self, slug: str, customers: list[str], softwares: set[str], agent_urls: set[str], since: date | None = None,
-                fresh: bool = False) -> tuple[list[PullRequest], str]:
+    def history(self, slug: str, customers: list[str], agent_urls: set[str], since: date | None = None,
+                softwares: set[str] = frozenset(), common: bool = False, fresh: bool = False) -> tuple[list[PullRequest], str]:
         """PR fusionnées ou fermées du client (scope du titre = sa clé ou son slug, ou PR d'un de ses agents), les plus
-        récentes d'abord. since : ajoute les PR fusionnées depuis cette date dont le scope est un de ses logiciels."""
+        récentes d'abord. Avec since, en option, les PR fusionnées depuis cette date qui l'impactent aussi : scope = un de ses
+        logiciels (softwares), ou scope `all`, communes à tous les clients (common)."""
         keys = client_keys(slug, customers)
-        softwares = softwares if since else set()
+        impacts = ([(n, "logiciel") for n in sorted(softwares)] + ([(COMMON, "commune")] if common else [])) if since else []
         reads = ([(lambda k=k: self.search(f"{k} in:title", fresh), lambda p: p.scopes & keys, "client") for k in sorted(keys)]
                  + [(lambda u=u: self._agent_pr(u, fresh), lambda p: True, "agent") for u in sorted(agent_urls)]
                  + [(lambda n=n: self.search(f"{n} in:title is:merged merged:>={since.isoformat()}", fresh),
-                     lambda p: p.state == "MERGED" and p.scopes & softwares and not p.scopes & keys, "logiciel") for n in sorted(softwares)])
+                     lambda p, n=n: p.state == "MERGED" and n in p.scopes, why)  # seulement les PR de ce scope
+                    for n, why in impacts])
         with ThreadPoolExecutor(max_workers=8) as pool:  # recherches indépendantes, en parallèle
             results = list(pool.map(lambda read: read[0](), reads))
         found: dict[int, PullRequest] = {}
         error = ""
-        for (_, keep, why), (prs, failed) in zip(reads, results):  # dans l'ordre : client, puis agent, puis logiciel
+        for (_, keep, why), (prs, failed) in zip(reads, results):  # dans l'ordre : client, agent, logiciel, commune
             error = error or failed
             for p in prs:
                 if p.state != "OPEN" and p.number not in found and keep(p):
