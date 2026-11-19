@@ -201,7 +201,7 @@ def test_filters_script_searches_without_accents_and_offers_hidden_matches():
     js = client.get("/static/filters.js").text
     assert 'normalize("NFD")' in js and "data-out" in js and "more-out" in js
     assert "filters-toggle" in js and "data-fold-filters" in js  # menus déroulants derrière « Filtres » sur la fiche
-    assert "filters.js?v=9" in client.get("/actions").text
+    assert "filters.js?v=10" in client.get("/actions").text
 
 
 def test_each_filter_accepts_several_values():
@@ -609,3 +609,14 @@ def test_structured_questions_offer_their_options_with_the_recommendation_checke
     follow_up = claude.runs[0]
     assert answered.headers["HX-Redirect"] == f"/agents/{follow_up.id}"
     assert "Question 1 : Corriger côté client ou logiciel ?\nCopie client en `a.sql:40`.\nRéponse : option « client »" in follow_up.prompt
+
+
+def test_retour_statuses_put_the_ball_where_it_is():
+    """« À faire » = ce que l'Inté doit faire ; un statut inconnu (« Autre ») va dans « À classer », plus dans « À faire »."""
+    from deploy_hub.models import DONE, IN_PROGRESS, OTHER, TODO, RetourRecette, group_counts
+    group = lambda s: RetourRecette(id="X", status=s).group
+    assert [group(s) for s in ("À faire", "INTE - En cours", "INTE - Fait > à faire en prod")] == [TODO] * 3
+    assert [group(s) for s in ("INTE - En attente donnée client", "OPS - Validation à faire en SNAP", "Non vérifié par le client")] == [IN_PROGRESS] * 3
+    assert [group(s) for s in ("INTE - Ancien retour - OK", "OPS - Vérifié en SNAP", "terminé")] == [DONE] * 3
+    assert group("Autre") == group("Action identifiée") == OTHER
+    assert OTHER not in group_counts([TODO, DONE]) and group_counts([OTHER])[OTHER] == 1
