@@ -208,7 +208,8 @@ DEPLOYMENT_TABS = [
 
 
 def _deployments(request: Request) -> list[Deployment]:
-    """Toutes les fiches, lues une seule fois par requête (menu et contenu de la page partagent la même liste)."""
+    """Fiches des clients suivis (les archivés n'y sont pas), lues une seule fois par requête (menu et contenu de la page
+    partagent la même liste)."""
     if not hasattr(request.state, "deployments"):
         request.state.deployments = fiches.list_deployments()
     return request.state.deployments
@@ -221,7 +222,8 @@ def _closest_go_live(d: Deployment) -> tuple:
 
 
 def _current(request: Request) -> Deployment | None:
-    """Client en cours : celui du cookie (dernière fiche ouverte), sinon le déploiement le plus proche."""
+    """Client en cours : celui du cookie (dernière fiche ouverte), sinon le déploiement le plus proche. Jamais un client
+    archivé : archiver le client en cours passe au suivant."""
     if not hasattr(request.state, "current"):
         deployments = _deployments(request)
         slug = request.cookies.get(CLIENT_COOKIE)
@@ -398,11 +400,14 @@ def whats_new(request: Request, depuis: str = "", client: str = ""):
 
 
 @app.get("/clients", response_class=HTMLResponse)
-def index(request: Request, enregistre: str = "", retire: str = ""):
+def index(request: Request, enregistre: str = "", retire: str = "", archive: str = "", desarchive: str = ""):
     everyone = _deployments(request)
     deployments = [d for d in everyone if not d.pending]  # cartes : clients synchronisés
     pending = [c for d in everyone if d.pending and (c := client_config.load(d.slug))]  # configurés, pas encore synchronisés
-    return _render(request, "index.html", "/clients", deployments=deployments, pending=pending, saved=enregistre, retired=retire)
+    archived = sorted(fiches.archived_deployments(), key=lambda d: d.client.lower())
+    names = {d.slug: d.client for d in everyone + archived}  # les messages nomment le client, pas son identifiant
+    return _render(request, "index.html", "/clients", deployments=deployments, pending=pending, archived=archived, saved=enregistre,
+                   retired=retire, archived_now=names.get(archive, archive), restored=names.get(desarchive, desarchive))
 
 
 def _client_form(request: Request, cfg, error: str = "", new: bool = True, form: dict | None = None, notice: str = "",
@@ -415,7 +420,8 @@ def _client_form(request: Request, cfg, error: str = "", new: bool = True, form:
     fiches = list({f["url"]: f for f in chosen.get("fiches", []) + directory.get("fiches", [])}.values())  # les siennes d'abord
     return _render(request, "client_form.html", "/clients", cfg=cfg, error=error, new=new, form=form or {}, suggestions=keys,
                    notice=notice, directory=directory, followed=followed, chosen=chosen, fiches=fiches,
-                   annuaire=client_directory.state() if new else {})
+                   annuaire=client_directory.state() if new else {},
+                   archivable=not new and client_config.exists(cfg.slug))  # fiche sans configuration : rien à archiver
 
 
 @app.get("/clients/nouveau", response_class=HTMLResponse)
@@ -515,6 +521,8 @@ async def client_save(request: Request, background: BackgroundTasks):
     existing = (form.get("existing_slug") or "").strip() or None
     try:
         cfg = client_config.from_form(form, existing)
+        if existing and (previous := client_config.load(existing)):  # le formulaire ne porte pas l'archivage : il est gardé
+            cfg = dataclasses.replace(cfg, archived=previous.archived, archived_at=previous.archived_at)
         client_config.save(cfg, new=existing is None)
     except client_config.ConfigError as e:
         return _client_form(request, _config_or_fiche(existing)[0] if existing else None, str(e), new=existing is None, form=form)
@@ -532,6 +540,29 @@ def _sync_new_client(slug: str, background: BackgroundTasks) -> None:
         background.add_task(_refresh, [slug])
     else:
         sync_routine.start()
+
+
+def _set_archived(slug: str, archived: bool) -> bool:
+    try:
+        return client_config.set_archived(slug, archived)
+    except client_config.ConfigError as e:
+        raise HTTPException(404, str(e))
+
+
+@app.post("/clients/{slug}/archiver")
+def client_archive(slug: str):
+    """On ne travaille plus sur ce client : il sort du menu, de l'accueil, des notifications et de la synchro. Sa fiche,
+    ses données et son historique restent en place, consultables depuis Clients → Archivés."""
+    _set_archived(slug, True)
+    return RedirectResponse(f"/clients?archive={slug}", status_code=303)
+
+
+@app.post("/clients/{slug}/desarchiver")
+def client_unarchive(slug: str, background: BackgroundTasks):
+    """Le client revient dans le suivi ; ses données, figées depuis l'archivage, sont resynchronisées comme à un ajout."""
+    if _set_archived(slug, False):
+        _sync_new_client(slug, background)
+    return RedirectResponse(f"/clients?desarchive={slug}", status_code=303)
 
 
 @app.post("/clients/{slug}/retirer")
@@ -874,7 +905,7 @@ def deployment_tab(request: Request, slug: str, tab: str, tous: bool = False, vu
         raise HTTPException(404, f"Onglet inconnu : {tab}")
     d = _get(slug)
     request.state.current = d  # la fiche ouverte devient le client en cours
-    return _remember(_render(
+    page = _render(
         request,
         "deployment.html",
         f"/deploiements/{slug}",
@@ -885,7 +916,8 @@ def deployment_tab(request: Request, slug: str, tab: str, tous: bool = False, vu
         show_all=tous,
         vue=vue,
         milestones=[(MILESTONE_LABELS.get(k, k), v) for k, v in sorted(d.milestones.items(), key=lambda kv: kv[1])],
-    ), slug)
+    )
+    return page if d.archived else _remember(page, slug)  # une fiche archivée se consulte sans devenir le client en cours
 
 
 def _launch(dag_id: str, padoa_env: str, d: Deployment | None = None, card: str = "", prod_authorized: bool = False) -> ActionResult:
@@ -1126,7 +1158,9 @@ def refresh_all(request: Request):
 
 @app.post("/actions/rafraichir/{slug}", response_class=HTMLResponse)
 def refresh_one(request: Request, slug: str):
-    _get(slug)
+    d = _get(slug)
+    if d.archived:  # la routine ne le lirait pas ; par l'API, il serait resynchronisé alors qu'on ne le suit plus
+        return _result(request, ActionResult(False, f"{d.client} est archivé : désarchive-le pour le rafraîchir.", simulated=False))
     if (routine := refresh_by_routine(request)) is not None:  # la routine passe sur tous les clients en une empreinte
         return routine
     ok, message = _refresh([slug])
@@ -1234,7 +1268,7 @@ def _reminder_notes(deployments: list[Deployment], today: date) -> list[dict]:
     names = {d.slug: d.client for d in deployments}
     return [{"key": f"rappel:{r.id}:{r.due.isoformat()}", "kind": "rappel", "level": "info", "title": f"Rappel : {r.label}",
              "detail": names.get(r.slug, ""), "link": ticket_url(r.slug, r.kind, r.ref) if r.kind else "/", "client": names.get(r.slug, "")}
-            for r in personal.due(today)]
+            for r in personal.due(today) if not r.slug or r.slug in names]  # rappel libre, ou d'un client suivi (pas archivé)
 
 
 # ============================================================ Notifications

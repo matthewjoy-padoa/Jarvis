@@ -476,7 +476,8 @@ button .ic { margin-right: 2px; }
 .field small { font-weight: 400; }
 .req { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--bg); border-radius: 999px; padding: 1px 7px; margin-left: 4px; }
 .form-actions { display: flex; gap: 10px; align-items: center; margin-top: 6px; }
-.danger-zone { max-width: 860px; border-color: var(--pa-ko); }
+.danger-zone, .archive-zone { max-width: 860px; }
+.danger-zone { border-color: var(--pa-ko); }
 
 /* Agents : page d'un agent et son journal */
 .agent-log { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
@@ -644,7 +645,8 @@ button:disabled { opacity: .45; box-shadow: none; transform: none; }
 .card-linked:hover, a.kpi-link:hover, .kb-card:hover, .wn-item:hover {
   transform: translateY(-2px); box-shadow: var(--shadow-lift); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
 .card-config { font-size: 12.5px; font-weight: 600; }
-.pending-card { border-style: dashed; box-shadow: none; background: color-mix(in srgb, var(--surface) 60%, transparent); }
+.pending-card { border-style: dashed; }
+.pending-card, .archived-card { box-shadow: none; background: color-mix(in srgb, var(--surface) 60%, transparent); }
 .empty-state { text-align: center; padding: 28px 20px; }
 .empty-state .btn-primary { margin: 6px 0 10px; }
 
@@ -1593,3 +1595,16 @@ details.filter.multi { position: relative; font-size: 13px; }
 /* Réglage visé par un lien d'un message d'erreur (/reglages#reglage-CLE) */
 .settings-key { font-size: 11px; color: var(--muted); }
 .field:target { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
+
+/* --- Clients archivés ------------------------------------------------------------------------------- */
+.card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 6px; }
+.card-actions a, .card-actions button { position: relative; z-index: 1; margin-top: 0; }  /* au-dessus du lien qui couvre la carte */
+.card-actions form { display: contents; }
+.link-button.card-archive { color: var(--muted); font-size: 12.5px; font-weight: 600; text-decoration: none; box-shadow: none; }
+.link-button.card-archive:hover:not(:disabled) { background: none; border: 0; box-shadow: none; transform: none; color: var(--text); text-decoration: underline; }
+.archived-clients { margin-top: 22px; }
+.archived-clients > summary { font-size: 15px; font-weight: 600; color: var(--text); }
+.archived-clients > p { margin: 6px 0 12px; }
+.archived-card .card-head strong { color: var(--muted); }
+.archived-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 8px 0 12px; border-style: dashed; }
+.archived-note p { margin: 0; flex: 1 1 320px; }
