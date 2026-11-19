@@ -276,6 +276,7 @@ class Deployment:
     links: list[Link] = field(default_factory=list)
     stacks: list[Stack] = field(default_factory=list)
     drive: list[Link] = field(default_factory=list)  # dossiers et fichiers Google Drive du client (configuration), jamais lus par Jarvis
+    dashboards: list[Link] = field(default_factory=list)  # autres dashboards Notion du client (configuration)
     resources: list[ResourceInjection] = field(default_factory=list)
     actions: list[Action] = field(default_factory=list)
     retours: list[RetourRecette] = field(default_factory=list)

@@ -20,7 +20,7 @@ cp .env.example .env          # facultatif : tout se règle aussi dans la page R
 uv run uvicorn deploy_hub.main:app --port 8765
 ```
 
-Ouvre http://localhost:8765, puis **Clients → Ajouter un client** : son nom et le lien de sa fiche dans la base Notion « Clients en déploiement » (••• → Copier le lien). Facultatif : son dashboard intégration, ses clés orchestrator (pour proposer les bons DAGs), ses stacks. La configuration va dans `config/clients/<slug>.yaml` (modèle : [`config.example/clients/exemple.yaml`](config.example/clients/exemple.yaml)).
+Ouvre http://localhost:8765, puis **Clients → Ajouter un client** : écris son nom et clique sur **Chercher dans Notion**. Claude Code (connecteur Notion, lecture seule, une vingtaine de secondes) lit la page « Liste des dashboards pour le déploiement des nouveaux clients », retrouve sa fiche dans « Clients en déploiement » et ses dashboards (déploiement, intégration, formation, gestion financière) ; tu relis le formulaire pré-rempli, puis tu ajoutes. Sans Claude Code, « Ou remplir à la main » : le lien de sa fiche (••• → Copier le lien), et au besoin son dashboard intégration. Facultatif : ses clés orchestrator (pour proposer les bons DAGs), ses stacks. Autre liste de dashboards : `JARVIS_NOTION_DASHBOARDS` (id de la page). La configuration va dans `config/clients/<slug>.yaml` (modèle : [`config.example/clients/exemple.yaml`](config.example/clients/exemple.yaml)).
 
 Le client apparaît alors comme « pas encore synchronisé » : lance une première synchro (section suivante) pour charger ses données.
 

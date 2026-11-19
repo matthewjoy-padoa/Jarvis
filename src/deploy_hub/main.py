@@ -31,6 +31,7 @@ from deploy_hub.sources.claude_runner import (TO_FILL, WAITING, ClaudeRunner, ag
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_source import DagSource
 from deploy_hub.sources.dag_watch import DagWatcher
+from deploy_hub.sources.client_lookup import ClientLookup
 from deploy_hub.sources.sync_routine import SyncRoutine
 from deploy_hub.sources import connections, flow_digger, notion_api
 from deploy_hub.sources.external import external_statuses
@@ -53,6 +54,7 @@ notifications = NotificationStore(Path(os.getenv("DEPLOY_HUB_NOTIFICATIONS") or 
 claude = ClaudeRunner.from_env(settings.orchestrator_dir, notifications, data_dir() / "agents")
 # Synchro Notion sans jeton : le bouton « Rafraîchir depuis Notion » fait suivre sync/routine.md à Claude Code (claude -p).
 sync_routine = SyncRoutine(notifications)
+client_lookup = ClientLookup()
 pulls = PullRequests(settings.orchestrator_dir)  # PR ouvertes de l'orchestrator (gh), gardées cinq minutes
 # Suivi des runs lancés (air.py d'Arthur) ; les suivis en cours au démarrage reprennent si Airflow est configuré.
 dag_watch = DagWatcher(data_dir() / "airflow", notifications, airflow.air_env())
@@ -371,14 +373,46 @@ def index(request: Request, enregistre: str = "", retire: str = ""):
     return _render(request, "index.html", "/clients", deployments=deployments, pending=pending, saved=enregistre, retired=retire)
 
 
-def _client_form(request: Request, cfg, error: str = "", new: bool = True, form: dict | None = None) -> HTMLResponse:
+def _client_form(request: Request, cfg, error: str = "", new: bool = True, form: dict | None = None, notice: str = "") -> HTMLResponse:
     suggestions = sorted(dag_catalogue.catalogue()["clients"])
-    return _render(request, "client_form.html", "/clients", cfg=cfg, error=error, new=new, form=form or {}, suggestions=suggestions)
+    return _render(request, "client_form.html", "/clients", cfg=cfg, error=error, new=new, form=form or {}, suggestions=suggestions,
+                   notice=notice, lookup=client_lookup.state() if new else {})
 
 
 @app.get("/clients/nouveau", response_class=HTMLResponse)
-def client_new(request: Request):
+def client_new(request: Request, depuis: str = ""):
+    """Formulaire vide, ou (depuis=notion) pré-rempli par la dernière recherche du client dans Notion, à relire avant l'ajout."""
+    state = client_lookup.state()
+    if depuis == "notion" and client_lookup.found(state):
+        found = state["proposal"]
+        missing = [label for key, label in (("page_id", "sa fiche dans « Clients en déploiement »"),
+                                            ("notion_url", "son dashboard intégration")) if not found.get(key)]
+        notice = (f"Trouvé dans Notion : {found['client']}. Relis, complète au besoin, puis ajoute le client."
+                  + (f" Introuvable : {', '.join(missing)}." if missing else "")
+                  + (f" Remarque de Claude : {found['remarque']}" if found.get("remarque") else ""))
+        return _client_form(request, None, form={k: found.get(k, "") for k in ("client", "slug", "page_id", "notion_url", "dashboards")},
+                            notice=notice)
     return _client_form(request, None)
+
+
+def _lookup_status(request: Request, error: str = "") -> HTMLResponse:
+    """Suivi de la recherche ; trouvée, le formulaire pré-rempli s'ouvre. error : refus au lancement (sans recherche à suivre)."""
+    state = {} if error else client_lookup.state()
+    if client_lookup.found(state):
+        return HTMLResponse("", headers={"HX-Redirect": "/clients/nouveau?depuis=notion"})
+    return templates.TemplateResponse(request, "_client_lookup.html", {"state": state, "message": error, "ok": not error})
+
+
+@app.post("/clients/recherche", response_class=HTMLResponse)
+def client_lookup_start(request: Request, nom: str = Form("")):
+    """« Chercher dans Notion » : Claude retrouve le client par son nom (lecture seule)."""
+    result = client_lookup.start(nom)
+    return _lookup_status(request, "" if result.ok else result.message)
+
+
+@app.get("/clients/recherche/etat", response_class=HTMLResponse)
+def client_lookup_status(request: Request):
+    return _lookup_status(request)
 
 
 def _config_or_fiche(slug: str):
@@ -425,6 +459,7 @@ async def client_links_save(request: Request, slug: str):
         if dashboard and not dashboard.startswith(("http://", "https://")):
             raise client_config.ConfigError("Le lien du dashboard Notion doit être une adresse https://")
         updated = dataclasses.replace(cfg, notion_url=dashboard, drive=client_config.parse_drive(str(form.get("drive") or "")),
+                                      dashboards=client_config.parse_dashboards(str(form.get("dashboards") or "")),
                                       stacks=client_config.parse_stacks(str(form.get("stacks") or "")))
         client_config.save(updated)
     except client_config.ConfigError as e:

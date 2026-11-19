@@ -36,6 +36,12 @@ def default_tools(data: Path) -> tuple[str, ...]:
     return ("Bash(uv run python -m deploy_hub.sync_notion:*)", f"Read({folder})", f"Edit({folder})", *NOTION_SERVERS)
 
 
+def app_env() -> dict:
+    """Environnement de l'app (mêmes dossiers, donc mêmes clients), sans les valeurs venues du .env : un processus lancé
+    par Jarvis relit le même .env lui-même (config.load_env_file), aucun secret ne transite par la ligne de commande."""
+    return {k: v for k, v in os.environ.items() if k not in ENV_FILE_KEYS}
+
+
 def routine_text() -> str:
     """Consigne de sync/routine.md, sans son commentaire d'en-tête."""
     text = ROUTINE.read_text(encoding="utf-8")
@@ -115,9 +121,7 @@ class SyncRoutine:
                 *(["--session-id", session] if session else []), "--allowedTools", *self.allowed_tools]
 
     def _env(self) -> dict:
-        """Environnement de l'app (mêmes dossiers, donc mêmes clients), sans les valeurs venues du .env : le processus de
-        synchro relit le même .env lui-même (config.load_env_file), aucun secret ne transite par la ligne de commande."""
-        return {k: v for k, v in os.environ.items() if k not in ENV_FILE_KEYS}
+        return app_env()
 
     def start(self) -> ActionResult:
         if (problem := self.problem()):

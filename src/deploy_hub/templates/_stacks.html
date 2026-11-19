@@ -1,6 +1,7 @@
 {# Liens rapides du client, en haut à droite de la fiche sur chaque onglet : Notion, stacks Padoa, puis Google Drive (configuration du client). #}
 <div class="stacks" aria-label="Liens rapides">
   {% if d.notion_url %}<a href="{{ d.notion_url }}" target="_blank" rel="noopener" title="Dashboard intégration dans Notion"><span class="env">Notion</span>Dashboard ↗</a>{% endif %}
+  {% for l in d.dashboards %}<a href="{{ l.url }}" target="_blank" rel="noopener" title="Dashboard Notion : {{ l.label }}"><span class="env">Notion</span>{{ l.label }} ↗</a>{% endfor %}
   {% for s in d.stacks %}
   <a href="{{ s.url }}" target="_blank" rel="noopener" title="{{ s.url }}">{% if s.env %}<span class="env">{{ s.env }}</span>{% endif %}{{ s.label }} ↗</a>
   {% else %}
