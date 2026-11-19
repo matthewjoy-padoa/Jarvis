@@ -84,20 +84,20 @@ def test_each_client_gets_its_dashboards_and_its_fiche():
     form = form_of(acme, {"acme1234", "acme1234-uegar", "autre"})
     assert form["slug"] == "acme1234"  # pas « acme-12-34 » : comme les clés de l'orchestrator
     assert form["orchestrator"] == "acme1234, acme1234-uegar"
-    assert form["page_id"] == "0123456789abcdef0123456789abcdef"  # « Déploiement ACME 12-34 », pas « … 12-345 » ni le lot 2
+    assert form["page_id"] == "https://app.notion.com/p/padoa/D-ploiement-ACME-12-34-0123456789abcdef0123456789abcdef"  # « Déploiement ACME 12-34 », pas « … 12-345 » ni le lot 2 ; lien complet
     assert form["notion_url"] == "https://app.notion.com/p/bbb1"
     assert form["dashboards"].splitlines() == ["Déploiement | https://app.notion.com/p/aaa1", "Formation | https://app.notion.com/p/ccc1",
                                                "Dashboard intégration - ACME 12-34 (lot 2) | https://app.notion.com/p/bbb2",
                                                "Gestion financière | https://app.notion.com/p/ddd1"]
     assert parse_dashboards(form["dashboards"])[0]["label"] == "Déploiement"
     beta = form_of(entries["betasante"])
-    assert beta["page_id"] == "3333333333333333cccccccccccccccc" and beta["notion_url"] == ""
+    assert beta["page_id"] == "https://app.notion.com/p/padoa/B-ta-Sant-3333333333333333cccccccccccccccc" and beta["notion_url"] == ""
 
 
 def test_two_main_fiches_with_the_name_leave_the_choice():
     rows = ROWS + [{"url": "https://app.notion.com/4444444444444444dddddddddddddddd", "Nom": "ACME 12-34 vague 2", "élément parent": ""}]
     entry = next(e for e in build(dashboards_of(PAGE_TEXT), fiches_of(rows)) if e["cle"] == "acme1234")
-    assert form_of(entry)["page_id"] == "0123456789abcdef0123456789abcdef"  # le nom exact l'emporte
+    assert form_of(entry)["page_id"] == "https://app.notion.com/p/padoa/D-ploiement-ACME-12-34-0123456789abcdef0123456789abcdef"  # le nom exact l'emporte
     rows = [r for r in rows if r["url"] != FICHE]
     entry = next(e for e in build(dashboards_of(PAGE_TEXT), fiches_of(rows)) if e["cle"] == "acme1234")
     assert form_of(entry)["page_id"] == ""  # « 12-345 » et « vague 2 » : à choisir dans la liste
@@ -189,7 +189,7 @@ def app(tmp_path, monkeypatch):
     monkeypatch.setenv("JARVIS_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setattr(main.fiches, "clients_dir", tmp_path / "config" / "clients")
     directory = ClientDirectory(folder=tmp_path / "data" / "notion", claude_bin=str(tmp_path / "absent"))
-    directory._write("annuaire.json", {"lu": datetime.now().isoformat(timespec="seconds"),
+    directory._write("annuaire.json", {"format": client_directory.FORMAT, "lu": datetime.now().isoformat(timespec="seconds"),
                                        "clients": build(dashboards_of(PAGE_TEXT), fiches_of(ROWS)),
                                        "fiches": [f for f in fiches_of(ROWS) if not f["parent"]]})
     monkeypatch.setattr(main, "client_directory", directory)
@@ -203,9 +203,9 @@ def test_choosing_a_client_fills_the_form_at_once(app, tmp_path):
     assert "Ou remplir à la main" in page and "Chercher" not in page  # rien à chercher : on choisit
     form = unescape(app.get("/clients/nouveau?client=acme1234").text)
     assert 'value="acme1234" selected' in form and "ACME 12-34 : relis" in form
-    for value in ('name="slug" value="acme1234"', 'value="0123456789abcdef0123456789abcdef"', 'value="https://app.notion.com/p/bbb1"',
+    for value in ('name="slug" value="acme1234"', 'value="https://app.notion.com/p/padoa/D-ploiement-ACME-12-34-0123456789abcdef0123456789abcdef"', 'value="https://app.notion.com/p/bbb1"',
                   'name="orchestrator" list="orchestrator-keys" value="acme1234"', "Formation | https://app.notion.com/p/ccc1",
-                  '<option value="https://app.notion.com/0123456789abcdef0123456789abcdef" label="Déploiement ACME 12-34">'):
+                  '<option value="https://app.notion.com/p/padoa/D-ploiement-ACME-12-34-0123456789abcdef0123456789abcdef" label="Déploiement ACME 12-34">'):
         assert value in form, value
     app.post("/clients/enregistrer", data={"client": "ACME 12-34", "slug": "acme1234", "page_id": FICHE})
     assert client_config.load("acme1234").page_id == "0123456789abcdef0123456789abcdef"
@@ -260,3 +260,32 @@ def test_a_refresh_with_a_list_already_shown_keeps_it_usable(app, tmp_path):
     page = unescape(app.get("/clients/nouveau").text)
     assert '<option value="acme1234">ACME 12-34</option>' in page and "la liste ci-dessus reste utilisable" in page
     assert "Première lecture" not in page
+
+
+def test_links_are_complete_like_notions_copy_link():
+    """« Copier le lien » de Notion donne https://app.notion.com/p/<espace>/<Titre>-<id> : la lecture ne donne que l'id."""
+    from deploy_hub.sources.client_directory import full_link
+    assert full_link("Déploiement ACME 12-34", FICHE) == "https://app.notion.com/p/padoa/D-ploiement-ACME-12-34-0123456789abcdef0123456789abcdef"
+    assert full_link("Dashboard intégration - ACME12-34 🇩🇪", "https://app.notion.com/p/" + "a" * 32) == (
+        "https://app.notion.com/p/padoa/Dashboard-int-gration-ACME12-34-" + "a" * 32)
+    assert full_link("", "https://app.notion.com/" + "b" * 32) == "https://app.notion.com/p/padoa/" + "b" * 32
+    assert full_link("Sans id", "https://app.notion.com/p/aaa1") == "https://app.notion.com/p/aaa1"  # rien à compléter
+    from deploy_hub.queries import page_id_of
+    assert page_id_of("https://app.notion.com/p/padoa/D-ploiement-ACME-12-34-0123456789abcdef0123456789abcdef") == "0123456789abcdef0123456789abcdef"  # le formulaire n'en garde que l'id
+
+
+def test_a_directory_of_an_older_format_is_read_again_at_once(tmp_path):
+    """Annuaire lu avant les liens complets : relu tout de suite, sans attendre un jour."""
+    directory = ClientDirectory(folder=tmp_path / "notion")
+    now = datetime.now().isoformat(timespec="seconds")
+    assert directory.should_refresh({"lu": now})  # format 1 (sans « format »)
+    assert not directory.should_refresh({"format": client_directory.FORMAT, "lu": now})
+
+
+def test_dashboard_links_without_p_are_repaired_on_display(app):
+    """La synchro renvoie des adresses « https://app.notion.com/<id> » (sans /p/, en erreur) : le dashboard du client est réparé."""
+    client_config.save(ClientConfig(slug="acme1234", client="ACME 12-34", page_id="0123456789abcdef0123456789abcdef",
+                                    notion_url="https://app.notion.com/" + "c" * 32,
+                                    dashboards=[{"label": "Formation", "url": "https://app.notion.com/" + "d" * 32}]))
+    fiche = app.get("/deploiements/acme1234/synthese").text
+    assert 'href="https://app.notion.com/p/' + "c" * 32 + '"' in fiche and 'href="https://app.notion.com/p/' + "d" * 32 + '"' in fiche
