@@ -26,7 +26,7 @@ Le client apparaît alors comme « pas encore synchronisé » : lance une premi�
 
 ## Synchroniser avec Notion
 
-Synchro incrémentale : une requête d'empreinte pour tous les clients, puis seulement ce qui a changé. **Clients synchronisés : ceux configurés dans ton Jarvis** (`config/clients/`, ou `JARVIS_CONFIG_DIR`) ; un client ajouté est pris au passage suivant, un client retiré ne l'est plus.
+Synchro incrémentale : une requête d'empreinte pour tous les clients, puis seulement ce qui a changé. **Clients synchronisés : ceux configurés dans ton Jarvis** (`config/clients/`, ou `JARVIS_CONFIG_DIR`) ; un client ajouté est pris au passage suivant, un client archivé ou retiré ne l'est plus. **Archiver** un client (sa carte de la page Clients, ou Configurer) quand on ne travaille plus dessus : il sort du menu, de l'accueil, des notifications et de la synchro ; sa fiche reste consultable dans « Archivés », en bas de la page Clients, et « Désarchiver » le remet dans le suivi (clé `archived` de son yaml).
 
 Deux façons de lire Notion, au choix :
 

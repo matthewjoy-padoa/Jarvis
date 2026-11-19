@@ -82,6 +82,19 @@
 </form>
 {% if collapsed %}</details>{% endif %}
 
+{% if not new and cfg.archived %}{% import "_archive.html" as archive %}
+<section class="panel archive-zone">
+  <h2>Client archivé</h2>
+  <p class="muted">{{ archive.since(cfg.archived_at) }} : {{ archive.effects() }}. Le désarchiver le remet dans le suivi et relance sa synchro.</p>
+  {{ archive.unarchive_form(cfg.slug) }}
+</section>
+{% elif archivable %}{% import "_archive.html" as archive %}
+<section class="panel archive-zone">
+  <h2>Archiver ce client</h2>
+  <p class="muted">Quand on ne travaille plus dessus : il devient {{ archive.effects() }}. Sa fiche, ses données et sa configuration restent en place (Clients → Archivés), et il se désarchive en un clic.</p>
+  {{ archive.archive_form(cfg.slug, cfg.client) }}
+</section>
+{% endif %}
 {% if not new %}
 <form class="panel danger-zone" method="post" action="/clients/{{ cfg.slug }}/retirer" onsubmit="return confirm({{ ('Retirer ' ~ cfg.client ~ ' du suivi ? Sa configuration et sa fiche sont mises de côté (retires/), ses données sont conservées.') | tojson | forceescape }})">
   <h2>Retirer ce client</h2>

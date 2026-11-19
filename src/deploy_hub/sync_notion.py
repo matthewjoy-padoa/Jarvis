@@ -408,7 +408,7 @@ def prepare(root: Path = PROJECT_ROOT) -> dict:
     if (other := running_elsewhere(root)):
         raise SyncError(f"Une autre synchro tourne déjà (lancée à {other.get('started', '?')}) : attends sa fin, puis relance")
     from deploy_hub import client_config
-    configs = [asdict(c) for c in client_config.all_configs(root)]
+    configs = [asdict(c) for c in client_config.active_configs(root)]  # un client archivé n'est plus synchronisé
     for config in configs:
         queries.write(config["slug"], config, root)
     folder = data_dir(root) / "notion"
@@ -490,7 +490,7 @@ def plan_all(root: Path = PROJECT_ROOT) -> dict:
     folder = data_dir(root) / "notion"
     rows = {r.get("cle"): r for r in _rows(folder / f"{EMPREINTES}.json")}
     out = {"requetes": [], "inchanges": [], "raisons": {}, "erreurs": {}}
-    for slug in client_config.slugs(root):
+    for slug in client_config.active_slugs(root):
         raw = folder / slug
         if slug not in rows:
             out["erreurs"][slug] = "absent de l'empreinte : relance « preparer »"
@@ -520,7 +520,7 @@ def merge_all(root: Path = PROJECT_ROOT) -> dict:
     """Fusionne les clients qui ont un plan ; un client en échec n'empêche pas les autres."""
     from deploy_hub import client_config
     results = {}
-    for slug in client_config.slugs(root):
+    for slug in client_config.active_slugs(root):
         if not (data_dir(root) / "notion" / slug / "plan.json").is_file():
             continue
         try:
@@ -726,7 +726,7 @@ if __name__ == "__main__":
             show(results)
             sys.exit(1 if any("erreur" in r for r in results.values()) else 0)
         elif command == "clients":
-            print("\n".join(client_config.slugs()))
+            print("\n".join(client_config.active_slugs()))
         elif command == "requetes":
             print(queries.write(sys.argv[2], load_config(sys.argv[2])))
         elif command == "deposer":  # deposer <sortie> [<fichier rangé par Claude Code>]

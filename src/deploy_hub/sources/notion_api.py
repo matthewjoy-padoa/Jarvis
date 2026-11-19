@@ -352,8 +352,9 @@ def refresh(slug: str, notion: NotionClient, root: Path = PROJECT_ROOT) -> dict:
 
 
 def clients(root: Path = PROJECT_ROOT) -> list[str]:
-    from deploy_hub.client_config import slugs
-    return slugs(root)
+    """Clients suivis : un client archivé n'est plus rafraîchi."""
+    from deploy_hub.client_config import active_slugs
+    return active_slugs(root)
 
 
 if __name__ == "__main__":

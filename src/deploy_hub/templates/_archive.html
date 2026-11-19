@@ -1,0 +1,5 @@
+{# Archivage d'un client : mêmes formulaires et mêmes mots sur la page Clients, la fiche et Configurer. #}
+{% macro archive_form(slug, name, cls="secondary") %}<form method="post" action="/clients/{{ slug }}/archiver" onsubmit="return confirm({{ ('Archiver ' ~ name ~ ' ? Il sort du menu, de l\'accueil, de la recherche, des notifications et de la synchro. Rien n\'est supprimé : tu peux le désarchiver à tout moment.') | tojson | forceescape }})"><button type="submit" class="{{ cls }}" title="On ne travaille plus sur {{ name }} : le ranger dans « Archivés »">Archiver</button></form>{% endmacro %}
+{% macro unarchive_form(slug) %}<form method="post" action="/clients/{{ slug }}/desarchiver"><button type="submit" class="secondary" title="Le remettre dans le suivi et relancer sa synchro">Désarchiver</button></form>{% endmacro %}
+{% macro since(day) %}Archivé{% if day %} le {{ day.strftime("%d/%m/%Y") }}{% endif %}{% endmacro %}
+{% macro effects() %}absent du menu, de l'accueil, de la recherche et des notifications, plus synchronisé{% endmacro %}

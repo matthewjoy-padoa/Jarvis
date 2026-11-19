@@ -6,8 +6,8 @@ Enregistrer un client écrit aussi ses requêtes SQL (queries.write) ; la synchr
 
 import re
 import unicodedata
-from dataclasses import asdict, dataclass, field, fields
-from datetime import datetime
+from dataclasses import asdict, dataclass, field, fields, replace
+from datetime import date, datetime
 from pathlib import Path
 
 import yaml
@@ -24,6 +24,14 @@ SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
 def slugify(name: str) -> str:
     text = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
     return re.sub(r"[^a-z0-9]+", "-", text).strip("-")[:40]
+
+
+def _day(value) -> date | None:
+    """Jour lu dans un yaml : une date, ou son texte AAAA-MM-JJ ; None s'il manque ou a été mal retouché à la main."""
+    try:
+        return value if isinstance(value, date) else date.fromisoformat(str(value))
+    except ValueError:
+        return None
 
 
 def _list(value) -> list[str]:
@@ -45,6 +53,8 @@ class ClientConfig:
     stacks: list[dict] = field(default_factory=list)
     drive: list[dict] = field(default_factory=list)  # liens Google Drive du client : ouverts par l'utilisateur, jamais lus par Jarvis
     dashboards: list[dict] = field(default_factory=list)  # autres dashboards Notion du client (déploiement, formation…)
+    archived: bool = False  # on ne travaille plus dessus : hors menu, accueil, notifications et synchro ; fiche gardée, consultable
+    archived_at: date | None = None  # jour de l'archivage ; None si le client est suivi (ou la date illisible)
 
     @property
     def stacks_text(self) -> str:
@@ -62,7 +72,10 @@ class ClientConfig:
         return "\n".join(f"{l['label']} | {l['url']}" for l in self.drive)
 
     def to_yaml(self) -> str:
-        return HEADER + yaml.safe_dump(asdict(self), allow_unicode=True, sort_keys=False)
+        data = asdict(self)
+        if not self.archived:  # un client suivi n'a aucune clé d'archivage dans son yaml
+            del data["archived"], data["archived_at"]
+        return HEADER + yaml.safe_dump(data, allow_unicode=True, sort_keys=False)
 
     @classmethod
     def from_deployment(cls, d) -> "ClientConfig":
@@ -86,6 +99,7 @@ def _normalize(slug: str, data: dict) -> ClientConfig:
                if isinstance(l, dict) and _is_drive(str(l.get("url") or ""))],
         dashboards=[{"label": str(l.get("label") or "Notion"), "url": str(l["url"])} for l in data.get("dashboards") or []
                     if isinstance(l, dict) and is_notion(str(l.get("url") or ""))],
+        archived=bool(data.get("archived")), archived_at=_day(data.get("archived_at")) if data.get("archived") else None,
     )
 
 
@@ -184,12 +198,25 @@ def load(slug: str, root: Path = PROJECT_ROOT) -> ClientConfig | None:
 
 
 def slugs(root: Path = PROJECT_ROOT) -> list[str]:
-    """Clients configurés : liste unique pour l'app, la synchro, la routine et « Tout rafraîchir »."""
+    """Clients configurés, archivés compris."""
     return sorted(p.stem for p in clients_dir(root).glob("*.yaml"))
+
+
+def exists(slug: str, root: Path = PROJECT_ROOT) -> bool:
+    return (clients_dir(root) / f"{slug}.yaml").is_file()
 
 
 def all_configs(root: Path = PROJECT_ROOT) -> list[ClientConfig]:
     return [c for slug in slugs(root) if (c := load(slug, root))]
+
+
+def active_configs(root: Path = PROJECT_ROOT) -> list[ClientConfig]:
+    """Clients suivis (non archivés) : liste unique pour la synchro, la routine et « Tout rafraîchir »."""
+    return [c for c in all_configs(root) if not c.archived]
+
+
+def active_slugs(root: Path = PROJECT_ROOT) -> list[str]:
+    return [c.slug for c in active_configs(root)]
 
 
 def save(config: ClientConfig, root: Path = PROJECT_ROOT, new: bool = False) -> Path:
@@ -202,6 +229,12 @@ def save(config: ClientConfig, root: Path = PROJECT_ROOT, new: bool = False) -> 
     twin = next((c for c in all_configs(root) if c.slug != config.slug and c.page_id and c.page_id == config.page_id), None)
     if twin:  # deux clients sur la même fiche Notion : l'un des deux affiche les données de l'autre
         raise ConfigError(f"Cette fiche Notion est déjà celle du client « {twin.client} » ({twin.slug}).")
+    _write(path, config)
+    queries.write(config.slug, asdict(config), root)
+    return path
+
+
+def _write(path: Path, config: ClientConfig) -> None:
     extra = {}
     if path.is_file():  # clés ajoutées à la main : conservées (les commentaires, eux, ne le sont pas)
         extra = {k: v for k, v in (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).items() if k not in FIELDS}
@@ -209,15 +242,27 @@ def save(config: ClientConfig, root: Path = PROJECT_ROOT, new: bool = False) -> 
     if extra:
         text += yaml.safe_dump(extra, allow_unicode=True, sort_keys=False)
     path.write_text(text, encoding="utf-8")
-    queries.write(config.slug, asdict(config), root)
-    return path
+
+
+def set_archived(slug: str, archived: bool, root: Path = PROJECT_ROOT) -> bool:
+    """Archive un client (on ne travaille plus dessus) ou le remet dans le suivi. Rien ne bouge sur le disque : seul son yaml
+    le note. Archivé, il sort du menu, de l'accueil, des notifications et de la synchro ; sa fiche reste consultable.
+    Renvoie False s'il était déjà dans cet état."""
+    config = load(slug, root)
+    if config is None:
+        raise ConfigError(f"Client inconnu : {slug}")
+    if config.archived == archived:
+        return False
+    # Seul le yaml change : ni requêtes ni contrôles de save(), qui refuseraient un client à la fiche Notion mal renseignée.
+    _write(clients_dir(root) / f"{slug}.yaml", replace(config, archived=archived, archived_at=date.today() if archived else None))
+    return True
 
 
 def retire(slug: str, root: Path = PROJECT_ROOT) -> Path:
     """Retire un client du suivi : son yaml part dans config/clients/retires/ et sa fiche dans data/deploiements/retires/.
     Rien n'est supprimé ; caches et contenu restent dans data/notion/<slug>/."""
     path = clients_dir(root) / f"{slug}.yaml"
-    if not path.is_file():
+    if not exists(slug, root):
         raise ConfigError(f"Client inconnu : {slug}")
     stamp = f"{datetime.now():%Y%m%d-%H%M%S}"
     target = clients_dir(root) / "retires" / f"{slug}-{stamp}.yaml"

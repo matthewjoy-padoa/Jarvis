@@ -13,12 +13,20 @@
     {% include "_stacks.html" %}
     <div class="refresh">
   <span class="muted last-sync" title="Dernière fois que Jarvis a lu Notion pour ce client">{% if d.last_sync %}Dernière synchro : {{ d.last_sync | quand }}{% else %}Jamais synchronisé{% endif %}</span>
+  {% if not d.archived %}{# archivé : plus synchronisé, le bandeau propose de le désarchiver #}
   <button type="button" class="secondary sync-btn" hx-post="/actions/rafraichir/{{ d.slug }}" hx-target="next .refresh-out" hx-indicator="closest .refresh" hx-disabled-elt="this"{% if not notion_ready %} disabled title="Ni jeton Notion ni Claude Code en ligne de commande : voir docs/routine-synchro.md"{% endif %}><span class="btn-face"><span class="btn-idle">{{ ic.icon("sync") }} Rafraîchir depuis Notion</span><span class="btn-busy" aria-hidden="true">Synchro…</span></span></button>
   <div class="refresh-out">{% if sync_running %}<div hx-get="/actions/rafraichir/etat" hx-trigger="load" hx-swap="outerHTML"></div>{% endif %}</div>
+  {% endif %}
 </div>
   </div>
 </div>
-{% if d.pending %}<p class="result ok pending-note">Pas encore synchronisé : les données Notion de {{ d.client }} arriveront à la première synchro. « Rafraîchir depuis Notion » la lance (ou <code>/jarvis-sync</code> dans Claude Code ouvert sur le dossier de Jarvis).</p>{% endif %}
+{% if d.archived %}{% import "_archive.html" as archive %}
+<section class="panel archived-note">
+  <p><strong>{{ archive.since(d.archived_at) }}.</strong> <span class="muted">Ce client est {{ archive.effects() }} : sa fiche montre les données du jour de l'archivage.</span></p>
+  {{ archive.unarchive_form(d.slug) }}
+</section>
+{% endif %}
+{% if d.pending and not d.archived %}<p class="result ok pending-note">Pas encore synchronisé : les données Notion de {{ d.client }} arriveront à la première synchro. « Rafraîchir depuis Notion » la lance (ou <code>/jarvis-sync</code> dans Claude Code ouvert sur le dossier de Jarvis).</p>{% endif %}
 <nav class="tabs" aria-label="Onglets">
   {% for key, label in tabs %}<a href="/deploiements/{{ d.slug }}/{{ key }}" class="{{ 'active' if key == tab }}">{{ label }}{% if key == 'recette' and d.open_retours %} <span class="count" title="Retours ouverts">{{ d.open_retours | length }}</span>{% endif %}</a>{% endfor %}
 </nav>

@@ -3,6 +3,7 @@
 {% import "_icons.html" as ic %}
 {% block content %}
 {% import "_charts.html" as charts with context %}
+{% import "_archive.html" as archive %}
 
 <div class="page-head">
   <h1>Clients</h1>
@@ -14,11 +15,13 @@
   <div class="segmented" aria-label="Vues tous clients"><span class="muted">Tous les clients :</span>{% for path, label in cross_pages %}<a href="{{ path }}">{{ label }}</a>{% endfor %}</div>
 </div>
 {% if saved %}<p class="result ok">Client « {{ saved }} » enregistré. « Rafraîchir depuis Notion » sur sa fiche met à jour ses données.</p>{% endif %}
+{% if archived_now %}<p class="result ok">{{ archived_now }} est archivé : {{ archive.effects() }}. Sa fiche reste dans « Archivés », en bas de page.</p>{% endif %}
+{% if restored %}<p class="result ok">{{ restored }} est de retour dans le suivi : ses données se resynchronisent.</p>{% endif %}
 {% if retired %}<p class="result ok">Client « {{ retired }} » retiré du suivi. Sa configuration est dans config/clients/retires/.</p>{% endif %}
 {% if not deployments and not pending %}
 <section class="panel empty-state">
   <h2>Aucun client suivi pour l'instant</h2>
-  <p>Ajoute ton premier client : il suffit de son nom et du lien de sa fiche dans la base Notion « Clients en déploiement ».</p>
+  <p>{% if archived %}Tous tes clients sont archivés : désarchive-en un ci-dessous, ou ajoute un client.{% else %}Ajoute ton premier client : il suffit de son nom et du lien de sa fiche dans la base Notion « Clients en déploiement ».{% endif %}</p>
   <a class="btn-primary" href="/clients/nouveau">+ Ajouter un client</a>
 </section>
 {% endif %}
@@ -35,7 +38,10 @@
         <span class="badge {{ 'g-ko' if d.days_left < 14 }}">J{{ '%+d' % (-d.days_left) }}</span></p>
     {% endif %}
     <p class="muted last-sync">{% if d.last_sync %}Dernière synchro : {{ d.last_sync | quand }}{% else %}Jamais synchronisé{% endif %}</p>
-    <a class="card-config" href="/clients/{{ d.slug }}/configuration" title="Configurer {{ d.client }}">Configurer</a>
+    <div class="card-actions">
+      <a class="card-config" href="/clients/{{ d.slug }}/configuration" title="Configurer {{ d.client }}">Configurer</a>
+      {% if d.configured %}{{ archive.archive_form(d.slug, d.client, "link-button card-archive") }}{% endif %}
+    </div>
     {% if d.stacks or d.drive %}<div class="stacks card-stacks">{% for st in d.stacks %}<a href="{{ st.url }}" target="_blank" rel="noopener" title="{{ st.url }}">{% if st.env %}<span class="env">{{ st.env }}</span>{% endif %}{{ st.label }} ↗</a>{% endfor %}{% for l in d.drive %}<a href="{{ l.url }}" target="_blank" rel="noopener noreferrer" title="Google Drive : s'ouvre avec ton compte"><span class="env">Drive</span>{{ l.label }} ↗</a>{% endfor %}</div>{% endif %}
   </div>
   {% endfor %}
@@ -47,9 +53,30 @@
   <div class="card card-linked pending-card">
     <div class="card-head"><a class="card-link" href="/deploiements/{{ c.slug }}/synthese"><strong>{{ c.client }}</strong></a>{% if c.software %}<span class="badge">{{ c.software }}</span>{% endif %}</div>
     <p class="muted">Configuré, pas encore synchronisé : ses données arrivent dans quelques instants, sinon « Rafraîchir depuis Notion » sur sa fiche.</p>
-    <a class="card-config" href="/clients/{{ c.slug }}/configuration">Configurer</a>
+    <div class="card-actions">
+      <a class="card-config" href="/clients/{{ c.slug }}/configuration">Configurer</a>
+      {{ archive.archive_form(c.slug, c.client, "link-button card-archive") }}
+    </div>
   </div>
   {% endfor %}
 </div>
+{% endif %}
+{% if archived %}
+<details class="fold archived-clients" id="archives"{% if archived_now %} open{% endif %}>
+  <summary>Archivés <span class="muted">· {{ archived | length }}</span></summary>
+  <p class="muted">Clients sur lesquels on ne travaille plus. Un client archivé est {{ archive.effects() }} ; sa fiche reste consultable, telle qu'au jour de l'archivage.</p>
+  <div class="grid">
+    {% for d in archived %}
+    <div class="card card-linked archived-card">
+      <div class="card-head"><a class="card-link" href="/deploiements/{{ d.slug }}/synthese"><strong>{{ ic.client_emoji(d) }}{{ d.client }}</strong></a><span class="badge">{{ d.software }}</span></div>
+      <p class="muted">{{ archive.since(d.archived_at) }} · {% if d.last_sync %}dernière synchro {{ d.last_sync | quand }}{% else %}jamais synchronisé{% endif %}</p>
+      <div class="card-actions">
+        {{ archive.unarchive_form(d.slug) }}
+        <a class="card-config" href="/clients/{{ d.slug }}/configuration" title="Configurer {{ d.client }}">Configurer</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</details>
 {% endif %}
 {% endblock %}

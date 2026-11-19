@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=148">
+  <link rel="stylesheet" href="/static/style.css?v=149">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=10" defer></script>
   <script src="/static/dag.js?v=3" defer></script>
@@ -45,7 +45,7 @@
         <svg class="switch-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></summary>
       <div class="client-menu" role="menu">
         <a role="menuitem" href="/deploiements/{{ current.slug }}/synthese">Ouvrir la fiche de {{ current.client }}</a>
-        {% if clients | length > 1 %}
+        {% if clients | rejectattr("slug", "equalto", current.slug) | list %}{# sur une fiche archivée, tous les clients suivis sont « les autres » #}
         <p class="client-menu-label">Changer de client</p>
         {% for d in clients if d.slug != current.slug %}
         <div class="client-menu-row">
