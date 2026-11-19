@@ -64,7 +64,7 @@ def app(tmp_path, monkeypatch):
 def test_add_edit_and_retire_a_client_from_the_app(app, tmp_path):
     assert "Ajouter un client" in app.get("/clients/nouveau").text
     r = app.post("/clients/enregistrer", data={"client": "Acme", "page_id": PAGE, "software": "Pulse"}, follow_redirects=False)
-    assert r.status_code == 303 and r.headers["location"] == "/clients?enregistre=acme"
+    assert r.status_code == 303 and r.headers["location"] == "/deploiements/acme/synthese"  # sa fiche, synchro lancée
     assert (tmp_path / "config" / "clients" / "acme.yaml").is_file()
     clients_page = app.get("/clients").text
     assert "En attente de première synchro" in clients_page and "Acme" in clients_page
@@ -197,3 +197,30 @@ def test_a_client_just_added_is_in_the_selector_with_an_empty_fiche(app, tmp_pat
     finally:
         main.fiches.deployments_dir = monkeypatch_dir
 
+
+def test_a_new_client_is_synced_at_once_without_a_token_by_the_routine(app, monkeypatch):
+    started = []
+    monkeypatch.setattr(main.notion_api, "load_token", lambda root=None: None)
+    monkeypatch.setattr(main.sync_routine, "start", lambda: started.append("routine"))
+    r = app.post("/clients/enregistrer", data={"client": "Acme", "page_id": PAGE}, follow_redirects=False)
+    assert r.headers["location"] == "/deploiements/acme/synthese" and started == ["routine"]
+    app.post("/clients/enregistrer", data={"existing_slug": "acme", "client": "Acme SST", "page_id": PAGE})
+    assert started == ["routine"]  # une modification ne relance pas de synchro
+
+
+def test_a_new_client_is_synced_at_once_with_a_token_by_the_api(app, monkeypatch):
+    import threading
+    done = threading.Event()
+    calls = []
+    monkeypatch.setattr(main.notion_api, "load_token", lambda root=None: "jeton-fictif")
+    monkeypatch.setattr(main, "_refresh", lambda slugs: (calls.append(slugs), done.set()))
+    app.post("/clients/enregistrer", data={"client": "Acme", "page_id": PAGE}, follow_redirects=False)
+    assert done.wait(5) and calls == [["acme"]]  # en fond : la page ne l'attend pas
+
+
+def test_a_client_not_synced_yet_can_be_opened_from_the_clients_page(app, monkeypatch):
+    monkeypatch.setattr(main, "_sync_new_client", lambda slug, background: None)
+    app.post("/clients/enregistrer", data={"client": "Acme", "page_id": PAGE})
+    page = app.get("/clients").text
+    assert "En attente de première synchro" in page and '<a class="card-link" href="/deploiements/acme/synthese"><strong>Acme</strong></a>' in page
+    assert app.get("/deploiements/acme/synthese").status_code == 200

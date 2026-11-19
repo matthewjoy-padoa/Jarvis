@@ -11,7 +11,7 @@ from urllib.parse import parse_qsl, quote, urlencode, urlsplit
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from fastapi import FastAPI, Form, HTTPException, Request, WebSocket
+from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -495,7 +495,7 @@ async def client_links_save(request: Request, slug: str):
 
 
 @app.post("/clients/enregistrer", response_class=HTMLResponse)
-async def client_save(request: Request):
+async def client_save(request: Request, background: BackgroundTasks):
     form = dict(await request.form())
     existing = (form.get("existing_slug") or "").strip() or None
     try:
@@ -503,7 +503,20 @@ async def client_save(request: Request):
         client_config.save(cfg, new=existing is None)
     except client_config.ConfigError as e:
         return _client_form(request, _config_or_fiche(existing)[0] if existing else None, str(e), new=existing is None, form=form)
-    return RedirectResponse(f"/clients?enregistre={cfg.slug}", status_code=303)
+    if existing:
+        return RedirectResponse(f"/clients?enregistre={cfg.slug}", status_code=303)
+    _sync_new_client(cfg.slug, background)  # nouveau client : ses données arrivent sans attendre la routine ni « Rafraîchir »
+    return RedirectResponse(f"/deploiements/{cfg.slug}/synthese", status_code=303)
+
+
+def _sync_new_client(slug: str, background: BackgroundTasks) -> None:
+    """Synchro lancée dès l'ajout d'un client, sans la faire attendre : par l'API avec un jeton Notion (juste après la réponse),
+    sinon par la routine Claude Code, qui passe sur tous les clients et dont sa fiche montre l'avancement. Une synchro déjà
+    en cours : il sera pris à la suivante."""
+    if notion_api.load_token():
+        background.add_task(_refresh, [slug])
+    else:
+        sync_routine.start()
 
 
 @app.post("/clients/{slug}/retirer")
