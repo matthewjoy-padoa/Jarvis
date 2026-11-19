@@ -25,7 +25,7 @@
   </form>
   <p class="muted">Sa fiche « Clients en déploiement », son dashboard intégration et ses autres dashboards se remplissent tout seuls. Tu relis, puis tu ajoutes.</p>
   {% endif %}
-  {% with directory=directory %}{% include "_client_directory.html" %}{% endwith %}
+  {% with directory=directory, lu=directory.lu or '' %}{% include "_client_directory.html" %}{% endwith %}
 </section>
 {% endif %}
 

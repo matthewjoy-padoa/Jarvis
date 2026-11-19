@@ -29,6 +29,7 @@ Jarvis suit une numérotation `0.MINEUR.CORRECTIF` tant qu'il n'est pas stable :
 - Agents Claude : « Ce que l'agent a constaté » au-dessus de ses questions, contexte, options et recommandation par question, texte de l'agent mis en forme (Markdown, HTML jamais interprété) (#74).
 - Agents Claude : questions rendues en JSON par l'agent, options à cocher et recommandation pré-cochée : on répond en un clic (#75).
 - Ajouter un client : choisi dans une liste, tout se remplit (identifiant comme dans l'orchestrator, « APST 26-07 » → `apst2607`, clés orchestrator, fiche « Clients en déploiement », dashboard intégration et autres dashboards). La liste est l'annuaire des clients, relu chaque jour par Claude Code (lecture seule) depuis la page Notion des dashboards ; réglage `JARVIS_NOTION_DASHBOARDS` ; autres dashboards dans les raccourcis du client (#76).
+- Ajouter un client sans attendre : l'annuaire est relu en fond par Jarvis (à son démarrage, puis chaque jour) ; une relecture en cours ne bloque ni ne recharge la page, la liste affichée reste utilisable.
 
 ## [0.1.0] · 2026-11-17
 

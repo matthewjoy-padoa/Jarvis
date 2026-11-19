@@ -95,19 +95,27 @@ async def lifespan(_app):
 PUSH_EVERY = 60  # secondes, comme le panneau des notifications
 
 
+def _guarded(label: str, job) -> None:
+    """Tâche de fond qui ne doit jamais empêcher les suivantes (ni l'envoi des notifications)."""
+    try:
+        job()
+    except Exception:  # noqa: BLE001
+        log.exception(f"{label} en échec")
+
+
 def _push_round() -> None:
     """Un tour : échéances du jour (créées d'habitude à l'ouverture d'une page), puis envoi des nouvelles notifications ;
-    au passage, le catalogue des DAGs est régénéré si le clone orchestrator local a changé."""
-    try:
-        dag_source.refresh()
-    except Exception:  # noqa: BLE001 : le catalogue des DAGs ne doit pas empêcher l'envoi des notifications
-        log.exception("Catalogue des DAGs : relevé du clone en échec")
+    au passage, le catalogue des DAGs est régénéré si le clone orchestrator local a changé, et l'annuaire des clients est
+    relu s'il a plus d'un jour (au démarrage, puis chaque jour) : « Ajouter un client » l'a déjà, sans attente."""
+    _guarded("Catalogue des DAGs : relevé du clone", dag_source.refresh)
     _deadline_notes()
     web_push.pump(notifications)
+    _guarded("Annuaire des clients : relecture", client_directory.refresh_if_stale)
 
 
 async def _push_loop() -> None:
-    """Toutes les minutes, même sans onglet ouvert : couvre aussi les notifications écrites par la synchro Notion (autre processus)."""
+    """Toutes les minutes, même sans onglet ouvert : couvre aussi les notifications écrites par la synchro Notion (autre processus),
+    et relit l'annuaire des clients quand il a plus d'un jour."""
     while True:
         try:
             await asyncio.to_thread(_push_round)
@@ -132,7 +140,15 @@ def when_text(moment: datetime | None) -> str:
 templates.env.filters["quand"] = when_text
 templates.env.filters["duree"] = duration_text
 templates.env.filters["tokens"] = tokens_text
-templates.env.filters["quand_iso"] = lambda iso: when_text(datetime.fromisoformat(iso)) if iso else ""
+def when_iso(iso: str) -> str:
+    """when_text d'une date ISO (fichier d'état) ; vide si elle manque ou est illisible."""
+    try:
+        return when_text(datetime.fromisoformat(iso))
+    except (TypeError, ValueError):
+        return ""
+
+
+templates.env.filters["quand_iso"] = when_iso
 templates.env.filters["md"] = md
 templates.env.filters["md_inline"] = md_inline
 templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STATUSES)
@@ -389,11 +405,9 @@ def _client_form(request: Request, cfg, error: str = "", new: bool = True, form:
 
 @app.get("/clients/nouveau", response_class=HTMLResponse)
 def client_new(request: Request, client: str = ""):
-    """Choisir le client dans l'annuaire Notion (relu seul en arrière-plan s'il a plus d'un jour) : le formulaire se remplit,
-    à relire avant l'ajout. Sans annuaire (pas de Claude Code), le formulaire à la main."""
-    directory = client_directory.directory()
-    if client_directory.should_refresh(directory):
-        client_directory.refresh()
+    """Choisir le client dans l'annuaire Notion (relu en fond par Jarvis au démarrage, puis chaque jour) : le formulaire se
+    remplit, à relire avant l'ajout. Sans annuaire (pas de Claude Code), le formulaire à la main."""
+    directory = client_directory.refresh_if_stale()  # en secours : Jarvis lancé sans sa boucle de fond, ou annuaire effacé
     entry = client_directory.entry(directory, client) if client else None
     if not entry:
         return _client_form(request, None, directory=directory)
@@ -418,12 +432,14 @@ def client_directory_status(request: Request, lu: str = ""):
 
 
 def _directory_status(request: Request, lu: str, error: str = "") -> HTMLResponse:
-    """Suivi de la lecture ; dès que l'annuaire affiché (lu) est remplacé par un plus récent, la page se recharge."""
+    """Suivi de la lecture. Une première liste arrive : la page se recharge pour l'afficher. Une liste plus récente remplace
+    celle affichée (lu) : un lien propose de l'afficher, sans recharger la page sous les doigts de qui remplit le formulaire."""
     directory = client_directory.directory()
-    if not error and directory.get("lu", "") != lu and not client_directory.running:
+    newer = not client_directory.running and directory.get("lu", "") != lu  # lecture finie, liste différente de celle affichée
+    if not error and newer and not lu:
         return HTMLResponse("", headers={"HX-Refresh": "true"})
-    return templates.TemplateResponse(request, "_client_directory.html", {"annuaire": client_directory.state(), "message": error,
-                                                                          "directory": directory})
+    return templates.TemplateResponse(request, "_client_directory.html", {
+        "annuaire": client_directory.state(), "message": error, "directory": directory, "lu": lu, "updated": newer and bool(lu)})
 
 
 def _config_or_fiche(slug: str):
