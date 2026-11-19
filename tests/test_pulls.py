@@ -190,7 +190,9 @@ def test_the_pr_tab_shows_the_history_and_the_software_switch(monkeypatch):
         "preventiel in:title is:merged merged:>=2026-09-15": [done(8, "[FIX](preventiel) Codes AMT", ended="2026-10-10T10:00:00Z")]})
     monkeypatch.setattr(main, "pulls", store)
     client = TestClient(main.app)
-    assert 'hx-get="/deploiements/client-demo/pr/historique"' in client.get("/deploiements/client-demo/pr/liste").text
+    tab = client.get("/deploiements/client-demo/pr").text  # les deux listes partent ensemble au chargement de l'onglet
+    assert 'hx-get="/deploiements/client-demo/pr/liste"' in tab and 'hx-get="/deploiements/client-demo/pr/historique"' in tab
+    assert "pr/historique" not in client.get("/deploiements/client-demo/pr/liste").text
     html = client.get("/deploiements/client-demo/pr/historique").text
     assert ">#7</a>" in html and "Codes AMT" not in html and "fusionnée" in html and "05/10/2026" in html
     assert "Ajouter les PR fusionnées depuis la réception des données (15/09/2026)" in html and "du logiciel (<code>preventiel</code>)" in html

@@ -29,6 +29,7 @@ ENDED = FIELDS + ",state,mergedAt,closedAt"  # PR de l'historique
 SEARCH = ("gh", "pr", "list", "--state", "closed", "--limit", "200", "--json", ENDED, "--search")  # closed : fusionnées comprises
 DETAILS = "reviewDecision,reviewRequests,statusCheckRollup"  # gh pr view <numéro> --json …
 TTL = 300  # secondes
+OPEN = "PR ouvertes"  # clé de la liste des PR ouvertes parmi les lectures gardées
 SCOPE = re.compile(r"\]\(([^)]+)\)")
 SPLIT = re.compile(r"[,;/+&]")
 COMMON = "all"  # scope des PR qui touchent tous les clients : `[FIX](all) …`
@@ -139,10 +140,16 @@ class PullRequests:
         self.run = run
         self.ttl = ttl
         self._lock = threading.Lock()
-        self._cache: tuple[float, list[PullRequest], str] | None = None
-        self._searches: dict[str, tuple[float, list[PullRequest], str]] = {}  # par recherche GitHub de l'historique
+        # Lectures GitHub gardées cinq minutes, par clé (OPEN : les PR ouvertes ; sinon une recherche de l'historique ou
+        # le lien d'une PR d'agent) : (lu à, PR, message d'erreur, heure de lecture).
+        self._reads: dict[str, tuple[float, list[PullRequest], str, datetime]] = {}
         self._details: dict[int, tuple[float, dict]] = {}  # par numéro de PR : (lu à, CI et relecture)
-        self.read_at: datetime | None = None
+
+    @property
+    def read_at(self) -> datetime | None:
+        """Heure de la dernière lecture des PR ouvertes chez GitHub."""
+        known = self._reads.get(OPEN)
+        return known[3] if known else None
 
     def _stale(self, read: float) -> bool:
         return time.monotonic() - read > self.ttl
@@ -166,28 +173,27 @@ class PullRequests:
 
     def all(self, fresh: bool = False) -> tuple[list[PullRequest], str]:
         """(PR ouvertes, les plus anciennes d'abord, sans CI ni relecture ; message si GitHub n'a pas pu être lu)."""
-        with self._lock:
-            if fresh or not self._cache or self._stale(self._cache[0]):
-                self._cache, self.read_at = (time.monotonic(), *self._list(LIST)), datetime.now()
-            return self._cache[1], self._cache[2]
+        return self._read(OPEN, LIST, fresh)
 
-    def _ended(self, key: str, command: tuple, fresh: bool) -> tuple[list[PullRequest], str]:
-        """Lecture de l'historique gardée cinq minutes ; `gh` tourne hors du verrou (la liste des PR ouvertes n'attend pas)."""
+    def _read(self, key: str, command: tuple, fresh: bool) -> tuple[list[PullRequest], str]:
+        """Lecture `gh` gardée cinq minutes. `gh` tourne hors du verrou, pour que les PR ouvertes et l'historique, chargés
+        ensemble, ne s'attendent pas : deux pages qui trouvent la même clé périmée au même moment lisent donc chacune
+        GitHub (la dernière lecture gagne), un coût accepté plutôt que de bloquer toutes les lectures derrière une seule."""
         with self._lock:
-            known = self._searches.get(key)
+            known = self._reads.get(key)
         if fresh or not known or self._stale(known[0]):
-            known = (time.monotonic(), *self._list(command))
+            known = (time.monotonic(), *self._list(command), datetime.now())
             with self._lock:
-                self._searches = {k: v for k, v in self._searches.items() if not self._stale(v[0])} | {key: known}
+                self._reads = {k: v for k, v in self._reads.items() if not self._stale(v[0])} | {key: known}
         return known[1], known[2]
 
     def search(self, query: str, fresh: bool = False) -> tuple[list[PullRequest], str]:
         """PR fusionnées ou fermées trouvées par une recherche GitHub."""
-        return self._ended(query, (*SEARCH, query), fresh)
+        return self._read(query, (*SEARCH, query), fresh)
 
     def _agent_pr(self, url: str, fresh: bool) -> tuple[list[PullRequest], str]:
         """PR d'un agent, lue par son lien : son titre peut ne pas porter la clé du client."""
-        return self._ended(url, ("gh", "pr", "view", url, "--json", ENDED), fresh)
+        return self._read(url, ("gh", "pr", "view", url, "--json", ENDED), fresh)
 
     def history(self, slug: str, customers: list[str], agent_urls: set[str], since: date | None = None,
                 softwares: set[str] = frozenset(), common: bool = False, fresh: bool = False) -> tuple[list[PullRequest], str]:
