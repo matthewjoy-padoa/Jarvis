@@ -225,15 +225,28 @@ class ClientDirectory:
 
     def should_refresh(self, directory: dict) -> bool:
         """Annuaire absent ou de plus d'un jour, aucune lecture en cours, et pas de tentative dans les 10 dernières minutes
-        (une lecture qui échoue n'est pas relancée à chaque ouverture de la page)."""
-        read, tried = _age(directory.get("lu")), _age(self.state().get("started"))
-        return (read is None or read > MAX_AGE) and not self.running and (tried is None or tried > timedelta(minutes=10))
+        (une lecture qui échoue, ou Claude Code absent, n'est pas relancée chaque minute)."""
+        if self.running or ((read := _age(directory.get("lu"))) is not None and read <= MAX_AGE):
+            return False
+        tried = _age(self.state().get("started"))  # lu seulement quand l'annuaire est à relire
+        return tried is None or tried > timedelta(minutes=10)
+
+    def refresh_if_stale(self, directory: dict | None = None) -> dict:
+        """Relance la lecture si l'annuaire est à relire (boucle de fond de Jarvis, et page « Ajouter un client » en secours) ;
+        renvoie l'annuaire tel qu'il est."""
+        directory = self.directory() if directory is None else directory
+        if self.should_refresh(directory):
+            self.refresh()
+        return directory
 
     def refresh(self) -> ActionResult:
         """Relit l'annuaire en arrière-plan (une vingtaine de secondes)."""
         if not shutil.which(self.claude_bin):
-            return ActionResult(False, f"Claude Code en ligne de commande introuvable ({self.claude_bin}) : installe-le ou "
-                                       "renseigne CLAUDE_BIN dans Réglages, ou remplis le formulaire à la main.", False)
+            message = (f"Claude Code en ligne de commande introuvable ({self.claude_bin}) : installe-le ou renseigne CLAUDE_BIN "
+                       "dans Réglages, ou remplis le formulaire à la main.")
+            # noté comme une tentative : pas de nouvel essai avant 10 minutes, et la page dit pourquoi
+            self._write("annuaire-etat.json", {"running": False, "started": datetime.now().isoformat(timespec="seconds"), "error": message})
+            return ActionResult(False, message, False)
         with self._lock:
             if self.running:
                 return ActionResult(False, "La liste des clients est déjà en cours de lecture.", False)

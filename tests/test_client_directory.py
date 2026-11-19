@@ -223,6 +223,40 @@ def test_an_old_directory_is_read_again_and_the_page_reloads_when_it_is_new(app,
     directory._write("annuaire.json", {**data, "lu": (datetime.now() - timedelta(days=2)).isoformat(timespec="seconds")})
     app.get("/clients/nouveau")
     assert calls == [1]
-    status = app.get("/clients/annuaire/etat", params={"lu": "ancienne"})
-    assert status.headers.get("HX-Refresh") == "true"  # plus récent que celui affiché : la page se recharge
-    assert "HX-Refresh" not in app.get("/clients/annuaire/etat", params={"lu": directory.directory()["lu"]}).headers
+    first = app.get("/clients/annuaire/etat", params={"lu": ""})
+    assert first.headers.get("HX-Refresh") == "true"  # aucune liste n'était affichée : la page se recharge pour la montrer
+    newer = app.get("/clients/annuaire/etat", params={"lu": "ancienne"})
+    assert "HX-Refresh" not in newer.headers and "Afficher la nouvelle liste" in newer.text  # jamais sous les doigts
+    same = app.get("/clients/annuaire/etat", params={"lu": directory.directory()["lu"]})
+    assert "HX-Refresh" not in same.headers and "Afficher la nouvelle liste" not in same.text
+
+
+def test_jarvis_reads_the_directory_in_the_background_so_nobody_waits(app, monkeypatch):
+    """Boucle de fond (chaque minute, dès le démarrage) : l'annuaire de plus d'un jour est relu sans qu'on ouvre la page."""
+    directory = main.client_directory
+    calls = []
+    monkeypatch.setattr(directory, "refresh", lambda: calls.append(1))
+    monkeypatch.setattr(main.dag_source, "refresh", lambda: 1 / 0)  # une tâche en échec n'empêche pas les suivantes
+    monkeypatch.setattr(main.web_push, "pump", lambda _n: None)
+    main._push_round()
+    assert not calls  # lu il y a moins d'un jour
+    data = directory.directory()
+    directory._write("annuaire.json", {**data, "lu": (datetime.now() - timedelta(days=2)).isoformat(timespec="seconds")})
+    main._push_round()
+    assert calls == [1]
+
+
+def test_without_claude_the_reading_is_not_retried_every_minute(tmp_path):
+    directory = ClientDirectory(folder=tmp_path / "notion", claude_bin=str(tmp_path / "absent"))
+    directory.refresh_if_stale()
+    state = directory.state()
+    assert "CLAUDE_BIN" in state["error"] and not directory.should_refresh({})  # noté : prochain essai dans 10 minutes
+
+
+def test_a_refresh_with_a_list_already_shown_keeps_it_usable(app, tmp_path):
+    directory = main.client_directory
+    directory._write("annuaire-etat.json", {"running": True, "started": datetime.now().isoformat()})
+    directory._proc = type("Proc", (), {"poll": lambda self: None})()  # lecture en cours dans ce Jarvis
+    page = unescape(app.get("/clients/nouveau").text)
+    assert '<option value="acme1234">ACME 12-34</option>' in page and "la liste ci-dessus reste utilisable" in page
+    assert "Première lecture" not in page
