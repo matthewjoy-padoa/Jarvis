@@ -9,7 +9,7 @@
   <a href="/clients" class="btn-link">← Clients</a>
 </div>
 <p class="muted">La configuration est enregistrée sur ta machine (<code>config/clients/</code>, hors git) : chacun suit ses propres clients. Après l'enregistrement, lance la synchro (routine ou « Rafraîchir depuis Notion ») pour charger ses données.</p>
-{% if error %}<p class="result ko">{{ error }}</p>{% endif %}
+{% if error %}<p class="result ko">{{ error | reglages }}</p>{% endif %}
 {% if notice %}<p class="result ok">{{ notice }}</p>{% endif %}
 
 {% if new %}

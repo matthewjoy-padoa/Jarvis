@@ -11,5 +11,5 @@
 {% elif ok %}
 <p class="result ok" data-sync-state="ok" role="status"{% if not simulated and reload %} data-reload-after="3"{% endif %}{% if reload %} hidden{% endif %}>{% if simulated %}{{ ic.icon("flask", "Simulation", "ic-muted") }} {% endif %}{{ message }}</p>
 {% else %}
-<p class="result ko" data-sync-state="ko" title="Cliquer pour fermer">{{ message }}</p>
+<p class="result ko" data-sync-state="ko" title="Cliquer pour fermer">{{ message | reglages }}</p>
 {% endif %}

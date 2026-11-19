@@ -56,7 +56,7 @@ FIELDS = (
     Field("JARVIS_NOTION_DASHBOARDS", "Liste des dashboards clients", "text",
           "Id de la page Notion qui liste les dashboards des clients (annuaire de « Ajouter un client »). Vide : « Liste des dashboards "
           "pour le déploiement des nouveaux clients »", section=NOTION),
-    Field("ORCHESTRATOR_DIR", "Dossier de integration-orchestrator", "path", "Pour les agents Claude", live=False, section=FOLDERS),
+    Field("ORCHESTRATOR_DIR", "Dossier de integration-orchestrator", "path", "Clone local de integration-orchestrator : DAGs proposés, onglet PR, agents Claude. Vide : ~/integration-orchestrator", live=False, section=FOLDERS),
     Field("FLOW_DIGGER_DIR", "Dossier de Flow Digger", "path", "Vide : cherché aux emplacements habituels", section=FOLDERS),
     Field("JARVIS_TZ", "Fuseau horaire", "text", "Vide : Europe/Paris, quelle que soit l'heure du serveur (la VM est en UTC). "
           "Nom IANA, ex. Europe/Paris", live=False, section=FOLDERS),

@@ -8,7 +8,7 @@
   <a href="{{ vers }}" class="btn-link">← Retour</a>
 </div>
 <p class="muted">Ils s'affichent dans les raccourcis à droite de chaque page et en haut de la fiche. Jarvis ne fait que les ouvrir dans ton navigateur : il ne lit jamais leur contenu.</p>
-{% if error %}<p class="result ko">{{ error }}</p>{% endif %}
+{% if error %}<p class="result ko">{{ error | reglages }}</p>{% endif %}
 <form class="panel client-form" method="post" action="/clients/{{ cfg.slug }}/liens">
   <input type="hidden" name="vers" value="{{ vers }}">
   <label class="field">Google Drive

@@ -554,7 +554,7 @@ def test_the_agent_form_says_before_the_click_why_no_agent_would_start(monkeypat
     claude.runs.clear()
     monkeypatch.setattr(claude, "problem", lambda: "Clone de integration-orchestrator introuvable (/x) : renseigne ORCHESTRATOR_DIR dans Réglages.")
     form = unescape(client.get("/deploiements/client-demo/recette/R-03/brief").text)
-    assert "L'agent ne peut pas partir : Clone de integration-orchestrator introuvable" in form and 'href="/reglages"' in form
+    assert "L'agent ne peut pas partir : Clone de integration-orchestrator introuvable" in form and 'href="/reglages#reglage-ORCHESTRATOR_DIR"' in form
     assert "Lancer l'agent" in form and " disabled " in form
     assert form.index('id="agent-client-demo-R-03"') < form.index("</form>")  # résultat sous le bouton, dans le formulaire
 
