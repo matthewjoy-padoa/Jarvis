@@ -7,7 +7,9 @@
 {% if vue == 'ced' %}{% include "_ced.html" %}{% else %}
 {% set grouped = vue != 'liste' %}
 {% import "_charts.html" as charts with context %}
-{% for d in deployments if d.injection_counts or d.resources %}
+{# Répartition et détail par statut : dans la vue Liste, et sur la page de tous les clients (un graphique par client) ;
+   sur la fiche d'un client, la vue par ressource ne garde que sa liste. #}
+{% for d in deployments if (show_client or not grouped) and (d.injection_counts or d.resources) %}
 <section class="chart-row">
   {% set scope = {"client": d.client} if show_client else {} %}
   {{ charts.segbar(d.client if show_client else "Répartition des injections", d.injection_groups, "cartes", slim=true, filter_key="groupe", scope=scope, href=(base ~ "?vue=liste") if grouped else None) }}

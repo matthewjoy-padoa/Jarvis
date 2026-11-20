@@ -114,7 +114,10 @@ def test_injections_grouped_by_resource(acme):
 
 def test_grouped_view_is_the_default(app):
     html = app.get("/deploiements/acme/injections").text
-    assert 'id="acme-firm"' in html and 'class="res-block worst-0"' in html and "open" in html
+    assert '<li class="inj-row" id="acme-firm" data-group="ko">' in html  # une ligne par ressource, ce qui bloque en haut
+    assert html.index('id="acme-firm"') < html.index('id="acme-visit_histo"')
+    assert "Vérification KO recette · Injection des firms · 2 cartes" in html  # la carte en KO est nommée
+    assert "Répartition des injections" not in html and "data-inj-stack" in html  # ni graphique ni bloc : la liste, et la stack en haut
     assert 'id="acme-firm"' not in app.get("/deploiements/acme/injections?vue=liste").text
 
 
