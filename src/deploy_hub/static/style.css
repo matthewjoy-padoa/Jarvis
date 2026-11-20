@@ -229,9 +229,10 @@ tbody tr:hover td { background: var(--bg); }
   background: var(--surface); box-shadow: var(--shadow-lift); font-size: 13px; }
 .refresh .refresh-out .result { cursor: pointer; }
 .refresh.htmx-request .refresh-out { display: none; }
+.auto-sync-box { display: inline-flex; align-items: center; gap: 8px; }  /* « · prochaine vers 14:15 » puis le bouton */
+.auto-sync:not([aria-pressed="true"]) { color: var(--muted); }  /* petit bouton bascule : mêmes règles que « Vue simplifiée » */
 /* Bouton « Rafraîchir » qui se remplit : les deux libellés sont superposés (la largeur est celle du plus long, le bouton ne
    bouge pas) ; la jauge est un fond qui avance de gauche à droite (--pct) ; sans étapes connues (API), des rayures qui défilent. */
-.auto-sync:not([aria-pressed="true"]) { color: var(--muted); }  /* petit bouton bascule : mêmes règles que « Vue simplifiée » */
 .sync-btn { position: relative; overflow: hidden; }
 .sync-btn > .btn-face { position: relative; z-index: 1; display: inline-grid; }
 .sync-btn .btn-idle, .sync-btn .btn-busy { grid-area: 1 / 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }

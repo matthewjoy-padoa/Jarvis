@@ -239,9 +239,11 @@ def test_automatic_sync_is_off_by_default_and_toggled_from_the_fiche(app, tmp_pa
     assert """hx-post="/clients/acme/synchro-auto" hx-vals='{"actif": "1"}'""" in fiche
     r = app.post("/clients/acme/synchro-auto", data={"actif": "1"})
     assert r.status_code == 200 and 'aria-pressed="true"' in r.text and "Synchro auto : oui" in r.text and '"actif": "0"' in r.text
+    assert 'class="auto-sync-box"' in r.text and "· prochaine " in r.text  # l'heure prévue s'affiche dès l'activation
     assert client_config.load("acme", tmp_path).auto_sync is True and "auto_sync: true" in yaml_file.read_text(encoding="utf-8")
     app.post("/clients/enregistrer", data={"existing_slug": "acme", "client": "Acme SST", "page_id": PAGE})  # modifier sa configuration ne la coupe pas
     assert client_config.load("acme", tmp_path).auto_sync is True
-    assert "Synchro auto : non" in app.post("/clients/acme/synchro-auto", data={"actif": "0"}).text
+    off = app.post("/clients/acme/synchro-auto", data={"actif": "0"}).text
+    assert "Synchro auto : non" in off and "· prochaine" not in off
     assert client_config.load("acme", tmp_path).auto_sync is False
     assert app.post("/clients/inconnu/synchro-auto", data={"actif": "1"}).status_code == 404
