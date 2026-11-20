@@ -27,8 +27,24 @@
 </section>
 {% endif %}
 {% if d.pending and not d.archived %}<p class="result ok pending-note">Pas encore synchronisé : les données Notion de {{ d.client }} arriveront à la première synchro. « Rafraîchir depuis Notion » la lance (ou <code>/jarvis-sync</code> dans Claude Code ouvert sur le dossier de Jarvis).</p>{% endif %}
+{% set here = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
 <nav class="tabs" aria-label="Onglets">
-  {% for key, label in tabs %}<a href="/deploiements/{{ d.slug }}/{{ key }}" class="{{ 'active' if key == tab }}">{{ label }}{% if key == 'recette' and d.open_retours %} <span class="count" title="Retours ouverts">{{ d.open_retours | length }}</span>{% endif %}</a>{% endfor %}
+  {% for key, label in tabs if not simple_view or key in kept_tabs or key == tab %}{% set off = simple_view and key not in kept_tabs %}<a href="/deploiements/{{ d.slug }}/{{ key }}" class="{{ 'active' if key == tab }}{{ ' off-view' if off }}"{% if off %} title="Hors de la vue simplifiée : ouvert par un lien"{% endif %}>{{ label }}{% if key == 'recette' and d.open_retours %} <span class="count" title="Retours ouverts">{{ d.open_retours | length }}</span>{% endif %}</a>{% endfor %}
+  {# Vue simplifiée : seulement les onglets choisis (roue), pour tous les clients ; les autres restent joignables par leur adresse. #}
+  <form class="tabs-view" method="post" action="/fiche/vue">
+    <input type="hidden" name="vers" value="{{ here }}">
+    <button type="submit" class="secondary view-toggle" name="vue" value="{{ 'complete' if simple_view else 'simple' }}" aria-pressed="{{ 'true' if simple_view else 'false' }}"
+            title="{% if simple_view %}Revenir à tous les onglets{% else %}Ne garder que : {{ tabs | selectattr('0', 'in', kept_tabs) | map(attribute='1') | join(', ') }}{% endif %}">Vue simplifiée</button>
+    <button type="button" class="secondary view-pick" popovertarget="tabs-pick" title="Choisir les onglets de la vue simplifiée" aria-label="Choisir les onglets de la vue simplifiée">{{ ic.icon("gear") }}</button>
+  </form>
 </nav>
+<form class="tabs-pick" id="tabs-pick" popover method="post" action="/fiche/vue">
+  <input type="hidden" name="vers" value="{{ here }}">
+  <p class="tabs-pick-title">Onglets de la vue simplifiée</p>
+  {% for key, label in tabs %}<label><input type="checkbox" name="onglets" value="{{ key }}"{% if key in kept_tabs %} checked{% endif %}> {{ label }}</label>
+  {% endfor %}
+  <p class="muted">Le même choix pour tous les clients, dans ce navigateur. Un onglet masqué reste joignable par la recherche (⌘K) et par les liens.</p>
+  <button type="submit" name="vue" value="simple">Afficher ces onglets</button>
+</form>
 {% with show_client = false %}{% include "_" ~ tab ~ ".html" %}{% endwith %}
 {% endblock %}

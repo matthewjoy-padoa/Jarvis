@@ -28,7 +28,7 @@
 <div class="grid">
   {% for d in deployments %}
   <div class="card card-linked">
-    <div class="card-head"><a class="card-link" href="/deploiements/{{ d.slug }}/synthese"><strong>{{ ic.health(d) }} {{ ic.client_emoji(d) }}{{ d.client }}</strong></a><span class="badge">{{ d.software }}</span></div>
+    <div class="card-head"><a class="card-link" href="/deploiements/{{ d.slug }}"><strong>{{ ic.health(d) }} {{ ic.client_emoji(d) }}{{ d.client }}</strong></a><span class="badge">{{ d.software }}</span></div>
     <div class="card-charts">
       {{ charts.client_bars(d) }}
     </div>
@@ -51,7 +51,7 @@
 <div class="grid">
   {% for c in pending %}
   <div class="card card-linked pending-card">
-    <div class="card-head"><a class="card-link" href="/deploiements/{{ c.slug }}/synthese"><strong>{{ c.client }}</strong></a>{% if c.software %}<span class="badge">{{ c.software }}</span>{% endif %}</div>
+    <div class="card-head"><a class="card-link" href="/deploiements/{{ c.slug }}"><strong>{{ c.client }}</strong></a>{% if c.software %}<span class="badge">{{ c.software }}</span>{% endif %}</div>
     <p class="muted">Configuré, pas encore synchronisé : ses données arrivent dans quelques instants, sinon « Rafraîchir depuis Notion » sur sa fiche.</p>
     <div class="card-actions">
       <a class="card-config" href="/clients/{{ c.slug }}/configuration">Configurer</a>
@@ -68,7 +68,7 @@
   <div class="grid">
     {% for d in archived %}
     <div class="card card-linked archived-card">
-      <div class="card-head"><a class="card-link" href="/deploiements/{{ d.slug }}/synthese"><strong>{{ ic.client_emoji(d) }}{{ d.client }}</strong></a><span class="badge">{{ d.software }}</span></div>
+      <div class="card-head"><a class="card-link" href="/deploiements/{{ d.slug }}"><strong>{{ ic.client_emoji(d) }}{{ d.client }}</strong></a><span class="badge">{{ d.software }}</span></div>
       <p class="muted">{{ archive.since(d.archived_at) }} · {% if d.last_sync %}dernière synchro {{ d.last_sync | quand }}{% else %}jamais synchronisé{% endif %}</p>
       <div class="card-actions">
         {{ archive.unarchive_form(d.slug) }}

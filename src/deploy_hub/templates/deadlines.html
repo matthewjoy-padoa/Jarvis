@@ -73,7 +73,7 @@
       <td><span class="badge {{ 'danger' if 0 <= days < 7 }}">J{{ '%+d' % (-days) }}</span></td>
       <td><span class="badge">{{ i.kind }}</span></td>
       <td>{{ item_link(i) }}</td>
-      <td><a href="/deploiements/{{ i.d.slug }}/synthese">{{ i.d.client }}</a></td>
+      <td><a href="/deploiements/{{ i.d.slug }}">{{ i.d.client }}</a></td>
     </tr>
   {% else %}
     <tr><td colspan="5" class="muted">Aucune échéance{{ " sur cette période" if periode }}.</td></tr>

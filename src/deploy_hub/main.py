@@ -205,6 +205,8 @@ DEPLOYMENT_TABS = [
     ("regles", "Règles"),
     ("accompagnement", "Accompagnement"),
 ]
+TABS_COOKIE = "jarvis_onglets"  # vue de la fiche, par navigateur : « simple:injections.recette.pr » ou « complete:… » (pas de virgule dans un cookie)
+SIMPLE_TABS = ("injections", "recette", "pr")  # onglets que garde la vue simplifiée tant qu'on n'en a pas choisi d'autres
 
 
 def _deployments(request: Request) -> list[Deployment]:
@@ -232,9 +234,31 @@ def _current(request: Request) -> Deployment | None:
     return request.state.current
 
 
-def _remember(response, slug: str):
-    response.set_cookie(CLIENT_COOKIE, slug, max_age=365 * 24 * 3600, samesite="lax")
+def _tab_view(request: Request) -> tuple[bool, list[str]]:
+    """Vue de la fiche (cookie) : la vue simplifiée est-elle active, et les onglets qu'elle garde, dans l'ordre de la fiche."""
+    mode, _, keys = request.cookies.get(TABS_COOKIE, "").partition(":")
+    return mode == "simple", _known_tabs(keys.split(".")) or list(SIMPLE_TABS)
+
+
+def _known_tabs(keys) -> list[str]:
+    return [k for k, _ in DEPLOYMENT_TABS if k in keys]
+
+
+def _fiche_url(request: Request, slug: str) -> str:
+    """Onglet sur lequel s'ouvre une fiche : la synthèse, sauf si la vue simplifiée ne la garde pas. Les liens « ouvrir la
+    fiche » visent /deploiements/<slug>, qui redirige ici."""
+    simple, kept = _tab_view(request)
+    return f"/deploiements/{slug}/{kept[0] if simple and 'synthese' not in kept else 'synthese'}"
+
+
+def _keep(response, cookie: str, value: str):
+    """Préférence gardée un an dans ce navigateur (client en cours, vue des fiches)."""
+    response.set_cookie(cookie, value, max_age=365 * 24 * 3600, samesite="lax")
     return response
+
+
+def _remember(response, slug: str):
+    return _keep(response, CLIENT_COOKIE, slug)
 
 
 def _render(request: Request, template: str, active: str, **context) -> HTMLResponse:
@@ -492,7 +516,7 @@ def client_links(request: Request, slug: str, vers: str = ""):
     cfg = client_config.load(slug)
     if cfg is None:  # pas encore de configuration : il faut d'abord sa fiche Notion
         return RedirectResponse(f"/clients/{slug}/configuration", status_code=303)
-    return _links_page(request, cfg, _local_path(vers, f"/deploiements/{slug}/synthese"))
+    return _links_page(request, cfg, _local_path(vers, _fiche_url(request, slug)))
 
 
 @app.post("/clients/{slug}/liens", response_class=HTMLResponse)
@@ -501,7 +525,7 @@ async def client_links_save(request: Request, slug: str):
     if cfg is None:
         raise HTTPException(404, f"Client sans configuration : {slug}")
     form = dict(await request.form())
-    vers = _local_path(str(form.get("vers") or ""), f"/deploiements/{slug}/synthese")
+    vers = _local_path(str(form.get("vers") or ""), _fiche_url(request, slug))
     try:
         dashboard = str(form.get("notion_url") or "").strip()
         if dashboard and not dashboard.startswith(("http://", "https://")):
@@ -529,7 +553,7 @@ async def client_save(request: Request, background: BackgroundTasks):
     if existing:
         return RedirectResponse(f"/clients?enregistre={cfg.slug}", status_code=303)
     _sync_new_client(cfg.slug, background)  # nouveau client : ses données arrivent sans attendre la routine ni « Rafraîchir »
-    return RedirectResponse(f"/deploiements/{cfg.slug}/synthese", status_code=303)
+    return RedirectResponse(_fiche_url(request, cfg.slug), status_code=303)
 
 
 def _sync_new_client(slug: str, background: BackgroundTasks) -> None:
@@ -748,8 +772,8 @@ def sources(request: Request):
 
 
 @app.get("/deploiements/{slug}")
-def deployment_root(slug: str):
-    return RedirectResponse(f"/deploiements/{slug}/synthese")
+def deployment_root(request: Request, slug: str):
+    return RedirectResponse(_fiche_url(request, slug))
 
 
 ICON_NAME = re.compile(r"icone\.(png|jpg|gif|webp)")
@@ -877,19 +901,30 @@ CLIENT_FILTERED_PAGES = ("/", "/brief", "/deadlines", "/actions", "/recette", "/
 
 
 @app.get("/client/{slug}")
-def switch_client(slug: str, vers: str = "/"):
+def switch_client(request: Request, slug: str, vers: str = "/"):
     """Change de client en cours en restant sur la même page : même onglet de fiche, ou même page globale."""
     _get(slug)
     path, _, query = vers.partition("?")
     if m := re.match(r"^/deploiements/[^/]+(/[a-z]+)?$", path):
-        target = f"/deploiements/{slug}{m[1] or '/synthese'}"
+        target = f"/deploiements/{slug}{m[1]}" if m[1] else _fiche_url(request, slug)
     elif path in CLIENT_FILTERED_PAGES:  # pages globales : leurs filtres suivent le client en cours
         dropped = ("client", "tous") if path == "/deadlines" else ("client",)  # tous=true : tous les clients sur Deadlines seulement
         kept = urlencode([(k, v) for k, v in parse_qsl(query) if k not in dropped])
         target = path + (f"?{kept}" if kept else "")
     else:
-        target = f"/deploiements/{slug}/synthese"
+        target = _fiche_url(request, slug)
     return _remember(RedirectResponse(target, status_code=303), slug)
+
+
+@app.post("/fiche/vue")
+def fiche_view(request: Request, vue: str = Form("complete"), onglets: list[str] = Form([]), vers: str = Form("/")):
+    """Vue complète ou simplifiée des fiches, et les onglets que garde la vue simplifiée : un choix par navigateur (cookie),
+    le même pour tous les clients. Sans onglet coché, la vue simplifiée garde ceux d'avant."""
+    simple, kept = vue == "simple", _known_tabs(onglets) or _tab_view(request)[1]
+    target = _local_path(vers, "/")
+    if simple and (m := re.match(r"^(/deploiements/[^/]+)/([a-z]+)$", target.partition("?")[0])) and m[2] not in kept:
+        target = f"{m[1]}/{kept[0]}"  # l'onglet ouvert sort de la vue : on passe au premier gardé
+    return _keep(RedirectResponse(target, status_code=303), TABS_COOKIE, f"{'simple' if simple else 'complete'}:{'.'.join(kept)}")
 
 
 @app.get("/deploiements/{slug}/pr/liste", response_class=HTMLResponse)
@@ -906,6 +941,7 @@ def deployment_tab(request: Request, slug: str, tab: str, tous: bool = False, vu
         raise HTTPException(404, f"Onglet inconnu : {tab}")
     d = _get(slug)
     request.state.current = d  # la fiche ouverte devient le client en cours
+    simple_view, kept_tabs = _tab_view(request)
     page = _render(
         request,
         "deployment.html",
@@ -914,6 +950,8 @@ def deployment_tab(request: Request, slug: str, tab: str, tous: bool = False, vu
         deployments=[d],
         tabs=DEPLOYMENT_TABS,
         tab=tab,
+        simple_view=simple_view,
+        kept_tabs=kept_tabs,
         show_all=tous,
         vue=vue,
         milestones=[(MILESTONE_LABELS.get(k, k), v) for k, v in sorted(d.milestones.items(), key=lambda kv: kv[1])],

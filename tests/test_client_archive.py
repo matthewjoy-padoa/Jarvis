@@ -107,8 +107,8 @@ def test_archive_from_the_clients_page_and_back(app):
     assert r.status_code == 303 and r.headers["location"] == "/clients?archive=acme"
     page = app.get("/clients?archive=acme").text
     cards, archives = page.split('id="archives"', 1)
-    assert "Acme est archivé" in cards and 'href="/deploiements/acme/synthese"' not in cards.split("<main>", 1)[1]
-    assert 'href="/deploiements/acme/synthese"' in archives and 'action="/clients/acme/desarchiver"' in archives
+    assert "Acme est archivé" in cards and 'href="/deploiements/acme"' not in cards.split("<main>", 1)[1]
+    assert 'href="/deploiements/acme"' in archives and 'action="/clients/acme/desarchiver"' in archives
     assert "Acme" not in _bar(app.get("/").text)  # il était le client en cours : le menu passe à un client suivi
     assert "Bolt" in _bar(app.get("/").text)
     assert "Acme" not in app.get("/palette?q=acme").text  # ni dans la recherche
