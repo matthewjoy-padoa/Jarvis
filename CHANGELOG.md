@@ -36,6 +36,7 @@ Jarvis suit une numérotation `0.MINEUR.CORRECTIF` tant qu'il n'est pas stable :
 - Onglet PR : toute la ligne d'une PR ouvre la PR dans GitHub (nouvel onglet), plus seulement le petit lien ; le numéro « #123 » s'affiche comme le reste de la ligne.
 - Emoji des clients sans jeton Notion : une petite lecture à part, sur Haiku (une dizaine de secondes, l'annuaire n'en est pas ralenti) prend l'icône du dashboard intégration de chaque client suivi qui n'en a pas encore (emoji ou image) ; elle s'affiche aussitôt et la synchro la reporte dans la fiche. Un client ajouté a la sienne dans la minute.
 - Archiver un client quand on ne travaille plus dessus (sa carte de la page Clients, ou Configurer) : il sort du menu, de l'accueil, de la recherche, des notifications et de la synchro ; sa fiche reste consultable dans « Archivés », en bas de la page Clients ; « Désarchiver » le remet dans le suivi et relance sa synchro. Rien ne bouge sur le disque : clé `archived` de son yaml.
+- Filtres mémorisés : la recherche, les filtres et le tri d'une liste (retours, actions, injections, règles, agents…) sont gardés dans le navigateur, page par page, et remis au retour sur la page, tout comme la recherche et l'état choisi (Avec KO, En cours…) de la vue « Par ressource » des injections ; la liste et le kanban d'un même onglet les partagent. Le filtre « Client » continue de suivre le client du menu, un lien venant d'un graphique l'emporte, « Effacer les filtres » vide la mémoire.
 
 ## [0.1.0] · 2026-11-17
 
