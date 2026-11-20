@@ -787,18 +787,18 @@ VERIFICATIONS = "verifications.json"  # data/notion/verifications.json : derniè
 CHECKED_FORMAT = "%d/%m/%Y %H:%M"
 
 
-def stale_clients(minutes: int, root: Path = PROJECT_ROOT) -> list[str]:
-    """Clients suivis dont la dernière vérification dans Notion (mark_checked) date d'au moins « minutes », ou qui n'ont
-    jamais été vérifiés : ceux que la synchro automatique doit relire."""
+def next_check(minutes: int, slugs: list[str], root: Path = PROJECT_ROOT) -> datetime | None:
+    """Moment à partir duquel l'un de ces clients est à revérifier dans Notion : sa dernière vérification (mark_checked)
+    plus « minutes » ; datetime.min, c'est-à-dire tout de suite, s'il n'a jamais été vérifié. None : aucun client donné.
+    C'est l'échéance de la synchro automatique."""
     seen = _load_json(data_dir(root) / "notion" / VERIFICATIONS, {})
-    limit = datetime.now() - timedelta(minutes=minutes)
 
-    def stale(slug: str) -> bool:
+    def due(slug: str) -> datetime:
         try:
-            return datetime.strptime(seen[slug], CHECKED_FORMAT) <= limit
+            return datetime.strptime(seen[slug], CHECKED_FORMAT) + timedelta(minutes=minutes)
         except (KeyError, TypeError, ValueError):
-            return True
-    return [slug for slug in _followed(root) if stale(slug)]
+            return datetime.min
+    return min(map(due, slugs), default=None)
 
 
 def mark_checked(slugs: list[str], root: Path = PROJECT_ROOT) -> None:

@@ -130,7 +130,7 @@ def _check_claude_login(startup: bool = False) -> None:
 
 SYNC_EVERY_MIN = 60  # réglage JARVIS_SYNC_EVERY_MIN (minutes ; 0 : jamais)
 SYNC_RETRY_S = 300  # synchro automatique non partie (une autre tourne, claude introuvable) : nouvel essai 5 minutes après
-_auto_sync_next = time.monotonic() + SYNC_RETRY_S  # pas avant ce moment ; au démarrage : on laisse Jarvis se lancer
+_auto_sync_next = datetime.now() + timedelta(seconds=SYNC_RETRY_S)  # pas avant ce moment ; au démarrage : on laisse Jarvis se lancer
 
 
 def auto_sync_every() -> int:
@@ -139,18 +139,40 @@ def auto_sync_every() -> int:
     return int(value) if value.isdigit() else SYNC_EVERY_MIN
 
 
-def _auto_sync() -> None:
-    """Synchro Notion des clients qui l'ont demandée (bouton « Synchro auto » de leur fiche ; aucun par défaut), lancée
-    par l'app dès que l'un d'eux n'a pas été vérifié depuis l'intervalle (une heure par défaut) : une synchro faite à la
-    main compte, et un redémarrage de Jarvis ne remet rien à zéro. Par l'API avec un jeton Notion, sinon par la routine
-    Claude Code. Partie : la suivante au plus tôt un intervalle après, même si un client reste en échec ; pas partie :
-    nouvel essai cinq minutes plus tard."""
-    global _auto_sync_next
+def auto_sync_plan() -> tuple[list[str], datetime | None]:
+    """Synchro Notion automatique : les clients qui l'ont demandée (bouton « Synchro auto » de leur fiche ; aucun par
+    défaut) et le moment où elle doit partir, None si rien n'est prévu (coupée dans Réglages, ou demandée par personne).
+    Elle part dès que l'un d'eux n'a pas été vérifié depuis l'intervalle (une heure par défaut) : une synchro faite à la
+    main compte, et un redémarrage de Jarvis ne remet rien à zéro. Jamais avant _auto_sync_next."""
     every = auto_sync_every()
-    if not every or time.monotonic() < _auto_sync_next:
-        return
-    wanted = [c.slug for c in client_config.active_configs() if c.auto_sync]
-    if not set(wanted) & set(sync_notion.stale_clients(every)):
+    wanted = [c.slug for c in client_config.active_configs() if c.auto_sync] if every else []
+    if not wanted:
+        return [], None
+    return wanted, max(sync_notion.next_check(every, wanted), _auto_sync_next)
+
+
+def auto_sync_note(d: Deployment) -> str:
+    """« prochaine vers 14:15 », à côté de la dernière synchro d'une fiche : l'heure prévue de la synchro automatique de
+    ce client. Vide s'il ne l'a pas demandée, si rien n'est prévu, ou pendant qu'une synchro tourne (règle d'affichage :
+    le bouton « Rafraîchir » porte alors l'avancement)."""
+    if not d.auto_sync or sync_routine.running or _refresh_lock.locked():
+        return ""
+    wanted, due = auto_sync_plan()
+    if due is None or d.slug not in wanted:
+        return ""
+    now = datetime.now()
+    if due <= now + timedelta(seconds=PUSH_EVERY):  # la boucle de fond regarde une fois par minute
+        return "prochaine dans la minute"
+    return f"prochaine vers {due:%H:%M}" if due.date() == now.date() else f"prochaine le {due:%d/%m} vers {due:%H:%M}"
+
+
+def _auto_sync() -> None:
+    """Lance la synchro Notion automatique quand son heure est venue (auto_sync_plan), pour tous les clients qui l'ont
+    demandée : par l'API avec un jeton Notion, sinon par la routine Claude Code. Partie : la suivante au plus tôt un
+    intervalle après, même si un client reste en échec ; pas partie : nouvel essai cinq minutes plus tard."""
+    global _auto_sync_next
+    wanted, due = auto_sync_plan()
+    if due is None or due > datetime.now():
         return
     if notion_api.load_token():
         threading.Thread(target=_refresh, args=(wanted,), name="jarvis-sync-auto", daemon=True).start()
@@ -158,7 +180,7 @@ def _auto_sync() -> None:
     else:
         r = sync_routine.start(wanted, auto=True)
         started, message = r.ok, r.message
-    _auto_sync_next = time.monotonic() + (every * 60 if started else SYNC_RETRY_S)
+    _auto_sync_next = datetime.now() + timedelta(seconds=auto_sync_every() * 60 if started else SYNC_RETRY_S)
     log.info(f"Synchro Notion automatique : {message}")
 
 
@@ -230,6 +252,7 @@ templates.env.filters["md_inline"] = md_inline
 templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STATUSES)
 templates.env.globals["kanban_columns"] = kanban_columns
 templates.env.globals["auto_sync_every"] = auto_sync_every  # bouton « Synchro auto » d'une fiche
+templates.env.globals["auto_sync_note"] = auto_sync_note
 templates.env.globals["ACTION_STATUSES"] = ACTION_STATUSES
 templates.env.globals["RETOUR_STATUSES"] = RETOUR_STATUSES
 try:

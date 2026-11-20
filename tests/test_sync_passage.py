@@ -287,6 +287,18 @@ def known_name(root: Path, q: dict) -> str:
     return known[q["requete"]].replace("-", "_")
 
 
+def frozen_clock(monkeypatch, main, start: datetime) -> list[datetime]:
+    """Fige l'heure vue par main : l'élément 0 de la liste rendue est « maintenant », à avancer à la main."""
+    now = [start]
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now[0]
+    monkeypatch.setattr(main, "datetime", Clock)
+    return now
+
+
 def test_jarvis_syncs_by_itself_the_clients_that_asked_for_it(monkeypatch):
     from types import SimpleNamespace as Config
     from deploy_hub import main
@@ -295,50 +307,88 @@ def test_jarvis_syncs_by_itself_the_clients_that_asked_for_it(monkeypatch):
     monkeypatch.setattr(main.client_config, "active_configs", lambda *a: [Config(slug=s, auto_sync=v) for s, v in on.items()])
     monkeypatch.setattr(main.sync_routine, "start", lambda slug="", client="", auto=False: started.append((slug, auto)) or main.ActionResult(answer_ok[0], "…", False))
     monkeypatch.setattr(main.notion_api, "load_token", lambda: None)
-    monkeypatch.setattr(main.sync_notion, "stale_clients", lambda minutes: asked.append(minutes) or (["acme", "calme"] if due[0] else []))
+    monkeypatch.setattr(main.sync_notion, "next_check", lambda minutes, slugs: asked.append(minutes) or (datetime.min if due[0] else datetime.max))
     monkeypatch.delenv("JARVIS_SYNC_EVERY_MIN", raising=False)
-    clock = [1000.0]
-    monkeypatch.setattr(main.time, "monotonic", lambda: clock[0])
-    monkeypatch.setattr(main, "_auto_sync_next", clock[0] + main.SYNC_RETRY_S)  # Jarvis vient de démarrer
-    main._auto_sync()
-    assert started == []  # pas pendant le démarrage
-    clock[0] += main.SYNC_RETRY_S
+    clock = frozen_clock(monkeypatch, main, datetime(2026, 11, 20, 13, 0))
+    retry = timedelta(seconds=main.SYNC_RETRY_S)
+    monkeypatch.setattr(main, "_auto_sync_next", clock[0] + retry)  # Jarvis vient de démarrer
     main._auto_sync()
     assert started == []  # aucun client ne l'a demandée : rien ne part, même s'ils n'ont pas été vérifiés
     on.update(acme=True, bolt=True)
     main._auto_sync()
+    assert started == []  # pas pendant le démarrage
+    clock[0] += retry
+    main._auto_sync()
     main._auto_sync()
     assert started == [(["acme", "bolt"], True)] and asked[-1] == 60  # l'un d'eux est à revérifier : ceux qui l'ont demandée, une fois
-    clock[0] += 59 * 60
+    clock[0] += timedelta(minutes=59)
     main._auto_sync()
     assert len(started) == 1  # la suivante au plus tôt une heure après, même si un client reste en échec
-    clock[0] += 60
+    clock[0] += timedelta(minutes=1)
     due[0] = False  # tout a été vérifié entre-temps (bouton d'une fiche, « Tout rafraîchir ») : rien à faire
     main._auto_sync()
     assert len(started) == 1
     due[0], answer_ok[0] = True, False  # une synchro manuelle tourne : nouvel essai cinq minutes après, pas une heure
     main._auto_sync()
-    clock[0] += main.SYNC_RETRY_S - 1
+    clock[0] += retry - timedelta(seconds=1)
     main._auto_sync()
     assert len(started) == 2
-    clock[0] += 1
+    clock[0] += timedelta(seconds=1)
     answer_ok[0] = True
     main._auto_sync()
     assert len(started) == 3
-    clock[0] += 7200
+    clock[0] += timedelta(hours=2)
     monkeypatch.setenv("JARVIS_SYNC_EVERY_MIN", "0")  # réglage : jamais
     main._auto_sync()
     assert len(started) == 3
     assert "_auto_sync" in __import__("inspect").getsource(main._push_round)  # vérifié à chaque tour de la boucle de fond
 
 
-def test_a_client_is_stale_when_never_checked_or_checked_too_long_ago(root):
-    assert sn.stale_clients(60, root) == ["autre", "demo"]  # jamais vérifiés
-    sn.mark_checked(["demo"], root)
-    assert sn.stale_clients(60, root) == ["autre"]
+def test_the_next_check_is_due_one_interval_after_the_oldest_one(root):
+    assert sn.next_check(60, ["demo", "autre"], root) == datetime.min  # jamais vérifiés : à relire tout de suite
+    assert sn.next_check(60, [], root) is None  # aucun client
     path = root / "data" / "notion" / sn.VERIFICATIONS
-    path.write_text(json.dumps({"demo": (datetime.now() - timedelta(minutes=61)).strftime(sn.CHECKED_FORMAT), "autre": "illisible"}), encoding="utf-8")
-    assert sn.stale_clients(60, root) == ["autre", "demo"] and sn.stale_clients(120, root) == ["autre"]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"demo": "20/11/2026 13:15", "autre": "20/11/2026 12:06"}), encoding="utf-8")
+    assert sn.next_check(60, ["demo"], root) == datetime(2026, 11, 20, 14, 15)
+    assert sn.next_check(60, ["demo", "autre"], root) == datetime(2026, 11, 20, 13, 6)  # le plus ancien décide
+    assert sn.next_check(120, ["demo"], root) == datetime(2026, 11, 20, 15, 15)
+    path.write_text(json.dumps({"demo": "20/11/2026 13:15", "autre": "illisible"}), encoding="utf-8")
+    assert sn.next_check(60, ["demo", "autre"], root) == datetime.min
+    sn.mark_checked(["autre"], root)
+    assert sn.next_check(60, ["demo", "autre"], root) == datetime(2026, 11, 20, 14, 15)
+
+
+def test_the_fiche_tells_when_the_next_automatic_sync_is_due(monkeypatch):
+    from types import SimpleNamespace as Config
+    from deploy_hub import main
+    on = {"acme": True, "bolt": False}
+    monkeypatch.setattr(main.client_config, "active_configs", lambda *a: [Config(slug=s, auto_sync=v) for s, v in on.items()])
+    monkeypatch.delenv("JARVIS_SYNC_EVERY_MIN", raising=False)
+    busy = [False]
+    monkeypatch.setattr(type(main.sync_routine), "running", property(lambda self: busy[0]))
+    clock = frozen_clock(monkeypatch, main, datetime(2026, 11, 20, 13, 20))
+    monkeypatch.setattr(main, "_auto_sync_next", clock[0] - timedelta(minutes=15))  # Jarvis tourne depuis un moment
+    due = [datetime(2026, 11, 20, 14, 15)]
+    monkeypatch.setattr(main.sync_notion, "next_check", lambda minutes, slugs: due[0])
+    acme, bolt = Config(slug="acme", auto_sync=True), Config(slug="bolt", auto_sync=False)
+    assert main.auto_sync_note(acme) == "prochaine vers 14:15"
+    assert main.auto_sync_note(bolt) == ""  # pas en synchro automatique
+    due[0] = datetime(2026, 11, 21, 0, 5)
+    assert main.auto_sync_note(acme) == "prochaine le 21/11 vers 00:05"  # pas aujourd'hui : le jour aussi
+    due[0] = datetime.min  # déjà à relire : au prochain tour de la boucle de fond
+    assert main.auto_sync_note(acme) == "prochaine dans la minute"
+    monkeypatch.setattr(main, "_auto_sync_next", clock[0] + timedelta(minutes=10))  # démarrage, ou nouvel essai : pas avant
+    assert main.auto_sync_note(acme) == "prochaine vers 13:30"
+    busy[0] = True  # la routine de synchro tourne : le bouton porte déjà son avancement
+    assert main.auto_sync_note(acme) == ""
+    busy[0] = False
+    with main._refresh_lock:  # pareil pendant une synchro par l'API
+        assert main.auto_sync_note(acme) == ""
+    monkeypatch.setenv("JARVIS_SYNC_EVERY_MIN", "0")  # coupée dans Réglages
+    assert main.auto_sync_note(acme) == ""
+    monkeypatch.delenv("JARVIS_SYNC_EVERY_MIN")
+    assert main.auto_sync_note(Config(slug="vieux", auto_sync=True)) == ""  # archivé : plus dans les clients actifs
 
 
 def test_a_failing_automatic_sync_is_notified_once_a_day(tmp_path):
