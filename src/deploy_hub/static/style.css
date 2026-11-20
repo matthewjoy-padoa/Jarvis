@@ -1634,5 +1634,7 @@ details.filter.multi { position: relative; font-size: 13px; }
 .archived-clients > summary { font-size: 15px; font-weight: 600; color: var(--text); }
 .archived-clients > p { margin: 6px 0 12px; }
 .archived-card .card-head strong { color: var(--muted); }
+.restart-note { margin: 0 0 16px; padding: 10px 16px; border-color: var(--danger); }  /* « Jarvis est à relancer » : en tête de toutes les pages */
+.restart-note p { margin: 0; }
 .archived-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 8px 0 12px; border-style: dashed; }
 .archived-note p { margin: 0; flex: 1 1 320px; }

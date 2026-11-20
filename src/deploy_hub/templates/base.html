@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=152">
+  <link rel="stylesheet" href="/static/style.css?v=153">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=11" defer></script>
   <script src="/static/dag.js?v=3" defer></script>
@@ -117,7 +117,16 @@
       show();
     })();
   </script>
-  <main>{% block content %}{% endblock %}</main>
+  <main>
+  {# Mis à jour par « git pull » sans relance du serveur : l'ancien code tourne encore (sources/running_code.py).
+     « is defined » : ce gabarit est relu sur le disque avant la relance, par un processus qui peut ne pas connaître restart_for. #}
+  {% set restart = restart_for() if restart_for is defined else () %}{# (installée, en service) : « v0.3.0 », « v0.2.0 » #}
+  {% if restart %}
+  <section class="panel restart-note" role="alert">
+    <p><strong>Jarvis est à relancer.</strong> La version <code>{{ restart[0] }}</code> est installée, mais c'est encore la <code>{{ restart[1] }}</code> qui tourne : tant que le serveur n'est pas relancé, la mise à jour n'est pas appliquée et des pages peuvent s'afficher en erreur.</p>
+  </section>
+  {% endif %}
+  {% block content %}{% endblock %}</main>
   <script>
     // Outils externes (Flow Digger) : une fenêtre à part, nommée, réutilisée au clic suivant ; le formulaire s'y envoie.
     // Fenêtres bloquées : le formulaire ouvre alors un onglet du même nom.
@@ -244,7 +253,7 @@
       </form>
     </div>
   </section>
-  <footer class="footer muted">Jarvis · <em>Just A Rather Very Intelligent System</em>, au service de l'équipe Integration · <a href="/sources">État des systèmes</a>{% if jarvis_version %} · <a href="https://github.com/matthewjoy-padoa/Jarvis/blob/main/CHANGELOG.md" title="Historique des versions">v{{ jarvis_version }}</a>{% endif %}</footer>
+  <footer class="footer muted">Jarvis · <em>Just A Rather Very Intelligent System</em>, au service de l'équipe Integration · <a href="/sources">État des systèmes</a>{% if jarvis_version %} · <a href="https://github.com/matthewjoy-padoa/Jarvis/blob/main/CHANGELOG.md" title="Historique des versions{% if jarvis_commit %} · commit {{ jarvis_commit }}{% endif %}">v{{ jarvis_version }}</a>{% endif %}</footer>
   {# Raccourcis du client en cours : dock de boutons ronds au bord droit, nom du lien en bulle au survol.
      Liens ouverts dans le navigateur : Jarvis ne lit jamais leur contenu. #}
   {% if current %}

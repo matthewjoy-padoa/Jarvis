@@ -1,12 +1,16 @@
 # Historique des versions
 
-Jarvis suit une numérotation `0.MINEUR.CORRECTIF` tant qu'il n'est pas stable :
-- **mineur** (0.2.0) : une nouvelle fonctionnalité ou un changement visible de comportement ;
-- **correctif** (0.1.1) : uniquement des corrections.
+Jarvis est numéroté `0.X.Y` et ne passe jamais en v1 : le premier chiffre reste 0. Chaque PR monte le numéro selon l'ampleur du changement :
+- **changement majeur** → chiffre du milieu, le dernier revient à 0 (0.2.4 → 0.3.0) : une nouvelle fonctionnalité, une nouvelle page, un changement visible de comportement ;
+- **changement mineur** → dernier chiffre (0.3.0 → 0.3.1) : une correction, un ajustement de texte ou de style, un détail.
 
-À chaque PR, ajouter une ligne sous « Non publié ». Pour publier : renommer cette section en `## [0.x.y] · AAAA-MM-JJ`, reporter le numéro dans `pyproject.toml` (`version`), fusionner, puis poser le tag `v0.x.y` sur `main`. Le numéro s'affiche en bas de chaque page.
+Ainsi la version affichée en bas de chaque page change à chaque fusion (et le bandeau « Jarvis est à relancer » la cite). Pour chaque PR :
+1. `version` dans `pyproject.toml`, puis `uv lock` (le numéro est aussi dans `uv.lock`) ;
+2. une section `## [0.x.y] · AAAA-MM-JJ` en tête de cet historique, avec la ligne de la PR.
 
-## Non publié
+Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
+
+## [0.2.0] · 2026-11-20
 
 - Fichiers de Jarvis (notifications, annuaire, états et caches des synchros, fiches, configuration des clients, `.env`, agents, suivis et enchaînements de DAG, perso, Web Push) écrits d'un bloc par une seule fonction (`safe_write`) : fichier temporaire forcé sur le disque puis remplacement, un arrêt brutal (Jarvis tué, VM coupée) laisse l'ancien fichier intact au lieu d'un fichier à moitié écrit relu comme vide ; fichiers en 600.
 - Onglet PR : historique des PR fusionnées ou fermées du client (scope du titre, ou ouvertes par un de ses agents), et en options d'affichage les PR fusionnées depuis la réception de ses données de son logiciel et celles communes à tous les clients (scope `all`). Historique gardé sur disque (`data/github/`, métadonnées GitHub), affiché aussitôt et complété en arrière-plan par les seules PR fermées depuis la dernière lecture ; chargé en même temps que les PR ouvertes.
@@ -45,6 +49,8 @@ Jarvis suit une numérotation `0.MINEUR.CORRECTIF` tant qu'il n'est pas stable :
 - Synchro Notion automatique, client par client : bouton « Synchro auto » sur la fiche (non par défaut). Jarvis relit Notion tout seul pour les clients qui l'ont activée, dès que l'un d'eux n'a pas été vérifié depuis une heure (réglage `JARVIS_SYNC_EVERY_MIN`, 0 : jamais) : une synchro faite à la main compte, un redémarrage ne remet rien à zéro ; un échec n'est signalé qu'une fois par jour. Bouton « Rafraîchir depuis Notion » : l'avancement monte à chaque réponse de Notion, au lieu de rester à 20 % puis de passer à « terminé ».
 - Connexion de Claude Code surveillée : au lancement de Jarvis (ligne « Jarvis · Claude Code » dans son terminal, comme Airflow et Notion), puis toutes les heures. Déconnecté, ou connexion qui expire dans les trois jours : avertissement dans le terminal, notification dans l'app (une par jour) et ligne « Claude Code » sur la page État des systèmes, avec la commande à lancer (`claude auth login`).
 - Fiche d'un client en synchro automatique : l'heure prévue de la prochaine synchro (« · prochaine vers 14:15 ») à la suite de « Dernière synchro » ; le lancement et l'affichage partent du même calcul.
+- Bandeau « Jarvis est à relancer » sur toutes les pages, avec une notification, quand le dossier a été mis à jour (`git pull`) et que le serveur tourne encore sur l'ancien code, en numéros de version (« la version v0.3.0 est installée, mais c'est encore la v0.2.0 qui tourne ») ; le commit seulement si le numéro n'a pas bougé.
+- Version en bas de page lue dans `pyproject.toml` (et non plus dans le paquet installé, figé jusqu'au `uv sync`), montée à chaque PR : elle change à chaque fusion.
 
 ## [0.1.0] · 2026-11-17
 
