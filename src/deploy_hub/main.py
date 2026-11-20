@@ -83,8 +83,9 @@ async def lifespan(_app):
     # Au lancement : Airflow et Notion sont-ils vraiment joignables ? (une lecture chacun, dans le terminal de Jarvis)
     checks = await asyncio.gather(
         asyncio.to_thread(connections.airflow_status, airflow, _airflow_problem()),
-        asyncio.to_thread(connections.notion_status, notion_api.load_token(), secret_problem("NOTION_TOKEN")))
-    for line in connections.lines(*checks):
+        asyncio.to_thread(connections.notion_status, notion_api.load_token(), secret_problem("NOTION_TOKEN")),
+        asyncio.to_thread(_check_claude_login, True))  # écrit sa propre ligne : avertissement s'il faut se reconnecter
+    for line in connections.lines(*checks[:2]):
         log.info(line)
     await asyncio.to_thread(dag_chains.reconcile, lambda watch_id: dag_watch.get(watch_id))
     await asyncio.to_thread(dag_source.refresh)  # catalogue de la branche à jour (génération en tâche de fond)
@@ -103,6 +104,28 @@ def _guarded(label: str, job) -> None:
         job()
     except Exception:  # noqa: BLE001
         log.exception(f"{label} en échec")
+
+
+CLAUDE_CHECK_S = 3600  # connexion de Claude Code : revérifiée toutes les heures tant que Jarvis tourne
+_claude_checked = time.monotonic()
+_claude_login: connections.ClaudeLogin | None = None  # dernier état connu : celui que montre la page État des systèmes
+
+
+def _check_claude_login(startup: bool = False) -> None:
+    """Claude Code est-il toujours connecté ? Au lancement de Jarvis (une ligne dans son terminal, comme Airflow et Notion),
+    puis toutes les heures : Jarvis tourne des jours, et c'est pendant ce temps que la connexion expire. Déconnecté, ou
+    connexion qui expire d'ici trois jours : avertissement dans le terminal et notification dans l'app, une par jour."""
+    global _claude_checked, _claude_login
+    if not startup and time.monotonic() - _claude_checked < CLAUDE_CHECK_S:
+        return
+    _claude_checked = time.monotonic()
+    _claude_login = login = connections.claude_status(sync_routine.claude_bin)
+    if login.alert:
+        log.warning(login.line)
+        notifications.add(f"claude-login:{login.word}:{date.today()}", "sync", "info" if login.ok else "urgent",
+                          "Claude Code : connexion bientôt expirée" if login.ok else "Claude Code déconnecté", login.message, "/sources")
+    elif startup:
+        log.info(login.line)
 
 
 SYNC_EVERY_MIN = 60  # réglage JARVIS_SYNC_EVERY_MIN (minutes ; 0 : jamais)
@@ -148,6 +171,7 @@ def _push_round() -> None:
     _deadline_notes()
     web_push.pump(notifications)
     _guarded("Annuaire des clients : relecture", client_directory.refresh_if_stale)
+    _guarded("Connexion de Claude Code", _check_claude_login)
     _guarded("Synchro Notion automatique", _auto_sync)
 
 
@@ -835,6 +859,7 @@ def dag_watch_stop(watch_id: int):
 def sources(request: Request):
     return _render(request, "sources.html", "/sources", externals=external_statuses(notion_api.load_token() is not None,
                                                                          secret_problem("NOTION_TOKEN")), settings=settings,
+                   claude_login=_claude_login or connections.claude_status(sync_routine.claude_bin),  # dernier contrôle (une heure au plus)
                    airflow_message="" if airflow.live else connections.airflow_status(airflow, _airflow_problem())[1])
 
 

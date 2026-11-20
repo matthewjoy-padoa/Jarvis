@@ -1,8 +1,16 @@
-"""État des connexions au lancement de Jarvis : Airflow et Notion sont-ils vraiment joignables avec les identifiants donnés ?
+"""État des connexions au lancement de Jarvis : Airflow et Notion sont-ils vraiment joignables avec les identifiants donnés,
+et Claude Code est-il toujours connecté ?
 
-Une requête de lecture chacun (Airflow : GET /dags?limit=1 ; Notion : GET /users/me), délai court ; rien n'est lancé
-ni modifié, aucun secret n'est affiché. Le résultat s'écrit dans le terminal qui lance Jarvis.
+Une requête de lecture chacun (Airflow : GET /dags?limit=1 ; Notion : GET /users/me ; Claude Code : « claude auth status »),
+délai court ; rien n'est lancé ni modifié, aucun secret ni identité n'est affiché. Le résultat s'écrit dans le terminal qui
+lance Jarvis.
 """
+
+import json
+import shutil
+import subprocess
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -44,6 +52,48 @@ def notion_status(token: str | None, problem: str = "", transport: httpx.BaseTra
         return False, f"réponse inattendue de Notion ({r.status_code})"
     name = (r.json().get("name") or "").strip()
     return True, f"connecté (intégration « {name} »)" if name else "connecté"
+
+
+CLAUDE_TIMEOUT = 15  # secondes : « claude auth status » répond en moins d'une seconde
+EXPIRY_WARNING_DAYS = 3  # connexion qui expire d'ici là : on prévient avant que agents et synchro ne s'arrêtent
+LOGIN = "lance « claude auth login » sur cette machine"
+
+
+@dataclass(frozen=True)
+class ClaudeLogin:
+    """Connexion de Claude Code sur cette machine. ok : les agents et la synchro Notion sans jeton peuvent tourner ;
+    alert : à signaler (déconnecté, ou connexion qui expire bientôt) ; word : l'état en un mot, pour la page Sources."""
+    ok: bool
+    message: str
+    alert: bool = False
+    word: str = "connecté"
+
+    @property
+    def line(self) -> str:
+        return f"Jarvis · Claude Code : {'✗' if not self.ok else '⚠' if self.alert else '✓'} {self.message}"
+
+
+def claude_status(claude_bin: str = "claude", now: datetime | None = None) -> ClaudeLogin:
+    """Demande son état à Claude Code (« claude auth status --json » : loggedIn, loginExpiresAt). Un état illisible (claude
+    absent, version sans cette commande) n'est pas une alerte : on ne sait pas, on le dit dans le terminal seulement."""
+    if not shutil.which(claude_bin):
+        return ClaudeLogin(False, f"introuvable ({claude_bin}) : installe Claude Code ou renseigne CLAUDE_BIN dans Réglages", word="absent")
+    try:
+        out = subprocess.run([claude_bin, "auth", "status", "--json"], capture_output=True, text=True, timeout=CLAUDE_TIMEOUT).stdout
+        status = json.loads(out)
+        logged_in = status["loggedIn"]
+        expires = datetime.fromisoformat(str(status["loginExpiresAt"]).replace("Z", "+00:00")) if status.get("loginExpiresAt") else None
+        if expires and expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)  # sans fuseau : UTC, comme le reste de la réponse
+    except (OSError, subprocess.TimeoutExpired, ValueError, KeyError, TypeError) as e:
+        return ClaudeLogin(False, f"état de connexion illisible ({type(e).__name__}) : vérifie avec « claude auth status »", word="inconnu")
+    now = now or datetime.now(timezone.utc)
+    if not logged_in or (expires and expires <= now):
+        return ClaudeLogin(False, f"déconnecté : {LOGIN} (agents, synchro Notion sans jeton et annuaire des clients à l'arrêt)",
+                           alert=True, word="déconnecté")
+    if expires and expires - now <= timedelta(days=EXPIRY_WARNING_DAYS):
+        return ClaudeLogin(True, f"connecté, mais la connexion expire le {expires.astimezone():%d/%m à %H:%M} : {LOGIN} avant", alert=True)
+    return ClaudeLogin(True, f"connecté (jusqu'au {expires.astimezone():%d/%m/%Y})" if expires else "connecté")
 
 
 def lines(airflow: tuple[bool, str], notion: tuple[bool, str]) -> list[str]:
