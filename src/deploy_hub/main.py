@@ -577,12 +577,12 @@ async def client_save(request: Request, background: BackgroundTasks):
 
 def _sync_new_client(slug: str, background: BackgroundTasks) -> None:
     """Synchro lancée dès l'ajout d'un client, sans la faire attendre : par l'API avec un jeton Notion (juste après la réponse),
-    sinon par la routine Claude Code, qui passe sur tous les clients et dont sa fiche montre l'avancement. Une synchro déjà
+    sinon par la routine Claude Code, pour ce client seulement, dont sa fiche montre l'avancement. Une synchro déjà
     en cours : il sera pris à la suivante."""
     if notion_api.load_token():
         background.add_task(_refresh, [slug])
     else:
-        sync_routine.start()
+        sync_routine.start(slug)  # lui seul : les autres clients n'ont pas à être relus pour un ajout
         client_directory.refresh_icons()  # sans jeton : son emoji (icône de son dashboard) est lu à part, tout de suite
 
 
@@ -1203,11 +1203,11 @@ def _sync_status(request: Request, running: bool, ok: bool, message: str, simula
                                                                      "progress": sync_routine.progress() if running else None})
 
 
-def refresh_by_routine(request: Request) -> HTMLResponse | None:
-    """Sans jeton Notion : la routine (tous les clients configurés dans l'app) ; None si un jeton permet l'API."""
+def refresh_by_routine(request: Request, d: Deployment | None = None) -> HTMLResponse | None:
+    """Sans jeton Notion : la routine, pour ce client seulement ou pour tous ceux de l'app ; None si un jeton permet l'API."""
     if notion_api.load_token():
         return None
-    r = sync_routine.start()
+    r = sync_routine.start(d.slug, d.client) if d else sync_routine.start()
     return _sync_status(request, r.ok and not r.simulated, r.ok, r.message, r.simulated)
 
 
@@ -1240,7 +1240,7 @@ def refresh_one(request: Request, slug: str):
     d = _get(slug)
     if d.archived:  # la routine ne le lirait pas ; par l'API, il serait resynchronisé alors qu'on ne le suit plus
         return _result(request, ActionResult(False, f"{d.client} est archivé : désarchive-le pour le rafraîchir.", simulated=False))
-    if (routine := refresh_by_routine(request)) is not None:  # la routine passe sur tous les clients en une empreinte
+    if (routine := refresh_by_routine(request, d)) is not None:  # la fiche d'un client ne relit que lui
         return routine
     ok, message = _refresh([slug])
     response = _result(request, ActionResult(ok, message, simulated=False))

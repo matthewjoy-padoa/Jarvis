@@ -71,6 +71,11 @@ FIELDS = (
     Field("JARVIS_AGENT_EFFORT", "Effort de réflexion", "choice",
           "Du plus rapide (low) au plus poussé (max) : plus haut, l'agent réfléchit plus, coûte plus et dure plus. Vide : celui de Claude Code",
           section=CLAUDE, choices=("", "low", "medium", "high", "xhigh", "max"), group=ENGINE),
+    Field("JARVIS_SYNC_MODEL", "Modèle de la synchro Notion", "text",
+          "Routine lancée par « Rafraîchir depuis Notion » sans jeton : elle ne fait qu'exécuter des requêtes, un modèle rapide suffit. "
+          "Vide : haiku", section=CLAUDE, group=ENGINE),
+    Field("JARVIS_SYNC_EFFORT", "Effort de la synchro Notion", "choice", "Vide : low (le plus rapide)",
+          section=CLAUDE, choices=("", "low", "medium", "high"), group=ENGINE),
     Field("JARVIS_AGENT_MAX", "Agents simultanés au plus", "int", "Vide : 2", section=CLAUDE, group=LIMITS),
     Field("JARVIS_AGENT_TIMEOUT_MIN", "Durée maximale d'un agent (min)", "int", "Vide : 90 ; au-delà, l'agent est interrompu", section=CLAUDE,
           group=LIMITS),

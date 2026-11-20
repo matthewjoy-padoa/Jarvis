@@ -17,7 +17,7 @@ from deploy_hub.sources.sync_routine import SyncRoutine, routine_text
 def test_the_routine_is_in_the_repository_without_anything_to_fill():
     text = routine_text()
     assert "<DOSSIER_JARVIS>" not in text and "<CANAL_SLACK>" not in text and "~/Documents" not in text
-    for step in ("preparer", "plan", "fusionner", "utilisateurs"):
+    for step in ("preparer", "suite", "utilisateurs"):
         assert f"uv run python -m deploy_hub.sync_notion {step}" in text
     command = (PROJECT_ROOT / ".claude" / "commands" / "jarvis-sync.md").read_text(encoding="utf-8")
     assert "sync/routine.md" in command and "$ARGUMENTS" in command  # /jarvis-sync [canal Slack]
@@ -145,7 +145,7 @@ def test_progress_follows_the_files_the_routine_drops(tmp_path):
     folder = tmp_path / "notion"
     routine = SyncRoutine(folder=folder)
     routine._save(running=True, started="2000-01-01T00:00:00")
-    assert routine.progress() == {"pct": 5, "label": "Empreinte de tous les clients…"}
+    assert routine.progress() == {"pct": 5, "label": "Empreinte…"}
     (folder / "empreintes.json").write_text("{}")
     assert routine.progress()["label"] == "Plan des requêtes…"
     raw = folder / "acme"
@@ -353,5 +353,4 @@ def test_hitting_the_page_cap_is_an_explicit_failure(tmp_path):
         sync_notion._rows(first)
     (tmp_path / f"actions-{sync_notion.MAX_PAGES + 1}.json").write_text(json.dumps({"results": []}), encoding="utf-8")
     assert len(sync_notion._rows(first)) == sync_notion.MAX_PAGES * sync_notion.PAGE_SIZE  # page suivante vide : complet
-    assert "Au plus 100 pages" in routine_text()
 

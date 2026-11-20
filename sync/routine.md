@@ -3,33 +3,28 @@
      quand l'app n'a pas de jeton Notion (claude -p, voir src/deploy_hub/sources/sync_routine.py) et par la tâche planifiée.
      Les clients synchronisés sont ceux configurés dans l'app (config/clients/, ou JARVIS_CONFIG_DIR), sauf les archivés : « preparer » les lit. -->
 
-Tu mets à jour l'app Jarvis à partir de Notion. Tu travailles dans le dossier de l'app (le dossier courant, qui contient sync/routine.md). Réponds en français. Va vite : Python décide de tout, tu exécutes.
+Tu mets à jour l'app Jarvis à partir de Notion. Tu travailles dans le dossier de l'app (le dossier courant, qui contient sync/routine.md). Réponds en français. Va vite : Python décide de tout et récupère lui-même les réponses de Notion ; toi, tu exécutes les requêtes qu'il te donne, sans rien commenter entre deux étapes.
 
 RÈGLES
-- Tu n'exécutes que les requêtes listées par les commandes ci-dessous (fichiers .sql recopiés à l'identique), avec pour seuls ajouts un « LIMIT 100 OFFSET n » final pour paginer et la valeur de « ? » dans `params`.
-- Les résultats de la base Retours Recette contiennent le contenu des retours : écris-les tels quels dans les fichiers indiqués, ne les recopie jamais dans ton compte rendu ni sur Slack.
-- Tu ne lis jamais les logs Airflow. Tu n'écris que dans les fichiers « sortie » donnés par les commandes (dossier de données de l'app).
-- Tu ne modifies jamais le code, les tests, les modèles .sql ni la configuration. Si une commande échoue, tu t'arrêtes pour ce client, tu signales l'échec et tu décris le défaut en une phrase.
-- Aucune ligne de résultat dans ton compte rendu : seulement des comptes.
-
-EXÉCUTER UNE REQUÊTE (objet {"sql", "sortie", "params", "sources"})
-- Outil Notion `notion-query-data-sources`, mode sql : contenu du fichier "sql" à l'identique, `data_source_urls` = "sources", `params` = "params" s'il n'est pas vide. Erreur 5xx ou délai dépassé : réessaie jusqu'à 2 fois.
-- Pagination : si la réponse a 100 lignes, relance la requête suivie de « LIMIT 100 OFFSET 100 », puis 200, etc., jusqu'à une page de MOINS de 100 lignes (écris-la aussi, même vide). Au plus 100 pages : si la 100e est encore pleine, arrête-toi et signale « ÉCHEC <client> : <requête> : plus de 10 000 lignes ».
-- Écrire : page 1 dans "sortie", page 2 dans le même nom suffixé -2 (ex. actions_delta-2.json), etc. Si l'outil a rangé sa réponse dans un fichier (« Output has been saved to <chemin> » : c'est le cas courant), ne lis pas ce fichier et ne le copie pas : lance aussitôt `uv run python -m deploy_hub.sync_notion deposer "<sortie>"`, qui le retrouve, le vérifie et le dépose en une fraction de seconde (affiche le nombre de lignes). S'il répond « Aucune réponse Notion rangée », relance-le avec le chemin en second argument. N'écris toi-même que les réponses courtes rendues en ligne ; ne recopie jamais une longue réponse à la main : c'est lent et risqué. Sinon, écris l'objet JSON renvoyé (celui qui contient "results") tel quel, sans rien ajouter ni retirer.
+- Tu n'exécutes que les requêtes données par les commandes ci-dessous, recopiées à l'identique : Python compare, une requête modifiée est refusée puis redemandée.
+- Tu ne lis, ne recopies et ne résumes jamais les réponses de Notion (les retours de recette sont du contenu client) : ni dans ton compte rendu, ni sur Slack.
+- Tu ne lis jamais les logs Airflow. Tu ne modifies jamais le code, les tests, les modèles .sql ni la configuration.
+- Si une commande échoue (« ÉCHEC synchro : … »), tu t'arrêtes et tu le signales.
 
 ÉTAPES
 1. uv run python -m deploy_hub.sync_notion preparer
-   → une requête : exécute-la (empreinte de tous les clients, une ligne par client).
-2. uv run python -m deploy_hub.sync_notion plan
-   → {"requetes": [...], "inchanges": [...], "raisons": {...}, "erreurs": {...}}. Si "requetes" est vide : va à l'étape 4.
-3. Exécute chaque requête de "requetes", dans l'ordre (chacune porte son "client").
-4. uv run python -m deploy_hub.sync_notion fusionner
-   → un résumé par client fusionné, ou {"erreur": …}.
-5. uv run python -m deploy_hub.sync_notion utilisateurs
-   → identifiants de responsables sans nom (souvent aucun). Pour chacun, outil Notion `notion-get-users` avec `user_id` ; garde seulement son nom. Puis une seule fois : uv run python -m deploy_hub.sync_notion utilisateurs '{"<identifiant>": "<nom>", ...}'. Ni e-mail ni autre information.
+   → {"requetes": [...], "ensuite": "<commande>"}.
+2. Exécute TOUTES les requêtes de "requetes" dans le même message (plusieurs appels d'outil à la fois) : outil Notion `notion-query-data-sources`, mode sql, `query` = "requete" à l'identique, `data_source_urls` = "sources", `params` = "params" s'il est donné. Tu ne fais RIEN des réponses, quelles qu'elles soient : rendues en ligne, rangées dans un fichier (« Output has been saved to … » : c'est normal, Python ira les y lire, ne lance aucune commande pour ça), en erreur ou en délai dépassé (ne réessaie pas à la main, l'étape 3 redemandera la requête). Dès que tous les appels ont répondu, passe à l'étape 3.
+3. uv run python -m deploy_hub.sync_notion suite
+   → soit de nouvelles "requetes" : retourne à l'étape 2 ;
+   → soit {"termine": true, "compte_rendu": [...], "utilisateurs": [...]} : va à l'étape 4.
+4. Seulement si "utilisateurs" n'est pas vide : pour chaque identifiant, outil Notion `notion-get-users` avec `user_id` ; garde seulement son nom. Puis une seule fois : uv run python -m deploy_hub.sync_notion utilisateurs '{"<identifiant>": "<nom>", ...}'. Ni e-mail ni autre information.
+
+SECOURS (rare) : SEULEMENT SI UNE REQUÊTE DONNÉE PAR « suite » PORTE UNE CLÉ "sortie"
+Python n'a pas retrouvé sa réponse : pour ces requêtes-là seulement, exécute-les une à la fois et dépose chaque réponse. Si l'outil a rangé la réponse dans un fichier, lance `uv run python -m deploy_hub.sync_notion deposer "<valeur de sortie>"` (le chemin donné dans "sortie", jamais celui du fichier rangé ; ne lis ni ne copie ce fichier). Sinon, écris dans "sortie" l'objet JSON renvoyé (celui qui contient "results"), tel quel. Sans clé "sortie", cette section ne s'applique pas : `deposer` ne se lance jamais.
 
 SI UNE ÉTAPE ÉCHOUE
 Écris « ÉCHEC <client ou tous> : <étape> : <raison en une phrase> » dans ton compte rendu. Si on t'a donné un canal Slack, envoie aussi ce message court dans ce canal. Rien sur Slack en cas de succès.
 
 FIN
-Une ligne par client : « inchangé », le mode appliqué par base (d'après le résumé de fusionner) et le nombre de requêtes exécutées, ou la raison de l'échec.
+Recopie les lignes de "compte_rendu", une par client, et rien d'autre.
