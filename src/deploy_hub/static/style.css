@@ -290,22 +290,6 @@ ul.changes .btn-link { margin-left: auto; }
 .diff summary { color: var(--accent); }
 
 /* Injections par ressource */
-.res-blocks { display: grid; gap: 8px; margin: 8px 0 16px; }
-.res-block { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
-.res-block.worst-0 { border-left: 3px solid var(--danger); }
-.res-block.worst-1 { border-left: 3px solid var(--accent); }
-.res-block > summary { display: grid; grid-template-columns: minmax(160px, 1.4fr) auto minmax(90px, 1fr) auto; gap: 6px 12px; align-items: center; padding: 10px 14px; cursor: pointer; list-style: none; color: var(--text); font-size: 14px; margin: 0; }
-.res-block > summary::-webkit-details-marker { display: none; }
-.res-block > summary::before { content: "▸"; color: var(--muted); position: absolute; margin-left: -10px; }
-.res-block[open] > summary::before { content: "▾"; }
-.res-block > summary .chart.thin { margin: 0; }
-.res-status { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
-.res-body { padding: 0 14px 12px; }
-.res-body table { border: 0; }
-.res-body td { padding: 7px 8px; }
-.res-body .dag-form { margin: 2px 0 6px; }
-.blocks-toolbar .segmented { margin: 0; }
-@media (max-width: 700px) { .res-block > summary { grid-template-columns: 1fr auto; } .res-bar { grid-column: 1 / -1; } .res-status { justify-content: flex-start; } }
 
 /* Listes limitées (« Voir plus ») */
 .is-collapsed { display: none !important; }
@@ -323,7 +307,7 @@ button, input, select, textarea { font-family: inherit; }
 .brand small { font-weight: 500; color: var(--muted); font-size: 14px; }
 .nav a { border-radius: 999px; font-weight: 500; }
 .nav a.active { background: var(--accent-soft); color: var(--text); font-weight: 600; }
-.card, .kpi, .stat, .chart, .panel, .retour, .res-block, table { border: 2px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.card, .kpi, .stat, .chart, .panel, .retour, table { border: 2px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
 .card:hover, .kpi-link:hover { border-color: var(--accent); }
 .kpi strong, .stat strong { font-size: 30px; font-weight: 700; line-height: 1.1; }
 .stat { padding: 14px 16px; }
@@ -360,8 +344,6 @@ button.secondary:hover, .theme-toggle:hover { border-color: var(--accent); }
 .tabs a.active { background: var(--text); color: var(--bg); border: 0; }
 .tabs a.active .count { background: var(--st-ko); }
 code.res, code.req { border-radius: 6px; border-width: 1px; }
-.res-block.worst-0 { border-left: 4px solid var(--st-ko); }
-.res-block.worst-1 { border-left: 4px solid var(--st-progress); }
 .late, .result.ko { color: var(--text); font-weight: 600; }
 .late::before, .result.ko::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--st-ko); margin-right: 6px; vertical-align: 1px; }
 .result.ok { color: var(--text); } .result.ok::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--st-done); margin-right: 6px; vertical-align: 1px; }
@@ -659,9 +641,9 @@ button:disabled { opacity: .45; box-shadow: none; transform: none; }
 .view-bar .note { font-size: 12.5px; }
 
 /* --- Cartes ----------------------------------------------------------------------------------------- */
-.card, .kpi, .stat, .chart, .panel, .retour, .res-block, table, .wn-item, .kb-card, .pending-card {
+.card, .kpi, .stat, .chart, .panel, .retour, table, .wn-item, .kb-card, .pending-card {
   border: var(--line) solid var(--border); box-shadow: var(--shadow-card); }
-.card, .kpi, .stat, .chart, .panel, .retour, .res-block { border-radius: var(--radius); }
+.card, .kpi, .stat, .chart, .panel, .retour { border-radius: var(--radius); }
 .card { padding: 16px 18px; }
 .card-head { gap: 10px; }
 .card-head strong { font-size: 15.5px; }
@@ -902,6 +884,31 @@ html.palette-open .console-fab, html.drawer-open .console-fab { display: none; }
 /* ============================================================ Suivi des runs (air.py, 2026-11-12) : journal et rapport bruts */
 pre.watch-scroll { max-height: 480px; overflow: auto; }  /* sur le style .agent-summary des comptes rendus d'agent */
 
+/* ============================================================ Onglet Injections, vue par ressource : une liste, une ligne par ressource (_injections_blocks.html) */
+.inj-stack { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+.inj-list { list-style: none; margin: 8px 0 16px; padding: 0; background: var(--surface); border: var(--line) solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-card); overflow: hidden; }
+/* scroll-margin : arrivée par une ancre (lien « Où ça coince »), la ligne s'arrête sous la barre et les onglets collés */
+.inj-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 12px; padding: 9px 14px; border-bottom: 1px solid var(--border);
+  scroll-margin-top: calc(var(--topbar-h, 61px) + 64px); }
+.inj-row:last-child { border-bottom: 0; }
+.inj-row:target { background: var(--accent-soft); }
+.inj-row > .key { flex: none; margin: 9px 0 0; border-radius: 50%; }  /* point d'état : couleurs des légendes (.key.g-*) */
+.inj-what { flex: 1; min-width: 200px; padding: 3px 0; }
+.inj-what > summary { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; cursor: pointer; list-style: none; margin: 0; color: var(--text); }
+.inj-what > summary::-webkit-details-marker { display: none; }
+.inj-state { font-size: 13px; color: var(--muted); }
+.inj-row[data-group="ko"] .inj-state { color: var(--st-ko); }
+.inj-what table { border: 0; box-shadow: none; margin: 6px 0 2px; }
+.inj-what td { padding: 6px 8px; }
+.inj-go { flex: none; display: flex; gap: 6px; align-items: center; min-height: 30px; font-size: 13px; }
+.inj-title { margin: 16px 0 0; font-size: 14px; }
+.inj-members { margin: 6px 0 2px; }
+.inj-row > .dag-out { flex-basis: 100%; }
+.inj-row > .dag-out:empty { display: none; }
+.dag-form select.dag-pick { max-width: 280px; field-sizing: content; }  /* le DAG qui part (« ETL » par défaut), large comme son texte ;
+  sans field-sizing (Firefox, vieux Safari), le script de _injections_blocks.html règle la largeur */
+
 /* ============================================================ Synthèse : « Où ça coince » (2026-11-12), 5 points avec le plus de KO */
 .blocking h2 { margin-bottom: 6px; }
 .blocking h2 .muted { font-size: 13px; font-weight: 400; }
@@ -916,8 +923,6 @@ a.blocking-row:hover { background: color-mix(in srgb, var(--accent) 7%, var(--su
 .blocking-counts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
 .blocking-none { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; color: var(--ok); }
 .blocking-more { margin: 6px 10px 0; font-size: 12.5px; }
-/* Arrivée par une ancre (lien « Où ça coince ») : le bloc s'arrête sous la barre et les onglets collés, pas dessous. */
-.res-block { scroll-margin-top: calc(var(--topbar-h, 61px) + 64px); }
 
 /* ============================================================ Client en cours (2026-11-12) : un client à la fois dans la barre,
    les autres dans le menu du sélecteur. Les styles .client-chip.strong reprennent ceux des anciennes puces du menu. */
@@ -995,14 +1000,11 @@ html.term-open:has(.term.is-minimized) main { padding-bottom: 48px; }
 .shell-pane .xterm-viewport::-webkit-scrollbar { width: 8px; } .shell-pane .xterm-viewport::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .18); border-radius: 4px; }
 
 /* ============================================================ Audit du style (2026-11-12) : téléphone */
-.res-blocks { grid-template-columns: minmax(0, 1fr); }  /* la grille ne s'élargit jamais au-delà de l'écran */
 @media (max-width: 700px) {
-  .res-block > summary > * { min-width: 0; }
   .res-name { overflow-wrap: anywhere; }  /* noms de ressources longs (employee_paper_file_location…) : ils passent à la ligne */
   .segmented { max-width: 100%; overflow-x: auto; scrollbar-width: none; }  /* filtres en pastille : défilent dans la pastille */
   .segmented::-webkit-scrollbar { display: none; }
   .segmented a { flex: none; }
-  .blocks-toolbar { flex-wrap: wrap; }
 }
 @media (max-width: 640px) {
   .client-menu { position: fixed; top: calc(var(--topbar-h, 61px) + 4px); left: 12px; right: 12px; min-width: 0; }  /* pleine largeur, jamais hors écran */

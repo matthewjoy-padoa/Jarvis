@@ -10,6 +10,10 @@ Ainsi la version affichée en bas de chaque page change à chaque fusion (et le 
 
 Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
+## [0.3.0] · 2026-11-20
+
+- Onglet Injections, vue par ressource : une liste simple à la place des blocs à déplier. Une ligne par ressource, avec un point de couleur, l'état de sa carte la plus en retard et le nom de la carte en KO ; ce qui bloque est en haut. La stack se choisit une fois en haut (gardée dans le navigateur, sauf la prod), puis « Lancer » en face de la ressource lance le DAG affiché dans la liste à côté (« ETL » par défaut, « Transform & load » ou le groupe au choix) ; un clic sur la ligne montre ses cartes. Sous les ressources, une ligne par groupe de ressources du catalogue, avec son bouton « Lancer » (l'ETL du groupe) ; une carte liée à plusieurs ressources apparaît sous chacune d'elles, et un groupe ne se lance que depuis sa ligne. Le graphique de répartition reste dans la vue Liste et sur la page de tous les clients.
+
 ## [0.2.0] · 2026-11-20
 
 - Fichiers de Jarvis (notifications, annuaire, états et caches des synchros, fiches, configuration des clients, `.env`, agents, suivis et enchaînements de DAG, perso, Web Push) écrits d'un bloc par une seule fonction (`safe_write`) : fichier temporaire forcé sur le disque puis remplacement, un arrêt brutal (Jarvis tué, VM coupée) laisse l'ancien fichier intact au lieu d'un fichier à moitié écrit relu comme vide ; fichiers en 600.

@@ -59,6 +59,27 @@ def test_injection_tab_offers_the_card_dags_and_the_stacks(app):
         assert f'<option value="{env}">' in html
 
 
+def test_resource_groups_have_their_own_line(app, monkeypatch):
+    groups = dag_catalogue.groups_for(["acme-uegar", "acme-pulse"])
+    assert [(g["customer"], g["groupe"], g["resources"]) for g in groups] == [("acme-pulse", "firm_base", ("firm",)), ("acme-uegar", "firm_base", ("firm", "firm_status"))]
+    html = app.get("/deploiements/acme/injections").text
+    assert "Groupes de ressources" in html and 'id="acme-groupe-acme-uegar-firm_base" data-group="todo"' in html  # état : celui des cartes de ses ressources
+    line = html[html.index('id="acme-groupe-acme-uegar-firm_base"'):]
+    assert 'name="card" value="Groupe firm_base"' in line and 'name="dag_id" value="acme-uegar-etl_group-firm_base"' in line
+
+
+def test_a_card_with_several_resources_is_under_each_of_them(app, monkeypatch):
+    d = Deployment(slug="acme", client="Acme", software="Uegar", orchestrator=["acme-uegar"],
+                   actions=[Action(title="Firms et statuts", injection=True, injection_status="A faire", resources=["firm", "firm_status"])])
+    monkeypatch.setattr(main.fiches, "get_deployment", lambda slug: d)
+    assert [(b["id"], b["resources"], len(b["cards"])) for b in d.injection_lines] == [("firm", ["firm"], 1), ("firm_status", ["firm_status"], 1)]
+    page = app.get("/deploiements/acme/injections").text
+    firm = page[page.index('id="acme-firm"'):page.index('id="acme-firm_status"')]
+    assert firm.index('<option value="acme-uegar-etl-firm"') < firm.index('<option value="acme-uegar-etl_group-firm_base"')  # l'ETL de la ressource d'abord
+    assert ">ETL</option>" in firm and ">ETL groupe firm_base</option>" in firm and ">Lancer</button>" in firm  # la liste dit ce qui part
+    assert "Lancer le groupe" not in page  # un groupe ne se lance que de sa ligne, section « Groupes de ressources »
+
+
 def test_launch_on_a_chosen_stack(app, fake_airflow):
     r = app.post("/actions/injection/acme", data={"dag_id": "acme-uegar-etl-firm", "padoa_env": "snap", "card": "Injection des firms"})
     assert "acme-uegar-etl-firm lancé sur snap" in r.text
