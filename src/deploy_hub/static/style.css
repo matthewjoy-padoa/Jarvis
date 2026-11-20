@@ -231,6 +231,7 @@ tbody tr:hover td { background: var(--bg); }
 .refresh.htmx-request .refresh-out { display: none; }
 /* Bouton « Rafraîchir » qui se remplit : les deux libellés sont superposés (la largeur est celle du plus long, le bouton ne
    bouge pas) ; la jauge est un fond qui avance de gauche à droite (--pct) ; sans étapes connues (API), des rayures qui défilent. */
+.auto-sync:not([aria-pressed="true"]) { color: var(--muted); }  /* petit bouton bascule : mêmes règles que « Vue simplifiée » */
 .sync-btn { position: relative; overflow: hidden; }
 .sync-btn > .btn-face { position: relative; z-index: 1; display: inline-grid; }
 .sync-btn .btn-idle, .sync-btn .btn-busy { grid-area: 1 / 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
@@ -463,8 +464,8 @@ button .ic { margin-right: 2px; }
 /* Vue simplifiée de la fiche : bouton à droite des onglets, roue pour choisir les onglets gardés. Le choix s'ouvre en
    popover (couche du dessus) : la barre d'onglets défile et rogne ce qui en dépasse. */
 .tabs-view { display: flex; flex: none; align-items: center; gap: 4px; margin: 0 0 6px auto; padding-left: 12px; }
-.tabs-view button { min-height: 28px; padding: 3px 12px; font-size: 12.5px; white-space: nowrap; box-shadow: none; }
-.tabs-view .view-toggle[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.tabs-view button, .auto-sync { min-height: 28px; padding: 3px 12px; font-size: 12.5px; white-space: nowrap; box-shadow: none; }
+.tabs-view .view-toggle[aria-pressed="true"], .auto-sync[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
 .tabs-view .view-toggle[aria-pressed="true"]::before { content: "✓"; }
 .tabs-view .view-pick { padding: 3px 7px; anchor-name: --tabs-pick; }
 .tabs-view .view-pick .ic { margin: 0; }

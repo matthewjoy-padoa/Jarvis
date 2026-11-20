@@ -115,7 +115,7 @@ Tous facultatifs. La page **Réglages** (accessible seulement en local, par exem
 | `NOTION_TOKEN` | Synchro par l'API Notion ; vide : le bouton « Rafraîchir depuis Notion » lance la routine Claude Code |
 | `CLAUDE_BIN`, `JARVIS_SYNC_ALLOWED_TOOLS` | Routine lancée par le bouton : binaire `claude`, outils permis (vide : liste par défaut) |
 | `JARVIS_SYNC_MODEL`, `JARVIS_SYNC_EFFORT` | Modèle et effort de la routine de synchro (vides : `haiku`, `low`) |
-| `JARVIS_SYNC_EVERY_MIN` | Synchro Notion automatique de tous les clients, en minutes (vide : 60 ; 0 : jamais) |
+| `JARVIS_SYNC_EVERY_MIN` | Intervalle de la synchro Notion automatique, en minutes (vide : 60 ; 0 : jamais). Elle ne concerne que les clients dont le bouton « Synchro auto » de la fiche est activé |
 | `JARVIS_NOTION_WORKSPACE` | Espace de travail Notion des liens complets que l'annuaire pré-remplit (`https://app.notion.com/p/<espace>/<Titre>-<id>`, vide : `padoa`) |
 | `JARVIS_NOTION_DASHBOARDS` | Page Notion qui liste les dashboards des clients, lue chaque jour pour l'annuaire de « Ajouter un client » (vide : « Liste des dashboards pour le déploiement des nouveaux clients ») |
 | `AIRFLOW_BASE_URL`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD` | Lancement réel des DAGs |

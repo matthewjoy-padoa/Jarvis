@@ -306,6 +306,7 @@ class Deployment:
     configured: bool = False  # a un yaml de configuration (sinon : fiche seule, à configurer avant de pouvoir l'archiver)
     archived: bool = False  # client archivé (configuration) : hors menu, accueil, notifications et synchro
     archived_at: date | None = None
+    auto_sync: bool = False  # Jarvis relit Notion tout seul pour ce client (configuration, bouton de sa fiche)
 
     @property
     def last_sync(self) -> datetime | None:

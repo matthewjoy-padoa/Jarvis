@@ -142,11 +142,14 @@ class SyncRoutine:
     def _env(self) -> dict:
         return app_env()
 
-    def start(self, slug: str = "", client: str = "", auto: bool = False) -> ActionResult:
-        """slug : ce client seulement (bouton de sa fiche, client : son nom pour le message) ; vide : tous les clients.
+    def start(self, slugs: str | list[str] = "", client: str = "", auto: bool = False) -> ActionResult:
+        """slugs : ce client seulement (bouton de sa fiche, client : son nom pour le message), ou ceux de la liste (synchro
+        automatique) ; vide : tous les clients. La liste n'est jointe qu'ici, pour la variable lue par « preparer ».
         auto : synchro lancée par l'app elle-même (toutes les heures) ; ses échecs ne sont signalés qu'une fois par jour."""
         if (problem := self.problem()):
             return ActionResult(False, problem, False)
+        slugs = [slugs] if isinstance(slugs, str) and slugs else list(slugs)
+        slug = ",".join(slugs)
         with self._lock:
             if self.running:
                 return ActionResult(False, "Une synchro est déjà en cours.", False)
@@ -169,7 +172,7 @@ class SyncRoutine:
         self._proc.stdin.write(routine_text() + (PREPARED + json.dumps(first, ensure_ascii=False) if first else ""))
         self._proc.stdin.close()
         threading.Thread(target=self._wait, args=(self._proc, log, auto), name="jarvis-sync", daemon=True).start()
-        scope = f"pour {client or slug}" if slug else "pour tous les clients de l'app"
+        scope = f"pour {client or ', '.join(slugs)}" if slugs else "pour tous les clients de l'app"
         return ActionResult(True, f"Synchro Notion lancée : Claude lit Notion {scope}. La page se mettra à jour à la fin.", False)
 
     def _prepare(self, slug: str) -> dict | None:

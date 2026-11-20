@@ -439,14 +439,15 @@ def _followed(root: Path, slugs: list[str] | None = None) -> list[str]:
 
 def prepare(root: Path = PROJECT_ROOT, only: str | None = None) -> dict:
     """Ouvre un passage : écrit les requêtes de chaque client et l'empreinte (une seule requête, une ligne par client).
-    only (ou JARVIS_SYNC_CLIENT) : ce client seulement. Refuse si une autre synchro lancée par Jarvis tourne : deux
+    only (ou JARVIS_SYNC_CLIENT) : ce client seulement, ou ceux-là (slugs séparés par des virgules). Refuse si une autre synchro lancée par Jarvis tourne : deux
     passages écriraient les mêmes fichiers (vu le 2026-11-18)."""
     if (other := running_elsewhere(root)):
         raise SyncError(f"Une autre synchro tourne déjà (lancée à {other.get('started', '?')}) : attends sa fin, puis relance")
     from deploy_hub import client_config
     configs = [asdict(c) for c in client_config.active_configs(root)]  # un client archivé n'est plus synchronisé
     if (only := os.environ.get(CLIENT_ENV, "") if only is None else only):
-        configs = [c for c in configs if c["slug"] == only]
+        wanted = [slug.strip() for slug in only.split(",")]  # un client (sa fiche) ou plusieurs (synchro automatique)
+        configs = [c for c in configs if c["slug"] in wanted]
         if not configs:
             raise SyncError(f"{only} : client inconnu ou archivé, rien à synchroniser")
     for config in configs:

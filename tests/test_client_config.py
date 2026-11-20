@@ -225,3 +225,23 @@ def test_a_client_not_synced_yet_can_be_opened_from_the_clients_page(app, monkey
     page = app.get("/clients").text
     assert "En attente de première synchro" in page and '<a class="card-link" href="/deploiements/acme"><strong>Acme</strong></a>' in page
     assert app.get("/deploiements/acme/synthese").status_code == 200
+
+
+def test_automatic_sync_is_off_by_default_and_toggled_from_the_fiche(app, tmp_path, monkeypatch):
+    """Bouton « Synchro auto » de la fiche : non par défaut ; un clic l'active pour ce client seulement, noté dans son yaml."""
+    from deploy_hub import client_config
+    monkeypatch.setattr(main, "_sync_new_client", lambda slug, background: None)
+    app.post("/clients/enregistrer", data={"client": "Acme", "page_id": PAGE})
+    yaml_file = tmp_path / "config" / "clients" / "acme.yaml"
+    assert client_config.load("acme", tmp_path).auto_sync is False and "auto_sync" not in yaml_file.read_text(encoding="utf-8")
+    fiche = app.get("/deploiements/acme/synthese").text
+    assert 'class="secondary auto-sync" aria-pressed="false"' in fiche and "Synchro auto : non" in fiche
+    assert """hx-post="/clients/acme/synchro-auto" hx-vals='{"actif": "1"}'""" in fiche
+    r = app.post("/clients/acme/synchro-auto", data={"actif": "1"})
+    assert r.status_code == 200 and 'aria-pressed="true"' in r.text and "Synchro auto : oui" in r.text and '"actif": "0"' in r.text
+    assert client_config.load("acme", tmp_path).auto_sync is True and "auto_sync: true" in yaml_file.read_text(encoding="utf-8")
+    app.post("/clients/enregistrer", data={"existing_slug": "acme", "client": "Acme SST", "page_id": PAGE})  # modifier sa configuration ne la coupe pas
+    assert client_config.load("acme", tmp_path).auto_sync is True
+    assert "Synchro auto : non" in app.post("/clients/acme/synchro-auto", data={"actif": "0"}).text
+    assert client_config.load("acme", tmp_path).auto_sync is False
+    assert app.post("/clients/inconnu/synchro-auto", data={"actif": "1"}).status_code == 404

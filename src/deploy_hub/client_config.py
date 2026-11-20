@@ -56,6 +56,7 @@ class ClientConfig:
     dashboards: list[dict] = field(default_factory=list)  # autres dashboards Notion du client (déploiement, formation…)
     archived: bool = False  # on ne travaille plus dessus : hors menu, accueil, notifications et synchro ; fiche gardée, consultable
     archived_at: date | None = None  # jour de l'archivage ; None si le client est suivi (ou la date illisible)
+    auto_sync: bool = False  # Jarvis relit Notion tout seul pour ce client (bouton de sa fiche) ; non par défaut : à la demande
 
     @property
     def stacks_text(self) -> str:
@@ -76,6 +77,8 @@ class ClientConfig:
         data = asdict(self)
         if not self.archived:  # un client suivi n'a aucune clé d'archivage dans son yaml
             del data["archived"], data["archived_at"]
+        if not self.auto_sync:  # comme l'archivage : la clé n'apparaît que quand elle dit quelque chose
+            del data["auto_sync"]
         return HEADER + yaml.safe_dump(data, allow_unicode=True, sort_keys=False)
 
     @classmethod
@@ -101,6 +104,7 @@ def _normalize(slug: str, data: dict) -> ClientConfig:
         dashboards=[{"label": str(l.get("label") or "Notion"), "url": str(l["url"])} for l in data.get("dashboards") or []
                     if isinstance(l, dict) and is_notion(str(l.get("url") or ""))],
         archived=bool(data.get("archived")), archived_at=_day(data.get("archived_at")) if data.get("archived") else None,
+        auto_sync=bool(data.get("auto_sync")),
     )
 
 
@@ -256,6 +260,18 @@ def set_archived(slug: str, archived: bool, root: Path = PROJECT_ROOT) -> bool:
         return False
     # Seul le yaml change : ni requêtes ni contrôles de save(), qui refuseraient un client à la fiche Notion mal renseignée.
     _write(clients_dir(root) / f"{slug}.yaml", replace(config, archived=archived, archived_at=date.today() if archived else None))
+    return True
+
+
+def set_auto_sync(slug: str, on: bool, root: Path = PROJECT_ROOT) -> bool:
+    """Active ou coupe la synchro automatique de ce client. Seul son yaml change, comme pour l'archivage.
+    Renvoie False s'il était déjà dans cet état."""
+    config = load(slug, root)
+    if config is None:
+        raise ConfigError(f"Client inconnu : {slug}")
+    if config.auto_sync == on:
+        return False
+    _write(clients_dir(root) / f"{slug}.yaml", replace(config, auto_sync=on))
     return True
 
 

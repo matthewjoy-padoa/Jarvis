@@ -287,12 +287,15 @@ def known_name(root: Path, q: dict) -> str:
     return known[q["requete"]].replace("-", "_")
 
 
-def test_jarvis_syncs_by_itself_as_soon_as_a_client_was_not_checked_for_an_hour(monkeypatch):
+def test_jarvis_syncs_by_itself_the_clients_that_asked_for_it(monkeypatch):
+    from types import SimpleNamespace as Config
     from deploy_hub import main
     started, answer_ok, asked, due = [], [True], [], [True]
+    on = {"acme": False, "bolt": False, "calme": False}  # synchro automatique : à personne par défaut
+    monkeypatch.setattr(main.client_config, "active_configs", lambda *a: [Config(slug=s, auto_sync=v) for s, v in on.items()])
     monkeypatch.setattr(main.sync_routine, "start", lambda slug="", client="", auto=False: started.append((slug, auto)) or main.ActionResult(answer_ok[0], "…", False))
     monkeypatch.setattr(main.notion_api, "load_token", lambda: None)
-    monkeypatch.setattr(main.sync_notion, "stale_clients", lambda minutes: asked.append(minutes) or (["acme"] if due[0] else []))
+    monkeypatch.setattr(main.sync_notion, "stale_clients", lambda minutes: asked.append(minutes) or (["acme", "calme"] if due[0] else []))
     monkeypatch.delenv("JARVIS_SYNC_EVERY_MIN", raising=False)
     clock = [1000.0]
     monkeypatch.setattr(main.time, "monotonic", lambda: clock[0])
@@ -301,8 +304,11 @@ def test_jarvis_syncs_by_itself_as_soon_as_a_client_was_not_checked_for_an_hour(
     assert started == []  # pas pendant le démarrage
     clock[0] += main.SYNC_RETRY_S
     main._auto_sync()
+    assert started == []  # aucun client ne l'a demandée : rien ne part, même s'ils n'ont pas été vérifiés
+    on.update(acme=True, bolt=True)
     main._auto_sync()
-    assert started == [("", True)] and asked == [60]  # un client à revérifier : tous les clients, une fois
+    main._auto_sync()
+    assert started == [(["acme", "bolt"], True)] and asked[-1] == 60  # l'un d'eux est à revérifier : ceux qui l'ont demandée, une fois
     clock[0] += 59 * 60
     main._auto_sync()
     assert len(started) == 1  # la suivante au plus tôt une heure après, même si un client reste en échec
@@ -349,3 +355,26 @@ def test_a_failing_automatic_sync_is_notified_once_a_day(tmp_path):
                 break
             __import__("time").sleep(0.05)
     assert len(notes.all()) == 1 and "auto:" in notes.all()[0].key
+
+
+def test_several_chosen_clients_in_one_passage(root):
+    (root / "config" / "clients" / "trois.yaml").write_text("client: Trois\nsoftware: Pulse\nstatus: en cours\npage_id: " + "c" * 32 + "\n", encoding="utf-8")
+    sn.prepare(root, "demo, trois")
+    sql = (root / "data" / "notion" / "empreintes.sql").read_text(encoding="utf-8")
+    assert "d" * 32 in sql and "c" * 32 in sql and "a" * 32 not in sql
+    assert json.loads((root / "data" / "notion" / sn.PASSAGE).read_text(encoding="utf-8"))["clients"] == ["demo", "trois"]
+
+
+def test_the_automatic_sync_hands_its_clients_to_the_routine_as_one_variable(tmp_path):
+    seen = tmp_path / "vu.txt"
+    script = tmp_path / "claude"
+    script.write_text(f"#!/bin/sh\ncat > /dev/null\necho \"$JARVIS_SYNC_CLIENT\" > {seen}\necho 'acme : inchangé'\n", encoding="utf-8")
+    script.chmod(0o755)
+    routine = SyncRoutine(folder=tmp_path / "notion", claude_bin=str(script))
+    r = routine.start(["acme", "bolt"], auto=True)
+    assert r.ok and "pour acme, bolt" in r.message
+    for _ in range(100):
+        if seen.is_file() and not routine.running:
+            break
+        __import__("time").sleep(0.05)
+    assert seen.read_text(encoding="utf-8").strip() == "acme,bolt"  # ce que « preparer » relit

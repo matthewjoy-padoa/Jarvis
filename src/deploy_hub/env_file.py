@@ -72,7 +72,7 @@ FIELDS = (
           "Du plus rapide (low) au plus poussé (max) : plus haut, l'agent réfléchit plus, coûte plus et dure plus. Vide : celui de Claude Code",
           section=CLAUDE, choices=("", "low", "medium", "high", "xhigh", "max"), group=ENGINE),
     Field("JARVIS_SYNC_EVERY_MIN", "Synchro Notion automatique (minutes)", "int",
-          "Jarvis relit Notion tout seul pour tous les clients suivis, à cet intervalle. Vide : 60 ; 0 : jamais",
+          "Intervalle auquel Jarvis relit Notion tout seul, pour les clients dont le bouton « Synchro auto » de la fiche est activé. Vide : 60 ; 0 : jamais",
           section=CLAUDE, group=ENGINE, minimum=0),
     Field("JARVIS_SYNC_MODEL", "Modèle de la synchro Notion", "text",
           "Routine lancée par « Rafraîchir depuis Notion » sans jeton : elle ne fait qu'exécuter des requêtes, un modèle rapide suffit. "
