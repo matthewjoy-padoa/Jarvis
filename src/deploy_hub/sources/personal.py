@@ -4,12 +4,12 @@ Tout est dans data/perso.json (hors git : titres de tickets et notes). Rien n'es
 """
 
 import json
-import os
-import tempfile
 import threading
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
+
+from deploy_hub.safe_write import write_json
 
 NOTE_MAX = 20_000  # caractères par note
 LABEL_MAX = 200
@@ -74,16 +74,8 @@ class PersonalStore:
         with _lock:
             data = self._read()
             out = edit(data)
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            fd, tmp = tempfile.mkstemp(dir=self.path.parent, prefix=".perso.", suffix=".tmp")
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as f:
-                    json.dump(data, f, ensure_ascii=False)
-                os.replace(tmp, self.path)
-                self._cache = None
-            except BaseException:
-                Path(tmp).unlink(missing_ok=True)
-                raise
+            write_json(self.path, data)
+            self._cache = None
             return out
 
     # ------------------------------------------------------------ Épingles

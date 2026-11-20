@@ -8,10 +8,10 @@
 
 import os
 import shutil
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from deploy_hub.safe_write import write_text
 from deploy_hub.config import ENV_FILE_KEYS, OP_PREFIX, PROCESS_KEYS, PROJECT_ROOT, parse_env_line
 
 
@@ -179,7 +179,7 @@ def update(form: dict[str, str], clear: set[str] = frozenset(), file: Path | Non
             lines[i] = f"{parsed[0]}={wanted[parsed[0]]}"
             done.add(parsed[0])
     lines += [f"{k}={v}" for k, v in wanted.items() if k not in done]
-    _write(file, "\n".join(lines) + "\n")
+    write_text(file, "\n".join(lines) + "\n")
     for key, value in wanted.items():  # la suite de Jarvis voit tout de suite les nouvelles valeurs
         ENV_FILE_KEYS.add(key)
         PROCESS_KEYS.discard(key)  # appliquée tout de suite ; au redémarrage, l'environnement du processus regagnera
@@ -190,14 +190,3 @@ def update(form: dict[str, str], clear: set[str] = frozenset(), file: Path | Non
     return list(wanted)
 
 
-def _write(file: Path, text: str) -> None:
-    file.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=file.parent, prefix=".env.", suffix=".tmp")  # créé en 600
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as out:
-            out.write(text)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, file)
-    except BaseException:
-        Path(tmp).unlink(missing_ok=True)
-        raise

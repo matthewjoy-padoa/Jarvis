@@ -1,3 +1,7 @@
 <div id="pr-list" hx-get="/deploiements/{{ d.slug }}/pr/liste" hx-trigger="load" hx-swap="outerHTML">
   <p class="muted">Jarvis interroge GitHub…</p>
 </div>
+{# Chargé en même temps que les PR ouvertes, pas après : chacun attend GitHub de son côté. #}
+<section id="pr-history" hx-get="/deploiements/{{ d.slug }}/pr/historique" hx-trigger="load" hx-swap="outerHTML">
+  <h3>Historique</h3><p class="muted">Jarvis interroge GitHub…</p>
+</section>

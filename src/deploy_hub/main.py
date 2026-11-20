@@ -40,7 +40,7 @@ from deploy_hub.sources.journal import changes_since, group_changes
 from deploy_hub.sources import watchers
 from deploy_hub.sources.notifications import Notification, NotificationStore
 from deploy_hub.sources.personal import PersonalStore, remind_date
-from deploy_hub.sources.pulls import PullRequests
+from deploy_hub.sources.pulls import PullRequests, names
 from deploy_hub.sources import review as agent_review
 from deploy_hub.sources.fiches import FicheSource
 from deploy_hub.sources.web_push import WebPush
@@ -927,12 +927,34 @@ def fiche_view(request: Request, vue: str = Form("complete"), onglets: list[str]
     return _keep(RedirectResponse(target, status_code=303), TABS_COOKIE, f"{'simple' if simple else 'complete'}:{'.'.join(kept)}")
 
 
+def _softwares(d) -> set[str]:
+    """Logiciels du client, pour rattacher les PR de son logiciel : ceux de sa fiche et ceux du catalogue des DAGs."""
+    return names(d.software) | dag_catalogue.softwares_of(d.orchestrator)
+
+
+def _agent_pr_urls(slug: str) -> set[str]:
+    return {r.pr_url for r in claude.runs if r.slug == slug and r.pr_url}
+
+
 @app.get("/deploiements/{slug}/pr/liste", response_class=HTMLResponse)
 def deployment_pulls(request: Request, slug: str, frais: bool = False):
     """PR ouvertes de l'orchestrator qui concernent ce client ; chargé par l'onglet PR (GitHub peut mettre quelques secondes)."""
     d = _get(slug)
-    prs, error = pulls.for_client(d.slug, d.orchestrator, d.software, {r.pr_url for r in claude.runs if r.slug == slug and r.pr_url}, frais)
+    prs, error = pulls.for_client(d.slug, d.orchestrator, _softwares(d), _agent_pr_urls(slug), frais)
     return templates.TemplateResponse(request, "_pr_list.html", {"d": d, "prs": prs, "error": error, "today": date.today(), "read_at": pulls.read_at})
+
+
+@app.get("/deploiements/{slug}/pr/historique", response_class=HTMLResponse)
+def deployment_pull_history(request: Request, slug: str, logiciel: bool = False, tous: bool = False, frais: bool = False):
+    """PR fusionnées ou fermées du client ; options d'affichage, depuis la réception de ses données : PR de son logiciel
+    (logiciel) et PR communes à tous les clients (tous)."""
+    d = _get(slug)
+    since, softwares = d.milestones.get("reception_donnees"), _softwares(d)
+    prs, error, updating = pulls.history(d.slug, d.orchestrator, _agent_pr_urls(slug), since, softwares if logiciel else set(), tous,
+                                         frais)
+    return templates.TemplateResponse(request, "_pr_history.html", {"d": d, "prs": prs, "error": error, "since": since,
+                                                                    "softwares": sorted(softwares), "logiciel": logiciel, "tous": tous,
+                                                                    "updating": updating})
 
 
 @app.get("/deploiements/{slug}/{tab}", response_class=HTMLResponse)

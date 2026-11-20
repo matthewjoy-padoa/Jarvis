@@ -19,6 +19,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
+from deploy_hub.safe_write import write_json
 from deploy_hub.config import child_environment
 from deploy_hub.models import DONE, IN_PROGRESS, KO, status_group
 from deploy_hub.sources.airflow import AIR_COMMAND
@@ -110,10 +111,7 @@ class DagWatcher:
 
     def _save(self) -> None:
         with self._lock:
-            self.state_dir.mkdir(parents=True, exist_ok=True)
-            tmp = self.state_file.with_suffix(".tmp")
-            tmp.write_text(json.dumps([asdict(w) for w in self.watches], ensure_ascii=False, default=datetime.isoformat), encoding="utf-8")
-            tmp.replace(self.state_file)
+            write_json(self.state_file, [asdict(w) for w in self.watches], default=datetime.isoformat)
 
     def get(self, watch_id: int) -> DagWatch | None:
         return next((w for w in self.watches if w.id == watch_id), None)
