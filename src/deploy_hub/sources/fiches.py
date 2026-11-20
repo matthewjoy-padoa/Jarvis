@@ -79,8 +79,8 @@ def _notion_dir(fiche_dir: Path, slug: str) -> Path:
 
 
 def _from_config(cfg) -> dict:
-    """Ce que la fiche tient de la seule configuration du client : son existence et son archivage."""
-    return {"configured": True, "archived": cfg.archived, "archived_at": cfg.archived_at} if cfg else {}
+    """Ce que la fiche tient de la seule configuration du client : son existence, son archivage, sa synchro automatique."""
+    return {"configured": True, "archived": cfg.archived, "archived_at": cfg.archived_at, "auto_sync": cfg.auto_sync} if cfg else {}
 
 
 def parse_deployment(path: Path, clients_dir: Path | None = None) -> Deployment:

@@ -254,3 +254,127 @@ def test_jarvis_opens_the_passage_itself_so_the_model_starts_with_the_first_quer
     monkeypatch.setattr(sync_routine, "first_queries", refuse)
     r = SyncRoutine(folder=tmp_path / "notion", claude_bin=str(script)).start("acme")
     assert not r.ok and "client inconnu ou archivé" in r.message
+
+
+def test_the_button_follows_notion_answers_as_they_come(root, tmp_path):
+    """Vu le 2026-11-20 : l'avancement restait à 20 % puis passait à « terminé ». Les réponses ne sont rangées qu'à « suite »,
+    toutes ensemble : le bouton les compte donc dans la session de la routine, dès qu'elles arrivent."""
+    folder = root / "data" / "notion"
+    routine = SyncRoutine(folder=folder)
+    asked = start(root)
+    routine._save(running=True, started=datetime.now().isoformat(timespec="seconds"), session=SESSION)
+    assert routine.progress() == {"pct": 8, "label": "Empreinte…"}
+    answer(asked["requetes"][0]["requete"], json.dumps({"results": [FINGERPRINT]}))
+    assert routine.progress() == {"pct": 15, "label": "Plan des requêtes…"}
+    asked = sn.advance(root)
+    seen = [routine.progress()]
+    for q in asked["requetes"]:
+        answer(q["requete"], (FIXTURES / f"{known_name(root, q)}.json").read_text(encoding="utf-8"), q.get("params", ()))
+        seen.append(routine.progress())
+    assert [p["label"] for p in seen] == ["Requêtes : 0 / 4", "Requêtes : 1 / 4", "Requêtes : 2 / 4", "Requêtes : 3 / 4", "Fusion…"]
+    assert [p["pct"] for p in seen] == [20, 36, 52, 68, 90]  # il monte à chaque réponse
+    sn.advance(root)
+    assert routine.progress()["pct"] == 97
+    # passage d'une synchro précédente, ou session inconnue : rien à compter, la synchro démarre
+    old = datetime.now().timestamp() - 3600
+    __import__("os").utime(folder / sn.PASSAGE, (old, old))
+    assert routine.progress() == {"pct": 3, "label": "Démarrage…"}
+    assert SyncRoutine(folder=tmp_path / "vide").progress() == {"pct": 3, "label": "Démarrage…"}
+
+
+def known_name(root: Path, q: dict) -> str:
+    known = {p.read_text(encoding="utf-8").rstrip(): p.stem for p in (root / "data" / "notion" / "demo" / "requetes").glob("*.sql")}
+    return known[q["requete"]].replace("-", "_")
+
+
+def test_jarvis_syncs_by_itself_the_clients_that_asked_for_it(monkeypatch):
+    from types import SimpleNamespace as Config
+    from deploy_hub import main
+    started, answer_ok, asked, due = [], [True], [], [True]
+    on = {"acme": False, "bolt": False, "calme": False}  # synchro automatique : à personne par défaut
+    monkeypatch.setattr(main.client_config, "active_configs", lambda *a: [Config(slug=s, auto_sync=v) for s, v in on.items()])
+    monkeypatch.setattr(main.sync_routine, "start", lambda slug="", client="", auto=False: started.append((slug, auto)) or main.ActionResult(answer_ok[0], "…", False))
+    monkeypatch.setattr(main.notion_api, "load_token", lambda: None)
+    monkeypatch.setattr(main.sync_notion, "stale_clients", lambda minutes: asked.append(minutes) or (["acme", "calme"] if due[0] else []))
+    monkeypatch.delenv("JARVIS_SYNC_EVERY_MIN", raising=False)
+    clock = [1000.0]
+    monkeypatch.setattr(main.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(main, "_auto_sync_next", clock[0] + main.SYNC_RETRY_S)  # Jarvis vient de démarrer
+    main._auto_sync()
+    assert started == []  # pas pendant le démarrage
+    clock[0] += main.SYNC_RETRY_S
+    main._auto_sync()
+    assert started == []  # aucun client ne l'a demandée : rien ne part, même s'ils n'ont pas été vérifiés
+    on.update(acme=True, bolt=True)
+    main._auto_sync()
+    main._auto_sync()
+    assert started == [(["acme", "bolt"], True)] and asked[-1] == 60  # l'un d'eux est à revérifier : ceux qui l'ont demandée, une fois
+    clock[0] += 59 * 60
+    main._auto_sync()
+    assert len(started) == 1  # la suivante au plus tôt une heure après, même si un client reste en échec
+    clock[0] += 60
+    due[0] = False  # tout a été vérifié entre-temps (bouton d'une fiche, « Tout rafraîchir ») : rien à faire
+    main._auto_sync()
+    assert len(started) == 1
+    due[0], answer_ok[0] = True, False  # une synchro manuelle tourne : nouvel essai cinq minutes après, pas une heure
+    main._auto_sync()
+    clock[0] += main.SYNC_RETRY_S - 1
+    main._auto_sync()
+    assert len(started) == 2
+    clock[0] += 1
+    answer_ok[0] = True
+    main._auto_sync()
+    assert len(started) == 3
+    clock[0] += 7200
+    monkeypatch.setenv("JARVIS_SYNC_EVERY_MIN", "0")  # réglage : jamais
+    main._auto_sync()
+    assert len(started) == 3
+    assert "_auto_sync" in __import__("inspect").getsource(main._push_round)  # vérifié à chaque tour de la boucle de fond
+
+
+def test_a_client_is_stale_when_never_checked_or_checked_too_long_ago(root):
+    assert sn.stale_clients(60, root) == ["autre", "demo"]  # jamais vérifiés
+    sn.mark_checked(["demo"], root)
+    assert sn.stale_clients(60, root) == ["autre"]
+    path = root / "data" / "notion" / sn.VERIFICATIONS
+    path.write_text(json.dumps({"demo": (datetime.now() - timedelta(minutes=61)).strftime(sn.CHECKED_FORMAT), "autre": "illisible"}), encoding="utf-8")
+    assert sn.stale_clients(60, root) == ["autre", "demo"] and sn.stale_clients(120, root) == ["autre"]
+
+
+def test_a_failing_automatic_sync_is_notified_once_a_day(tmp_path):
+    from deploy_hub.sources.notifications import NotificationStore
+    script = tmp_path / "claude"
+    script.write_text("#!/bin/sh\ncat > /dev/null\necho 'ÉCHEC tous : étape 2 : connecteur Notion absent'\nexit 1\n", encoding="utf-8")
+    script.chmod(0o755)
+    notes = NotificationStore(tmp_path / "notifications.json")
+    for n in range(2):
+        routine = SyncRoutine(notifications=notes, folder=tmp_path / f"notion{n}", claude_bin=str(script))
+        assert routine.start(auto=True).ok
+        for _ in range(100):
+            if not routine.running and "finished" in routine.state():
+                break
+            __import__("time").sleep(0.05)
+    assert len(notes.all()) == 1 and "auto:" in notes.all()[0].key
+
+
+def test_several_chosen_clients_in_one_passage(root):
+    (root / "config" / "clients" / "trois.yaml").write_text("client: Trois\nsoftware: Pulse\nstatus: en cours\npage_id: " + "c" * 32 + "\n", encoding="utf-8")
+    sn.prepare(root, "demo, trois")
+    sql = (root / "data" / "notion" / "empreintes.sql").read_text(encoding="utf-8")
+    assert "d" * 32 in sql and "c" * 32 in sql and "a" * 32 not in sql
+    assert json.loads((root / "data" / "notion" / sn.PASSAGE).read_text(encoding="utf-8"))["clients"] == ["demo", "trois"]
+
+
+def test_the_automatic_sync_hands_its_clients_to_the_routine_as_one_variable(tmp_path):
+    seen = tmp_path / "vu.txt"
+    script = tmp_path / "claude"
+    script.write_text(f"#!/bin/sh\ncat > /dev/null\necho \"$JARVIS_SYNC_CLIENT\" > {seen}\necho 'acme : inchangé'\n", encoding="utf-8")
+    script.chmod(0o755)
+    routine = SyncRoutine(folder=tmp_path / "notion", claude_bin=str(script))
+    r = routine.start(["acme", "bolt"], auto=True)
+    assert r.ok and "pour acme, bolt" in r.message
+    for _ in range(100):
+        if seen.is_file() and not routine.running:
+            break
+        __import__("time").sleep(0.05)
+    assert seen.read_text(encoding="utf-8").strip() == "acme,bolt"  # ce que « preparer » relit

@@ -14,6 +14,7 @@
     <div class="refresh">
   <span class="muted last-sync" title="Dernière fois que Jarvis a lu Notion pour ce client">{% if d.last_sync %}Dernière synchro : {{ d.last_sync | quand }}{% else %}Jamais synchronisé{% endif %}</span>
   {% if not d.archived %}{# archivé : plus synchronisé, le bandeau propose de le désarchiver #}
+  {% if d.configured %}{% include "_auto_sync.html" %}{% endif %}
   <button type="button" class="secondary sync-btn" hx-post="/actions/rafraichir/{{ d.slug }}" hx-target="next .refresh-out" hx-indicator="closest .refresh" hx-disabled-elt="this"{% if not notion_ready %} disabled title="Ni jeton Notion ni Claude Code en ligne de commande : voir docs/routine-synchro.md"{% endif %}><span class="btn-face"><span class="btn-idle">{{ ic.icon("sync") }} Rafraîchir depuis Notion</span><span class="btn-busy" aria-hidden="true">Synchro…</span></span></button>
   <div class="refresh-out">{% if sync_running %}<div hx-get="/actions/rafraichir/etat" hx-trigger="load" hx-swap="outerHTML"></div>{% endif %}</div>
   {% endif %}

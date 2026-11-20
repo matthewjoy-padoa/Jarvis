@@ -139,28 +139,6 @@ def test_status_reloads_the_page_only_when_a_live_sync_ends_well(monkeypatch, tm
     assert "Synchro interrompue" in r.text and "hx-trigger" not in r.text
 
 
-def test_progress_follows_the_files_the_routine_drops(tmp_path):
-    """Cercle d'avancement : empreinte, plan, requêtes déposées, fusion, lus dans data/notion depuis le lancement."""
-    import json
-    folder = tmp_path / "notion"
-    routine = SyncRoutine(folder=folder)
-    routine._save(running=True, started="2000-01-01T00:00:00")
-    assert routine.progress() == {"pct": 5, "label": "Empreinte…"}
-    (folder / "empreintes.json").write_text("{}")
-    assert routine.progress()["label"] == "Plan des requêtes…"
-    raw = folder / "acme"
-    raw.mkdir()
-    (raw / "plan.json").write_text(json.dumps({"sorties": ["actions", "recette", "client", "regles"]}))
-    (raw / "actions.json").write_text("{}")
-    assert routine.progress() == {"pct": 20 + 65 * 1 // 4, "label": "Requêtes : 1 / 4"}
-    for name in ("recette", "client", "regles"):
-        (raw / f"{name}.json").write_text("{}")
-    assert routine.progress()["label"] == "Fusion…"
-    (raw / "plan.json").unlink()
-    (raw / "etat-synchro.json").write_text("{}")  # fusionné : le plan est effacé
-    assert routine.progress() == {"pct": 92, "label": "Fusion : 1 client(s)…"}
-
-
 def test_refresh_button_does_not_move_when_clicked():
     """Attente, avancement et résultat vont dans un encart posé sous le bouton (position absolue), jamais à côté de lui."""
     css = (PROJECT_ROOT / "src" / "deploy_hub" / "static" / "style.css").read_text(encoding="utf-8")
@@ -317,28 +295,6 @@ def test_two_syncs_never_run_at_once(tmp_path, monkeypatch):
     assert sync_notion.running_elsewhere(tmp_path) is None
     (folder / "routine.json").write_text(json.dumps({"running": True, "started": "08:06", "pid": 999999999, "session": "x"}))
     assert sync_notion.running_elsewhere(tmp_path) is None  # processus mort : la synchro est finie, on peut relancer
-
-
-def test_progress_shows_the_page_of_a_long_query(tmp_path):
-    """Une requête lue page par page (100 lignes) : le cercle dit laquelle, au lieu de rester figé sur « 3 / 4 »."""
-    import json
-    folder = tmp_path / "notion"
-    routine = SyncRoutine(folder=folder)
-    routine._save(running=True, started="2000-01-01T00:00:00")
-    (folder / "empreintes.json").parent.mkdir(parents=True, exist_ok=True)
-    (folder / "empreintes.json").write_text("{}")
-    raw = folder / "acme"
-    raw.mkdir()
-    (raw / "plan.json").write_text(json.dumps({"sorties": ["client", "regles", "recette", "actions"]}))
-    for name in ("client", "regles", "recette", "actions", "actions-2", "actions-6"):
-        (raw / f"{name}.json").write_text("{}")
-        time.sleep(0.02)
-    p = routine.progress()  # la dernière requête lit encore ses pages : pas « Fusion »
-    assert p["label"] == "Requêtes : 3 / 4 · actions, page 7" and p["pct"] < 88
-    old = time.time() - 600
-    for page in raw.glob("actions-*.json"):
-        os.utime(page, (old, old))  # plus de page depuis 10 min : la lecture est finie
-    assert routine.progress()["label"] == "Fusion…"
 
 
 def test_hitting_the_page_cap_is_an_explicit_failure(tmp_path):

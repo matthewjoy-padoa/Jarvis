@@ -1,0 +1,6 @@
+{# Bouton « Synchro auto » de la fiche d'un client : Jarvis relit Notion tout seul pour lui, ou non (non par défaut).
+   Attend : d. Un clic bascule (POST /clients/<slug>/synchro-auto) et le bouton se remplace lui-même. #}
+{% set every = auto_sync_every() %}
+<button type="button" class="secondary auto-sync" aria-pressed="{{ 'true' if d.auto_sync else 'false' }}"
+        hx-post="/clients/{{ d.slug }}/synchro-auto" hx-vals='{"actif": "{{ '0' if d.auto_sync else '1' }}"}' hx-swap="outerHTML"
+        title="{% if d.auto_sync %}Jarvis relit Notion tout seul pour {{ d.client }}{% if every %}, toutes les {{ every }} min{% endif %}. Un clic : seulement à la demande.{% else %}{{ d.client }} n'est relu qu'à la demande. Un clic : Jarvis le relit tout seul{% if every %}, toutes les {{ every }} min{% endif %}.{% endif %}{% if not every %} Pour l'instant coupée pour tous les clients dans Réglages (intervalle à 0).{% endif %}">Synchro auto : {{ "oui" if d.auto_sync else "non" }}</button>

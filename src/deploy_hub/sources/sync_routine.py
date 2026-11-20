@@ -19,7 +19,7 @@ from deploy_hub.safe_write import write_json
 from deploy_hub.config import ENV_FILE_KEYS, PROJECT_ROOT, data_dir
 from deploy_hub.sources import ActionResult
 from deploy_hub.queries import ConfigError
-from deploy_hub.sync_notion import CLIENT_ENV, SESSION_ENV, SyncError, first_queries
+from deploy_hub.sync_notion import CLIENT_ENV, PASSAGE, SESSION_ENV, SyncError, first_queries, passage_progress
 
 ROUTINE = PROJECT_ROOT / "sync" / "routine.md"
 INSTRUCTION = "Suis la consigne reçue sur l'entrée standard (routine de synchro Notion de Jarvis)."
@@ -142,10 +142,14 @@ class SyncRoutine:
     def _env(self) -> dict:
         return app_env()
 
-    def start(self, slug: str = "", client: str = "") -> ActionResult:
-        """slug : ce client seulement (bouton de sa fiche, client : son nom pour le message) ; vide : tous les clients."""
+    def start(self, slugs: str | list[str] = "", client: str = "", auto: bool = False) -> ActionResult:
+        """slugs : ce client seulement (bouton de sa fiche, client : son nom pour le message), ou ceux de la liste (synchro
+        automatique) ; vide : tous les clients. La liste n'est jointe qu'ici, pour la variable lue par « preparer ».
+        auto : synchro lancée par l'app elle-même (toutes les heures) ; ses échecs ne sont signalés qu'une fois par jour."""
         if (problem := self.problem()):
             return ActionResult(False, problem, False)
+        slugs = [slugs] if isinstance(slugs, str) and slugs else list(slugs)
+        slug = ",".join(slugs)
         with self._lock:
             if self.running:
                 return ActionResult(False, "Une synchro est déjà en cours.", False)
@@ -167,8 +171,8 @@ class SyncRoutine:
                        client=slug)
         self._proc.stdin.write(routine_text() + (PREPARED + json.dumps(first, ensure_ascii=False) if first else ""))
         self._proc.stdin.close()
-        threading.Thread(target=self._wait, args=(self._proc, log), name="jarvis-sync", daemon=True).start()
-        scope = f"pour {client or slug}" if slug else "pour tous les clients de l'app"
+        threading.Thread(target=self._wait, args=(self._proc, log, auto), name="jarvis-sync", daemon=True).start()
+        scope = f"pour {client or ', '.join(slugs)}" if slugs else "pour tous les clients de l'app"
         return ActionResult(True, f"Synchro Notion lancée : Claude lit Notion {scope}. La page se mettra à jour à la fin.", False)
 
     def _prepare(self, slug: str) -> dict | None:
@@ -176,7 +180,7 @@ class SyncRoutine:
         du bouton) ; None sinon : la routine fait alors son étape 1 elle-même."""
         return first_queries(only=slug) if self.folder == data_dir() / "notion" else None
 
-    def _wait(self, proc: subprocess.Popen, log) -> None:
+    def _wait(self, proc: subprocess.Popen, log, auto: bool = False) -> None:
         try:
             code = proc.wait(timeout=self.timeout)
         except subprocess.TimeoutExpired:
@@ -194,48 +198,31 @@ class SyncRoutine:
         self._save(running=False, started=self.state().get("started"), finished=datetime.now().isoformat(timespec="seconds"),
                    ok=ok, summary=self.summary() if ok else reason)
         if not ok and self.notifications is not None:
-            self.notifications.add(f"sync-routine-fail:{datetime.now().isoformat(timespec='minutes')}", "sync", "urgent",
+            when = f"auto:{datetime.now():%Y-%m-%d}" if auto else datetime.now().isoformat(timespec="minutes")
+            self.notifications.add(f"sync-routine-fail:{when}", "sync", "urgent",
                                    "Synchro Notion en échec", reason[:300], "/clients")
 
     def progress(self) -> dict:
-        """Avancement de la synchro en cours, lu dans les fichiers que la routine dépose (data/notion/) depuis son lancement :
-        empreinte, plan de chaque client (ses requêtes), résultats déposés, fusion. {"pct": 0-100, "label": "..."}."""
+        """Avancement de la synchro en cours, {"pct": 0-100, "label": "..."}, d'après son passage (data/notion/passage.json,
+        ouvert juste avant le lancement) : les réponses de Notion sont comptées dans la session de la routine dès qu'elles
+        arrivent. « suite » ne les range qu'ensuite, toutes ensemble : lu dans les fichiers déposés, l'avancement restait
+        à 20 % puis passait à « terminé » (vu le 2026-11-20)."""
+        state = self.state()
+        path = self.folder / PASSAGE
         try:
-            since = datetime.fromisoformat(self.state()["started"]).timestamp()
-        except (KeyError, TypeError, ValueError):
-            return {"pct": 0, "label": "Démarrage…"}
-        fresh = lambda path: path.is_file() and path.stat().st_mtime >= since  # noqa: E731
-        if not fresh(self.folder / "empreintes.json"):
-            return {"pct": 5, "label": "Empreinte…"}
-        done = total = merged = 0
-        latest = None  # dernier résultat déposé : on montre sa page quand une requête en a plusieurs
-        for raw in (p for p in self.folder.iterdir() if p.is_dir()):
-            plan = raw / "plan.json"
-            if fresh(plan):
-                try:
-                    outputs = json.loads(plan.read_text(encoding="utf-8")).get("sorties", [])
-                except (OSError, ValueError):
-                    outputs = []
-                total += len(outputs)
-                done += sum((raw / f"{name}.json").is_file() for name in outputs)
-                for name in outputs:
-                    for page in raw.glob(f"{name}*.json"):
-                        if fresh(page) and (latest is None or page.stat().st_mtime > latest.stat().st_mtime):
-                            latest = page
-            elif fresh(raw / "etat-synchro.json"):  # client fusionné : son plan est effacé
-                merged += 1
-        if merged:
-            return {"pct": 92, "label": f"Fusion : {merged} client(s)…"}
-        if not total:
-            return {"pct": 15, "label": "Plan des requêtes…"}
-        number = latest.stem.rsplit("-", 1)[-1] if latest and "-" in latest.stem else ""
-        paging = number.isdigit() and time.time() - latest.stat().st_mtime < 120  # une page vient d'arriver : la lecture continue
-        if done < total or paging:
-            label = f"Requêtes : {min(done, total - 1) if paging else done} / {total}"
-            if paging:  # requête lue page par page (100 lignes) : la page en cours
-                label += f" · {latest.stem.rsplit('-', 1)[0]}, page {int(number) + 1}"
-            return {"pct": 20 + 65 * min(done, total - 1 if paging else done) // total, "label": label}
-        return {"pct": 88, "label": "Fusion…"}
+            since = datetime.fromisoformat(state["started"]).timestamp()
+            if not state.get("session") or path.stat().st_mtime < since - 30:  # pas de passage de cette synchro
+                return {"pct": 3, "label": "Démarrage…"}
+            step, done, total = passage_progress(json.loads(path.read_text(encoding="utf-8")), state["session"])
+        except (OSError, ValueError, KeyError, TypeError):
+            return {"pct": 3, "label": "Démarrage…"}
+        if step == "fini":
+            return {"pct": 97, "label": "Terminé : la page va se recharger…"}
+        if step == "empreinte":
+            return {"pct": 15, "label": "Plan des requêtes…"} if total and done >= total else {"pct": 8, "label": "Empreinte…"}
+        if done < total:
+            return {"pct": 20 + 65 * done // total, "label": f"Requêtes : {done} / {total}"}
+        return {"pct": 90, "label": "Fusion…"}
 
     def failures(self) -> list[str]:
         """Échecs de la dernière synchro, où qu'ils soient : erreurs par client du « plan » (fichier écrit par Python, sûr)

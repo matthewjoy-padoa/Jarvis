@@ -439,14 +439,15 @@ def _followed(root: Path, slugs: list[str] | None = None) -> list[str]:
 
 def prepare(root: Path = PROJECT_ROOT, only: str | None = None) -> dict:
     """Ouvre un passage : écrit les requêtes de chaque client et l'empreinte (une seule requête, une ligne par client).
-    only (ou JARVIS_SYNC_CLIENT) : ce client seulement. Refuse si une autre synchro lancée par Jarvis tourne : deux
+    only (ou JARVIS_SYNC_CLIENT) : ce client seulement, ou ceux-là (slugs séparés par des virgules). Refuse si une autre synchro lancée par Jarvis tourne : deux
     passages écriraient les mêmes fichiers (vu le 2026-11-18)."""
     if (other := running_elsewhere(root)):
         raise SyncError(f"Une autre synchro tourne déjà (lancée à {other.get('started', '?')}) : attends sa fin, puis relance")
     from deploy_hub import client_config
     configs = [asdict(c) for c in client_config.active_configs(root)]  # un client archivé n'est plus synchronisé
     if (only := os.environ.get(CLIENT_ENV, "") if only is None else only):
-        configs = [c for c in configs if c["slug"] == only]
+        wanted = [slug.strip() for slug in only.split(",")]  # un client (sa fiche) ou plusieurs (synchro automatique)
+        configs = [c for c in configs if c["slug"] in wanted]
         if not configs:
             raise SyncError(f"{only} : client inconnu ou archivé, rien à synchroniser")
     for config in configs:
@@ -576,10 +577,11 @@ def current_session() -> str:
     return os.environ.get(SESSION_ENV) or os.environ.get("CLAUDE_CODE_SESSION_ID") or ""
 
 
-def _transcripts(since: datetime) -> list[Path]:
-    """Transcripts de Claude Code où chercher les réponses : celui de la session qui lance la commande si on la connaît
-    (routine lancée par Jarvis, ou variable posée par Claude Code), sinon ceux écrits depuis le début du passage."""
-    session = current_session()
+def _transcripts(since: datetime, session: str = "") -> list[Path]:
+    """Transcripts de Claude Code où chercher les réponses : celui de la session donnée, sinon de celle qui lance la
+    commande si on la connaît (routine lancée par Jarvis, ou variable posée par Claude Code), sinon ceux écrits depuis
+    le début du passage."""
+    session = session or current_session()
     if session and (found := list(CLAUDE_PROJECTS.glob(f"*/{session}.jsonl"))):
         return found
     return [p for p in CLAUDE_PROJECTS.glob("*/*.jsonl") if p.stat().st_mtime >= since.timestamp()]
@@ -598,12 +600,12 @@ def _answer(content) -> str | None:
     return text
 
 
-def notion_answers(since: datetime) -> dict[tuple, str]:
+def notion_answers(since: datetime, session: str = "") -> dict[tuple, str]:
     """Réponses de l'outil Notion reçues depuis le début du passage, lues dans le transcript de la session Claude Code :
     {(requête, paramètres): texte brut de la dernière réponse valable}. Le format du transcript est interne à Claude Code :
     tout ce qui n'a pas la forme attendue est ignoré, et « suite » fait alors déposer les réponses par le modèle."""
     answers: dict[tuple, str] = {}
-    for path in _transcripts(since):
+    for path in _transcripts(since, session):
         asked: dict[str, tuple] = {}
         try:
             lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -677,6 +679,15 @@ def _collect(state: dict) -> list[dict]:
             continue
         q["recue"] = True
     return missing
+
+
+def passage_progress(state: dict, session: str = "") -> tuple[str, int, int]:
+    """Où en est un passage, pour le bouton de l'app : (étape, réponses déjà reçues de Notion, requêtes du plan). Les
+    réponses sont comptées dans le transcript de la session au fur et à mesure : « suite » ne les range qu'ensuite, toutes
+    ensemble, et l'avancement sautait du début à la fin (vu le 2026-11-20)."""
+    answers = notion_answers(datetime.fromisoformat(state["debut"]), session)
+    asked = state.get("attendues") or []
+    return state.get("etape", ""), sum(1 for q in asked if q.get("recue") or _sql_key(q["requete"], q["params"]) in answers), len(asked)
 
 
 def _next_pages(state: dict) -> list[dict]:
@@ -773,6 +784,23 @@ PLAN_ERRORS = "plan-erreurs.json"  # data/notion/plan-erreurs.json : erreurs par
 VERIFICATIONS = "verifications.json"  # data/notion/verifications.json : dernière vérification de chaque client
 
 
+CHECKED_FORMAT = "%d/%m/%Y %H:%M"
+
+
+def stale_clients(minutes: int, root: Path = PROJECT_ROOT) -> list[str]:
+    """Clients suivis dont la dernière vérification dans Notion (mark_checked) date d'au moins « minutes », ou qui n'ont
+    jamais été vérifiés : ceux que la synchro automatique doit relire."""
+    seen = _load_json(data_dir(root) / "notion" / VERIFICATIONS, {})
+    limit = datetime.now() - timedelta(minutes=minutes)
+
+    def stale(slug: str) -> bool:
+        try:
+            return datetime.strptime(seen[slug], CHECKED_FORMAT) <= limit
+        except (KeyError, TypeError, ValueError):
+            return True
+    return [slug for slug in _followed(root) if stale(slug)]
+
+
 def mark_checked(slugs: list[str], root: Path = PROJECT_ROOT) -> None:
     """Note l'heure à laquelle ces clients ont été vérifiés dans Notion, même s'il n'y avait rien de neuf : la fiche n'est
     réécrite (et synced_at mis à jour) que quand quelque chose change, la « dernière synchro » affichée ne doit pas dater."""
@@ -780,7 +808,7 @@ def mark_checked(slugs: list[str], root: Path = PROJECT_ROOT) -> None:
         return
     path = data_dir(root) / "notion" / VERIFICATIONS
     seen = _load_json(path, {})
-    seen.update({slug: datetime.now().strftime("%d/%m/%Y %H:%M") for slug in slugs})
+    seen.update({slug: datetime.now().strftime(CHECKED_FORMAT) for slug in slugs})
     write_json(path, seen)
 
 

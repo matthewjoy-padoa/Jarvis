@@ -6,6 +6,7 @@ import os
 import re
 from contextlib import asynccontextmanager
 import threading
+import time
 from importlib.metadata import PackageNotFoundError, version as package_version
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit
 from datetime import date, datetime, timedelta
@@ -21,7 +22,7 @@ from deploy_hub import client_config
 from deploy_hub.config import PROCESS_KEYS, PROJECT_ROOT, clients_dir, data_dir, ensure_private_dirs, forget_secrets, load_settings, secret_problem
 from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, KO, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
                                kanban_columns, notion_link, status_group)
-from deploy_hub import brief, console, env_file, onepassword, shell
+from deploy_hub import brief, console, env_file, onepassword, shell, sync_notion
 from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
@@ -104,14 +105,50 @@ def _guarded(label: str, job) -> None:
         log.exception(f"{label} en échec")
 
 
+SYNC_EVERY_MIN = 60  # réglage JARVIS_SYNC_EVERY_MIN (minutes ; 0 : jamais)
+SYNC_RETRY_S = 300  # synchro automatique non partie (une autre tourne, claude introuvable) : nouvel essai 5 minutes après
+_auto_sync_next = time.monotonic() + SYNC_RETRY_S  # pas avant ce moment ; au démarrage : on laisse Jarvis se lancer
+
+
+def auto_sync_every() -> int:
+    """Minutes entre deux synchros automatiques (0 : jamais). Relu à chaque fois : un changement dans Réglages s'applique."""
+    value = os.getenv("JARVIS_SYNC_EVERY_MIN", "").strip()
+    return int(value) if value.isdigit() else SYNC_EVERY_MIN
+
+
+def _auto_sync() -> None:
+    """Synchro Notion des clients qui l'ont demandée (bouton « Synchro auto » de leur fiche ; aucun par défaut), lancée
+    par l'app dès que l'un d'eux n'a pas été vérifié depuis l'intervalle (une heure par défaut) : une synchro faite à la
+    main compte, et un redémarrage de Jarvis ne remet rien à zéro. Par l'API avec un jeton Notion, sinon par la routine
+    Claude Code. Partie : la suivante au plus tôt un intervalle après, même si un client reste en échec ; pas partie :
+    nouvel essai cinq minutes plus tard."""
+    global _auto_sync_next
+    every = auto_sync_every()
+    if not every or time.monotonic() < _auto_sync_next:
+        return
+    wanted = [c.slug for c in client_config.active_configs() if c.auto_sync]
+    if not set(wanted) & set(sync_notion.stale_clients(every)):
+        return
+    if notion_api.load_token():
+        threading.Thread(target=_refresh, args=(wanted,), name="jarvis-sync-auto", daemon=True).start()
+        started, message = True, "lancée par l'API"
+    else:
+        r = sync_routine.start(wanted, auto=True)
+        started, message = r.ok, r.message
+    _auto_sync_next = time.monotonic() + (every * 60 if started else SYNC_RETRY_S)
+    log.info(f"Synchro Notion automatique : {message}")
+
+
 def _push_round() -> None:
     """Un tour : échéances du jour (créées d'habitude à l'ouverture d'une page), puis envoi des nouvelles notifications ;
     au passage, le catalogue des DAGs est régénéré si le clone orchestrator local a changé, et l'annuaire des clients est
-    relu s'il a plus d'un jour (au démarrage, puis chaque jour) : « Ajouter un client » l'a déjà, sans attente."""
+    relu s'il a plus d'un jour (au démarrage, puis chaque jour) : « Ajouter un client » l'a déjà, sans attente ; enfin la
+    synchro Notion part toute seule quand son intervalle est écoulé (une heure par défaut)."""
     _guarded("Catalogue des DAGs : relevé du clone", dag_source.refresh)
     _deadline_notes()
     web_push.pump(notifications)
     _guarded("Annuaire des clients : relecture", client_directory.refresh_if_stale)
+    _guarded("Synchro Notion automatique", _auto_sync)
 
 
 async def _push_loop() -> None:
@@ -168,6 +205,7 @@ templates.env.filters["md"] = md
 templates.env.filters["md_inline"] = md_inline
 templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STATUSES)
 templates.env.globals["kanban_columns"] = kanban_columns
+templates.env.globals["auto_sync_every"] = auto_sync_every  # bouton « Synchro auto » d'une fiche
 templates.env.globals["ACTION_STATUSES"] = ACTION_STATUSES
 templates.env.globals["RETOUR_STATUSES"] = RETOUR_STATUSES
 try:
@@ -564,8 +602,8 @@ async def client_save(request: Request, background: BackgroundTasks):
     existing = (form.get("existing_slug") or "").strip() or None
     try:
         cfg = client_config.from_form(form, existing)
-        if existing and (previous := client_config.load(existing)):  # le formulaire ne porte pas l'archivage : il est gardé
-            cfg = dataclasses.replace(cfg, archived=previous.archived, archived_at=previous.archived_at)
+        if existing and (previous := client_config.load(existing)):  # ce que le formulaire ne porte pas est gardé
+            cfg = dataclasses.replace(cfg, archived=previous.archived, archived_at=previous.archived_at, auto_sync=previous.auto_sync)
         client_config.save(cfg, new=existing is None)
     except client_config.ConfigError as e:
         return _client_form(request, _config_or_fiche(existing)[0] if existing else None, str(e), new=existing is None, form=form)
@@ -591,6 +629,16 @@ def _set_archived(slug: str, archived: bool) -> bool:
         return client_config.set_archived(slug, archived)
     except client_config.ConfigError as e:
         raise HTTPException(404, str(e))
+
+
+@app.post("/clients/{slug}/synchro-auto", response_class=HTMLResponse)
+def client_auto_sync(request: Request, slug: str, actif: str = Form("")):
+    """Bouton « Synchro auto » de la fiche : Jarvis relit ou non Notion tout seul pour ce client (non par défaut)."""
+    try:
+        client_config.set_auto_sync(slug, actif == "1")
+    except client_config.ConfigError as e:
+        raise HTTPException(404, str(e))
+    return templates.TemplateResponse(request, "_auto_sync.html", {"d": _get(slug)})
 
 
 @app.post("/clients/{slug}/archiver")
