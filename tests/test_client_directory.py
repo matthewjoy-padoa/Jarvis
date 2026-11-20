@@ -289,3 +289,108 @@ def test_dashboard_links_without_p_are_repaired_on_display(app):
                                     dashboards=[{"label": "Formation", "url": "https://app.notion.com/" + "d" * 32}]))
     fiche = app.get("/deploiements/acme1234/synthese").text
     assert 'href="https://app.notion.com/p/' + "c" * 32 + '"' in fiche and 'href="https://app.notion.com/p/' + "d" * 32 + '"' in fiche
+
+
+DASHBOARD = "e" * 32  # dashboard intégration fictif d'un client suivi
+
+
+def test_the_directory_reading_does_not_read_icons():
+    """L'annuaire garde sa durée : les icônes se lisent dans une tâche à part."""
+    assert "ICONE" not in prompt() and "notion-fetch" in prompt()
+
+
+def _follow(tmp_path, slug="acme1234"):
+    folder = tmp_path / "config" / "clients"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / f"{slug}.yaml").write_text(f"client: Acme\npage_id: {'0' * 32}\nnotion_url: https://app.notion.com/p/{DASHBOARD}\n")
+
+
+def test_only_followed_clients_without_an_icon_are_read_in_a_separate_task(tmp_path, monkeypatch):
+    monkeypatch.setenv("JARVIS_CONFIG_DIR", str(tmp_path / "config"))
+    _follow(tmp_path)
+    out = f"ICONE https://app.notion.com/p/{DASHBOARD} 🦇"
+    directory = ClientDirectory(folder=tmp_path / "notion", claude_bin=str(fake_claude(tmp_path, f"print({out!r})")))
+    assert directory.missing_icons() == {DASHBOARD: ("acme1234", f"https://app.notion.com/p/{DASHBOARD}")}
+    assert directory.refresh_icons()
+    for _ in range(200):
+        if not directory.icons_running:
+            break
+        time.sleep(0.05)
+    from deploy_hub.sync_notion import saved_icon
+    assert saved_icon(tmp_path / "notion" / "acme1234")["emoji"] == "🦇"
+    args, _, stdin, _ = eval((tmp_path / "recu.txt").read_text())
+    assert args[args.index("--allowedTools") + 1:] == ["mcp__claude_ai_Notion"] and DASHBOARD in stdin and "ICONE" in stdin
+    assert directory.missing_icons() == {} and not directory.refresh_icons()  # lue une fois : plus relue
+
+
+def test_a_failed_icon_reading_is_retried_later_but_not_every_minute(tmp_path, monkeypatch):
+    monkeypatch.setenv("JARVIS_CONFIG_DIR", str(tmp_path / "config"))
+    _follow(tmp_path)
+    directory = ClientDirectory(folder=tmp_path / "notion", claude_bin=str(fake_claude(tmp_path, "print('ÉCHEC : Notion indisponible')")))
+    assert directory.refresh_icons()
+    for _ in range(200):
+        if not directory.icons_running:
+            break
+        time.sleep(0.05)
+    assert directory.missing_icons() and not directory.refresh_icons()  # pas de ligne ICONE : pas notée ; pas avant 10 minutes
+
+
+def test_a_page_without_icon_is_noted_and_not_read_again(tmp_path, monkeypatch):
+    monkeypatch.setenv("JARVIS_CONFIG_DIR", str(tmp_path / "config"))
+    _follow(tmp_path)
+    out = f"ICONE https://app.notion.com/p/{DASHBOARD} aucune"
+    directory = ClientDirectory(folder=tmp_path / "notion", claude_bin=str(fake_claude(tmp_path, f"print({out!r})")))
+    directory.refresh_icons()
+    for _ in range(200):
+        if not directory.icons_running:
+            break
+        time.sleep(0.05)
+    from deploy_hub.sync_notion import saved_icon
+    assert saved_icon(tmp_path / "notion" / "acme1234") == {"emoji": "", "icone": ""} and directory.missing_icons() == {}
+
+
+def test_the_icon_is_kept_for_the_client_and_shown_on_its_fiche(tmp_path):
+    from deploy_hub.sources.fiches import parse_deployment
+    from deploy_hub.sync_notion import saved_icon
+    directory = ClientDirectory(folder=tmp_path / "data" / "notion")
+    followed = {DASHBOARD: "acme1234"}
+    directory._save_icons({DASHBOARD: {"type": "emoji", "emoji": "🦇"}, "f" * 32: {"type": "emoji", "emoji": "🐙"}}, followed)
+    assert saved_icon(tmp_path / "data" / "notion" / "acme1234") == {"emoji": "🦇", "icone": ""}
+    assert not (tmp_path / "data" / "notion" / ("f" * 32)).exists()  # page d'un client non suivi : ignorée
+    fiches_dir = tmp_path / "data" / "deploiements"
+    fiches_dir.mkdir(parents=True)
+    (fiches_dir / "acme1234.md").write_text("---\nclient: Acme\n---\n", encoding="utf-8")
+    assert parse_deployment(fiches_dir / "acme1234.md").emoji == "🦇"  # fiche sans emoji : celui de l'annuaire
+    (fiches_dir / "acme1234.md").write_text("---\nclient: Acme\nemoji: 🦖\n---\n", encoding="utf-8")
+    assert parse_deployment(fiches_dir / "acme1234.md").emoji == "🦖"  # celui de la fiche (synchro avec jeton) l'emporte
+
+
+def test_icons_written_in_the_answer_cover_small_pages():
+    """Une petite page revient directement à Claude (pas de fichier rangé) : son icône vient de la ligne ICONE de sa réponse."""
+    from deploy_hub.sources.client_directory import answered_icons
+    answer = (f"fini\nICONE https://app.notion.com/p/{DASHBOARD} 🦖\nICONE https://app.notion.com/p/{'f' * 32} https://img.test/a.png\n"
+              f"ICONE https://app.notion.com/p/{'1' * 32} aucune\nICONE https://app.notion.com/p/{'2' * 32} mot\nICONE pas-une-page 🐙")
+    assert answered_icons(answer) == {DASHBOARD: {"type": "emoji", "emoji": "🦖"},
+                                      "f" * 32: {"type": "external", "external": {"url": "https://img.test/a.png"}},
+                                      "1" * 32: {}, "2" * 32: {}}  # « aucune » ou un mot : lue, sans icône
+    from deploy_hub.sources.client_directory import icons_prompt
+    assert "ICONE <adresse de la page> <icône>" in icons_prompt([f"https://app.notion.com/p/{DASHBOARD}"])
+
+
+def test_an_image_that_cannot_be_downloaded_is_not_noted_so_it_is_read_again(tmp_path):
+    directory = ClientDirectory(folder=tmp_path / "notion")
+    directory._save_icons({DASHBOARD: {"type": "external", "external": {"url": "https://img.test/a.png"}}}, {DASHBOARD: "acme1234"})
+    assert not (tmp_path / "notion" / "acme1234" / "icone.json").exists()
+
+
+def test_the_icons_task_uses_haiku_unless_an_image_failed(tmp_path, monkeypatch):
+    monkeypatch.setenv("JARVIS_CONFIG_DIR", str(tmp_path / "config"))
+    _follow(tmp_path)
+    directory = ClientDirectory(folder=tmp_path / "notion", claude_bin=str(fake_claude(tmp_path, "print('rien')")))
+    for bad, model in ((set(), ["--model", "haiku"]), ({DASHBOARD}, [])):
+        directory._missed, directory._icons_tried = bad, None
+        assert directory.refresh_icons()
+        directory._icons_thread.join(10)
+        args = eval((tmp_path / "recu.txt").read_text())[0]
+        assert ("--model" in args) == bool(model) and (not model or args[args.index("--model") + 1] == "haiku")
+        assert directory._missed == {DASHBOARD}  # pas de ligne ICONE pour la page : relue avec le modèle par défaut
