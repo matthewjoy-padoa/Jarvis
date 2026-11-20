@@ -315,7 +315,7 @@ def test_charts_set_filters():
     assert 'data-filter-set="type=' in rec
     assert 'data-filter-set="groupe=done" data-filter-href="/deploiements/client-demo/recette?tous=true"' in rec  # retours clos masqués par défaut
     syn = client.get("/deploiements/client-demo/synthese").text
-    assert 'data-filter-href="/deploiements/client-demo/injections"' in syn
+    assert 'data-filter-href="/deploiements/client-demo/injections?vue=liste"' in syn
     assert 'data-filter-set="groupe=todo;client=Client Démo"' in client.get("/injections").text
 
 

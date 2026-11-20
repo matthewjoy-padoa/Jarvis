@@ -31,7 +31,7 @@ def test_points_are_blocks_and_types_with_a_ko_most_ko_first_then_most_open():
         ("injection", "amt + amt_task", 1, 2, 2),
         ("injection", "firm", 1, 2, 3)]
     amt_block = points[2]
-    assert amt_block["resources"] == ["amt", "amt_task"] and amt_block["href"] == "/deploiements/acme/injections#acme-amt-amt_task"
+    assert amt_block["resources"] == ["amt", "amt_task"] and amt_block["href"] == "/deploiements/acme/injections?vue=ressources#acme-amt-amt_task"
     assert points[1]["href"] == "/deploiements/acme/recette#type=AMT"
 
 
@@ -57,7 +57,7 @@ def test_synthesis_shows_the_top_five_and_the_rest(monkeypatch):
     monkeypatch.setattr(main.fiches, "list_deployments", lambda: [d])
     html = TestClient(main.app).get("/deploiements/acme/synthese").text
     assert "Où ça coince" in html and html.count('class="blocking-row"') == 5
-    assert html.index("injections#acme-firm_contact") < html.index("recette#type=AMT")  # le plus de KO d'abord
+    assert html.index("injections?vue=ressources#acme-firm_contact") < html.index("recette#type=AMT")  # le plus de KO d'abord
     assert 'href="/deploiements/acme/recette#type=AMT"' in html and "+ 2 autre(s) point(s) avec un KO" in html
 
 

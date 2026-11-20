@@ -20,6 +20,8 @@
 // - Mémoire : recherche, filtres et tri de chaque bloc sont gardés dans ce navigateur (localStorage), par page, et remis
 //   au retour sur la page. Le filtre « Client » n'est pas gardé (il suit le client du menu) ; une ancre de filtres
 //   (#clé=valeur) l'emporte sur ce qui était gardé ; « Effacer les filtres » vide aussi la mémoire (le tri reste).
+// - Choix de vue : un clic sur une pastille [data-view="page.clé:valeur"] (Ouverts / Tous, Liste / Kanban, période…) le
+//   note dans le cookie jarvis_vues ; le serveur s'en sert quand l'adresse ne porte aucun choix de vue (main.py, _views).
 (function () {
   const collator = new Intl.Collator("fr", { numeric: true, sensitivity: "base" });
   const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
@@ -360,10 +362,24 @@
     }
   }
 
+  // Choix de vue gardés : les « page.clé:valeur » des pastilles actives de la barre, puis celui de la pastille cliquée
+  // (il gagne), notés dans le cookie (un an, comme le client en cours) avant que la page ne change. Toute la barre, car
+  // on a pu arriver par un lien direct qui montre autre chose que ce qui était gardé.
+  function keepView(pill) {
+    const kept = new Map((document.cookie.match(/(?:^|; )jarvis_vues=([^;]*)/)?.[1] || "").split("|").filter((p) => p.includes(":")).map((p) => p.split(":")));
+    const bar = pill.closest(".view-bar, .deadline-bar") || pill.parentElement;
+    [...bar.querySelectorAll("a.active[data-view]"), pill].forEach((a) => kept.set(...a.dataset.view.split(":")));
+    document.cookie = `jarvis_vues=${[...kept].map((p) => p.join(":")).join("|")}; path=/; max-age=31536000; samesite=lax`;
+  }
+
+  const keepClickedView = (e) => { const view = e.target.closest("a[data-view]"); if (view) keepView(view); };
+  document.addEventListener("auxclick", keepClickedView); // clic molette : l'onglet ouvert doit montrer la vue cliquée
+
   // Menu de filtre ouvert : un clic ailleurs ou Échap le ferme (un seul ouvert à la fois).
   const closeMenus = (keep) => document.querySelectorAll("details.filter.multi[open]").forEach((d) => { if (!d.contains(keep)) d.open = false; });
   document.addEventListener("click", (e) => {
     closeMenus(e.target);
+    keepClickedView(e);
     const el = e.target.closest("[data-filter-set]");
     if (el) { e.preventDefault(); activate(el); }
   });

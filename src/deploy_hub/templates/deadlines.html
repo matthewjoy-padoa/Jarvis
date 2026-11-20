@@ -20,11 +20,11 @@
     <noscript><button type="submit" class="secondary">Afficher</button></noscript>
   </form>
   <div class="segmented" role="group" aria-label="Période">
-    <a href="{{ link({'periode': ''}) }}"{% if not periode %} class="active"{% endif %}>Toutes</a>
-    {%- for key, label in periods.items() %}<a href="{{ link({'periode': key}) }}"{% if periode == key %} class="active"{% endif %}>{{ label }}</a>{% endfor %}
+    <a href="{{ link({'periode': ''}) }}"{% if not periode %} class="active"{% endif %} data-view="deadlines.periode:toutes">Toutes</a>
+    {%- for key, label in periods.items() %}<a href="{{ link({'periode': key}) }}"{% if periode == key %} class="active"{% endif %} data-view="deadlines.periode:{{ key }}">{{ label }}</a>{% endfor %}
   </div>
   <div class="segmented" role="group" aria-label="Vue">
-    <a href="{{ link({'vue': '', 'mois': ''}) }}"{% if vue == "liste" %} class="active"{% endif %}>Liste</a><a href="{{ link({'vue': 'calendrier', 'mois': month.strftime('%Y-%m')}) }}"{% if vue == "calendrier" %} class="active"{% endif %}>Calendrier</a>
+    <a href="{{ link({'vue': '', 'mois': ''}) }}"{% if vue == "liste" %} class="active"{% endif %} data-view="deadlines.vue:liste">Liste</a><a href="{{ link({'vue': 'calendrier', 'mois': month.strftime('%Y-%m')}) }}"{% if vue == "calendrier" %} class="active"{% endif %} data-view="deadlines.vue:calendrier">Calendrier</a>
   </div>
 </div>
 {% import "_charts.html" as charts with context %}
