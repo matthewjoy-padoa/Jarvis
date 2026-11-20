@@ -12,7 +12,7 @@ Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant
 
 ## [0.4.0] · 2026-11-20
 
-- Onglet Injections : chaque ligne (ressource ou groupe) montre ses derniers DAG lancés depuis Jarvis. Sur la ligne, une pastille donne le dernier (stack et état) ; en ouvrant la ligne, les trois derniers avec leur date, leur stack, leur état, leur durée et la dernière nouvelle d'`air.py`. Chacun mène à la page de son suivi (journal, rapport de fin).
+- Onglet Injections : chaque ligne (ressource ou groupe) montre ses derniers DAG lancés depuis Jarvis. Sur la ligne, une pastille donne le dernier (stack et état) ; en ouvrant la ligne, le dernier avec sa date, sa stack, son état, sa durée et la dernière nouvelle d'`air.py`, puis « Voir plus » ajoute les précédents trois par trois. Chacun mène à la page de son suivi (journal, rapport de fin).
 
 ## [0.3.0] · 2026-11-20
 

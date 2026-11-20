@@ -284,13 +284,18 @@ templates.env.globals["RETOUR_STATUSES"] = RETOUR_STATUSES
 templates.env.globals["console_commands"] = list(console.COMMANDS)  # complétion par Tab dans la console
 
 
-def _runs_of(choices, limit: int = 3) -> list[tuple]:
-    """Derniers runs suivis (air.py) des DAG d'une ligne de l'onglet Injections, le plus récent d'abord : (suivi, DAG)."""
+RUNS_SHOWN = 25  # runs d'une ligne de l'onglet Injections : le dernier s'affiche, « Voir plus » ajoute les suivants 3 par 3
+
+
+def _runs_of(choices, limit: int = RUNS_SHOWN) -> list[tuple]:
+    """Derniers runs suivis (air.py) des DAG d'une ligne de l'onglet Injections, le plus récent d'abord : (suivi, DAG).
+    Au-delà de la limite, la ligne renvoie à Agents → DAG, qui les a tous."""
     by_id = {c.dag_id: c for c in choices}
     return [(w, by_id[w.dag_id]) for w in dag_watch.watches if w.dag_id in by_id][:limit]
 
 
 templates.env.globals["runs_of"] = _runs_of
+templates.env.globals["RUNS_SHOWN"] = RUNS_SHOWN
 templates.env.globals["dag_source_status"] = lambda: dag_source.status(dag_catalogue.CATALOGUE)  # bandeau Injections
 
 # Pages globales et onglets d'une fiche, calqués sur les blocs du dashboard Notion.

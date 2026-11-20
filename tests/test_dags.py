@@ -98,8 +98,11 @@ def test_a_line_shows_its_last_runs_and_leads_to_their_watch(app, monkeypatch, t
     assert 'class="badge g-in_progress inj-last" href="/agents/suivis/3"' in firm and "recette · suivi en cours" in firm
     assert firm.index('href="/agents/suivis/3" title="Ouvrir') < firm.index('href="/agents/suivis/1" title="Ouvrir') and "/agents/suivis/2" not in firm
     assert "firm en échec · voir le rapport" in firm and "en échec ou incomplet · 10 min" in firm
+    assert '<li><a href="/agents/suivis/3"' in firm and '<li hidden><a href="/agents/suivis/1"' in firm  # le dernier seul ; les autres attendent
+    assert firm.count("data-inj-more>Voir plus</button>") == 1 and "hidden.slice(0, 3)" in page  # « Voir plus » : 3 de plus à chaque clic
     group = page[page.index('id="acme-groupe-acme-uegar-firm_base"'):]
     assert 'href="/agents/suivis/3" title="Ouvrir' in group and "/agents/suivis/1" not in group  # la ligne du groupe : ses DAG seulement
+    assert "data-inj-more>Voir plus" not in group  # un seul run : pas de bouton
     monkeypatch.setattr(main, "dag_watch", DagWatcher(tmp_path / "vide", None, {}))
     assert "Aucun DAG lancé depuis Jarvis pour cette ligne." in app.get("/deploiements/acme/injections").text
 

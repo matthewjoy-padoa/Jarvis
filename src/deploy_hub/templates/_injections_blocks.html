@@ -19,16 +19,17 @@
 {% else %}<input type="hidden" name="dag_id" value="{{ choices[0].dag_id }}">{% endif %}
 {% endmacro %}
 {# Derniers DAG lancés d'une ligne (runs_of : suivis d'air.py). last_run : pastille sur la ligne, le dernier seulement ;
-   last_runs : la liste montrée quand on ouvre la ligne. Chacun mène à la page du suivi (journal, rapport de fin). #}
+   last_runs : quand on ouvre la ligne, le dernier, puis « Voir plus » ajoute les précédents 3 par 3 (il peut y en avoir
+   beaucoup). Chacun mène à la page du suivi (journal, rapport de fin). #}
 {% macro last_run(runs) %}
 {% if runs %}{% set w = runs[0][0] %}<a class="badge g-{{ w.group }} inj-last" href="/agents/suivis/{{ w.id }}" title="Dernier DAG lancé : {{ runs[0][1].short }} sur {{ w.padoa_env }}, {{ w.started_at | quand }}. Ouvrir son suivi.">{{ w.padoa_env }} · {{ w.status }}</a>{% endif %}
 {% endmacro %}
 {% macro last_runs(runs) %}
-<p class="inj-sub">Derniers DAG lancés</p>
+<p class="inj-sub">Dernier DAG lancé</p>
 {% if runs %}
 <ul class="inj-runs">
   {% for w, dag in runs %}
-  <li><a href="/agents/suivis/{{ w.id }}" title="Ouvrir le suivi #{{ w.id }} : journal et rapport de fin">
+  <li{% if not loop.first %} hidden{% endif %}><a href="/agents/suivis/{{ w.id }}" title="Ouvrir le suivi #{{ w.id }} : journal et rapport de fin">
     <span class="inj-run-when">{{ w.started_at | quand }}</span>
     <span class="badge">{{ w.padoa_env }}</span>
     <span class="badge g-{{ w.group }}">{{ w.status }}{% if w.ended_at %} · {{ (w.ended_at - w.started_at) | duree }}{% endif %}</span>
@@ -36,7 +37,9 @@
     {% if w.summary %}<span class="muted">{{ w.summary | truncate(140) }}</span>{% endif %}
   </a></li>
   {% endfor %}
+  {% if runs | length >= RUNS_SHOWN %}<li hidden><a href="/agents#dags">Les runs plus anciens sont dans Agents → DAG</a></li>{% endif %}
 </ul>
+{% if runs | length > 1 %}<button type="button" class="secondary inj-more" data-inj-more>Voir plus</button>{% endif %}
 {% else %}<p class="muted inj-none">Aucun DAG lancé depuis Jarvis pour cette ligne.</p>{% endif %}
 {% endmacro %}
 {% for d in deployments %}
@@ -193,6 +196,14 @@
       };
       document.querySelectorAll(".dag-pick").forEach((pick) => { fit(pick); pick.addEventListener("change", () => fit(pick)); });
     }
+    // « Voir plus » : montre les 3 runs suivants de la ligne ; plus rien à montrer, le bouton disparaît.
+    document.addEventListener("click", (e) => {
+      const more = e.target.closest("[data-inj-more]");
+      if (!more) return;
+      const hidden = [...more.previousElementSibling.querySelectorAll("li[hidden]")];
+      hidden.slice(0, 3).forEach((li) => { li.hidden = false; });
+      if (hidden.length <= 3) more.remove();
+    });
     const fold = (text) => text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");  // sans accents ni majuscules
     function apply() {
       const q = fold(search.value); let n = 0;
