@@ -88,7 +88,7 @@ def app(acme, monkeypatch):
 def test_today_page(app):
     html = app.get("/").text
     assert "Accueil" in html and "Préparer le COPIL" in html and "Retour 0001AB" in html  # en retard, aujourd'hui
-    assert "Injection des firms" in html and 'injections#acme-firm"' in html  # KO, lien vers le bloc
+    assert "Injection des firms" in html and 'injections?vue=ressources#acme-firm"' in html  # KO, lien vers le bloc
     assert "Déploiement" in html and "J-10" in html  # prochain jalon
     assert 'hx-get="/quoi-de-neuf"' in html
 

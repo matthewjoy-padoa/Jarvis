@@ -17,10 +17,10 @@
 {% set kanban = vue == "kanban" %}
 <div class="view-bar">
 <div class="segmented" role="group" aria-label="Présentation">
-  <a href="{{ base }}{{ '?tous=true' if show_all }}" class="{{ 'active' if not kanban }}">Liste</a><a href="{{ base }}?vue=kanban{{ '&tous=true' if show_all }}" class="{{ 'active' if kanban }}">Kanban</a>
+  <a href="{{ base }}{{ '?tous=true' if show_all }}" class="{{ 'active' if not kanban }}" data-view="recette.vue:liste">Liste</a><a href="{{ base }}?vue=kanban{{ '&tous=true' if show_all }}" class="{{ 'active' if kanban }}" data-view="recette.vue:kanban">Kanban</a>
 </div>
 <div class="segmented" role="group" aria-label="Retours affichés">
-  <a href="{{ base }}{{ '?vue=kanban' if kanban }}" class="{{ 'active' if not show_all }}">Ouverts</a><a href="{{ base }}?tous=true{{ '&vue=kanban' if kanban }}" class="{{ 'active' if show_all }}">Tous</a>
+  <a href="{{ base }}{{ '?vue=kanban' if kanban }}" class="{{ 'active' if not show_all }}" data-view="recette.tous:false">Ouverts</a><a href="{{ base }}?tous=true{{ '&vue=kanban' if kanban }}" class="{{ 'active' if show_all }}" data-view="recette.tous:true">Tous</a>
 </div>
 </div>
 {% if kanban %}

@@ -201,7 +201,18 @@ def test_filters_script_searches_without_accents_and_offers_hidden_matches():
     js = client.get("/static/filters.js").text
     assert 'normalize("NFD")' in js and "data-out" in js and "more-out" in js
     assert "filters-toggle" in js and "data-fold-filters" in js  # menus déroulants derrière « Filtres » sur la fiche
-    assert "filters.js?v=10" in client.get("/actions").text
+    assert "filters.js?v=11" in client.get("/actions").text
+
+
+def test_filters_are_remembered_per_page_in_the_browser():
+    """Recherche, filtres et tri gardés dans localStorage, par page ; pas le client (il suit le menu), ni face à une ancre."""
+    js = client.get("/static/filters.js").text
+    assert "`jarvis.filtres:${location.pathname}:" in js and "localStorage.setItem(entry.memory" in js
+    assert "if (s.value && !isClient(k)) f[k] = s.value; else delete f[k];" in js
+    assert "const saved = fromAnchor ? {} : recall(entry.memory);" in js
+    assert "s.options.some((o) => o.value === v)" in js  # une valeur disparue des données n'est pas remise
+    blocs = client.get("/deploiements/client-demo/injections").text  # vue « Par ressource » : sa recherche et son état aussi
+    assert "`jarvis.filtres:${location.pathname}:blocs`" in blocs and "localStorage.setItem(memory" in blocs
 
 
 def test_each_filter_accepts_several_values():
@@ -304,7 +315,7 @@ def test_charts_set_filters():
     assert 'data-filter-set="type=' in rec
     assert 'data-filter-set="groupe=done" data-filter-href="/deploiements/client-demo/recette?tous=true"' in rec  # retours clos masqués par défaut
     syn = client.get("/deploiements/client-demo/synthese").text
-    assert 'data-filter-href="/deploiements/client-demo/injections"' in syn
+    assert 'data-filter-href="/deploiements/client-demo/injections?vue=liste"' in syn
     assert 'data-filter-set="groupe=todo;client=Client Démo"' in client.get("/injections").text
 
 

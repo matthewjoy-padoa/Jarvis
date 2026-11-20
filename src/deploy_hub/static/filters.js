@@ -17,6 +17,11 @@
 //   se cumulent. Dans une ancre ou un data-filter-set, « a|b » coche les deux.
 // - Bloc [data-fold-filters] (listes de la fiche client) : la barre montre la recherche et un bouton « Filtres » (nombre de
 //   filtres actifs) ; les menus déroulants et le tri sont dans un panneau qu'il ouvre. Tous les filtres restent là.
+// - Mémoire : recherche, filtres et tri de chaque bloc sont gardés dans ce navigateur (localStorage), par page, et remis
+//   au retour sur la page. Le filtre « Client » n'est pas gardé (il suit le client du menu) ; une ancre de filtres
+//   (#clé=valeur) l'emporte sur ce qui était gardé ; « Effacer les filtres » vide aussi la mémoire (le tri reste).
+// - Choix de vue : un clic sur une pastille [data-view="page.clé:valeur"] (Ouverts / Tous, Liste / Kanban, période…) le
+//   note dans le cookie jarvis_vues ; le serveur s'en sert quand l'adresse ne porte aucun choix de vue (main.py, _views).
 (function () {
   const collator = new Intl.Collator("fr", { numeric: true, sensitivity: "base" });
   const text = (el) => (el ? el.textContent.replace(/\s+/g, " ").trim() : "");
@@ -24,6 +29,33 @@
   const blocks = []; // { keys: {clé: <select>}, apply, bar }
   const fold = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const isClient = (k) => k.toLowerCase() === "client"; // « client » ou en-tête « Client »
+  const fromAnchor = location.hash.includes("="); // arrivée par un graphique d'une autre page : ses filtres seuls comptent
+
+  // Filtres gardés d'une visite à l'autre : { q: recherche, f: {clé: "a|b"}, sort } par page et par bloc (son rang parmi
+  // les blocs filtrables de la page : la liste et le kanban d'un même onglet partagent donc leurs filtres).
+  const memoryKey = (block) => `jarvis.filtres:${location.pathname}:${[...document.querySelectorAll("[data-filterable]")].indexOf(block)}`;
+  const recall = (key) => { try { return JSON.parse(localStorage.getItem(key)) || {}; } catch (e) { return {}; } };
+  function remember(entry) {
+    const saved = recall(entry.memory); // un filtre ou un tri que ce bloc n'a pas (autre présentation de la page) reste gardé
+    const f = { ...saved.f };
+    Object.entries(entry.keys).forEach(([k, s]) => { if (s.value && !isClient(k)) f[k] = s.value; else delete f[k]; });
+    const state = { q: entry.search.value, f, sort: (entry.sort ? entry.sort.value : saved.sort) || "" };
+    try {
+      if (state.q || state.sort || Object.keys(f).length) localStorage.setItem(entry.memory, JSON.stringify(state));
+      else localStorage.removeItem(entry.memory);
+    } catch (e) {} // navigation privée, stockage plein : les filtres marchent, sans mémoire
+  }
+  function restore(entry) {
+    const saved = fromAnchor ? {} : recall(entry.memory);
+    entry.search.value = saved.q || "";
+    Object.entries(entry.keys).forEach(([k, s]) => { // seulement les valeurs encore proposées (la donnée a pu changer)
+      if (!isClient(k)) s.value = (saved.f?.[k] || "").split("|").filter((v) => s.options.some((o) => o.value === v)).join("|");
+    });
+    if (entry.sort && saved.sort && [...entry.sort.options].some((o) => o.value === saved.sort)) {
+      entry.sort.value = saved.sort;
+      entry.sort.dispatchEvent(new Event("change"));
+    }
+  }
 
   // Texte où chercher : ce qui est affiché, le groupe, la colonne du kanban, les attributs data-* (cartes et cellules).
   function haystack(el) {
@@ -121,7 +153,7 @@
       bar.append(toggle);
     }
     block.before(bar);
-    return { bar, panel, toggle, search, count, reset, more, outLabel: block.dataset.outLabel || "masqué(s)" };
+    return { bar, panel, toggle, search, count, reset, more, outLabel: block.dataset.outLabel || "masqué(s)", memory: memoryKey(block) };
   }
 
   function groupSelect(items, apply) {
@@ -130,9 +162,11 @@
     return multiSelect("Groupe", Object.entries(GROUPS).filter(([k]) => present.has(k)), apply);
   }
 
-  function register(tools, keys, apply) {
+  function register(tools, keys, apply, sort = null) { // sort : le <select> de tri du bloc, s'il en a un
     const { bar, panel, toggle, search, count, reset, more } = tools;
-    const entry = { ...tools, keys, apply, out: null, shownOut: false }; // out : choix fait au bouton (null : aucun) ; shownOut : état affiché
+    const entry = { ...tools, keys, apply, sort, out: null, shownOut: false }; // out : choix fait au bouton (null : aucun) ; shownOut : état affiché
+    restore(entry);
+    sort?.addEventListener("change", () => remember(entry));
     reset.addEventListener("click", () => {
       search.value = "";
       Object.values(keys).forEach((s) => (s.value = ""));
@@ -171,6 +205,7 @@
     }
     const total = out ? items.length : items.filter((el) => !el.hasAttribute("data-out")).length;
     entry.count.textContent = `${visible.size} / ${total}`;
+    remember(entry);
     markCharts();
   }
 
@@ -249,6 +284,7 @@
     const group = groupSelect(items, apply);
     if (group) { panel.append(group[0]); keys.groupe = group[1]; }
     const sorts = pairs(block.dataset.sorts);
+    let sort = null;
     if (sorts.length) {
       const wrap = document.createElement("label");
       wrap.className = "filter";
@@ -261,8 +297,9 @@
       });
       wrap.append(s);
       panel.append(wrap);
+      sort = s;
     }
-    const entry = register(tools, keys, apply);
+    const entry = register(tools, keys, apply, sort);
 
     function apply() {
       const found = searcher(search);
@@ -325,10 +362,24 @@
     }
   }
 
+  // Choix de vue gardés : les « page.clé:valeur » des pastilles actives de la barre, puis celui de la pastille cliquée
+  // (il gagne), notés dans le cookie (un an, comme le client en cours) avant que la page ne change. Toute la barre, car
+  // on a pu arriver par un lien direct qui montre autre chose que ce qui était gardé.
+  function keepView(pill) {
+    const kept = new Map((document.cookie.match(/(?:^|; )jarvis_vues=([^;]*)/)?.[1] || "").split("|").filter((p) => p.includes(":")).map((p) => p.split(":")));
+    const bar = pill.closest(".view-bar, .deadline-bar") || pill.parentElement;
+    [...bar.querySelectorAll("a.active[data-view]"), pill].forEach((a) => kept.set(...a.dataset.view.split(":")));
+    document.cookie = `jarvis_vues=${[...kept].map((p) => p.join(":")).join("|")}; path=/; max-age=31536000; samesite=lax`;
+  }
+
+  const keepClickedView = (e) => { const view = e.target.closest("a[data-view]"); if (view) keepView(view); };
+  document.addEventListener("auxclick", keepClickedView); // clic molette : l'onglet ouvert doit montrer la vue cliquée
+
   // Menu de filtre ouvert : un clic ailleurs ou Échap le ferme (un seul ouvert à la fois).
   const closeMenus = (keep) => document.querySelectorAll("details.filter.multi[open]").forEach((d) => { if (!d.contains(keep)) d.open = false; });
   document.addEventListener("click", (e) => {
     closeMenus(e.target);
+    keepClickedView(e);
     const el = e.target.closest("[data-filter-set]");
     if (el) { e.preventDefault(); activate(el); }
   });

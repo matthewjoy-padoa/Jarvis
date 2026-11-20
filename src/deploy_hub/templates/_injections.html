@@ -2,7 +2,7 @@
 {% set base = request.url.path %}
 {% with s = dag_source_status() %}{% include "_dag_source.html" %}{% endwith %}
 <div class="segmented" role="group" aria-label="Vue des injections">
-  <a href="{{ base }}" class="{{ 'active' if vue not in ('liste', 'ced') }}">Par ressource</a><a href="{{ base }}?vue=liste" class="{{ 'active' if vue == 'liste' }}">Liste</a><a href="{{ base }}?vue=ced" class="{{ 'active' if vue == 'ced' }}">CED (fichiers)</a>
+  <a href="{{ base }}" class="{{ 'active' if vue not in ('liste', 'ced') }}" data-view="injections.vue:ressources">Par ressource</a><a href="{{ base }}?vue=liste" class="{{ 'active' if vue == 'liste' }}" data-view="injections.vue:liste">Liste</a><a href="{{ base }}?vue=ced" class="{{ 'active' if vue == 'ced' }}" data-view="injections.vue:ced">CED (fichiers)</a>
 </div>
 {% if vue == 'ced' %}{% include "_ced.html" %}{% else %}
 {% set grouped = vue != 'liste' %}

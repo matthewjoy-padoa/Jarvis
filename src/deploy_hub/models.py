@@ -363,7 +363,7 @@ class Deployment:
         retours de recette qui ont au moins un KO, les plus de KO d'abord, puis le plus d'éléments ouverts.
         Un KO d'injection et un KO de recette pèsent pareil. Chaque point mène à sa liste (bloc ou filtre « type »)."""
         points = [{"kind": "injection", "label": b["label"], "resources": b["resources"], "counts": b["counts"], "total": len(b["cards"]),
-                   "href": f"/deploiements/{self.slug}/injections#{self.slug}-{b['id']}"} for b in self.injection_blocks]
+                   "href": f"/deploiements/{self.slug}/injections?vue=ressources#{self.slug}-{b['id']}"} for b in self.injection_blocks]
         by_type: dict[str, list[str]] = {}
         for r in self.retours:
             by_type.setdefault(r.data_type, []).append(r.group)

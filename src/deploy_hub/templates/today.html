@@ -85,7 +85,7 @@
         <li><span class="badge g-ko">{{ a.injection_status }}</span>
           {% if a.ref %}<a data-ticket href="{{ ticket_url(d.slug, 'action', a.ref) }}">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}
           <span class="muted">· {% for r in a.resources %}<code class="res">{{ r }}</code> {% endfor %}{{ d.client if deployments | length > 1 }}</span>
-          <a class="btn-link" href="/deploiements/{{ d.slug }}/injections#{{ d.slug }}-{{ a.resources | join('-') or 'sans-ressource' }}">Relancer ↗</a></li>
+          <a class="btn-link" href="/deploiements/{{ d.slug }}/injections?vue=ressources#{{ d.slug }}-{{ a.resources | join('-') or 'sans-ressource' }}">Relancer ↗</a></li>
         {% else %}<li class="muted">Aucune injection KO. Tous les systèmes sont opérationnels.</li>{% endfor %}
       </ul>
     </section>

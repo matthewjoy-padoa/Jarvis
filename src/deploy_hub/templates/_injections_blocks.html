@@ -101,11 +101,21 @@
     });
   });
   // Blocs de ressources : recherche, filtre par état, tout déplier ; un lien #<client>-<ressource> ouvre le bloc.
+  // Recherche et état choisi sont gardés dans ce navigateur, par page (comme les filtres de filters.js), sauf arrivée
+  // par un lien vers un bloc : il doit rester visible.
   (function () {
     const bar = document.querySelector("[data-blocks-toolbar]"), blocks = [...document.querySelectorAll(".res-block")];
     if (!bar) return;
     const search = bar.querySelector("input"), count = bar.querySelector(".count-label"), toggle = bar.querySelector("[data-toggle-all]");
+    const memory = `jarvis.filtres:${location.pathname}:blocs`;
+    const target = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
     let show = "";
+    if (!target) try {
+      const saved = JSON.parse(localStorage.getItem(memory)) || {};
+      search.value = saved.q || "";
+      const pill = bar.querySelector(`[data-show="${CSS.escape(saved.show || "")}"]`);
+      if (pill) { show = pill.dataset.show; bar.querySelectorAll("[data-show]").forEach((x) => x.classList.toggle("active", x === pill)); }
+    } catch (e) {}
     function apply() {
       const q = search.value.toLowerCase(); let n = 0;
       for (const b of blocks) {
@@ -114,6 +124,7 @@
         if (q && ok) b.open = true;
       }
       count.textContent = `${n} / ${blocks.length} ressources`;
+      try { q || show ? localStorage.setItem(memory, JSON.stringify({ q: search.value, show })) : localStorage.removeItem(memory); } catch (e) {}
     }
     search.addEventListener("input", apply);
     bar.querySelectorAll("[data-show]").forEach((a) => a.addEventListener("click", (e) => {
@@ -125,7 +136,6 @@
       blocks.forEach((b) => { if (!b.hidden) b.open = open; });
       toggle.textContent = open ? "Tout replier" : "Tout déplier";
     });
-    const target = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
     if (target && target.classList.contains("res-block")) { target.open = true; target.scrollIntoView({ block: "start" }); }
     apply();
   })();
