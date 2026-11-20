@@ -29,6 +29,7 @@ from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
 from deploy_hub.rendu import md, md_inline
 from deploy_hub.sources.claude_runner import (TO_FILL, WAITING, ClaudeRunner, agent_branch, agent_questions, answer_text, chosen_answer,
                                               duration_text, read_log, retour_prompt, tokens_text, usage)
+from deploy_hub.sources.dag_board import board
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_source import DagSource
 from deploy_hub.sources.dag_watch import DagWatcher
@@ -794,11 +795,11 @@ def deadlines(request: Request, tous: bool = False, client: str = ""):
 
 @app.get("/agents", response_class=HTMLResponse)
 def agents(request: Request):
-    """Historique des lancements : agents, suivis de DAG, enchaînements, DAGs lancés."""
+    """Historique des lancements : agents, et une carte par run de DAG (suivis, enchaînements, lancements sans suivi)."""
     for run in claude.runs:
         claude.refresh_context(run)  # agents en cours : où en est leur contexte
-    return _render(request, "agents.html", "/agents", runs=claude.runs, dag_runs=airflow.runs, watches=dag_watch.watches,
-                   chains=dag_chains.chains, usage=usage(claude.runs))
+    return _render(request, "agents.html", "/agents", runs=claude.runs,
+                   cards=board(dag_watch, dag_chains.chains, airflow.runs), usage=usage(claude.runs))
 
 
 def _run_or_404(run_id: int):
@@ -1131,7 +1132,7 @@ def _launch_watched(dag_id: str, padoa_env: str, d: Deployment | None = None, ca
         customer = next((c.customer for c in dag_catalogue.dags_for(customers) if c.dag_id == dag_id), "") or \
             next((c["customer"] for c in dag_catalogue.ced_for(customers) if c["dag_id"] == dag_id), "")  # client du catalogue
         w = dag_watch.start(d.slug if d else "", d.client if d else "", customer, dag_id, result.run_id, padoa_env, card)
-        result.message += f" · suivi #{w.id} lancé (relances automatiques, rapport à la fin) : Agents → Suivis de DAG"
+        result.message += f" · suivi #{w.id} lancé (relances automatiques, rapport à la fin) : Agents → DAG"
     return result, w
 
 
@@ -1197,7 +1198,7 @@ def chain_start(request: Request, slug: str, padoa_env: str = Form(...), dag_id:
     if chain.group == "ko":
         return _result(request, ActionResult(False, f"Enchaînement #{chain.id} {chain.status} · {first.dag_id} : {first.message}", simulated=False))
     return _result(request, ActionResult(True, f"Enchaînement #{chain.id} lancé sur {padoa_env} : chaque DAG part quand le précédent finit vert"
-                                               f" · {' → '.join(dag_ids)} · à suivre dans Agents → Enchaînements", simulated=False))
+                                               f" · {' → '.join(dag_ids)} · à suivre dans Agents → DAG", simulated=False))
 
 
 @app.post("/agents/chaines/{chain_id}/arreter")
@@ -1205,7 +1206,7 @@ def chain_stop(chain_id: int):
     if not dag_chains.get(chain_id):
         raise HTTPException(404, f"Enchaînement #{chain_id} inconnu")
     dag_chains.stop(chain_id)
-    return RedirectResponse("/agents#chaines", status_code=303)
+    return RedirectResponse(f"/agents#chaine-{chain_id}", status_code=303)
 
 
 @app.post("/actions/claude/{slug}/{resource}", response_class=HTMLResponse)

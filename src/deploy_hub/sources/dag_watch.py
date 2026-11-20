@@ -27,6 +27,7 @@ from deploy_hub.sources.airflow import AIR_COMMAND
 WATCH_STATUSES = {"suivi en cours": IN_PROGRESS, "vert": DONE, "en échec ou incomplet": KO, "Airflow injoignable": KO,
                   "arrêté": KO, "interrompu": KO}
 EXIT_STATUS = {0: "vert", 1: "en échec ou incomplet", 2: "Airflow injoignable"}  # codes de sortie de air.py watch
+CLEAR = "Clear "  # début des lignes qu'air.py imprime à chaque relance d'une tâche ou d'un batch
 NOTIF = "[notif] "  # préfixe des lignes JSON imprimées par air.notify sous Jarvis (AIR_NOTIFY=print)
 
 
@@ -55,6 +56,7 @@ class DagWatch:
     status: str
     ended_at: datetime | None = None
     summary: str = ""  # dernière notification du suivi, ou cause de sa fin
+    clears: int = 0  # relances automatiques faites par le suivi (lignes « Clear <tâche> (n/max) » d'air.py)
 
     @property
     def group(self) -> str:
@@ -125,8 +127,11 @@ class DagWatcher:
 
     def report(self, w: DagWatch) -> str:
         """Rapport de fin écrit par air.py (durées, loader, compare, cleaner, mappings manquants), s'il existe."""
-        path = self.state_dir / "air" / report_name(w.dag_id, w.run_id)
+        path = self.report_path(w)
         return path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
+
+    def report_path(self, w: DagWatch) -> Path:
+        return self.state_dir / "air" / report_name(w.dag_id, w.run_id)
 
     # --- suivi --------------------------------------------------------------------------------------------------
     def start(self, slug: str, client: str, customer: str, dag_id: str, run_id: str, padoa_env: str, card: str) -> DagWatch:
@@ -153,6 +158,9 @@ class DagWatcher:
                     out.write(line)
                     out.flush()
                     last = line.strip() or last
+                    if line.startswith(CLEAR):
+                        w.clears += 1
+                        self._save()  # gardé tout de suite : un redémarrage de Jarvis ne remet pas le compte à zéro
                     if line.startswith(NOTIF):
                         notes += 1
                         self._notify(w, json.loads(line[len(NOTIF):]).get("msg", ""))

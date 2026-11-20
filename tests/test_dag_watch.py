@@ -198,7 +198,7 @@ def test_a_real_launch_starts_the_watch_and_the_agents_pages_show_it(live_app):
     wait_done(w)
     assert (w.customer, w.padoa_env, w.status) == ("acme-uegar", "snap", "vert")
     listing = app.get("/agents").text
-    assert "Suivis de DAG" in listing and 'href="/agents/suivis/1"' in listing
+    assert 'id="suivi-1"' in listing and 'href="/agents/suivis/1"' in listing and "Rapport de fin" in listing  # sa carte
     detail = app.get("/agents/suivis/1").text
     assert "Rapport de fin" in detail and "## rapport de test" in detail and "Arrêter le suivi" not in detail
     assert app.get("/agents/suivis/1/journal").status_code == 200 and app.get("/agents/suivis/9").status_code == 404
@@ -221,3 +221,10 @@ def test_watch_state_stays_in_jarvis_data_not_the_vault():
 
 def test_sources_page_no_longer_promises_no_logs():
     assert "jamais les logs" not in TestClient(main.app).get("/sources").text
+
+
+def test_the_watch_counts_the_automatic_clears_of_air(tmp_path):
+    watcher = DagWatcher(tmp_path, None, AIRFLOW_ENV, command=fake_air(tmp_path, ["Clear load.batch_3 (1/3) : délai", "Clear load.batch_4 (1/3) : délai"]))
+    w = watcher.start("acme", "Acme", "acme", "acme-etl-firm", "manual__1", "snap", "Carte")
+    wait_done(w)
+    assert w.clears == 2 and DagWatcher(tmp_path, None, AIRFLOW_ENV).get(1).clears == 2  # gardé dans suivis.json

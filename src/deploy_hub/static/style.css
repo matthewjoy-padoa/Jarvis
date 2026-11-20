@@ -659,9 +659,9 @@ button:disabled { opacity: .45; box-shadow: none; transform: none; }
 .view-bar .note { font-size: 12.5px; }
 
 /* --- Cartes ----------------------------------------------------------------------------------------- */
-.card, .kpi, .stat, .chart, .panel, .retour, .res-block, table, .wn-item, .kb-card, .pending-card {
+.card, .kpi, .stat, .chart, .panel, .retour, .res-block, .run-card, table, .wn-item, .kb-card, .pending-card {
   border: var(--line) solid var(--border); box-shadow: var(--shadow-card); }
-.card, .kpi, .stat, .chart, .panel, .retour, .res-block { border-radius: var(--radius); }
+.card, .kpi, .stat, .chart, .panel, .retour, .res-block, .run-card { border-radius: var(--radius); }
 .card { padding: 16px 18px; }
 .card-head { gap: 10px; }
 .card-head strong { font-size: 15.5px; }
@@ -686,12 +686,12 @@ button:disabled { opacity: .45; box-shadow: none; transform: none; }
 /* Panneaux et retours de recette */
 .panel { padding: 6px 18px 12px; }
 .panel h2 { font-size: 15px; letter-spacing: -.005em; }
-.retour { padding: 12px 16px; border-left-width: 4px; }
-.retour[data-group="todo"] { border-left-color: var(--st-todo); }
-.retour[data-group="in_progress"] { border-left-color: var(--st-progress); }
-.retour[data-group="ko"] { border-left-color: var(--st-ko); }
-.retour[data-group="other"] { border-left-color: var(--muted); }
-.retour[data-group="done"] { border-left-color: var(--st-done); }
+.retour, .run-card { padding: 12px 16px; border-left-width: 4px; }
+.retour[data-group="todo"], .run-card[data-group="todo"] { border-left-color: var(--st-todo); }
+.retour[data-group="in_progress"], .run-card[data-group="in_progress"] { border-left-color: var(--st-progress); }
+.retour[data-group="ko"], .run-card[data-group="ko"] { border-left-color: var(--st-ko); }
+.retour[data-group="other"], .run-card[data-group="other"] { border-left-color: var(--muted); }
+.retour[data-group="done"], .run-card[data-group="done"] { border-left-color: var(--st-done); }
 .retour .agent summary, .retour .retour-content summary { font-weight: 600; font-size: 13px; }
 
 /* Kanban et Quoi de neuf : mêmes cartes */
@@ -901,6 +901,31 @@ html.palette-open .console-fab, html.drawer-open .console-fab { display: none; }
 
 /* ============================================================ Suivi des runs (air.py, 2026-11-12) : journal et rapport bruts */
 pre.watch-scroll { max-height: 480px; overflow: auto; }  /* sur le style .agent-summary des comptes rendus d'agent */
+
+/* ============================================================ Onglet DAG de la page Agents : une carte par run (_dag_board.html) */
+.run-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin: 8px 0 20px; }
+.run-section h2 { margin: 0; font-size: 15px; }
+.run-section:not(:has(.run-card:not([hidden]))) { display: none; }  /* tout est masqué par les filtres : pas de titre orphelin */
+.run-card { background: var(--surface); scroll-margin-top: calc(var(--topbar-h, 61px) + 16px); }  /* cadre et liseré d'état : règles des cartes et de .retour */
+.run-card:target { border-color: var(--accent); }
+.run-card header { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: space-between; }
+.run-card h3 { margin: 0; font-size: 16px; overflow-wrap: anywhere; }
+.run-card h3 a { color: inherit; }
+.run-card h3 a:hover { color: var(--accent); }
+.run-client { color: var(--muted); font-weight: 500; }
+.run-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.run-news { margin: 8px 0 0; font-size: 14px; overflow-wrap: anywhere; }
+.run-foot { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; margin-top: 8px; font-size: 13px; color: var(--muted); }
+.run-foot form { margin: 0 0 0 auto; }
+.run-clears { display: inline-flex; gap: 4px; align-items: center; }
+.run-steps { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 10px; margin: 10px 0 0; padding: 0; font-size: 13px; }
+.run-steps li { display: flex; gap: 6px; align-items: center; }
+.run-steps li + li::before { content: "→"; color: var(--muted); margin-right: 4px; }
+.run-dot { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 12px; font-weight: 600;
+  background: var(--pa-todo); color: var(--text); }
+.run-steps .g-in_progress .run-dot { background: var(--st-progress); color: var(--on-status); }
+.run-steps .g-done .run-dot { background: var(--pa-done); }
+.run-steps .g-ko .run-dot { background: var(--pa-ko); }
 
 /* ============================================================ Synthèse : « Où ça coince » (2026-11-12), 5 points avec le plus de KO */
 .blocking h2 { margin-bottom: 6px; }
@@ -1231,8 +1256,6 @@ ul.todo li > button.remind-done, ul.todo li > button.remind-drop { margin-left: 
 .chain-box > summary { cursor: pointer; font-weight: 600; }
 .chain-pick { list-style: none; margin: 6px 0 10px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 2px 16px; font-size: 13.5px; }
 .chain-rank { font-weight: 700; color: var(--accent); }
-ol.chain-steps { margin: 0; padding-left: 20px; font-size: 13px; }
-ol.chain-steps li { margin: 2px 0; }
 
 /* Suivi des PR, relecture guidée */
 button.pr-refresh { min-height: 0; padding: 2px 10px; font-size: 12.5px; margin-left: 6px; }
