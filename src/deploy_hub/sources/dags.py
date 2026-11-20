@@ -34,6 +34,12 @@ class DagChoice:
         what = f"groupe {self.groupe}" if self.groupe else ", ".join(self.resources)
         return f"{TYPE_LABELS.get(self.type, self.type)} · {what} ({self.customer})"
 
+    @property
+    def short(self) -> str:
+        """Libellé court, là où la ligne dit déjà la ressource : « ETL », « Transform & load », « ETL groupe medical »."""
+        kind = TYPE_LABELS.get(self.type, self.type)
+        return f"{kind} {self.groupe}" if self.groupe else kind.removesuffix(" ressource")
+
 
 @lru_cache(maxsize=4)
 def _load(path: str, mtime: float) -> dict:

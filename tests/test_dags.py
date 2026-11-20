@@ -75,7 +75,8 @@ def test_a_card_with_several_resources_is_under_each_of_them(app, monkeypatch):
     assert [(b["id"], b["resources"], len(b["cards"])) for b in d.injection_lines] == [("firm", ["firm"], 1), ("firm_status", ["firm_status"], 1)]
     page = app.get("/deploiements/acme/injections").text
     firm = page[page.index('id="acme-firm"'):page.index('id="acme-firm_status"')]
-    assert 'data-default="acme-uegar-etl-firm"' in firm and ">Lancer</button>" in firm  # l'ETL de la ressource, jamais le groupe
+    assert firm.index('<option value="acme-uegar-etl-firm"') < firm.index('<option value="acme-uegar-etl_group-firm_base"')  # l'ETL de la ressource d'abord
+    assert ">ETL</option>" in firm and ">ETL groupe firm_base</option>" in firm and ">Lancer</button>" in firm  # la liste dit ce qui part
     assert "Lancer le groupe" not in page  # un groupe ne se lance que de sa ligne, section « Groupes de ressources »
 
 

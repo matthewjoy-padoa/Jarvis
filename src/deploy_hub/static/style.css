@@ -906,8 +906,7 @@ pre.watch-scroll { max-height: 480px; overflow: auto; }  /* sur le style .agent-
 .inj-members { margin: 6px 0 2px; }
 .inj-row > .dag-out { flex-basis: 100%; }
 .inj-row > .dag-out:empty { display: none; }
-.dag-form select.dag-pick { width: 34px; text-indent: -999px; }  /* juste sa flèche : « un autre DAG » ; son texte est dans l'infobulle */
-.dag-form select.dag-pick.is-changed { width: auto; max-width: 240px; text-indent: 0; }
+.dag-form select.dag-pick { max-width: 220px; }  /* le DAG qui part : « ETL » par défaut */
 
 /* ============================================================ Synthèse : « Où ça coince » (2026-11-12), 5 points avec le plus de KO */
 .blocking h2 { margin-bottom: 6px; }

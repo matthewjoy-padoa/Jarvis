@@ -2,19 +2,20 @@
 {# Attend : deployments, show_client, padoa_envs. Vue « Par ressource » de l'onglet Injections : une liste, une ligne par
    ressource (ses cartes d'injection, Deployment.injection_lines ; une carte liée à deux ressources est sous chacune), ce qui bloque en haut.
    Se repérer : un point de couleur, l'état le plus en retard de ses cartes, la carte en KO nommée. Lancer vite : la stack
-   se choisit une fois, en haut ; « Lancer » prend le premier DAG proposé (celui de la ressource seule), la petite liste à
-   côté en choisit un autre. Un clic sur la ligne montre ses cartes. Sous les ressources, une ligne par groupe de
+   se choisit une fois, en haut ; « Lancer » lance le DAG affiché dans la liste à côté de lui : l'ETL de la ressource par
+   défaut, un autre au choix. Un clic sur la ligne montre ses cartes. Sous les ressources, une ligne par groupe de
    ressources du catalogue (dags.groups_for) : « Lancer » y prend l'ETL du groupe ; un groupe ne se lance que de là. #}
 <div class="toolbar inj-toolbar" data-inj-toolbar>
   <input type="search" placeholder="Rechercher une ressource ou une carte…" aria-label="Rechercher">
   <label class="inj-stack dag-form" data-dag-form>Lancer sur <select name="padoa_env" data-inj-stack aria-label="Stack cible">{% for e in padoa_envs %}<option value="{{ e }}">{{ e }}</option>{% endfor %}</select></label>
   <span class="muted count-label"></span>
 </div>
-{# Champ « dag_id » d'un formulaire de ligne : caché s'il n'y a qu'un DAG ; sinon une petite liste (juste sa flèche), le DAG
-   qui part par défaut déjà choisi. #}
-{% macro dag_field(choices, default) %}
-{% if choices | length > 1 %}<select name="dag_id" class="dag-pick" aria-label="DAG à lancer" title="Autre DAG que : {{ default.label }}" data-default="{{ default.dag_id }}">{% for c in choices %}<option value="{{ c.dag_id }}" title="{{ c.dag_id }}"{% if c.dag_id == default.dag_id %} selected{% endif %}>{{ c.label }}</option>{% endfor %}</select>
-{% else %}<input type="hidden" name="dag_id" value="{{ default.dag_id }}">{% endif %}
+{# Champ « dag_id » d'un formulaire de ligne : caché s'il n'y a qu'un DAG ; sinon une liste courte (« ETL », « Transform &
+   load », « ETL groupe … ») qui montre celui qui part, le premier proposé. inside_group : la ligne nomme déjà le groupe ;
+   customers : les clients orchestrator de la fiche (s'il y en a plusieurs, chaque DAG dit le sien). #}
+{% macro dag_field(choices, customers, inside_group=false) %}
+{% if choices | length > 1 %}<select name="dag_id" class="dag-pick" aria-label="DAG à lancer">{% for c in choices %}<option value="{{ c.dag_id }}" title="{{ c.dag_id }}">{{ c.short.replace(" groupe " ~ c.groupe, "") if inside_group else c.short }}{% if customers | length > 1 %} ({{ c.customer }}){% endif %}</option>{% endfor %}</select>
+{% else %}<input type="hidden" name="dag_id" value="{{ choices[0].dag_id }}">{% endif %}
 {% endmacro %}
 {% for d in deployments %}
 {% if show_client and (d.injection_lines or d.resources) %}<h2>{{ d.client }}</h2>{% endif %}
@@ -44,7 +45,7 @@
     <form class="dag-form inj-go" hx-post="/actions/injection/{{ d.slug }}" hx-target="next .dag-out" data-dag-form>
       <input type="hidden" name="card" value="{{ b.label }}">
       <input type="hidden" name="padoa_env" value="{{ padoa_envs[0] }}" data-inj-env>
-      {{ dag_field(choices, choices[0]) }}
+      {{ dag_field(choices, d.orchestrator) }}
       <button type="submit" title="{{ choices[0].label }}">Lancer</button>
     </form>
     {% elif b.resources %}<span class="muted inj-go" title="Aucun DAG de {{ d.orchestrator | join(', ') or d.client }} ne traite {{ b.label }} dans dags/config_deployment.py">aucun DAG{% if not d.orchestrator %} (client absent de l'orchestrator){% endif %}</span>
@@ -87,7 +88,7 @@
     <form class="dag-form inj-go" hx-post="/actions/injection/{{ d.slug }}" hx-target="next .dag-out" data-dag-form>
       <input type="hidden" name="card" value="Groupe {{ g.groupe }}">
       <input type="hidden" name="padoa_env" value="{{ padoa_envs[0] }}" data-inj-env>
-      {{ dag_field(g.dags, g.dags[0]) }}
+      {{ dag_field(g.dags, d.orchestrator, inside_group=true) }}
       <button type="submit" title="{{ g.dags[0].label }}">Lancer</button>
     </form>
     <div class="dag-out"></div>
@@ -153,11 +154,6 @@
     } catch (e) {}
     stack.addEventListener("change", setStack);
     setStack();
-    // Un autre DAG que le premier proposé : la petite liste s'élargit pour montrer ce qui partira.
-    document.querySelectorAll(".dag-pick").forEach((pick) => pick.addEventListener("change", () => {
-      pick.classList.toggle("is-changed", pick.value !== pick.dataset.default);
-      pick.title = `DAG choisi : ${pick.options[pick.selectedIndex].text}`;
-    }));
     const fold = (text) => text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");  // sans accents ni majuscules
     function apply() {
       const q = fold(search.value); let n = 0;
