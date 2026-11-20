@@ -46,6 +46,7 @@ class DagRun:
     started_at: datetime
     result: str
     simulated: bool
+    run_id: str = ""  # run créé par un lancement réel : il a alors son suivi (sources/dag_watch.py)
 
 
 class AirflowSource:
@@ -65,7 +66,7 @@ class AirflowSource:
         return {"AIRFLOW_URL": self.base_url, "AIRFLOW_USER": self.user, "AIRFLOW_PASSWORD": self.password} if self.live else {}
 
     def _log(self, dag_id, padoa_env, client, card, result: ActionResult) -> ActionResult:
-        self.runs.insert(0, DagRun(dag_id, padoa_env, client, card, datetime.now(), result.message, result.simulated))
+        self.runs.insert(0, DagRun(dag_id, padoa_env, client, card, datetime.now(), result.message, result.simulated, result.run_id))
         return result
 
     def _refused(self, padoa_env: str) -> ActionResult | None:

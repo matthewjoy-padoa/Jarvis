@@ -143,7 +143,7 @@ def test_a_chain_follows_the_click_order_and_shows_on_the_agents_page(app, fake_
     assert [s.dag_id for s in main.dag_chains.get(1).steps] == wanted
     assert fake_airflow.runs[0].dag_id == DAGS[2]  # le premier cliqué part d'abord ; le second attend la fin de son suivi
     page = app.get("/agents").text
-    assert 'id="chaines"' in page and DAGS[2] in page and "/agents/chaines/1/arreter" in page  # en cours : arrêtable
+    assert 'id="chaine-1"' in page and DAGS[2] in page and "/agents/chaines/1/arreter" in page  # en cours : arrêtable
 
 
 def test_a_chain_without_airflow_starts_nothing(app):

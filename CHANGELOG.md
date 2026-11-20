@@ -10,6 +10,10 @@ Ainsi la version affichée en bas de chaque page change à chaque fusion (et le 
 
 Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
+## [0.3.0] · 2026-11-20
+
+- Agents → DAG : une carte par run lancé depuis Jarvis, à la place des trois tableaux (suivis, enchaînements, lancements) qui racontaient le même run trois fois. Les cartes sont rangées par état (en cours, en échec ou arrêtés, terminés, simulations) ; chaque carte donne le client, le DAG en clair (« administratif · ETL groupe »), la stack, l'état et la durée, la dernière nouvelle du suivi, le nombre de relances automatiques et le lien vers le journal ou le rapport de fin. Un enchaînement tient sur une seule carte, avec ses étapes numérotées. Recherche et filtres par client, stack et état.
+
 ## [0.2.0] · 2026-11-20
 
 - Fichiers de Jarvis (notifications, annuaire, états et caches des synchros, fiches, configuration des clients, `.env`, agents, suivis et enchaînements de DAG, perso, Web Push) écrits d'un bloc par une seule fonction (`safe_write`) : fichier temporaire forcé sur le disque puis remplacement, un arrêt brutal (Jarvis tué, VM coupée) laisse l'ancien fichier intact au lieu d'un fichier à moitié écrit relu comme vide ; fichiers en 600.
