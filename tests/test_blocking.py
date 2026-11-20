@@ -31,7 +31,7 @@ def test_points_are_blocks_and_types_with_a_ko_most_ko_first_then_most_open():
         ("injection", "amt + amt_task", 1, 2, 2),
         ("injection", "firm", 1, 2, 3)]
     amt_block = points[2]
-    assert amt_block["resources"] == ["amt", "amt_task"] and amt_block["href"] == "/deploiements/acme/injections?vue=ressources#acme-amt-amt_task"
+    assert amt_block["resources"] == ["amt", "amt_task"] and amt_block["href"] == "/deploiements/acme/injections?vue=ressources#acme-amt"  # la ligne de sa première ressource
     assert points[1]["href"] == "/deploiements/acme/recette#type=AMT"
 
 

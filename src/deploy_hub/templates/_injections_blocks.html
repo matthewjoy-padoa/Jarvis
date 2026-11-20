@@ -1,10 +1,10 @@
 {% import "_icons.html" as ic %}
 {# Attend : deployments, show_client, padoa_envs. Vue « Par ressource » de l'onglet Injections : une liste, une ligne par
-   ressource (cartes d'injection regroupées par ressources liées, Deployment.injection_blocks), ce qui bloque en haut.
+   ressource (ses cartes d'injection, Deployment.injection_lines ; une carte liée à deux ressources est sous chacune), ce qui bloque en haut.
    Se repérer : un point de couleur, l'état le plus en retard de ses cartes, la carte en KO nommée. Lancer vite : la stack
    se choisit une fois, en haut ; « Lancer » prend le premier DAG proposé (celui de la ressource seule), la petite liste à
    côté en choisit un autre. Un clic sur la ligne montre ses cartes. Sous les ressources, une ligne par groupe de
-   ressources du catalogue (dags.groups_for) : « Lancer » y prend l'ETL du groupe. #}
+   ressources du catalogue (dags.groups_for) : « Lancer » y prend l'ETL du groupe ; un groupe ne se lance que de là. #}
 <div class="toolbar inj-toolbar" data-inj-toolbar>
   <input type="search" placeholder="Rechercher une ressource ou une carte…" aria-label="Rechercher">
   <label class="inj-stack dag-form" data-dag-form>Lancer sur <select name="padoa_env" data-inj-stack aria-label="Stack cible">{% for e in padoa_envs %}<option value="{{ e }}">{{ e }}</option>{% endfor %}</select></label>
@@ -17,16 +17,12 @@
 {% else %}<input type="hidden" name="dag_id" value="{{ default.dag_id }}">{% endif %}
 {% endmacro %}
 {% for d in deployments %}
-{% if show_client and (d.injection_blocks or d.resources) %}<h2>{{ d.client }}</h2>{% endif %}
-{% if d.injection_blocks or d.resources %}
+{% if show_client and (d.injection_lines or d.resources) %}<h2>{{ d.client }}</h2>{% endif %}
+{% if d.injection_lines or d.resources %}
 <ul class="inj-list">
-{% for b in d.injection_blocks %}
+{% for b in d.injection_lines %}
   {% set choices = dags_for(d.orchestrator, b.resources) %}
   {% set worst = b.cards[0] %}{# cartes triées : la plus en retard d'abord #}
-  {# DAG qui part par défaut : le premier proposé (la ressource seule) ; pour une ligne à plusieurs ressources, le premier
-     qui les traite toutes (son groupe), s'il existe. #}
-  {% set pick = namespace(dag=choices[0] if choices else None) %}
-  {% if b.resources | length > 1 %}{% for c in choices if c.resources | length == b.resources | length %}{% if loop.first %}{% set pick.dag = c %}{% endif %}{% endfor %}{% endif %}
   <li class="inj-row" id="{{ d.slug }}-{{ b.id }}" data-group="{{ worst.injection_group }}">
     <span class="key g-{{ worst.injection_group }}" aria-hidden="true"></span>
     <details class="inj-what">
@@ -48,8 +44,8 @@
     <form class="dag-form inj-go" hx-post="/actions/injection/{{ d.slug }}" hx-target="next .dag-out" data-dag-form>
       <input type="hidden" name="card" value="{{ b.label }}">
       <input type="hidden" name="padoa_env" value="{{ padoa_envs[0] }}" data-inj-env>
-      {{ dag_field(choices, pick.dag) }}
-      <button type="submit" title="{{ pick.dag.label }}">Lancer{% if pick.dag.groupe %} le groupe {{ pick.dag.groupe }}{% endif %}</button>
+      {{ dag_field(choices, choices[0]) }}
+      <button type="submit" title="{{ choices[0].label }}">Lancer</button>
     </form>
     {% elif b.resources %}<span class="muted inj-go" title="Aucun DAG de {{ d.orchestrator | join(', ') or d.client }} ne traite {{ b.label }} dans dags/config_deployment.py">aucun DAG{% if not d.orchestrator %} (client absent de l'orchestrator){% endif %}</span>
     {% else %}<span class="muted inj-go" title="Ces cartes n'ont pas de ressource liée dans Notion (ni sur la carte, ni sur sa carte Bible)">pas de ressource liée</span>{% endif %}
@@ -99,7 +95,7 @@
 {% endfor %}
 </ul>
 {% endif %}
-{% if not (d.injection_blocks or d.resources or groups) %}<p class="muted">Aucune carte d'injection{% if show_client %} pour {{ d.client }}{% endif %}.</p>{% endif %}
+{% if not (d.injection_lines or d.resources or groups) %}<p class="muted">Aucune carte d'injection{% if show_client %} pour {{ d.client }}{% endif %}.</p>{% endif %}
 {% set all_dags = dags_for(d.orchestrator) %}
 {% if all_dags | length > 1 %}
 <details class="panel chain-box">

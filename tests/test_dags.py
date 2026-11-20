@@ -68,14 +68,15 @@ def test_resource_groups_have_their_own_line(app, monkeypatch):
     assert 'name="card" value="Groupe firm_base"' in line and 'name="dag_id" value="acme-uegar-etl_group-firm_base"' in line
 
 
-def test_a_line_with_several_resources_launches_the_group_that_covers_them(app, monkeypatch):
+def test_a_card_with_several_resources_is_under_each_of_them(app, monkeypatch):
     d = Deployment(slug="acme", client="Acme", software="Uegar", orchestrator=["acme-uegar"],
                    actions=[Action(title="Firms et statuts", injection=True, injection_status="A faire", resources=["firm", "firm_status"])])
     monkeypatch.setattr(main.fiches, "get_deployment", lambda slug: d)
-    line = app.get("/deploiements/acme/injections").text
-    line = line[line.index('id="acme-firm-firm_status"'):line.index("Groupes de ressources")]
-    assert '<option value="acme-uegar-etl_group-firm_base" title="acme-uegar-etl_group-firm_base" selected>' in line  # pas l'ETL de firm seul
-    assert "Lancer le groupe firm_base</button>" in line and 'data-default="acme-uegar-etl_group-firm_base"' in line
+    assert [(b["id"], b["resources"], len(b["cards"])) for b in d.injection_lines] == [("firm", ["firm"], 1), ("firm_status", ["firm_status"], 1)]
+    page = app.get("/deploiements/acme/injections").text
+    firm = page[page.index('id="acme-firm"'):page.index('id="acme-firm_status"')]
+    assert 'data-default="acme-uegar-etl-firm"' in firm and ">Lancer</button>" in firm  # l'ETL de la ressource, jamais le groupe
+    assert "Lancer le groupe" not in page  # un groupe ne se lance que de sa ligne, section « Groupes de ressources »
 
 
 def test_launch_on_a_chosen_stack(app, fake_airflow):
