@@ -35,7 +35,7 @@ from deploy_hub.sources.dag_source import DagSource
 from deploy_hub.sources.dag_watch import DagWatcher
 from deploy_hub.sources.client_directory import ClientDirectory, form_of, name_key
 from deploy_hub.sources.sync_routine import SyncRoutine
-from deploy_hub.sources import connections, flow_digger, notion_api
+from deploy_hub.sources import connections, flow_digger, notion_api, running_code
 from deploy_hub.sources.external import external_statuses
 from deploy_hub.sources.journal import changes_since, group_changes
 from deploy_hub.sources import watchers
@@ -128,6 +128,22 @@ def _check_claude_login(startup: bool = False) -> None:
         log.info(login.line)
 
 
+_code_started = running_code.head()  # commit du code chargé par ce processus ("" : dossier hors de git)
+_code_newer = ""  # commit (court) extrait depuis, quand le code de l'app a changé : Jarvis est à relancer
+
+
+def _check_restart() -> None:
+    """Jarvis se met à jour par « git pull » puis relance du serveur : tant que la relance n'est pas faite, bandeau sur
+    toutes les pages (base.html), ligne dans le terminal et notification, une fois par commit déployé."""
+    global _code_newer
+    _code_newer = running_code.newer_code(_code_started)[:7]
+    if not _code_newer:
+        return
+    detail = f"Son dossier est passé à {_code_newer}, le serveur tourne encore sur {_code_started[:7]} : relance-le pour appliquer la mise à jour."
+    if notifications.add(f"relance:{_code_newer}", "sync", "urgent", "Jarvis est à relancer", detail, "/sources"):  # clé déjà vue : rien
+        log.warning(f"Jarvis est à relancer. {detail}")
+
+
 SYNC_EVERY_MIN = 60  # réglage JARVIS_SYNC_EVERY_MIN (minutes ; 0 : jamais)
 SYNC_RETRY_S = 300  # synchro automatique non partie (une autre tourne, claude introuvable) : nouvel essai 5 minutes après
 _auto_sync_next = datetime.now() + timedelta(seconds=SYNC_RETRY_S)  # pas avant ce moment ; au démarrage : on laisse Jarvis se lancer
@@ -194,6 +210,7 @@ def _push_round() -> None:
     web_push.pump(notifications)
     _guarded("Annuaire des clients : relecture", client_directory.refresh_if_stale)
     _guarded("Connexion de Claude Code", _check_claude_login)
+    _guarded("Code à jour", _check_restart)
     _guarded("Synchro Notion automatique", _auto_sync)
 
 
@@ -253,6 +270,8 @@ templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STAT
 templates.env.globals["kanban_columns"] = kanban_columns
 templates.env.globals["auto_sync_every"] = auto_sync_every  # bouton « Synchro auto » d'une fiche
 templates.env.globals["auto_sync_note"] = auto_sync_note
+templates.env.globals["jarvis_commit"] = _code_started[:7]  # pied de page : le code qui tourne
+templates.env.globals["restart_for"] = lambda: _code_newer  # bandeau « Jarvis est à relancer » (base.html)
 templates.env.globals["ACTION_STATUSES"] = ACTION_STATUSES
 templates.env.globals["RETOUR_STATUSES"] = RETOUR_STATUSES
 try:

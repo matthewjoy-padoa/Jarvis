@@ -45,6 +45,7 @@ Jarvis suit une numérotation `0.MINEUR.CORRECTIF` tant qu'il n'est pas stable :
 - Synchro Notion automatique, client par client : bouton « Synchro auto » sur la fiche (non par défaut). Jarvis relit Notion tout seul pour les clients qui l'ont activée, dès que l'un d'eux n'a pas été vérifié depuis une heure (réglage `JARVIS_SYNC_EVERY_MIN`, 0 : jamais) : une synchro faite à la main compte, un redémarrage ne remet rien à zéro ; un échec n'est signalé qu'une fois par jour. Bouton « Rafraîchir depuis Notion » : l'avancement monte à chaque réponse de Notion, au lieu de rester à 20 % puis de passer à « terminé ».
 - Connexion de Claude Code surveillée : au lancement de Jarvis (ligne « Jarvis · Claude Code » dans son terminal, comme Airflow et Notion), puis toutes les heures. Déconnecté, ou connexion qui expire dans les trois jours : avertissement dans le terminal, notification dans l'app (une par jour) et ligne « Claude Code » sur la page État des systèmes, avec la commande à lancer (`claude auth login`).
 - Fiche d'un client en synchro automatique : l'heure prévue de la prochaine synchro (« · prochaine vers 14:15 ») à la suite de « Dernière synchro » ; le lancement et l'affichage partent du même calcul.
+- Bandeau « Jarvis est à relancer » sur toutes les pages, avec une notification, quand le dossier a été mis à jour (`git pull`) et que le serveur tourne encore sur l'ancien code ; le commit qui tourne s'affiche en pied de page et sur la page État des systèmes.
 
 ## [0.1.0] · 2026-11-17
 

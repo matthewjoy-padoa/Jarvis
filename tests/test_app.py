@@ -542,7 +542,7 @@ def test_context_is_read_from_the_journal_even_while_the_agent_runs():
 def test_footer_shows_version_from_pyproject():
     import tomllib
     expected = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())["project"]["version"]
-    assert f"v{expected}</a></footer>" in client.get("/").text
+    assert f"v{expected}</a>" in client.get("/").text.rsplit('<footer class="footer muted">', 1)[1]  # suivi du commit qui tourne
 
 
 def test_an_agent_in_error_has_a_relaunch_button():

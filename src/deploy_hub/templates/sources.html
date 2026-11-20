@@ -10,6 +10,9 @@
     <tr><td><strong>Airflow</strong></td><td><span class="dot {{ 'ok' if airflow.live else 'off' }}"></span>{{ 'connecté' if airflow.live else 'non configuré' }}</td><td class="muted">{% if airflow.live %}<code>{{ airflow.base_url }}</code>{% else %}{{ airflow_message | reglages }}{% endif %} · lancement, état et suivi des runs (air.py, comme /air) : tout passe par l'API REST, rien d'autre à régler</td></tr>
     <tr><td><strong>Claude</strong></td><td><span class="dot {{ 'off' if claude_problem else 'ok' }}"></span>{{ 'prêt' if not claude_problem else 'à configurer' }}</td><td class="muted">{% if claude_problem %}{{ claude_problem | reglages }}{% else %}<code>{{ settings.orchestrator_dir }}</code>{% endif %}</td></tr>
     <tr><td><strong>Claude Code (connexion)</strong></td><td><span class="dot {{ 'ok' if claude_login.ok and not claude_login.alert else 'off' }}"></span>{{ claude_login.word }}</td><td class="muted">{{ claude_login.message | reglages }} · agents, synchro Notion sans jeton, annuaire des clients</td></tr>
+    {% if jarvis_commit %}{% set restart = restart_for() %}
+    <tr><td><strong>Code de Jarvis</strong></td><td><span class="dot {{ 'off' if restart else 'ok' }}"></span>{{ 'à relancer' if restart else 'à jour' }}</td><td class="muted">Le serveur tourne sur <code>{{ jarvis_commit }}</code>{% if restart %} ; son dossier est passé à <code>{{ restart }}</code> : relance-le pour appliquer la mise à jour{% endif %}</td></tr>
+    {% endif %}
     {% for e in externals %}
     <tr><td><strong>{{ e.name }}</strong></td><td><span class="dot {{ 'ok' if e.connected else 'off' }}"></span>{{ 'connecté' if e.connected else 'non connecté' }}</td><td class="muted">{{ e.hint | reglages }}</td></tr>
     {% endfor %}
