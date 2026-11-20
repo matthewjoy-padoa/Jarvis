@@ -18,6 +18,7 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from py_vapid import Vapid
 from pywebpush import WebPushException, webpush
 
+from deploy_hub.safe_write import write_json
 from deploy_hub.sources.notifications import Notification, NotificationStore
 
 # Contact exigé par VAPID (RFC 8292) : une URL https sans chemin (py_vapid refuse les chemins), pas besoin d'adresse e-mail.
@@ -32,11 +33,6 @@ _lock = threading.Lock()
 
 def _read(path: Path, default):
     return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else default
-
-
-def _write(path: Path, value) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
 
 
 class WebPush:
@@ -70,11 +66,11 @@ class WebPush:
             raise ValueError("abonnement incomplet (adresse https du service de push et clés attendues)")
         with _lock:
             subs = [s for s in self.subscriptions() if s["endpoint"] != sub["endpoint"]]
-            _write(self.subs_path, subs + [{"endpoint": sub["endpoint"], "keys": sub["keys"]}])
+            write_json(self.subs_path, subs + [{"endpoint": sub["endpoint"], "keys": sub["keys"]}])
 
     def unsubscribe(self, endpoint: str) -> None:
         with _lock:
-            _write(self.subs_path, [s for s in self.subscriptions() if s["endpoint"] != endpoint])
+            write_json(self.subs_path, [s for s in self.subscriptions() if s["endpoint"] != endpoint])
 
     def send(self, note: Notification) -> int:
         """Pousse une notification à chaque navigateur abonné ; renvoie le nombre de remises acceptées."""
@@ -102,10 +98,10 @@ class WebPush:
         latest = max((n.id for n in store.all()), default=0)
         state = _read(self.state_path, {})
         if "last_id" not in state or not self.subscriptions():
-            _write(self.state_path, {"last_id": latest})  # sans abonné, rien à rattraper plus tard
+            write_json(self.state_path, {"last_id": latest})  # sans abonné, rien à rattraper plus tard
             return []
         fresh = sorted(store.after(state["last_id"]), key=lambda n: n.id)[-MAX_PER_ROUND:]
         for note in fresh:
             self.send(note)
-        _write(self.state_path, {"last_id": max([latest, *(n.id for n in fresh)])})  # une notification arrivée pendant le tour ne repart pas
+        write_json(self.state_path, {"last_id": max([latest, *(n.id for n in fresh)])})  # une notification arrivée pendant le tour ne repart pas
         return fresh

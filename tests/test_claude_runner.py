@@ -87,9 +87,13 @@ def _runner(repo: Path, claude: Path, tmp_path: Path, **kw) -> ClaudeRunner:
 
 def _wait(runner: ClaudeRunner, run_id: int, timeout: float = 20) -> None:
     end = time.time() + timeout
-    while runner.get(run_id).running and time.time() < end:
+    # Fin complète : statut final ET notification envoyée (finished() enregistre l'état avant de notifier).
+    def done() -> bool:
+        return not runner.get(run_id).running and (
+            not runner.notifications or any(n.key.startswith(f"agent:{run_id}:") for n in runner.notifications.all()))
+    while not done() and time.time() < end:
         time.sleep(0.05)
-    assert not runner.get(run_id).running, "l'agent ne s'est pas terminé"
+    assert done(), "l'agent ne s'est pas terminé"
 
 
 def test_real_agent_runs_in_its_own_worktree_and_finds_the_pr(repo, fake_claude, tmp_path, monkeypatch):

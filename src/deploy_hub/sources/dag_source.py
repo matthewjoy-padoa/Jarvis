@@ -14,7 +14,6 @@ Une version en échec n'est retentée que par « Régénérer ».
 
 import hashlib
 import json
-import os
 import subprocess
 import tempfile
 import threading
@@ -22,6 +21,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from deploy_hub.safe_write import write_json
 from deploy_hub.config import PROJECT_ROOT, child_environment
 from deploy_hub.sources import dags as dag_catalogue
 
@@ -137,10 +137,7 @@ class DagSource:
                 # Jarvis note lui-même la version : le générateur ne voit que le commit, pas les modifications.
                 catalogue = {**json.loads(partial.read_text(encoding="utf-8")), "commit_orchestrator": checkout.version,
                              "branche": checkout.label}
-                self.target.parent.mkdir(parents=True, exist_ok=True)
-                staged = self.target.with_suffix(".tmp")
-                staged.write_text(json.dumps(catalogue, ensure_ascii=False), encoding="utf-8")
-                os.replace(staged, self.target)  # atomique : un lecteur voit l'ancien catalogue ou le nouveau
+                write_json(self.target, catalogue)  # un lecteur voit l'ancien catalogue ou le nouveau
                 self._failed.pop(checkout.version, None)
         except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as e:
             self._failed[checkout.version] = f"{checkout.label} : {e}"
