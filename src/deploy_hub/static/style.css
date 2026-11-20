@@ -460,6 +460,28 @@ button .ic { margin-right: 2px; }
 .tabs.is-stuck { border-bottom-color: transparent; box-shadow: 0 0 0 100vmax var(--bg), 0 6px 12px -10px rgba(0, 18, 53, .35); clip-path: inset(0 -100vmax -14px); }
 @media (max-width: 900px) { .tabs { position: static; box-shadow: none; clip-path: none; } }
 
+/* Vue simplifiée de la fiche : bouton à droite des onglets, roue pour choisir les onglets gardés. Le choix s'ouvre en
+   popover (couche du dessus) : la barre d'onglets défile et rogne ce qui en dépasse. */
+.tabs-view { display: flex; flex: none; align-items: center; gap: 4px; margin: 0 0 6px auto; padding-left: 12px; }
+.tabs-view button { min-height: 28px; padding: 3px 12px; font-size: 12.5px; white-space: nowrap; box-shadow: none; }
+.tabs-view .view-toggle[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.tabs-view .view-toggle[aria-pressed="true"]::before { content: "✓"; }
+.tabs-view .view-pick { padding: 3px 7px; anchor-name: --tabs-pick; }
+.tabs-view .view-pick .ic { margin: 0; }
+.tabs a.off-view { outline: 2px dashed var(--muted); outline-offset: 1px; }  /* ouvert par un lien, hors de la vue simplifiée */
+.tabs-pick { width: 290px; max-width: calc(100vw - 32px); padding: 14px; color: var(--text); background: var(--surface);
+  border: var(--line) solid var(--border); border-radius: 14px; box-shadow: var(--shadow-lift); }
+.tabs-pick:popover-open { display: grid; gap: 2px; }
+.tabs-pick::backdrop { background: rgba(0, 18, 53, .2); }
+.tabs-pick-title { margin: 0 0 6px; font-weight: 600; }
+.tabs-pick label { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 6px; font-size: 14px; cursor: pointer; }
+.tabs-pick label:hover { background: var(--bg); }
+.tabs-pick .muted { margin: 6px 0 10px; font-size: 12.5px; }
+@supports (top: anchor(bottom)) {  /* sous la roue quand le navigateur sait ancrer ; sinon au centre de la page */
+  .tabs-pick { position-anchor: --tabs-pick; inset: auto; top: anchor(bottom); right: anchor(right); margin: 6px 0 0; }
+  .tabs-pick::backdrop { background: none; }
+}
+
 /* Configuration des clients */
 .btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: 14px; white-space: nowrap; }
 .btn-primary:hover { filter: brightness(1.08); }

@@ -223,5 +223,5 @@ def test_a_client_not_synced_yet_can_be_opened_from_the_clients_page(app, monkey
     monkeypatch.setattr(main, "_sync_new_client", lambda slug, background: None)
     app.post("/clients/enregistrer", data={"client": "Acme", "page_id": PAGE})
     page = app.get("/clients").text
-    assert "En attente de première synchro" in page and '<a class="card-link" href="/deploiements/acme/synthese"><strong>Acme</strong></a>' in page
+    assert "En attente de première synchro" in page and '<a class="card-link" href="/deploiements/acme"><strong>Acme</strong></a>' in page
     assert app.get("/deploiements/acme/synthese").status_code == 200

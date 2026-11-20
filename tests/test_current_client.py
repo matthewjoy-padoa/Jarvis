@@ -77,12 +77,12 @@ def test_the_current_client_fiche_is_one_click_away():
     c = fresh()
     c.get("/deploiements/client-exemple/actions")
     bar = c.get("/deadlines").text.split("<main>", 1)[0]
-    assert 'href="/deploiements/client-exemple/synthese" class="nav-item nav-fiche' in bar  # onglet « Fiche »
+    assert 'href="/deploiements/client-exemple" class="nav-item nav-fiche' in bar  # onglet « Fiche »
     fiche_bar = c.get("/deploiements/client-exemple/synthese").text.split("<main>", 1)[0]
     assert 'nav-fiche active' in fiche_bar
     # chaque autre client du menu : un raccourci direct vers sa fiche (et il devient le client en cours)
-    assert 'href="/client/client-demo?vers=/deploiements/client-demo/synthese"' in bar
-    r = c.get("/client/client-demo?vers=/deploiements/client-demo/synthese", follow_redirects=False)
+    assert 'href="/client/client-demo?vers=/deploiements/client-demo"' in bar
+    r = c.get("/client/client-demo?vers=/deploiements/client-demo", follow_redirects=False)
     assert r.headers["location"] == "/deploiements/client-demo/synthese" and r.cookies.get(CLIENT_COOKIE) == "client-demo"
 
 
