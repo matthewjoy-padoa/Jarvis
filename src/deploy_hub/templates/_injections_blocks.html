@@ -154,6 +154,17 @@
     } catch (e) {}
     stack.addEventListener("change", setStack);
     setStack();
+    // Liste des DAG : large comme l'option choisie, pas comme la plus longue. Le CSS le fait (field-sizing) ; à défaut, on
+    // mesure le texte choisi.
+    if (!CSS.supports("field-sizing", "content")) {
+      const ruler = document.createElement("canvas").getContext("2d");
+      const fit = (pick) => {
+        const style = getComputedStyle(pick);
+        ruler.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+        pick.style.width = `${Math.ceil(ruler.measureText(pick.options[pick.selectedIndex].text).width) + 38}px`;  // + marges et flèche
+      };
+      document.querySelectorAll(".dag-pick").forEach((pick) => { fit(pick); pick.addEventListener("change", () => fit(pick)); });
+    }
     const fold = (text) => text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");  // sans accents ni majuscules
     function apply() {
       const q = fold(search.value); let n = 0;

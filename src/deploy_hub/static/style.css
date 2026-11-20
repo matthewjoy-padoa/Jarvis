@@ -906,7 +906,8 @@ pre.watch-scroll { max-height: 480px; overflow: auto; }  /* sur le style .agent-
 .inj-members { margin: 6px 0 2px; }
 .inj-row > .dag-out { flex-basis: 100%; }
 .inj-row > .dag-out:empty { display: none; }
-.dag-form select.dag-pick { max-width: 220px; }  /* le DAG qui part : « ETL » par défaut */
+.dag-form select.dag-pick { max-width: 280px; field-sizing: content; }  /* le DAG qui part (« ETL » par défaut), large comme son texte ;
+  sans field-sizing (Firefox, vieux Safari), le script de _injections_blocks.html règle la largeur */
 
 /* ============================================================ Synthèse : « Où ça coince » (2026-11-12), 5 points avec le plus de KO */
 .blocking h2 { margin-bottom: 6px; }
