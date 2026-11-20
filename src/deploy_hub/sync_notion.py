@@ -27,6 +27,7 @@ from pathlib import Path
 
 import yaml
 
+from deploy_hub.safe_write import write_json, write_text
 from deploy_hub.config import PROJECT_ROOT, data_dir
 from deploy_hub import queries
 from deploy_hub.queries import ConfigError, page_id_of
@@ -119,10 +120,10 @@ def write_caches(raw: Path, caches: dict[str, dict]) -> None:
         if base == "recette":
             meta = {u: {k: v for k, v in r.items() if k in RECETTE_META} for u, r in cache.items()}
             content = {u: {k: r[k] for k in RECETTE_CONTENT if r.get(k)} for u, r in cache.items()}
-            (raw / "cache-recette.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
-            (raw / "contenu-recette.json").write_text(json.dumps(content, ensure_ascii=False), encoding="utf-8")
+            write_json(raw / "cache-recette.json", meta)
+            write_json(raw / "contenu-recette.json", content)
         else:
-            (raw / f"cache-{base}.json").write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+            write_json(raw / f"cache-{base}.json", cache)
 
 
 def merge_base(raw: Path, base: str) -> tuple[dict[str, dict], str]:
@@ -213,10 +214,9 @@ def unknown_users(root: Path = PROJECT_ROOT) -> list[str]:
 
 def add_users(names: dict[str, str], root: Path = PROJECT_ROOT) -> None:
     path = users_path(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
     known = _load_json(path, {})
     known.update({k.removeprefix("user://"): v for k, v in names.items() if v})
-    path.write_text(json.dumps(known, ensure_ascii=False, indent=1, sort_keys=True), encoding="utf-8")
+    write_json(path, known, indent=1, sort_keys=True)
 
 
 def _retour(r: dict) -> dict:
@@ -294,20 +294,15 @@ def _fiche_icon(fiche: Path) -> dict:
 
 
 def write_fiche(deployment: dict, out: Path) -> None:
-    out.parent.mkdir(parents=True, exist_ok=True)
     front = yaml.safe_dump(deployment, allow_unicode=True, sort_keys=False)
-    out.write_text(
-        "---\n# Généré par deploy_hub.sync_notion depuis Notion : ne pas modifier à la main.\n"
-        f"{front}---\n",
-        encoding="utf-8",
-    )
+    write_text(out, f"---\n# Généré par deploy_hub.sync_notion depuis Notion : ne pas modifier à la main.\n{front}---\n")
 
 
 def update_blocklist(retours: list[dict], blocklist: Path) -> int:
     """Ajoute les pages de recette au fichier lu par le hook ; ne retire jamais une page."""
     known = set(blocklist.read_text().split()) if blocklist.is_file() else set()
     known |= {pid for r in retours if (pid := _page_id(r["notion_url"]))}
-    blocklist.write_text("\n".join(sorted(known)) + "\n")
+    write_text(blocklist, "\n".join(sorted(known)) + "\n")
     return len(known)
 
 
@@ -480,8 +475,7 @@ def deposit(output: str, source: str = "", root: Path = PROJECT_ROOT) -> dict:
         raise SyncError(f"{src.name} n'est pas du JSON") from None
     if not isinstance(data, dict) or not isinstance(data.get("results"), list):
         raise SyncError(f"{src.name} n'est pas une réponse Notion (pas de « results »)")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(text, encoding="utf-8")
+    write_text(out, text)
     return {"sortie": str(out), "lignes": len(data["results"]), "source": src.name}
 
 
@@ -497,8 +491,7 @@ def mark_checked(slugs: list[str], root: Path = PROJECT_ROOT) -> None:
     path = data_dir(root) / "notion" / VERIFICATIONS
     seen = _load_json(path, {})
     seen.update({slug: datetime.now().strftime("%d/%m/%Y %H:%M") for slug in slugs})
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(seen, ensure_ascii=False), encoding="utf-8")
+    write_json(path, seen)
 
 
 def plan_all(root: Path = PROJECT_ROOT) -> dict:
@@ -522,14 +515,13 @@ def plan_all(root: Path = PROJECT_ROOT) -> dict:
             out["inchanges"].append(slug)
             continue
         _clean(raw, [name for _, name, _ in p["requetes"]])
-        (raw / "plan.json").write_text(json.dumps({"sorties": [name for _, name, _ in p["requetes"]], "empreinte": rows[slug]},
-                                                  ensure_ascii=False), encoding="utf-8")
+        write_json(raw / "plan.json", {"sorties": [name for _, name, _ in p["requetes"]], "empreinte": rows[slug]})
         out["requetes"] += [{"client": slug, **_query(raw / "requetes" / f"{q}.sql", raw / f"{name}.json", params)}
                             for q, name, params in p["requetes"]]
         out["raisons"][slug] = p["raisons"]
     mark_checked(out["inchanges"], root)  # vérifiés, rien de neuf
     # Erreurs par client : Jarvis les affiche à la fin de la synchro, quel que soit le compte rendu de Claude.
-    (folder / PLAN_ERRORS).write_text(json.dumps(out["erreurs"], ensure_ascii=False), encoding="utf-8")
+    write_json(folder / PLAN_ERRORS, out["erreurs"])
     return out
 
 
@@ -594,7 +586,7 @@ def append_journal(raw: Path, events: list[dict]) -> None:
     journal = _load_json(path, [])
     cutoff = (datetime.now() - timedelta(days=JOURNAL_DAYS)).isoformat(timespec="seconds")
     journal = [e for e in journal if e["quand"] >= cutoff] + events
-    path.write_text(json.dumps(journal, ensure_ascii=False), encoding="utf-8")
+    write_json(path, journal)
 
 
 URGENT_DAYS = 2  # une deadline déplacée à moins de 2 jours est urgente
@@ -714,7 +706,7 @@ def sync(slug: str, root: Path = PROJECT_ROOT) -> dict:
                 state["ids_requis"] = True
             elif len(caches[base]) < n:
                 state.setdefault("complet_requis", []).append(base)
-    (raw / "etat-synchro.json").write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+    write_json(raw / "etat-synchro.json", state)
     _clean(raw, RESULTS[2:] + ("plan",))
     result = summary(out["deployment"], out["blocked"], {base: how for base, (_, how) in merged.items()}, out["changes"])
     if any(removed.values()):

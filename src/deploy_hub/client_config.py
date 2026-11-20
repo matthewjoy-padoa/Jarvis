@@ -12,6 +12,7 @@ from pathlib import Path
 
 import yaml
 
+from deploy_hub.safe_write import write_text
 from deploy_hub import queries
 from deploy_hub.config import PROJECT_ROOT, clients_dir, deployments_dir
 from deploy_hub.queries import ConfigError, page_id_of
@@ -241,7 +242,7 @@ def _write(path: Path, config: ClientConfig) -> None:
     text = config.to_yaml()
     if extra:
         text += yaml.safe_dump(extra, allow_unicode=True, sort_keys=False)
-    path.write_text(text, encoding="utf-8")
+    write_text(path, text)
 
 
 def set_archived(slug: str, archived: bool, root: Path = PROJECT_ROOT) -> bool:

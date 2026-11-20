@@ -8,6 +8,8 @@ Jarvis suit une numérotation `0.MINEUR.CORRECTIF` tant qu'il n'est pas stable :
 
 ## Non publié
 
+- Fichiers de Jarvis (notifications, annuaire, états et caches des synchros, fiches, configuration des clients, `.env`, agents, suivis et enchaînements de DAG, perso, Web Push) écrits d'un bloc par une seule fonction (`safe_write`) : fichier temporaire forcé sur le disque puis remplacement, un arrêt brutal (Jarvis tué, VM coupée) laisse l'ancien fichier intact au lieu d'un fichier à moitié écrit relu comme vide ; fichiers en 600.
+- Onglet PR : historique des PR fusionnées ou fermées du client (scope du titre, ou ouvertes par un de ses agents), et en options d'affichage les PR fusionnées depuis la réception de ses données de son logiciel et celles communes à tous les clients (scope `all`). Historique gardé sur disque (`data/github/`, métadonnées GitHub), affiché aussitôt et complété en arrière-plan par les seules PR fermées depuis la dernière lecture ; chargé en même temps que les PR ouvertes.
 - Plus de mode démo : `JARVIS_MODE` disparaît ; agents Claude et synchro Notion toujours réels, DAG lancés seulement avec Airflow configuré ; ce qui manque est dit (Claude Code, orchestrator, Airflow) au lieu d'être simulé ; plus d'agents fictifs sur la page Agents (#51).
 - Bouton « Rafraîchir depuis Notion » : la synchro peut enfin écrire ses résultats dans le dossier de données (règle `Edit(…)` au lieu de `Write(…)`, que Claude Code ignore), au lieu de s'arrêter sur « Résultat manquant » (#53).
 - Un client ajouté apparaît tout de suite dans le sélecteur, avec une fiche vide et le bouton « Rafraîchir depuis Notion » en attendant sa première synchro (#52).

@@ -76,3 +76,11 @@ def known_dag(customers: list[str], dag_id: str, path: Path | None = None) -> bo
     clients = catalogue(path)["clients"]
     return any(dag_id in (clients.get(c) or {}).get("dags", {}) or dag_id == ((clients.get(c) or {}).get("ced") or {}).get("dag_id")
                for c in customers)
+
+
+def softwares_of(customers: list[str], path: Path | None = None) -> set[str]:
+    """Logiciels des clients orchestrator d'après le catalogue, et leur racine, comme dans les scopes des titres de PR
+    (« preventiel_postgres » → aussi « preventiel », « medtra_4 » → aussi « medtra »)."""
+    clients = catalogue(path)["clients"]
+    found = {str(name).lower() for c in customers if (name := (clients.get(c) or {}).get("logiciel"))}
+    return found | {name.split("_")[0] for name in found}

@@ -22,6 +22,7 @@ from statistics import median
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from deploy_hub.safe_write import write_json
 from deploy_hub.config import child_environment
 from deploy_hub.models import DONE, IN_PROGRESS, KO, TODO, Deployment, RetourRecette, status_group
 from deploy_hub.sources import ActionResult
@@ -486,10 +487,7 @@ class ClaudeRunner:
 
     def _save(self) -> None:
         with self._lock:
-            self.state_dir.mkdir(parents=True, exist_ok=True)
-            tmp = self.state_file.with_suffix(".tmp")  # écriture atomique : jamais d'historique à moitié écrit
-            tmp.write_text(json.dumps([asdict(r) for r in self.runs], ensure_ascii=False, default=datetime.isoformat), encoding="utf-8")
-            tmp.replace(self.state_file)
+            write_json(self.state_file, [asdict(r) for r in self.runs], default=datetime.isoformat)
 
     def get(self, run_id: int) -> AgentRun | None:
         return next((r for r in self.runs if r.id == run_id), None)

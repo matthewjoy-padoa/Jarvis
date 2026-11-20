@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from deploy_hub.safe_write import write_json
 from deploy_hub import client_config
 from deploy_hub.client_config import is_notion, slugify
 from deploy_hub.config import PROJECT_ROOT, data_dir
@@ -254,8 +255,7 @@ class ClientDirectory:
         return data if isinstance(data, dict) else {}
 
     def _write(self, name: str, data: dict) -> None:
-        self.folder.mkdir(parents=True, exist_ok=True)
-        (self.folder / name).write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        write_json(self.folder / name, data)
 
     def directory(self) -> dict:
         """{"lu": date ISO, "clients": [...], "fiches": [...]} ; vide tant qu'il n'a jamais été lu."""
@@ -392,5 +392,4 @@ class ClientDirectory:
             if icons[page] and not any(found.values()):  # image non téléchargée (adresse signée mal recopiée) : relue plus tard
                 self._missed.add(page)
                 continue
-            folder.mkdir(parents=True, exist_ok=True)
-            (folder / ICON_FILE).write_text(json.dumps(found, ensure_ascii=False), encoding="utf-8")
+            write_json(folder / ICON_FILE, found)
