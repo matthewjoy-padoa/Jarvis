@@ -6,6 +6,7 @@ import os
 import re
 from contextlib import asynccontextmanager
 import threading
+import time
 from importlib.metadata import PackageNotFoundError, version as package_version
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit
 from datetime import date, datetime, timedelta
@@ -21,7 +22,7 @@ from deploy_hub import client_config
 from deploy_hub.config import PROCESS_KEYS, PROJECT_ROOT, clients_dir, data_dir, ensure_private_dirs, forget_secrets, load_settings, secret_problem
 from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, KO, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
                                kanban_columns, notion_link, status_group)
-from deploy_hub import brief, console, env_file, onepassword, shell
+from deploy_hub import brief, console, env_file, onepassword, shell, sync_notion
 from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
@@ -104,14 +105,41 @@ def _guarded(label: str, job) -> None:
         log.exception(f"{label} en échec")
 
 
+SYNC_EVERY_MIN = 60  # réglage JARVIS_SYNC_EVERY_MIN (minutes ; 0 : jamais)
+SYNC_RETRY_S = 300  # synchro automatique non partie (une autre tourne, claude introuvable) : nouvel essai 5 minutes après
+_auto_sync_next = time.monotonic() + SYNC_RETRY_S  # pas avant ce moment ; au démarrage : on laisse Jarvis se lancer
+
+
+def _auto_sync() -> None:
+    """Synchro Notion de tous les clients suivis, lancée par l'app dès qu'un client n'a pas été vérifié depuis l'intervalle
+    (une heure par défaut) : une synchro faite à la main compte, et un redémarrage de Jarvis ne remet rien à zéro. Par
+    l'API avec un jeton Notion, sinon par la routine Claude Code. Partie : la suivante au plus tôt un intervalle après,
+    même si un client reste en échec ; pas partie : nouvel essai cinq minutes plus tard."""
+    global _auto_sync_next
+    value = os.getenv("JARVIS_SYNC_EVERY_MIN", "").strip()  # relu à chaque tour : un changement dans Réglages s'applique
+    every = int(value) if value.isdigit() else SYNC_EVERY_MIN
+    if not every or time.monotonic() < _auto_sync_next or not sync_notion.stale_clients(every):
+        return
+    if notion_api.load_token():
+        threading.Thread(target=_refresh, args=(notion_api.clients(),), name="jarvis-sync-auto", daemon=True).start()
+        started, message = True, "lancée par l'API"
+    else:
+        r = sync_routine.start(auto=True)
+        started, message = r.ok, r.message
+    _auto_sync_next = time.monotonic() + (every * 60 if started else SYNC_RETRY_S)
+    log.info(f"Synchro Notion automatique : {message}")
+
+
 def _push_round() -> None:
     """Un tour : échéances du jour (créées d'habitude à l'ouverture d'une page), puis envoi des nouvelles notifications ;
     au passage, le catalogue des DAGs est régénéré si le clone orchestrator local a changé, et l'annuaire des clients est
-    relu s'il a plus d'un jour (au démarrage, puis chaque jour) : « Ajouter un client » l'a déjà, sans attente."""
+    relu s'il a plus d'un jour (au démarrage, puis chaque jour) : « Ajouter un client » l'a déjà, sans attente ; enfin la
+    synchro Notion part toute seule quand son intervalle est écoulé (une heure par défaut)."""
     _guarded("Catalogue des DAGs : relevé du clone", dag_source.refresh)
     _deadline_notes()
     web_push.pump(notifications)
     _guarded("Annuaire des clients : relecture", client_directory.refresh_if_stale)
+    _guarded("Synchro Notion automatique", _auto_sync)
 
 
 async def _push_loop() -> None:

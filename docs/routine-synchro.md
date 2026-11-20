@@ -26,7 +26,9 @@ Durées mesurées sur la VM le 2026-11-20 (un client de 1 130 cartes et 150 reto
 3. Le modèle exécute ces requêtes ; `suite` récolte les réponses, met à jour les caches et les fiches, et rend le compte rendu (une ligne par client).
 
 ## Lancer la routine
-Trois façons, la même consigne :
+**Toute seule** : Jarvis lance une synchro de tous les clients suivis dès que l'un d'eux n'a pas été vérifié dans Notion depuis une heure (réglage `JARVIS_SYNC_EVERY_MIN`, en minutes ; 0 : jamais), par l'API s'il a un jeton Notion, sinon par cette routine. Une synchro faite à la main compte (heure de dernière vérification de chaque client, `data/notion/verifications.json`) et un redémarrage de Jarvis ne remet rien à zéro (premier contrôle cinq minutes après le démarrage). Si elle ne part pas (une autre synchro tourne, `claude` introuvable), nouvel essai cinq minutes plus tard ; un client qui reste en échec est retenté une fois par intervalle. Un échec de synchro automatique n'est signalé qu'une fois par jour.
+
+À la demande, trois façons, la même consigne :
 
 1. **Bouton « Rafraîchir depuis Notion »** (fiche d'un client) ou **« Tout rafraîchir »** (page Clients), quand l'app n'a pas de jeton Notion.
    Jarvis ouvre le passage lui-même, puis lance `claude -p` dans son dossier, avec son propre environnement (donc ses clients), et affiche l'état sous le bouton ; la page se recharge à la fin.
