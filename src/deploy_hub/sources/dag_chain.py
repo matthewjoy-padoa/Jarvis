@@ -12,6 +12,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
+from deploy_hub.safe_write import write_json
 from deploy_hub.models import DONE, IN_PROGRESS, KO, TODO
 
 log = logging.getLogger(__name__)
@@ -76,10 +77,7 @@ class ChainRunner:
             return []
 
     def _save(self) -> None:
-        self.state_file.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.state_file.with_suffix(".tmp")
-        tmp.write_text(json.dumps([asdict(c) for c in self.chains], ensure_ascii=False, default=datetime.isoformat), encoding="utf-8")
-        tmp.replace(self.state_file)
+        write_json(self.state_file, [asdict(c) for c in self.chains], default=datetime.isoformat)
 
     def get(self, chain_id: int) -> DagChain | None:
         return next((c for c in self.chains if c.id == chain_id), None)

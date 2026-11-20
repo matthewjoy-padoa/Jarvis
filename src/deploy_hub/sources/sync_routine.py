@@ -15,6 +15,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+from deploy_hub.safe_write import write_json
 from deploy_hub.config import ENV_FILE_KEYS, PROJECT_ROOT, data_dir
 from deploy_hub.sources import ActionResult
 from deploy_hub.sync_notion import SESSION_ENV
@@ -87,8 +88,7 @@ class SyncRoutine:
             return {}
 
     def _save(self, **state) -> None:
-        self.folder.mkdir(parents=True, exist_ok=True)
-        self.state_path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        write_json(self.state_path, state)
 
     def _other(self) -> dict | None:
         """Synchro lancée par un autre processus (autre Jarvis, test) et toujours vivante, d'après routine.json."""

@@ -10,6 +10,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from deploy_hub.safe_write import write_json
+
 MAX_KEPT = 500
 LEVELS = ("urgent", "info")
 KINDS = {"agent": "bot", "sync": "sync", "deadline": "calendar", "dag": "play", "rappel": "bell"}  # icônes de templates/_icons.html
@@ -51,8 +53,7 @@ class NotificationStore:
         return json.loads(self.path.read_text(encoding="utf-8")) if self.path.is_file() else []
 
     def _save(self, items: list[dict]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(items[-MAX_KEPT:], ensure_ascii=False), encoding="utf-8")
+        write_json(self.path, items[-MAX_KEPT:])
 
     def add_many(self, notes: list[dict]) -> list[Notification]:
         """Ajoute les notifications dont la clé est nouvelle ; renvoie celles ajoutées."""
@@ -95,8 +96,7 @@ class NotificationStore:
         return json.loads(self.state_path.read_text(encoding="utf-8")) if self.state_path.is_file() else {}
 
     def save_state(self, state: dict) -> None:
-        self.state_path.parent.mkdir(parents=True, exist_ok=True)
-        self.state_path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        write_json(self.state_path, state)
 
     def mark_read(self, ids: list[int] | None = None) -> None:
         with _lock:
