@@ -66,19 +66,19 @@ def test_every_page_says_jarvis_must_be_restarted_until_it_is(monkeypatch):
     home = app.get("/").text
     assert "Jarvis est à relancer" not in home and 'title="Historique des versions · commit 1111111">v0.2.0</a></footer>' in home
     sources = app.get("/sources").text
-    assert "à jour</td>" in sources and "<code>v0.2.0</code> (commit <code>1111111</code>)" in sources
+    assert "à jour</td>" in sources and "Version <code>v0.2.0</code> en service (commit <code>1111111</code>)" in sources
     newer[0], disk[0] = "2222222bbbb", "0.3.0"  # git pull d'une PR fusionnée : code et numéro de version ont changé
     main._check_restart()
     main._check_restart()
     for page in ("/", "/sources", "/reglages"):
         text = app.get(page).text
-        assert "<strong>Jarvis est à relancer.</strong> Son dossier est passé à <code>v0.3.0</code>, mais le serveur tourne encore sur <code>v0.2.0</code>" in text
+        assert "<strong>Jarvis est à relancer.</strong> La version <code>v0.3.0</code> est installée, mais c'est encore la <code>v0.2.0</code> qui tourne" in text
     assert "à relancer</td>" in app.get("/sources").text
     notes = [n for n in main.notifications.all() if n.key == "relance:2222222"]
     assert len(notes) == 1 and notes[0].level == "urgent" and "v0.3.0" in notes[0].detail  # une fois par commit déployé
     newer[0], disk[0] = "3333333cccc", "0.2.0"  # code changé sans numéro monté : les commits, faute de mieux
     main._check_restart()
-    assert "passé à <code>3333333</code>, mais le serveur tourne encore sur <code>1111111</code>" in app.get("/").text
+    assert "La version <code>3333333</code> est installée, mais c'est encore la <code>1111111</code> qui tourne" in app.get("/").text
     newer[0] = ""  # retour au commit de lancement
     main._check_restart()
     assert "Jarvis est à relancer" not in app.get("/").text

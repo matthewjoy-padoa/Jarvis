@@ -120,10 +120,10 @@
   <main>
   {# Mis à jour par « git pull » sans relance du serveur : l'ancien code tourne encore (sources/running_code.py).
      « is defined » : ce gabarit est relu sur le disque avant la relance, par un processus qui peut ne pas connaître restart_for. #}
-  {% set restart = restart_for() if restart_for is defined else () %}{# (dossier, serveur) : « v0.3.0 », « v0.2.0 » #}
+  {% set restart = restart_for() if restart_for is defined else () %}{# (installée, en service) : « v0.3.0 », « v0.2.0 » #}
   {% if restart %}
   <section class="panel restart-note" role="alert">
-    <p><strong>Jarvis est à relancer.</strong> Son dossier est passé à <code>{{ restart[0] }}</code>, mais le serveur tourne encore sur <code>{{ restart[1] }}</code> : tant qu'il n'est pas relancé, la mise à jour n'est pas appliquée et des pages peuvent s'afficher en erreur.</p>
+    <p><strong>Jarvis est à relancer.</strong> La version <code>{{ restart[0] }}</code> est installée, mais c'est encore la <code>{{ restart[1] }}</code> qui tourne : tant que le serveur n'est pas relancé, la mise à jour n'est pas appliquée et des pages peuvent s'afficher en erreur.</p>
   </section>
   {% endif %}
   {% block content %}{% endblock %}</main>

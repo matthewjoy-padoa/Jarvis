@@ -129,7 +129,7 @@ def _check_claude_login(startup: bool = False) -> None:
 
 _code_started = running_code.head()  # commit du code chargé par ce processus ("" : dossier hors de git)
 _version_started = running_code.version()  # son numéro de version (pyproject.toml), en pied de page ; monté à chaque PR
-_restart: tuple[str, ...] = ()  # Jarvis à relancer : (dossier, serveur), en numéros de version, en commits si le numéro n'a pas bougé
+_restart: tuple[str, ...] = ()  # Jarvis à relancer : (installée, en service), en numéros de version, en commits si le numéro n'a pas bougé
 
 
 def _check_restart() -> None:
@@ -145,7 +145,7 @@ def _check_restart() -> None:
         _restart = (f"v{disk}", f"v{_version_started}")
     else:  # numéro pas monté (ou illisible) : les commits, faute de mieux
         _restart = (newer, _code_started[:7])
-    detail = f"Son dossier est passé à {_restart[0]}, le serveur tourne encore sur {_restart[1]} : relance-le pour appliquer la mise à jour."
+    detail = f"La version {_restart[0]} est installée, mais c'est encore la {_restart[1]} qui tourne : relance le serveur pour l'appliquer."
     if notifications.add(f"relance:{newer}", "sync", "urgent", "Jarvis est à relancer", detail, "/sources"):  # clé déjà vue : rien
         log.warning(f"Jarvis est à relancer. {detail}")
 
