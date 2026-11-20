@@ -65,7 +65,7 @@ def test_status_and_blocking_points(acme):
     etat = text(run(acme, "etat"))
     assert "Acme" in etat and "1 retour(s) ouvert(s) sur 2" in etat and "1 KO" in etat
     coince = text(run(acme, "coince"))
-    assert "t-head" in coince and "firm" in coince and 'href="/deploiements/acme/injections#acme-firm"' in coince
+    assert "t-head" in coince and "firm" in coince and 'href="/deploiements/acme/injections?vue=ressources#acme-firm"' in coince
 
 
 def test_dags_lists_the_client_catalogue_filtered_by_words(acme):

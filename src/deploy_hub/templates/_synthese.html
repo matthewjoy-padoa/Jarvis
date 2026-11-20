@@ -36,7 +36,7 @@
 <section class="panel"><h2>Jalons</h2><ul class="timeline">{% for label, day in milestones %}<li class="{{ 'past' if day < today }}"><span class="date">{{ day.strftime("%d/%m/%Y") }}</span> {{ label }}</li>{% endfor %}</ul></section>
 {% endif %}
 <div class="chart-row">
-  {{ charts.segbar("Injections (cartes)", d.injection_groups, "cartes", slim=true, filter_key="groupe", href="/deploiements/" ~ d.slug ~ "/injections") }}
+  {{ charts.segbar("Injections (cartes)", d.injection_groups, "cartes", slim=true, filter_key="groupe", href="/deploiements/" ~ d.slug ~ "/injections?vue=liste") }}
   {% set recette = "/deploiements/" ~ d.slug ~ "/recette" %}
   {{ charts.segbar("Retours de recette", d.retour_groups, "retours", slim=true, filter_key="groupe", href=recette, hrefs={"done": recette ~ "?tous=true"}) }}
 </div>

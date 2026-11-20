@@ -13,10 +13,10 @@
 {% set q_vue = "&vue=kanban" if kanban else "" %}
 <div class="view-bar">
   <div class="segmented" role="group" aria-label="Actions affichées">
-    <a href="{{ base }}{{ '?vue=kanban' if kanban }}" class="{{ 'active' if not show_all }}" title="Vigilance, dates clés, en cours, échéance entre J-7 et J+30">Actives</a><a href="{{ base }}?tous=true{{ q_vue }}" class="{{ 'active' if show_all }}">Toutes</a>
+    <a href="{{ base }}{{ '?vue=kanban' if kanban }}" class="{{ 'active' if not show_all }}" title="Vigilance, dates clés, en cours, échéance entre J-7 et J+30" data-view="actions.tous:false">Actives</a><a href="{{ base }}?tous=true{{ q_vue }}" class="{{ 'active' if show_all }}" data-view="actions.tous:true">Toutes</a>
   </div>
   <div class="segmented" role="group" aria-label="Présentation">
-    <a href="{{ base }}{{ '?tous=true' if show_all }}" class="{{ 'active' if not kanban }}">Tableau</a><a href="{{ base }}?vue=kanban{{ '&tous=true' if show_all }}" class="{{ 'active' if kanban }}">Kanban</a>
+    <a href="{{ base }}{{ '?tous=true' if show_all }}" class="{{ 'active' if not kanban }}" data-view="actions.vue:tableau">Tableau</a><a href="{{ base }}?vue=kanban{{ '&tous=true' if show_all }}" class="{{ 'active' if kanban }}" data-view="actions.vue:kanban">Kanban</a>
   </div>
 </div>
 {% if kanban %}

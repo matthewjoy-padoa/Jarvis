@@ -232,6 +232,25 @@ def _current(request: Request) -> Deployment | None:
     return request.state.current
 
 
+VIEWS_COOKIE = "jarvis_vues"  # choix de vue gardés : « recette.vue:kanban|recette.tous:true|deadlines.periode:semaine »
+
+
+def _views(request: Request, page: str, *keys: str) -> dict[str, str]:
+    """Choix de vue d'une page (vue, tous, periode… ; "" : le défaut). Si l'adresse en porte un, elle seule compte : une
+    pastille ou un lien direct disent tout ce qu'ils veulent, le reste vaut le défaut. Sinon (on arrive par le menu), les
+    derniers choix faits sur les pastilles : filters.js les note dans le cookie au clic, le serveur n'y écrit jamais."""
+    if any(k in request.query_params for k in keys):
+        return {k: request.query_params.get(k, "") for k in keys}
+    kept = dict(p.split(":", 1) for p in request.cookies.get(VIEWS_COOKIE, "").split("|") if ":" in p)
+    return {k: kept.get(f"{page}.{k}", "") for k in keys}
+
+
+def _list_view(request: Request, page: str) -> dict:
+    """Présentation (vue) et étendue (show_all : terminés compris) d'une liste, pour son gabarit."""
+    views = _views(request, page, "vue", "tous")
+    return {"vue": views["vue"], "show_all": views["tous"].lower() in ("true", "1")}
+
+
 def _remember(response, slug: str):
     response.set_cookie(CLIENT_COOKIE, slug, max_age=365 * 24 * 3600, samesite="lax")
     return response
@@ -576,23 +595,21 @@ def client_retire(slug: str):
 
 
 @app.get("/injections", response_class=HTMLResponse)
-def injections(request: Request, vue: str = "ressources"):
-    return _render(request, "list.html", "/injections", title="Injections", part="injections", deployments=_deployments(request), vue=vue)
+def injections(request: Request):
+    return _render(request, "list.html", "/injections", title="Injections", part="injections", deployments=_deployments(request),
+                   **_views(request, "injections", "vue"))
 
 
 @app.get("/actions", response_class=HTMLResponse)
-def actions(request: Request, tous: bool = False, vue: str = "tableau"):
-    return _render(
-        request, "list.html", "/actions", title="Actions", part="actions", deployments=_deployments(request), show_all=tous, vue=vue
-    )
+def actions(request: Request):
+    return _render(request, "list.html", "/actions", title="Actions", part="actions", deployments=_deployments(request),
+                   **_list_view(request, "actions"))
 
 
 @app.get("/recette", response_class=HTMLResponse)
-def recette(request: Request, tous: bool = False, vue: str = "liste"):
-    return _render(
-        request, "list.html", "/recette", title="Retours de recette", part="recette", deployments=_deployments(request), show_all=tous,
-        vue=vue,
-    )
+def recette(request: Request):
+    return _render(request, "list.html", "/recette", title="Retours de recette", part="recette", deployments=_deployments(request),
+                   **_list_view(request, "recette"))
 
 
 def _month(value: str, today: date) -> date:
@@ -605,9 +622,11 @@ def _month(value: str, today: date) -> date:
 
 
 @app.get("/deadlines", response_class=HTMLResponse)
-def deadlines(request: Request, tous: bool = False, client: str = "", periode: str = "", vue: str = "liste", mois: str = ""):
+def deadlines(request: Request, tous: bool = False, client: str = ""):
     """Échéances en liste ou en calendrier. client : un slug, ou « tous » (tous=true : idem) ; vide = client en cours.
-    periode : retard, aujourdhui ou semaine (compteurs de l'accueil) ; mois (AAAA-MM) : mois affiché par le calendrier."""
+    periode : retard, aujourdhui ou semaine (compteurs de l'accueil) ; mois (AAAA-MM) : mois affiché par le calendrier.
+    Sans periode, vue ni mois dans l'adresse : la période et la vue du dernier choix fait sur les pastilles de la page."""
+    periode, vue, mois = _views(request, "deadlines", "periode", "vue", "mois").values()
     current = _current(request)
     everyone = _deployments(request)
     chosen = next((d for d in everyone if d.slug == client), None) if client and client != "tous" else None
@@ -923,7 +942,7 @@ def deployment_pull_history(request: Request, slug: str, logiciel: bool = False,
 
 
 @app.get("/deploiements/{slug}/{tab}", response_class=HTMLResponse)
-def deployment_tab(request: Request, slug: str, tab: str, tous: bool = False, vue: str = "ressources"):
+def deployment_tab(request: Request, slug: str, tab: str):
     if tab not in dict(DEPLOYMENT_TABS):
         raise HTTPException(404, f"Onglet inconnu : {tab}")
     d = _get(slug)
@@ -936,8 +955,7 @@ def deployment_tab(request: Request, slug: str, tab: str, tous: bool = False, vu
         deployments=[d],
         tabs=DEPLOYMENT_TABS,
         tab=tab,
-        show_all=tous,
-        vue=vue,
+        **_list_view(request, tab),  # mêmes choix gardés que la page tous clients de l'onglet
         milestones=[(MILESTONE_LABELS.get(k, k), v) for k, v in sorted(d.milestones.items(), key=lambda kv: kv[1])],
     )
     return page if d.archived else _remember(page, slug)  # une fiche archivée se consulte sans devenir le client en cours
