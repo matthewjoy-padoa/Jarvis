@@ -6,7 +6,7 @@ Jarvis lit Notion de deux façons :
 
 La consigne de la routine est dans le dépôt : [`sync/routine.md`](../sync/routine.md). C'est la seule source ; il n'y a rien à recopier ni à compléter (le dossier est celui où on la lance).
 
-**Clients synchronisés** : ceux configurés dans l'app (`config/clients/`, ou `JARVIS_CONFIG_DIR`), lus par `sync_notion preparer`. Un client ajouté depuis « Clients → Ajouter un client » est pris au passage suivant ; un client retiré ne l'est plus.
+**Clients synchronisés** : ceux configurés dans l'app (`config/clients/`, ou `JARVIS_CONFIG_DIR`), lus par `sync_notion preparer`. Un client ajouté depuis « Clients → Ajouter un client » est pris au passage suivant ; un client archivé ou retiré ne l'est plus (désarchivé, il est repris).
 
 ## Ce que fait un passage
 1. **Une seule requête d'empreinte pour tous les clients** : nombre de lignes et dernière modification des actions et des retours, signature des règles et des dates de la fiche.

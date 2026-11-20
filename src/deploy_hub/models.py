@@ -303,6 +303,9 @@ class Deployment:
     regles: list[Regle] = field(default_factory=list)
     remontees: list[Remontee] = field(default_factory=list)
     pending: bool = False  # client configuré, pas encore synchronisé : fiche vide en attendant la première synchro
+    configured: bool = False  # a un yaml de configuration (sinon : fiche seule, à configurer avant de pouvoir l'archiver)
+    archived: bool = False  # client archivé (configuration) : hors menu, accueil, notifications et synchro
+    archived_at: date | None = None
 
     @property
     def last_sync(self) -> datetime | None:

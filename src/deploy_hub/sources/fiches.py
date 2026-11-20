@@ -78,6 +78,11 @@ def _notion_dir(fiche_dir: Path, slug: str) -> Path:
     return fiche_dir.parent / "notion" / slug
 
 
+def _from_config(cfg) -> dict:
+    """Ce que la fiche tient de la seule configuration du client : son existence et son archivage."""
+    return {"configured": True, "archived": cfg.archived, "archived_at": cfg.archived_at} if cfg else {}
+
+
 def parse_deployment(path: Path, clients_dir: Path | None = None) -> Deployment:
     """Fiche synchronisée, avec par-dessus ce qui appartient à la configuration du client (nom, logiciel, statut,
     dashboard, stacks, clés orchestrator) : une modification dans l'app s'affiche tout de suite, sans attendre la synchro."""
@@ -109,6 +114,7 @@ def parse_deployment(path: Path, clients_dir: Path | None = None) -> Deployment:
                  for r in data.get("retours", [])],
         regles=[Regle(**r) for r in data.get("regles", [])],
         remontees=[Remontee(**r) for r in data.get("remontees", [])],
+        **_from_config(cfg),
     )
 
 
@@ -154,9 +160,9 @@ class FicheSource:
         return Deployment(slug=slug, client=cfg.client, software=cfg.software or "?", status=cfg.status, notion_url=notion_link(cfg.notion_url),
                           stacks=[Stack(**s) for s in cfg.stacks], drive=[Link(**l) for l in cfg.drive],
                           dashboards=_dashboards(cfg), orchestrator=cfg.orchestrator,
-                          pending=True, **_icon(self.deployments_dir, slug, {}))
+                          pending=True, **_icon(self.deployments_dir, slug, {}), **_from_config(cfg))
 
-    def list_deployments(self) -> list[Deployment]:
+    def _all(self) -> list[Deployment]:
         """Fiches synchronisées, et les clients configurés qui n'en ont pas encore (fiche vide, « pending »)."""
         paths = sorted(self.deployments_dir.glob("*.md")) if self.deployments_dir.is_dir() else []
         self._cache = {p: v for p, v in self._cache.items() if p in paths}  # fiches retirées ou supprimées : oubliées
@@ -164,6 +170,13 @@ class FicheSource:
         have = {d.slug for d in synced}
         waiting = [d for slug in self._configured() if slug not in have and (d := self._pending(slug))]
         return sorted(synced + waiting, key=lambda d: d.slug)
+
+    def list_deployments(self) -> list[Deployment]:
+        """Clients suivis : tout ce que l'app affiche et surveille. Les archivés sont à part (archived_deployments)."""
+        return [d for d in self._all() if not d.archived]
+
+    def archived_deployments(self) -> list[Deployment]:
+        return [d for d in self._all() if d.archived]
 
     def get_deployment(self, slug: str) -> Deployment | None:
         path = self.deployments_dir / f"{slug}.md"

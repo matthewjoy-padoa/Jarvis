@@ -1,7 +1,7 @@
 <!-- Routine de synchro Notion → Jarvis : source unique de la consigne.
      Utilisée par la commande /jarvis-sync (.claude/commands/jarvis-sync.md), par le bouton « Rafraîchir depuis Notion »
      quand l'app n'a pas de jeton Notion (claude -p, voir src/deploy_hub/sources/sync_routine.py) et par la tâche planifiée.
-     Les clients synchronisés sont ceux configurés dans l'app (config/clients/, ou JARVIS_CONFIG_DIR) : « preparer » les lit. -->
+     Les clients synchronisés sont ceux configurés dans l'app (config/clients/, ou JARVIS_CONFIG_DIR), sauf les archivés : « preparer » les lit. -->
 
 Tu mets à jour l'app Jarvis à partir de Notion. Tu travailles dans le dossier de l'app (le dossier courant, qui contient sync/routine.md). Réponds en français. Va vite : Python décide de tout, tu exécutes.
 
