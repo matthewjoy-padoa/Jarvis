@@ -358,6 +358,13 @@ class Deployment:
             })
         return sorted(out, key=lambda b: (not b["resources"], b["worst"], b["label"]))
 
+    def injection_state(self, resources) -> dict:
+        """Où en sont les cartes d'injection liées à l'une de ces ressources (ligne d'un groupe, onglet Injections) :
+        {group: l'état le plus en retard, vide sans carte ; cards ; ko}."""
+        groups = [a.injection_group for a in self.injection_cards if set(a.resources) & set(resources)]
+        worst = next((g for g in (KO, IN_PROGRESS, TODO, DONE) if g in groups), "")
+        return {"group": worst, "cards": len(groups), "ko": groups.count(KO)}
+
     @property
     def blocking_points(self) -> list[dict]:
         """« Où ça coince » : blocs d'injection (cartes regroupées par ressources liées, comme l'onglet Injections) et types de

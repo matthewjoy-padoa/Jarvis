@@ -12,7 +12,7 @@ Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant
 
 ## [0.3.0] · 2026-11-20
 
-- Onglet Injections, vue par ressource : une liste simple à la place des blocs à déplier. Une ligne par ressource, avec un point de couleur, l'état de sa carte la plus en retard et le nom de la carte en KO ; ce qui bloque est en haut. La stack se choisit une fois en haut (gardée dans le navigateur, sauf la prod), puis « Lancer » en face de la ressource lance son DAG (une petite liste à côté en choisit un autre) ; un clic sur la ligne montre ses cartes. Le graphique de répartition reste dans la vue Liste et sur la page de tous les clients.
+- Onglet Injections, vue par ressource : une liste simple à la place des blocs à déplier. Une ligne par ressource, avec un point de couleur, l'état de sa carte la plus en retard et le nom de la carte en KO ; ce qui bloque est en haut. La stack se choisit une fois en haut (gardée dans le navigateur, sauf la prod), puis « Lancer » en face de la ressource lance son DAG (une petite liste à côté en choisit un autre) ; un clic sur la ligne montre ses cartes. Sous les ressources, une ligne par groupe de ressources du catalogue, avec son bouton « Lancer » (l'ETL du groupe) ; une ligne à plusieurs ressources lance par défaut le groupe qui les couvre toutes, et son bouton le dit (« Lancer le groupe medical »). Le graphique de répartition reste dans la vue Liste et sur la page de tous les clients.
 
 ## [0.2.0] · 2026-11-20
 

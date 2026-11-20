@@ -59,6 +59,25 @@ def test_injection_tab_offers_the_card_dags_and_the_stacks(app):
         assert f'<option value="{env}">' in html
 
 
+def test_resource_groups_have_their_own_line(app, monkeypatch):
+    groups = dag_catalogue.groups_for(["acme-uegar", "acme-pulse"])
+    assert [(g["customer"], g["groupe"], g["resources"]) for g in groups] == [("acme-pulse", "firm_base", ("firm",)), ("acme-uegar", "firm_base", ("firm", "firm_status"))]
+    html = app.get("/deploiements/acme/injections").text
+    assert "Groupes de ressources" in html and 'id="acme-groupe-acme-uegar-firm_base" data-group="todo"' in html  # état : celui des cartes de ses ressources
+    line = html[html.index('id="acme-groupe-acme-uegar-firm_base"'):]
+    assert 'name="card" value="Groupe firm_base"' in line and 'name="dag_id" value="acme-uegar-etl_group-firm_base"' in line
+
+
+def test_a_line_with_several_resources_launches_the_group_that_covers_them(app, monkeypatch):
+    d = Deployment(slug="acme", client="Acme", software="Uegar", orchestrator=["acme-uegar"],
+                   actions=[Action(title="Firms et statuts", injection=True, injection_status="A faire", resources=["firm", "firm_status"])])
+    monkeypatch.setattr(main.fiches, "get_deployment", lambda slug: d)
+    line = app.get("/deploiements/acme/injections").text
+    line = line[line.index('id="acme-firm-firm_status"'):line.index("Groupes de ressources")]
+    assert '<option value="acme-uegar-etl_group-firm_base" title="acme-uegar-etl_group-firm_base" selected>' in line  # pas l'ETL de firm seul
+    assert "Lancer le groupe firm_base</button>" in line and 'data-default="acme-uegar-etl_group-firm_base"' in line
+
+
 def test_launch_on_a_chosen_stack(app, fake_airflow):
     r = app.post("/actions/injection/acme", data={"dag_id": "acme-uegar-etl-firm", "padoa_env": "snap", "card": "Injection des firms"})
     assert "acme-uegar-etl-firm lancé sur snap" in r.text

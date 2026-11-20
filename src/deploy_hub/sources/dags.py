@@ -62,6 +62,17 @@ def dags_for(customers: list[str], resources: list[str] | None = None, path: Pat
     return sorted(choices, key=lambda c: (TYPE_ORDER.get(c.type, 9), c.customer, c.dag_id))
 
 
+def groups_for(customers: list[str], path: Path | None = None) -> list[dict]:
+    """Groupes de ressources des clients orchestrator, d'après leurs DAG de groupe :
+    {groupe, customer, resources, dags: [DagChoice]} (l'ETL du groupe d'abord, puis son transform & load)."""
+    groups: dict[tuple[str, str], dict] = {}
+    for c in dags_for(customers, path=path):
+        if c.groupe:
+            group = groups.setdefault((c.customer, c.groupe), {"groupe": c.groupe, "customer": c.customer, "resources": c.resources, "dags": []})
+            group["dags"].append(c)
+    return sorted(groups.values(), key=lambda g: (g["customer"], g["groupe"]))
+
+
 def ced_for(customers: list[str], path: Path | None = None) -> list[dict]:
     """DAG CED de chaque client orchestrator : {customer, dag_id, ressources: {ressource: [{requete, niveau}]}}."""
     out, clients = [], catalogue(path)["clients"]

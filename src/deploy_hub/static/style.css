@@ -902,6 +902,8 @@ pre.watch-scroll { max-height: 480px; overflow: auto; }  /* sur le style .agent-
 .inj-what table { border: 0; box-shadow: none; margin: 6px 0 2px; }
 .inj-what td { padding: 6px 8px; }
 .inj-go { flex: none; display: flex; gap: 6px; align-items: center; min-height: 30px; font-size: 13px; }
+.inj-title { margin: 16px 0 0; font-size: 14px; }
+.inj-members { margin: 6px 0 2px; }
 .inj-row > .dag-out { flex-basis: 100%; }
 .inj-row > .dag-out:empty { display: none; }
 .dag-form select.dag-pick { width: 34px; text-indent: -999px; }  /* juste sa flèche : « un autre DAG » ; son texte est dans l'infobulle */
