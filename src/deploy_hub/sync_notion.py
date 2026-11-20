@@ -4,9 +4,12 @@ La routine « deploy-hub-sync » exécute avec le connecteur Notion les requête
 chaque résultat brut dans data/notion/<slug>/. Le module tient un cache par base (cache-actions.json,
 cache-recette.json + contenu-recette.json), en fait la fiche data/deploiements/<slug>.md lue par l'app.
 
-    uv run python -m deploy_hub.sync_notion preparer    # requêtes de chaque client + empreinte de tous les clients
-    uv run python -m deploy_hub.sync_notion plan        # d'après l'empreinte : les seules requêtes à exécuter
-    uv run python -m deploy_hub.sync_notion fusionner   # fusionne les résultats, écrit les fiches
+    uv run python -m deploy_hub.sync_notion preparer    # ouvre un passage : la requête d'empreinte à exécuter
+    uv run python -m deploy_hub.sync_notion suite       # récolte les réponses, puis : requêtes suivantes, ou fusion et fin
+
+« suite » lit les réponses de Notion dans la session Claude Code qui les a reçues (son transcript) : le modèle n'a ni à
+relire les requêtes, ni à recopier ou déposer les réponses, et une requête qu'il aurait modifiée est refusée. Les
+commandes d'avant (plan, deposer, fusionner) restent : « suite » les enchaîne, et « deposer » sert de secours.
 
 Ce que le plan demande, base par base (la routine recopie chaque résultat : moins de lignes, moins de temps) :
 - rien si l'empreinte (nombre de lignes, dernière modification ; signature des règles et de la fiche) n'a pas bougé ;
@@ -22,7 +25,7 @@ import os
 from dataclasses import asdict
 import re
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import yaml
@@ -54,6 +57,13 @@ def _pages(path: Path) -> list[Path]:
     return [path] + sorted(path.parent.glob(f"{path.stem}-*.json"), key=lambda p: int(p.stem.rsplit("-", 1)[1]))
 
 
+def _unwrapped(data):
+    """Réponse d'outil copiée telle quelle depuis son fichier, avec son enveloppe [{"type": "text", "text": "<JSON>"}]."""
+    if isinstance(data, list) and data and isinstance(data[0], dict) and data[0].get("type") == "text":
+        return json.loads(data[0]["text"])
+    return data
+
+
 def _rows(path: Path) -> list[dict]:
     """Lignes de <nom>.json, puis des pages suivantes <nom>-2.json, <nom>-3.json… (réponses Notion limitées à 100 lignes)."""
     if not path.is_file():
@@ -61,9 +71,7 @@ def _rows(path: Path) -> list[dict]:
     pages = _pages(path)
     rows, last = [], []
     for page in pages:
-        data = json.loads(page.read_text(encoding="utf-8"))
-        if isinstance(data, list) and data and isinstance(data[0], dict) and data[0].get("type") == "text":
-            data = json.loads(data[0]["text"])  # réponse d'outil copiée telle quelle depuis son fichier, enveloppée
+        data = _unwrapped(json.loads(page.read_text(encoding="utf-8")))
         last = data["results"] if isinstance(data, dict) else data
         rows += last
     # Avec un « LIMIT » dans la requête, Notion répond has_more: false même s'il reste des lignes :
@@ -414,21 +422,56 @@ def running_elsewhere(root: Path = PROJECT_ROOT) -> dict | None:
     return state
 
 
-def prepare(root: Path = PROJECT_ROOT) -> dict:
-    """Écrit les requêtes de chaque client et l'empreinte de tous les clients (une seule requête pour la routine).
-    Refuse si une autre synchro lancée par Jarvis tourne : deux passages écriraient les mêmes fichiers (vu le 2026-11-18)."""
+PASSAGE = "passage.json"  # data/notion/passage.json : le passage en cours (début, clients, étape, requêtes attendues)
+CLIENT_ENV = "JARVIS_SYNC_CLIENT"  # synchro d'un seul client (bouton de sa fiche) : son slug ; vide : tous les clients
+
+
+def _passage(root: Path) -> Path:
+    return data_dir(root) / "notion" / PASSAGE
+
+
+def _followed(root: Path, slugs: list[str] | None = None) -> list[str]:
+    """Clients suivis (non archivés) ; slugs : seulement ceux-là (les clients d'un passage)."""
+    from deploy_hub import client_config
+    active = client_config.active_slugs(root)
+    return active if slugs is None else [slug for slug in active if slug in slugs]
+
+
+def prepare(root: Path = PROJECT_ROOT, only: str | None = None) -> dict:
+    """Ouvre un passage : écrit les requêtes de chaque client et l'empreinte (une seule requête, une ligne par client).
+    only (ou JARVIS_SYNC_CLIENT) : ce client seulement. Refuse si une autre synchro lancée par Jarvis tourne : deux
+    passages écriraient les mêmes fichiers (vu le 2026-11-18)."""
     if (other := running_elsewhere(root)):
         raise SyncError(f"Une autre synchro tourne déjà (lancée à {other.get('started', '?')}) : attends sa fin, puis relance")
     from deploy_hub import client_config
     configs = [asdict(c) for c in client_config.active_configs(root)]  # un client archivé n'est plus synchronisé
+    if (only := os.environ.get(CLIENT_ENV, "") if only is None else only):
+        configs = [c for c in configs if c["slug"] == only]
+        if not configs:
+            raise SyncError(f"{only} : client inconnu ou archivé, rien à synchroniser")
     for config in configs:
         queries.write(config["slug"], config, root)
     folder = data_dir(root) / "notion"
     folder.mkdir(parents=True, exist_ok=True)
-    sql = folder / f"{EMPREINTES}.sql"
-    sql.write_text(queries.empreintes(configs), encoding="utf-8")
     _clean(folder, [EMPREINTES])
-    return _query(sql, folder / f"{EMPREINTES}.json", [])
+    for old in folder.glob(f"{EMPREINTES}*.sql"):
+        old.unlink()
+    # Une requête d'empreinte par paquet de clients : chacune doit tenir dans ce qu'une commande peut rendre au modèle
+    # (BATCH_CHARS). Les réponses vont dans empreintes.json, empreintes-2.json… que _rows lit comme les pages d'un résultat.
+    packs: list[list[dict]] = [[]]
+    for config in configs:
+        if packs[-1] and len(queries.empreintes(packs[-1] + [config])) > BATCH_CHARS // 2:
+            packs.append([])
+        packs[-1].append(config)
+    asked = []
+    for n, pack in enumerate(packs, start=1):
+        name = EMPREINTES if n == 1 else f"{EMPREINTES}-{n}"
+        (folder / f"{name}.sql").write_text(queries.empreintes(pack), encoding="utf-8")
+        asked.append(_query(folder / f"{name}.sql", folder / f"{name}.json", []))
+    write_json(_passage(root), {"debut": datetime.now(timezone.utc).isoformat(timespec="seconds"), "etape": "empreinte",
+                                "clients": [c["slug"] for c in configs], "demandes": 0,
+                                "attendues": [_expected(None, query) for query in asked]})
+    return asked[0]
 
 
 def _query(sql: Path, out: Path, params: list) -> dict:
@@ -465,18 +508,265 @@ def deposit(output: str, source: str = "", root: Path = PROJECT_ROOT) -> dict:
     folder = (data_dir(root) / "notion").resolve()
     if folder not in out.resolve().parents:
         raise SyncError(f"Sortie hors du dossier de données : {out}")
-    src = Path(source).expanduser() if source else saved_response(os.environ.get(SESSION_ENV, ""))
+    src = Path(source).expanduser() if source else saved_response(current_session())
+    text = _saved_text(src)
+    rows = _notion_rows(text, src.name)
+    write_text(out, text)
+    return {"sortie": str(out), "lignes": len(rows), "source": src.name}
+
+
+def _saved_text(src: Path) -> str:
+    """Contenu d'une réponse que Claude Code a rangée dans un fichier : seulement sous ~/.claude/projects."""
     if CLAUDE_PROJECTS.resolve() not in src.resolve().parents or not src.is_file():
         raise SyncError(f"Pas une réponse rangée par Claude Code : {src.name}")
-    text = src.read_text(encoding="utf-8")
+    return src.read_text(encoding="utf-8")
+
+
+def _notion_rows(text: str, name: str = "la réponse") -> list:
+    """Lignes d'une réponse de l'outil Notion (JSON avec « results ») ; SyncError si ce n'en est pas une."""
     try:
-        data = json.loads(text)
-    except ValueError:
-        raise SyncError(f"{src.name} n'est pas du JSON") from None
+        data = _unwrapped(json.loads(text))  # dépôt à la main : l'enveloppe est admise, comme dans _rows
+    except (ValueError, KeyError, TypeError):
+        raise SyncError(f"{name} n'est pas du JSON") from None
     if not isinstance(data, dict) or not isinstance(data.get("results"), list):
-        raise SyncError(f"{src.name} n'est pas une réponse Notion (pas de « results »)")
-    write_text(out, text)
-    return {"sortie": str(out), "lignes": len(data["results"]), "source": src.name}
+        raise SyncError(f"{name} n'est pas une réponse Notion (pas de « results »)")
+    return data["results"]
+
+
+# ------------------------------------------------------------------------------------------------------------------
+# Passage piloté par « suite » : Python donne les requêtes, le modèle les exécute, Python récolte les réponses.
+NOTION_QUERY = "notion-query-data-sources"  # fin du nom de l'outil du connecteur (mcp__claude_ai_Notion__…)
+SAVED_TO = re.compile(r"Output has been saved to (\S+?\.(?:txt|json))")  # avis de Claude Code quand il range une grosse réponse
+MAX_ASKS = 3  # « suite » redemande une requête restée sans réponse ; à la troisième fois, le passage s'arrête
+NEXT = "uv run python -m deploy_hub.sync_notion suite"
+# Requêtes données par lot : au-delà de 30 000 caractères, Claude Code range la sortie d'une commande dans un fichier que
+# le modèle ne lit pas (vu le 2026-11-20 sur une lecture complète : 12 pages, 31,7 Ko), et un lot est aussi ce que le
+# modèle réécrit en un seul message. Le reste du plan part aux « suite » suivants.
+BATCH_CHARS = 16000
+PAGED = {"actions": "actions", "recette": "recette", "recette_meta": "recette"}  # lectures complètes : résultat → base comptée
+
+
+def _sql_key(sql: str, params) -> tuple:
+    """Ce qui identifie une requête exécutée : son texte aux blancs près, et ses paramètres. Selon la façon dont l'outil
+    lui est présenté, le modèle passe les paramètres en liste ou en texte JSON (« ["…"] », vu le 2026-11-20) : même requête."""
+    if isinstance(params, str) and params.strip():
+        try:
+            params = json.loads(params)
+        except ValueError:
+            params = [params]
+    params = params if isinstance(params, (list, tuple)) else [params] if params else []
+    return " ".join(str(sql).split()), tuple(str(p) for p in params)
+
+
+def _expected(client: str | None, query: dict, page: int = 1) -> dict:
+    """Requête attendue par « suite » : son texte exact, et où ranger sa réponse. Les pages suivantes reprennent la requête
+    avec « LIMIT 100 OFFSET n » et vont dans <nom>-2.json, <nom>-3.json… (voir _rows)."""
+    out = Path(query["sortie"])
+    sql = Path(query["sql"]).read_text(encoding="utf-8").rstrip()
+    if page > 1:
+        sql += f"\nLIMIT {PAGE_SIZE} OFFSET {PAGE_SIZE * (page - 1)}"
+        out = out.with_name(f"{out.stem}-{page}.json")
+    return {"client": client, "nom": Path(query["sortie"]).stem, "page": page, "requete": sql, "params": query["params"],
+            "sources": query["sources"], "sql": query["sql"], "sortie": str(out)}
+
+
+def current_session() -> str:
+    """Session Claude Code qui lance la commande : celle de la routine lancée par Jarvis, sinon celle que Claude Code
+    annonce aux commandes qu'il lance (/jarvis-sync, tâche planifiée) ; "" si on ne la connaît pas."""
+    return os.environ.get(SESSION_ENV) or os.environ.get("CLAUDE_CODE_SESSION_ID") or ""
+
+
+def _transcripts(since: datetime) -> list[Path]:
+    """Transcripts de Claude Code où chercher les réponses : celui de la session qui lance la commande si on la connaît
+    (routine lancée par Jarvis, ou variable posée par Claude Code), sinon ceux écrits depuis le début du passage."""
+    session = current_session()
+    if session and (found := list(CLAUDE_PROJECTS.glob(f"*/{session}.jsonl"))):
+        return found
+    return [p for p in CLAUDE_PROJECTS.glob("*/*.jsonl") if p.stat().st_mtime >= since.timestamp()]
+
+
+def _answer(content) -> str | None:
+    """Texte brut d'une réponse Notion valable, rendue en ligne ou rangée dans un fichier par Claude Code (grosse réponse) ;
+    None pour tout le reste (erreur Notion, délai dépassé, fichier disparu) : la requête sera redemandée."""
+    text = content if isinstance(content, str) else "".join(p.get("text", "") for p in content or [] if isinstance(p, dict))
+    try:
+        if not text.lstrip().startswith("{") and (m := SAVED_TO.search(text[:2000])):
+            text = _saved_text(Path(m[1]))
+        _notion_rows(text)
+    except (SyncError, OSError):
+        return None
+    return text
+
+
+def notion_answers(since: datetime) -> dict[tuple, str]:
+    """Réponses de l'outil Notion reçues depuis le début du passage, lues dans le transcript de la session Claude Code :
+    {(requête, paramètres): texte brut de la dernière réponse valable}. Le format du transcript est interne à Claude Code :
+    tout ce qui n'a pas la forme attendue est ignoré, et « suite » fait alors déposer les réponses par le modèle."""
+    answers: dict[tuple, str] = {}
+    for path in _transcripts(since):
+        asked: dict[str, tuple] = {}
+        try:
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            try:
+                row = json.loads(line)
+                content = row["message"]["content"]
+                when = _stamp(row["timestamp"])
+            except (ValueError, KeyError, TypeError):
+                continue
+            if not isinstance(content, list) or when is None or when < since:
+                continue  # réponses d'un passage précédent (même requête d'empreinte) : jamais reprises
+            for part in content:
+                if not isinstance(part, dict):
+                    continue
+                if part.get("type") == "tool_use" and str(part.get("name", "")).endswith(NOTION_QUERY):
+                    data = part.get("input") or {}
+                    data = data.get("data") if isinstance(data.get("data"), dict) else data
+                    asked[part.get("id")] = _sql_key(data.get("query", ""), data.get("params"))
+                elif part.get("type") == "tool_result" and part.get("tool_use_id") in asked:
+                    if (text := _answer(part.get("content"))) is not None:
+                        answers[asked[part["tool_use_id"]]] = text
+    return answers
+
+
+def _shown(q: dict, lost: bool = False) -> dict:
+    return {"requete": q["requete"], "sources": q["sources"], **({"params": q["params"]} if q["params"] else {}),
+            **({"sortie": q["sortie"]} if lost else {})}
+
+
+def _ask(asked: list[dict], lost: bool = False) -> dict:
+    """Ce que « preparer » et « suite » affichent : les requêtes à exécuter, puis la commande à relancer. lost : réponses
+    introuvables dans le transcript ; chaque requête porte alors sa « sortie », que le modèle dépose lui-même (secours)."""
+    out = {"requetes": [_shown(q, lost) for q in asked], "ensuite": NEXT}
+    if lost:
+        out["note"] = "Réponses introuvables : réexécute ces requêtes, dépose chaque réponse dans sa « sortie », puis relance la commande."
+    return out
+
+
+def _hand(state: dict) -> list[dict]:
+    """Prochain lot de requêtes à donner au modèle (marquées « donnee »), dans l'ordre du plan : au moins une, puis tant
+    que le lot tient dans BATCH_CHARS."""
+    batch, size = [], 0
+    for q in state["attendues"]:
+        if q.get("donnee"):
+            continue
+        size += len(json.dumps(_shown(q), ensure_ascii=False))
+        if batch and size > BATCH_CHARS:
+            break
+        q["donnee"] = True
+        batch.append(q)
+    return batch
+
+
+def _collect(state: dict) -> list[dict]:
+    """Range dans leur « sortie » les réponses des requêtes attendues ; renvoie celles qui manquent encore. Une sortie
+    déposée à la main depuis le début du passage (secours) compte comme reçue."""
+    since = datetime.fromisoformat(state["debut"])
+    answers = notion_answers(since)
+    missing = []
+    for q in state["attendues"]:
+        if q.get("recue") or not q.get("donnee"):
+            continue
+        out = Path(q["sortie"])
+        if (text := answers.get(_sql_key(q["requete"], q["params"]))) is not None:
+            write_text(out, text)
+        elif not (out.is_file() and out.stat().st_mtime >= since.timestamp()):
+            missing.append(q)
+            continue
+        q["recue"] = True
+    return missing
+
+
+def _next_pages(state: dict) -> list[dict]:
+    """Pages suivantes à demander : une requête dont la dernière page reçue est pleine (100 lignes) a peut-être une suite.
+    Au plafond de pages, on n'insiste pas : la fusion refusera ce client (_rows), avec un message clair."""
+    last: dict[tuple, dict] = {}
+    for q in state["attendues"]:
+        key = (q["client"], q["nom"])
+        if key not in last or q["page"] > last[key]["page"]:
+            last[key] = q
+    more = []
+    for q in last.values():
+        rows = _notion_rows(Path(q["sortie"]).read_text(encoding="utf-8"), Path(q["sortie"]).name)
+        if len(rows) >= PAGE_SIZE and q["page"] < MAX_PAGES:
+            first = next(x for x in state["attendues"] if (x["client"], x["nom"], x["page"]) == (q["client"], q["nom"], 1))
+            more.append(_expected(q["client"], first, q["page"] + 1))
+    return more
+
+
+def _planned(plan: dict, root: Path) -> list[dict]:
+    """Requêtes du plan, avec d'emblée toutes les pages d'une lecture complète : l'empreinte donne le nombre de lignes, les
+    pages partent ensemble au lieu d'une par aller-retour (une de plus que nécessaire : la dernière doit être incomplète)."""
+    rows = {r.get("cle"): r for r in _rows(data_dir(root) / "notion" / f"{EMPREINTES}.json")}
+    out = []
+    for query in plan["requetes"]:
+        slug, name = query["client"], Path(query["sortie"]).stem
+        count = _signature(rows.get(slug, {}).get(PAGED[name]))[0] if name in PAGED else 0
+        out += [_expected(slug, query, page) for page in range(1, min(count // PAGE_SIZE + 1, MAX_PAGES) + 1)]
+    return out
+
+
+def _report(slugs: list[str], plan_errors: dict, merged: dict) -> list[str]:
+    """Une ligne par client du passage : des comptes et des modes, jamais de données. « ÉCHEC » : Jarvis le relève."""
+    lines = []
+    for slug in slugs:
+        if slug in plan_errors:
+            lines.append(f"ÉCHEC {slug} : plan : {plan_errors[slug]}")
+        elif "erreur" in merged.get(slug, {}):
+            lines.append(f"ÉCHEC {slug} : fusion : {merged[slug]['erreur']}")
+        elif slug in merged:
+            r = merged[slug]
+            modes = ", ".join(f"{base} {how}" for base, how in (r.get("mode") or {}).items()) or "fiche relue"
+            lines.append(f"{slug} : {modes} · {r.get('changements', 0)} changement(s) · {r.get('cartes', 0)} cartes, {r.get('retours', 0)} retours")
+        else:
+            lines.append(f"{slug} : inchangé")
+    return lines
+
+
+def first_queries(root: Path = PROJECT_ROOT, only: str | None = None) -> dict:
+    """Commande « preparer » : ouvre un passage et donne sa première requête (l'empreinte), au format de « suite »."""
+    prepare(root, only)
+    state = _load_json(_passage(root), {})
+    batch = _hand(state)
+    write_json(_passage(root), state)
+    return _ask(batch)
+
+
+def advance(root: Path = PROJECT_ROOT) -> dict:
+    """Commande « suite » : récolte les réponses des requêtes attendues, puis dit quoi faire. Soit de nouvelles requêtes
+    (réponses manquantes, pages suivantes, plan d'après l'empreinte), soit la fin : fusion faite, compte rendu, et les
+    identifiants de responsables encore sans nom."""
+    path = _passage(root)
+    state = _load_json(path, None)
+    if not state or state.get("etape") == "fini":
+        raise SyncError("Aucun passage en cours : lance d'abord « preparer »")
+    slugs = _followed(root, state["clients"])  # un client archivé en cours de passage n'est plus traité
+    if (missing := _collect(state)):
+        state["demandes"] += 1
+        write_json(path, state)
+        if state["demandes"] >= MAX_ASKS:
+            names = ", ".join(sorted({f"{q['client'] or 'tous'}/{q['nom']}" for q in missing}))
+            raise SyncError(f"réponses de Notion introuvables après {MAX_ASKS} demandes ({names}) : rien n'est fusionné")
+        return _ask(missing, lost=state["demandes"] > 1)  # une première fois telle quelle (erreur passagère de Notion)
+    state["demandes"] = 0
+    if not (batch := _hand(state)):  # tout le plan est donné et reçu : des pages pleines appellent leur suite
+        state["attendues"] += _next_pages(state)
+        batch = _hand(state)
+    if not batch and state["etape"] == "empreinte":
+        state.update(etape="requetes", attendues=_planned(plan_all(root, slugs), root))
+        batch = _hand(state)
+    if batch:
+        write_json(path, state)
+        return _ask(batch)
+    plan_errors = _load_json(data_dir(root) / "notion" / PLAN_ERRORS, {})  # écrites par plan_all
+    merged = merge_all(root, slugs)
+    errors = {**plan_errors, **{slug: f"fusion : {r['erreur']}" for slug, r in merged.items() if "erreur" in r}}
+    write_json(data_dir(root) / "notion" / PLAN_ERRORS, errors)  # Jarvis les affiche, quel que soit le compte rendu du modèle
+    state.update(etape="fini", attendues=[])
+    write_json(path, state)
+    return {"termine": True, "compte_rendu": _report(slugs, plan_errors, merged), "utilisateurs": unknown_users(root)}
 
 
 PLAN_ERRORS = "plan-erreurs.json"  # data/notion/plan-erreurs.json : erreurs par client du dernier « plan »
@@ -494,13 +784,12 @@ def mark_checked(slugs: list[str], root: Path = PROJECT_ROOT) -> None:
     write_json(path, seen)
 
 
-def plan_all(root: Path = PROJECT_ROOT) -> dict:
-    """Plan de tous les clients d'après data/notion/empreintes.json : requêtes à exécuter, clients inchangés."""
-    from deploy_hub import client_config
+def plan_all(root: Path = PROJECT_ROOT, slugs: list[str] | None = None) -> dict:
+    """Plan des clients du passage d'après data/notion/empreintes.json : requêtes à exécuter, clients inchangés."""
     folder = data_dir(root) / "notion"
     rows = {r.get("cle"): r for r in _rows(folder / f"{EMPREINTES}.json")}
     out = {"requetes": [], "inchanges": [], "raisons": {}, "erreurs": {}}
-    for slug in client_config.active_slugs(root):
+    for slug in _followed(root, slugs):
         raw = folder / slug
         if slug not in rows:
             out["erreurs"][slug] = "absent de l'empreinte : relance « preparer »"
@@ -525,11 +814,10 @@ def plan_all(root: Path = PROJECT_ROOT) -> dict:
     return out
 
 
-def merge_all(root: Path = PROJECT_ROOT) -> dict:
+def merge_all(root: Path = PROJECT_ROOT, slugs: list[str] | None = None) -> dict:
     """Fusionne les clients qui ont un plan ; un client en échec n'empêche pas les autres."""
-    from deploy_hub import client_config
     results = {}
-    for slug in client_config.active_slugs(root):
+    for slug in _followed(root, slugs):
         if not (data_dir(root) / "notion" / slug / "plan.json").is_file():
             continue
         try:
@@ -717,7 +1005,8 @@ def sync(slug: str, root: Path = PROJECT_ROOT) -> dict:
 if __name__ == "__main__":
     from deploy_hub.config import ensure_private_dirs
     ensure_private_dirs()
-    # uv run python -m deploy_hub.sync_notion preparer        → écrit les requêtes ; affiche la requête d'empreinte à exécuter
+    # uv run python -m deploy_hub.sync_notion preparer [<slug>] → ouvre un passage ; affiche la requête d'empreinte à exécuter
+    # uv run python -m deploy_hub.sync_notion suite           → récolte les réponses ; requêtes suivantes, ou fusion et compte rendu
     # uv run python -m deploy_hub.sync_notion plan            → d'après l'empreinte : les seules requêtes à exécuter
     # uv run python -m deploy_hub.sync_notion fusionner       → fusionne les résultats déposés, écrit les fiches
     # uv run python -m deploy_hub.sync_notion utilisateurs     → uuids des responsables sans nom dans l'annuaire
@@ -727,8 +1016,10 @@ if __name__ == "__main__":
     show = lambda value: print(json.dumps(value, ensure_ascii=False))
     try:
         command = sys.argv[1]
-        if command == "preparer":
-            show(prepare())
+        if command == "preparer":  # preparer [<slug>] : ce client seulement
+            show(first_queries(only=sys.argv[2] if len(sys.argv) > 2 else None))
+        elif command == "suite":
+            show(advance())
         elif command == "plan":
             show(plan_all())
         elif command == "fusionner":

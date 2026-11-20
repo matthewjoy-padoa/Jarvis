@@ -18,15 +18,25 @@ from pathlib import Path
 from deploy_hub.safe_write import write_json
 from deploy_hub.config import ENV_FILE_KEYS, PROJECT_ROOT, data_dir
 from deploy_hub.sources import ActionResult
-from deploy_hub.sync_notion import SESSION_ENV
+from deploy_hub.queries import ConfigError
+from deploy_hub.sync_notion import CLIENT_ENV, SESSION_ENV, SyncError, first_queries
 
 ROUTINE = PROJECT_ROOT / "sync" / "routine.md"
 INSTRUCTION = "Suis la consigne reçue sur l'entrée standard (routine de synchro Notion de Jarvis)."
+# Jarvis ouvre lui-même le passage avant de lancer Claude : la première requête part avec la consigne, un aller-retour en moins.
+PREPARED = "\n\nL'ÉTAPE 1 EST DÉJÀ FAITE par Jarvis, ne la relance pas. Voici ce qu'elle a affiché : commence à l'étape 2.\n"
 # Seuil (en tokens) au-delà duquel Claude Code range une réponse d'outil dans un fichier au lieu de la rendre à Claude.
 # Bas exprès : chaque page Notion est rangée, puis déposée par « sync_notion deposer » en quelques millisecondes. Sinon
 # Claude recopiait lui-même chaque page de 45 Ko, 2 minutes par page (vu le 2026-11-18 sur la VM).
 MCP_OUTPUT_TOKENS = "2000"
 NOTION_SERVERS = ("mcp__claude_ai_Notion",)  # connecteur Notion de claude.ai (nom vu sur la VM le 2026-11-18)
+# Le modèle ne fait qu'exécuter les requêtes que Python lui donne, et Python vérifie celles qu'il a exécutées : un modèle
+# rapide suffit. Mesuré sur la VM le 2026-11-20 : 80 % du temps d'une synchro était le modèle par défaut qui écrivait.
+MODEL, EFFORT = "haiku", "low"  # réglages JARVIS_SYNC_MODEL et JARVIS_SYNC_EFFORT
+# Outils intégrés gardés (Write : dépôt de secours d'une réponse ; ToolSearch : charge l'outil Notion à la demande). Sans
+# ToolSearch, Claude Code charge d'emblée les outils de tous les connecteurs du compte : un aller-retour en moins, mais
+# 180 000 tokens de contexte au lieu de 40 000 (mesuré sur la VM le 2026-11-20), trop près de la limite pour une lecture complète.
+BUILTIN_TOOLS = "Bash,Write,ToolSearch"
 
 
 def default_tools(data: Path) -> tuple[str, ...]:
@@ -71,6 +81,14 @@ class SyncRoutine:
     def allowed_tools(self) -> tuple[str, ...]:
         return self._allowed_tools or tuple(t.strip() for t in os.getenv("JARVIS_SYNC_ALLOWED_TOOLS", "").split(";") if t.strip()) \
             or default_tools(self.folder.parent)
+
+    @property
+    def model(self) -> str:
+        return os.getenv("JARVIS_SYNC_MODEL", "").strip() or MODEL
+
+    @property
+    def effort(self) -> str:
+        return os.getenv("JARVIS_SYNC_EFFORT", "").strip() or EFFORT
 
     # --- état ---------------------------------------------------------------------------------------------------
     @property
@@ -118,12 +136,14 @@ class SyncRoutine:
         """--session-id : Jarvis connaît la session, donc le dossier où Claude Code range ses grosses réponses (« deposer »).
         --permission-mode dontAsk : tout ce qui n'est pas permis est refusé, jamais mis en attente."""
         return [self.claude_bin, "-p", INSTRUCTION, "--output-format", "text", "--permission-mode", "dontAsk",
+                "--model", self.model, "--effort", self.effort, "--tools", BUILTIN_TOOLS,
                 *(["--session-id", session] if session else []), "--allowedTools", *self.allowed_tools]
 
     def _env(self) -> dict:
         return app_env()
 
-    def start(self) -> ActionResult:
+    def start(self, slug: str = "", client: str = "") -> ActionResult:
+        """slug : ce client seulement (bouton de sa fiche, client : son nom pour le message) ; vide : tous les clients."""
         if (problem := self.problem()):
             return ActionResult(False, problem, False)
         with self._lock:
@@ -133,17 +153,28 @@ class SyncRoutine:
                 return ActionResult(False, f"Une synchro tourne déjà, lancée à {other.get('started', '?')} par un autre Jarvis : "
                                            "attends sa fin.", False)
             self.folder.mkdir(parents=True, exist_ok=True)
+            try:
+                first = self._prepare(slug)
+            except (SyncError, ConfigError, OSError, KeyError, ValueError, IndexError) as e:  # comme la ligne de commande
+                return ActionResult(False, f"Synchro impossible : {e}", False)
             log = self.log_path.open("w", encoding="utf-8")
             session = str(uuid.uuid4())
-            env = {**self._env(), SESSION_ENV: session, "MAX_MCP_OUTPUT_TOKENS": MCP_OUTPUT_TOKENS}
+            env = {**self._env(), SESSION_ENV: session, CLIENT_ENV: slug, "MAX_MCP_OUTPUT_TOKENS": MCP_OUTPUT_TOKENS}
             self._proc = subprocess.Popen(self.command(session), cwd=PROJECT_ROOT, env=env,
                                           stdin=subprocess.PIPE,
                                           stdout=log, stderr=subprocess.STDOUT, text=True)
-            self._save(running=True, started=datetime.now().isoformat(timespec="seconds"), pid=self._proc.pid, session=session)
-        self._proc.stdin.write(routine_text())
+            self._save(running=True, started=datetime.now().isoformat(timespec="seconds"), pid=self._proc.pid, session=session,
+                       client=slug)
+        self._proc.stdin.write(routine_text() + (PREPARED + json.dumps(first, ensure_ascii=False) if first else ""))
         self._proc.stdin.close()
         threading.Thread(target=self._wait, args=(self._proc, log), name="jarvis-sync", daemon=True).start()
-        return ActionResult(True, "Synchro Notion lancée : Claude lit Notion pour tous les clients de l'app. La page se mettra à jour à la fin.", False)
+        scope = f"pour {client or slug}" if slug else "pour tous les clients de l'app"
+        return ActionResult(True, f"Synchro Notion lancée : Claude lit Notion {scope}. La page se mettra à jour à la fin.", False)
+
+    def _prepare(self, slug: str) -> dict | None:
+        """Première requête du passage, préparée ici quand la routine écrit dans le dossier de données de l'app (le cas
+        du bouton) ; None sinon : la routine fait alors son étape 1 elle-même."""
+        return first_queries(only=slug) if self.folder == data_dir() / "notion" else None
 
     def _wait(self, proc: subprocess.Popen, log) -> None:
         try:
@@ -175,7 +206,7 @@ class SyncRoutine:
             return {"pct": 0, "label": "Démarrage…"}
         fresh = lambda path: path.is_file() and path.stat().st_mtime >= since  # noqa: E731
         if not fresh(self.folder / "empreintes.json"):
-            return {"pct": 5, "label": "Empreinte de tous les clients…"}
+            return {"pct": 5, "label": "Empreinte…"}
         done = total = merged = 0
         latest = None  # dernier résultat déposé : on montre sa page quand une requête en a plusieurs
         for raw in (p for p in self.folder.iterdir() if p.is_dir()):

@@ -6,22 +6,31 @@ Jarvis lit Notion de deux façons :
 
 La consigne de la routine est dans le dépôt : [`sync/routine.md`](../sync/routine.md). C'est la seule source ; il n'y a rien à recopier ni à compléter (le dossier est celui où on la lance).
 
-**Clients synchronisés** : ceux configurés dans l'app (`config/clients/`, ou `JARVIS_CONFIG_DIR`), lus par `sync_notion preparer`. Un client ajouté depuis « Clients → Ajouter un client » est pris au passage suivant ; un client archivé ou retiré ne l'est plus (désarchivé, il est repris).
+**Clients synchronisés** : ceux configurés dans l'app (`config/clients/`, ou `JARVIS_CONFIG_DIR`), lus par `sync_notion preparer`. Un client ajouté depuis « Clients → Ajouter un client » est pris au passage suivant ; un client archivé ou retiré ne l'est plus (désarchivé, il est repris). Le bouton de la fiche d'un client ne relit que ce client (`sync_notion preparer <slug>`) ; « Tout rafraîchir », `/jarvis-sync` et la tâche planifiée les relisent tous.
 
 ## Ce que fait un passage
-1. **Une seule requête d'empreinte pour tous les clients** : nombre de lignes et dernière modification des actions et des retours, signature des règles et des dates de la fiche.
-2. **Python fait le plan** (`sync_notion plan`) : seulement ce qui a changé, base par base.
+Python décide de tout et récupère lui-même les réponses ; le modèle ne fait qu'exécuter les requêtes qu'on lui donne. Deux commandes : `sync_notion preparer` ouvre le passage, `sync_notion suite` se relance jusqu'à la fin.
+- **Récolte** : `suite` lit les réponses de Notion dans le transcript de la session Claude Code qui les a reçues (rendues en ligne ou rangées dans un fichier) et les range dans le dossier de données, à l'octet près. Le modèle ne relit pas les requêtes, ne recopie ni ne dépose les réponses.
+- **Vérification** : une réponse n'est prise que si la requête exécutée est celle demandée (aux blancs près) ; une requête modifiée, une erreur de Notion ou une réponse d'un passage précédent sont ignorées, et la requête est redemandée. À la deuxième demande, le modèle dépose la réponse lui-même (`deposer`, secours) ; à la troisième, le passage s'arrête sans rien fusionner.
+- **Lots** : les requêtes sont données par lots d'environ 16 000 caractères ; une lecture complète demande d'emblée toutes ses pages (l'empreinte donne le nombre de lignes).
+- Le format du transcript est interne à Claude Code : s'il change, la récolte ne trouve plus rien et le secours prend le relais (plus lent, mais la synchro aboutit).
+
+Durées mesurées sur la VM le 2026-11-20 (un client de 1 130 cartes et 150 retours, modèle `haiku`) : rien de neuf 16 s ; petit delta 20 à 24 s ; trois clients 29 à 36 s ; lecture complète 108 s. Avant (modèle par défaut, qui relisait les requêtes et recopiait les réponses) : 109 s pour un petit delta sur trois clients, 4 min 02 pour une lecture complète.
+
+1. **Une seule requête d'empreinte** (une ligne par client du passage) : nombre de lignes et dernière modification des actions et des retours, signature des règles et des dates de la fiche.
+2. **Python fait le plan** : seulement ce qui a changé, base par base.
    - Lignes modifiées ou ajoutées : delta depuis la dernière modification connue du cache.
    - Lignes supprimées : liste compacte des identifiants (une ligne).
    - Colonne de métadonnées ajoutée à la recette : métadonnées seules, les textes restent ceux du cache.
    - Relecture complète : pas de cache, colonnes des actions modifiées, ou actions relues il y a 7 jours ou plus (leurs ressources et types viennent des cartes Bible).
-3. La routine exécute ces requêtes et dépose les résultats ; `sync_notion fusionner` met à jour les caches et les fiches.
+3. Le modèle exécute ces requêtes ; `suite` récolte les réponses, met à jour les caches et les fiches, et rend le compte rendu (une ligne par client).
 
 ## Lancer la routine
 Trois façons, la même consigne :
 
 1. **Bouton « Rafraîchir depuis Notion »** (fiche d'un client) ou **« Tout rafraîchir »** (page Clients), quand l'app n'a pas de jeton Notion.
-   Jarvis lance `claude -p` dans son dossier, avec son propre environnement (donc ses clients), et affiche l'état sous le bouton ; la page se recharge à la fin.
+   Jarvis ouvre le passage lui-même, puis lance `claude -p` dans son dossier, avec son propre environnement (donc ses clients), et affiche l'état sous le bouton ; la page se recharge à la fin.
+   - Modèle : `haiku`, effort `low` (réglages `JARVIS_SYNC_MODEL` et `JARVIS_SYNC_EFFORT`, section Claude Code des Réglages). Il ne fait qu'exécuter des requêtes que Python vérifie : un modèle rapide suffit.
    - Il faut Claude Code en ligne de commande (`claude` dans le PATH, ou `CLAUDE_BIN` dans Réglages) et le connecteur Notion disponible en ligne de commande.
    - Outils permis : les commandes `sync_notion` (dont `deposer`, qui dépose les grosses réponses que Claude Code range dans `~/.claude/…/tool-results/` : Claude Code refuse un `cp` depuis ce dossier), la lecture et l'écriture du dossier de données, le connecteur Notion `mcp__claude_ai_Notion`, en `--permission-mode dontAsk`. Pour un connecteur au nom inhabituel : `JARVIS_SYNC_ALLOWED_TOOLS` (séparés par « ; »).
    - Une seule synchro à la fois ; compte rendu dans `data/notion/routine.log`, échec signalé dans les notifications.
