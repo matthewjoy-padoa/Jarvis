@@ -7,7 +7,6 @@ import re
 from contextlib import asynccontextmanager
 import threading
 import time
-from importlib.metadata import PackageNotFoundError, version as package_version
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -129,18 +128,25 @@ def _check_claude_login(startup: bool = False) -> None:
 
 
 _code_started = running_code.head()  # commit du code chargé par ce processus ("" : dossier hors de git)
-_code_newer = ""  # commit (court) extrait depuis, quand le code de l'app a changé : Jarvis est à relancer
+_version_started = running_code.version()  # son numéro de version (pyproject.toml), en pied de page ; monté à chaque PR
+_restart: tuple[str, ...] = ()  # Jarvis à relancer : (dossier, serveur), en numéros de version, en commits si le numéro n'a pas bougé
 
 
 def _check_restart() -> None:
     """Jarvis se met à jour par « git pull » puis relance du serveur : tant que la relance n'est pas faite, bandeau sur
     toutes les pages (base.html), ligne dans le terminal et notification, une fois par commit déployé."""
-    global _code_newer
-    _code_newer = running_code.newer_code(_code_started)[:7]
-    if not _code_newer:
+    global _restart
+    newer = running_code.newer_code(_code_started)[:7]
+    if not newer:
+        _restart = ()
         return
-    detail = f"Son dossier est passé à {_code_newer}, le serveur tourne encore sur {_code_started[:7]} : relance-le pour appliquer la mise à jour."
-    if notifications.add(f"relance:{_code_newer}", "sync", "urgent", "Jarvis est à relancer", detail, "/sources"):  # clé déjà vue : rien
+    disk = running_code.version()
+    if disk and _version_started and disk != _version_started:
+        _restart = (f"v{disk}", f"v{_version_started}")
+    else:  # numéro pas monté (ou illisible) : les commits, faute de mieux
+        _restart = (newer, _code_started[:7])
+    detail = f"Son dossier est passé à {_restart[0]}, le serveur tourne encore sur {_restart[1]} : relance-le pour appliquer la mise à jour."
+    if notifications.add(f"relance:{newer}", "sync", "urgent", "Jarvis est à relancer", detail, "/sources"):  # clé déjà vue : rien
         log.warning(f"Jarvis est à relancer. {detail}")
 
 
@@ -270,14 +276,11 @@ templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STAT
 templates.env.globals["kanban_columns"] = kanban_columns
 templates.env.globals["auto_sync_every"] = auto_sync_every  # bouton « Synchro auto » d'une fiche
 templates.env.globals["auto_sync_note"] = auto_sync_note
-templates.env.globals["jarvis_commit"] = _code_started[:7]  # pied de page : le code qui tourne
-templates.env.globals["restart_for"] = lambda: _code_newer  # bandeau « Jarvis est à relancer » (base.html)
+templates.env.globals["jarvis_version"] = _version_started  # pied de page ; historique dans CHANGELOG.md
+templates.env.globals["jarvis_commit"] = _code_started[:7]
+templates.env.globals["restart_for"] = lambda: _restart  # bandeau « Jarvis est à relancer » (base.html)
 templates.env.globals["ACTION_STATUSES"] = ACTION_STATUSES
 templates.env.globals["RETOUR_STATUSES"] = RETOUR_STATUSES
-try:
-    templates.env.globals["jarvis_version"] = package_version("deploy-hub")  # pyproject.toml ; historique dans CHANGELOG.md
-except PackageNotFoundError:
-    templates.env.globals["jarvis_version"] = ""
 templates.env.globals["console_commands"] = list(console.COMMANDS)  # complétion par Tab dans la console
 
 

@@ -120,10 +120,10 @@
   <main>
   {# Mis à jour par « git pull » sans relance du serveur : l'ancien code tourne encore (sources/running_code.py).
      « is defined » : ce gabarit est relu sur le disque avant la relance, par un processus qui peut ne pas connaître restart_for. #}
-  {% set restart = restart_for() if restart_for is defined else "" %}
+  {% set restart = restart_for() if restart_for is defined else () %}{# (dossier, serveur) : « v0.3.0 », « v0.2.0 » #}
   {% if restart %}
   <section class="panel restart-note" role="alert">
-    <p><strong>Jarvis est à relancer.</strong> Son dossier est passé à <code>{{ restart }}</code>, mais le serveur tourne encore sur <code>{{ jarvis_commit }}</code> : tant qu'il n'est pas relancé, la mise à jour n'est pas appliquée et des pages peuvent s'afficher en erreur.</p>
+    <p><strong>Jarvis est à relancer.</strong> Son dossier est passé à <code>{{ restart[0] }}</code>, mais le serveur tourne encore sur <code>{{ restart[1] }}</code> : tant qu'il n'est pas relancé, la mise à jour n'est pas appliquée et des pages peuvent s'afficher en erreur.</p>
   </section>
   {% endif %}
   {% block content %}{% endblock %}</main>
@@ -253,7 +253,7 @@
       </form>
     </div>
   </section>
-  <footer class="footer muted">Jarvis · <em>Just A Rather Very Intelligent System</em>, au service de l'équipe Integration · <a href="/sources">État des systèmes</a>{% if jarvis_version %} · <a href="https://github.com/matthewjoy-padoa/Jarvis/blob/main/CHANGELOG.md" title="Historique des versions">v{{ jarvis_version }}</a>{% endif %}{% if jarvis_commit %} · <span title="Commit du code qui tourne">{{ jarvis_commit }}</span>{% endif %}</footer>
+  <footer class="footer muted">Jarvis · <em>Just A Rather Very Intelligent System</em>, au service de l'équipe Integration · <a href="/sources">État des systèmes</a>{% if jarvis_version %} · <a href="https://github.com/matthewjoy-padoa/Jarvis/blob/main/CHANGELOG.md" title="Historique des versions{% if jarvis_commit %} · commit {{ jarvis_commit }}{% endif %}">v{{ jarvis_version }}</a>{% endif %}</footer>
   {# Raccourcis du client en cours : dock de boutons ronds au bord droit, nom du lien en bulle au survol.
      Liens ouverts dans le navigateur : Jarvis ne lit jamais leur contenu. #}
   {% if current %}

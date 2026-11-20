@@ -45,25 +45,40 @@ def test_git_missing_is_not_an_error(tmp_path, monkeypatch):
     assert running_code.head(tmp_path) == "" and running_code.newer_code("abc", tmp_path) == ""
 
 
+def test_the_version_is_read_from_pyproject_on_disk(tmp_path):
+    assert running_code.version(tmp_path) == ""  # pas de pyproject.toml
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "deploy-hub"\nversion = "0.3.0"\n', encoding="utf-8")
+    assert running_code.version(tmp_path) == "0.3.0"
+    (tmp_path / "pyproject.toml").write_text("[project\n", encoding="utf-8")
+    assert running_code.version(tmp_path) == ""  # illisible
+
+
 def test_every_page_says_jarvis_must_be_restarted_until_it_is(monkeypatch):
-    newer = [""]
+    newer, disk = [""], ["0.2.0"]
     monkeypatch.setattr(main, "_code_started", "1111111aaaa")
+    monkeypatch.setattr(main, "_version_started", "0.2.0")
+    monkeypatch.setitem(main.templates.env.globals, "jarvis_version", "0.2.0")
     monkeypatch.setitem(main.templates.env.globals, "jarvis_commit", "1111111")
     monkeypatch.setattr(main.running_code, "newer_code", lambda started: newer[0])
-    monkeypatch.setattr(main, "_code_newer", "")
+    monkeypatch.setattr(main.running_code, "version", lambda: disk[0])
+    monkeypatch.setattr(main, "_restart", ())
     main._check_restart()
     home = app.get("/").text
-    assert "Jarvis est à relancer" not in home and 'title="Commit du code qui tourne">1111111<' in home
-    assert "à jour" in app.get("/sources").text
-    newer[0] = "2222222bbbb"  # git pull : le code de l'app a changé
+    assert "Jarvis est à relancer" not in home and 'title="Historique des versions · commit 1111111">v0.2.0</a></footer>' in home
+    sources = app.get("/sources").text
+    assert "à jour</td>" in sources and "<code>v0.2.0</code> (commit <code>1111111</code>)" in sources
+    newer[0], disk[0] = "2222222bbbb", "0.3.0"  # git pull d'une PR fusionnée : code et numéro de version ont changé
     main._check_restart()
     main._check_restart()
     for page in ("/", "/sources", "/reglages"):
         text = app.get(page).text
-        assert "<strong>Jarvis est à relancer.</strong>" in text and "<code>2222222</code>" in text and "<code>1111111</code>" in text
+        assert "<strong>Jarvis est à relancer.</strong> Son dossier est passé à <code>v0.3.0</code>, mais le serveur tourne encore sur <code>v0.2.0</code>" in text
     assert "à relancer</td>" in app.get("/sources").text
     notes = [n for n in main.notifications.all() if n.key == "relance:2222222"]
-    assert len(notes) == 1 and notes[0].level == "urgent" and "2222222" in notes[0].detail  # une fois par commit déployé
+    assert len(notes) == 1 and notes[0].level == "urgent" and "v0.3.0" in notes[0].detail  # une fois par commit déployé
+    newer[0], disk[0] = "3333333cccc", "0.2.0"  # code changé sans numéro monté : les commits, faute de mieux
+    main._check_restart()
+    assert "passé à <code>3333333</code>, mais le serveur tourne encore sur <code>1111111</code>" in app.get("/").text
     newer[0] = ""  # retour au commit de lancement
     main._check_restart()
     assert "Jarvis est à relancer" not in app.get("/").text
