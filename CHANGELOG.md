@@ -10,6 +10,10 @@ Ainsi la version affichée en bas de chaque page change à chaque fusion (et le 
 
 Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
+## [0.5.4] · 2026-11-23
+
+- Fiche d'un client : plus de rangée de liens en haut (Notion, stacks, Drive, « + Stacks », « + Drive »), en doublon avec le dock à droite de l'écran ; le dock reprend aussi les autres dashboards Notion du client et ses autres liens, qui n'étaient que dans cette rangée. Les liens Google Drive (drive.google.com, docs.google.com) y ont le logo Google Drive, les liens Notion le logo Notion.
+
 ## [0.5.3] · 2026-11-23
 
 - Action qui n'a pas abouti (Jarvis injoignable ou en erreur) annoncée partout au lieu d'échouer en silence : note tapée, rappel, épingle, tâche, « Tout marquer comme lu », lancements, agents, Rafraîchir, tests des Réglages. Le message « Non pris en compte : … » s'affiche dans la zone de résultat de l'action, sinon juste après le bouton ou le formulaire, et disparaît au prochain essai (`static/errors.js`). Notes et to-do lists : un seul état d'enregistrement par zone, discret (« Enregistré » en gris qui s'efface ; « Non enregistré » en rouge, la raison au survol), dans la barre du panneau Notes et en bas du bloc « Mes notes » de la fiche, au lieu d'un message sous chaque note.
