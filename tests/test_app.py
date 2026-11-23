@@ -293,6 +293,15 @@ def test_theme_switch_is_in_every_page():
     assert 'id="theme-toggle"' in html and 'localStorage.getItem("theme")' in html
 
 
+def test_christmas_theme_is_one_of_the_themes_and_has_its_palette():
+    """« Noël » se choisit au bouton de thème (et par la commande de la palette) ; sa palette est dans la feuille de style."""
+    html = client.get("/").text
+    assert 'noel: "Noël"' in html
+    css = client.get("/static/style.css").text
+    assert ':root[data-theme="noel"] {' in css and ':root[data-theme="noel"] body::before' in css
+    assert "Noël" in client.get("/palette", params={"q": ">thème"}).text
+
+
 def test_navigation_shows_the_current_client_and_the_others_in_its_menu():
     """Un client à la fois : le client en cours dans la barre, les autres seulement dans le menu du sélecteur."""
     html = TestClient(app).get("/deploiements/client-demo/synthese").text
