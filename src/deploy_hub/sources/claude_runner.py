@@ -333,6 +333,28 @@ def agent_branch(*parts: str) -> str:
     return re.sub(r"[^a-z0-9_]+", "-", text).strip("-_")[:100]
 
 
+BRANCH_MAX = 60  # caractères : un nom de branche qu'on lit d'un coup d'œil
+BRANCH_WORDS = 6  # premiers mots de la ligne du cahier de recette gardés dans le nom
+
+
+def retour_branch(d: Deployment, r: RetourRecette, runs: list[AgentRun] = ()) -> str:
+    """Branche d'un agent sur un retour : celle du dernier agent lancé sur ce retour (reprise, relance), sinon un nom qui
+    dit le sujet, fix-<client>-<ressource ou type de données>-<premiers mots de la ligne>, sans numéro : les chiffres de
+    la ligne sont retirés (ni matricule ni identifiant dans un nom poussé sur GitHub). Le numéro du retour ne s'ajoute
+    que si le nom ne dit rien (ligne et type vides) ou qu'une autre branche d'agent le porte déjà."""
+    subject = f"retour {r.id}"
+    if (previous := next((run for run in runs if run.slug == d.slug and run.subject == subject), None)):
+        return previous.branch
+    topic = [r.resource or r.data_type or ""] + re.sub(r"\d+", " ", r.ligne or "").split()[:BRANCH_WORDS]
+    branch = agent_branch("fix", d.slug, *topic)
+    if len(branch) > BRANCH_MAX:
+        branch = branch[:BRANCH_MAX].rsplit("-", 1)[0]
+    taken = {run.branch for run in runs if (run.slug, run.subject) != (d.slug, subject)}
+    if branch == agent_branch("fix", d.slug) or branch in taken:
+        branch = agent_branch(branch, r.id)
+    return branch
+
+
 TO_FILL = "À COMPLÉTER"  # marqueur laissé dans le brief quand une info manque ; le lancement est refusé tant qu'il reste
 
 
@@ -340,7 +362,7 @@ def _tag(name: str, text: str) -> str:
     return f"<{name}>\n{text.strip()}\n</{name}>"
 
 
-def retour_prompt(d: Deployment, r: RetourRecette, description: str = "") -> str:
+def retour_prompt(d: Deployment, r: RetourRecette, description: str = "", branch: str = "") -> str:
     """Brief pré-rempli de l'agent sur un retour de recette, pensé pour Claude Code dans integration-orchestrator.
 
     Contexte et contenu du retour balisés, démarche tirée de kb/anatomie-orchestrator et des patterns
@@ -348,7 +370,7 @@ def retour_prompt(d: Deployment, r: RetourRecette, description: str = "") -> str
     La personne qui lance l'agent n'a qu'à relire, et à compléter <precisions> si besoin.
     """
     software = r.software or d.software
-    branch = agent_branch("fix", d.slug, r.id)
+    branch = branch or retour_branch(d, r)
     context = [
         f"Client : {d.client} (slug Jarvis : {d.slug}) · logiciel du retour : {software} · logiciel(s) du client : {d.software}",
         f"Retour de recette : {r.id} · statut Notion : {r.status} · type de données : {r.data_type or 'non précisé'}"
@@ -695,8 +717,13 @@ class ClaudeRunner:
 
     def launch_retour(self, d: Deployment, r: RetourRecette, description: str = "", prompt: str = "") -> ActionResult:
         """prompt : le brief relu (et éventuellement modifié) par la personne qui lance l'agent ; sinon il est construit ici."""
-        return self._launch(d.slug, d.client, f"retour {r.id}", agent_branch("fix", d.slug, r.id),
-                            prompt.strip() or retour_prompt(d, r, description), r.data_type or r.resource or "")
+        branch = self.retour_branch(d, r)
+        return self._launch(d.slug, d.client, f"retour {r.id}", branch,
+                            prompt.strip() or retour_prompt(d, r, description, branch), r.data_type or r.resource or "")
+
+    def retour_branch(self, d: Deployment, r: RetourRecette) -> str:
+        with self._lock:
+            return retour_branch(d, r, list(self.runs))
 
     def _child(self, run_id: int, link: str) -> AgentRun | None:
         """Agent le plus récent qui pointe vers run_id par le champ link (reply_to ou relaunch_of)."""

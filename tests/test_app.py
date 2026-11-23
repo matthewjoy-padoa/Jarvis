@@ -141,15 +141,15 @@ def test_retour_prompt_carries_my_description():
     assert "Client : Client Démo (slug Jarvis : client-demo) · logiciel du retour : Preventiel" in prompt
     assert "Ressource orchestrator : visit_histo" in prompt
     assert "<precisions>\nLa conclusion manque sur les visites de reprise.\n</precisions>" in prompt
-    assert "aucune donnée client" in prompt and "`fix-client-demo-r-02`" in prompt and "[FIX](client-demo)" in prompt
+    assert "aucune donnée client" in prompt and "`fix-client-demo-visit_histo`" in prompt and "[FIX](client-demo)" in prompt
 
 
 def test_agent_on_open_retour_uses_my_description_and_is_listed():
     claude.runs.clear()
     r = client.post("/actions/agent-retour/client-demo/R-02", data={"description": "Conclusion absente"})
-    assert r.status_code == 200 and "Agent #" in r.text and "lancé sur" in r.text and "fix-client-demo-r-02" in r.text
+    assert r.status_code == 200 and "Agent #" in r.text and "lancé sur" in r.text and "fix-client-demo-visit_histo" in r.text
     assert claude.runs[0].subject == "retour R-02" and "Conclusion absente" in claude.runs[0].prompt
-    assert "fix-client-demo-r-02" in client.get("/agents").text
+    assert "fix-client-demo-visit_histo" in client.get("/agents").text
 
 
 def test_agent_needs_a_description():
