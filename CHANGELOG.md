@@ -16,6 +16,7 @@ La version affichée en bas de chaque page change donc avec chaque fonctionnalit
 - Règle de version : une correction ou un changement trop petit ne monte plus le numéro ; sa ligne s'ajoute à la version en cours.
 - Flow Digger : à chaque clic, Jarvis regarde s'il y a des commits à récupérer (`git fetch`). Arrêté, il ne met à jour que s'il y a du nouveau (des modifications locales ne bloquent plus le lancement quand rien n'a changé) ; déjà lancé mais en retard, il propose « Mettre à jour et relancer » ou « Ouvrir la version actuelle » au lieu d'ouvrir une vieille version sans rien dire. Il ne coupe jamais un Flow Digger qu'il n'a pas lancé lui-même.
 - Page Agents : les armures du schéma portent une tête en photo, détourée, et leur casque en suit le contour dans la couleur de l'état ; en échec, la tête est grise.
+- Page Agents : une seconde tête pour les armures. Chaque agent tire la sienne au hasard à partir de son numéro et la garde ; chaque tête a son casque.
 
 ## [0.5.5] · 2026-11-23
 
