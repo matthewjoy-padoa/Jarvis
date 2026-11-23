@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=160">
+  <link rel="stylesheet" href="/static/style.css?v=164">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=11" defer></script>
   <script src="/static/dag.js?v=3" defer></script>
@@ -19,7 +19,8 @@
   <script src="/static/drawer.js?v=5" defer></script>
   <script src="/static/palette.js?v=7" defer></script>
   <script src="/static/console.js?v=4" defer></script>
-  <script src="/static/notes.js?v=2" defer></script>
+  <script src="/static/notes.js?v=6" defer></script>
+  <script src="/static/errors.js?v=3" defer></script>
   <script src="/static/shell.js?v=2" defer></script>
 </head>
 <body{% if current %} data-current-client="{{ current.client }}"{% endif %}>
@@ -163,7 +164,7 @@
       }
     }));
     // Résultat d'un rafraîchissement (encart sous le bouton) : un clic le ferme.
-    document.addEventListener("click", (e) => { const r = e.target.closest(".refresh-out > .result"); if (r) r.remove(); });
+    document.addEventListener("click", (e) => { const r = e.target.closest(".refresh-out > .result, .refresh .request-error"); if (r) r.remove(); });
     // Sélecteur du client en cours : se ferme au clic ailleurs et à Échap.
     (function () {
       const menu = document.querySelector("[data-client-switch]");
@@ -221,8 +222,10 @@
   <button type="button" class="console-fab notes-fab" data-notes-open aria-label="Mes notes" aria-expanded="false" aria-controls="notes"
           title="Mes notes : bloc-notes perso, jamais envoyé dans Notion (touche n)">
     {{ ic.icon("note") }}<span class="console-fab-label">Notes</span><kbd>n</kbd></button>
-  <section class="notes" id="notes" hidden aria-label="Mes notes">
+  {# data-save-scope : un seul état d'enregistrement (data-save-status) pour toutes les notes et to-do lists du panneau (notes.js). #}
+  <section class="notes" id="notes" hidden aria-label="Mes notes" data-save-scope>
     <div class="notes-bar">{{ ic.icon("note") }}<strong>Mes notes</strong><span class="muted">pour moi seulement</span>
+      <span class="save-status" data-save-status role="status"></span>
       <button type="button" class="notes-close" data-notes-close aria-label="Fermer les notes" title="Fermer (Échap)">×</button></div>
     <div class="notes-body" id="notes-body" hx-get="/perso/notes" hx-trigger="notes-open"></div>
   </section>

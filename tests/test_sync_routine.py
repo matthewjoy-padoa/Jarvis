@@ -142,7 +142,7 @@ def test_status_reloads_the_page_only_when_a_live_sync_ends_well(monkeypatch, tm
 def test_refresh_button_does_not_move_when_clicked():
     """Attente, avancement et résultat vont dans un encart posé sous le bouton (position absolue), jamais à côté de lui."""
     css = (PROJECT_ROOT / "src" / "deploy_hub" / "static" / "style.css").read_text(encoding="utf-8")
-    assert ".refresh .refresh-out { position: absolute; top: calc(100% + 6px)" in css
+    assert ".refresh .refresh-out, .refresh .request-error { position: absolute; top: calc(100% + 6px)" in css
 
 
 def test_a_failure_buried_in_a_long_report_is_still_a_failure(tmp_path):
