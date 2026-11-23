@@ -135,12 +135,13 @@ def test_only_google_drive_addresses_are_accepted(line):
         from_form({"client": "Acme", "page_id": PAGE, "drive": line})
 
 
-def test_drive_links_are_shown_as_links_and_never_given_to_agents():
+def test_drive_links_are_shown_as_links_and_never_given_to_agents(app):
     from deploy_hub.models import Deployment, Link, RetourRecette
     from deploy_hub.sources.claude_runner import retour_prompt
+    app.post("/clients/enregistrer", data={"client": "Acme", "page_id": PAGE, "drive": f"Dossier client | {DRIVE}"})
+    fiche = app.get("/deploiements/acme/synthese").text
+    assert f'href="{DRIVE}" target="_blank" rel="noopener noreferrer" data-tip="Drive · Dossier client ↗"' in fiche  # dans le dock
     d = Deployment(slug="acme", client="Acme", software="Pulse", drive=[Link("Dossier client", DRIVE)])
-    html = main.templates.get_template("_stacks.html").render(d=d)
-    assert f'href="{DRIVE}" target="_blank" rel="noopener noreferrer"' in html and "Dossier client ↗" in html
     assert DRIVE not in retour_prompt(d, RetourRecette(id="0001AB", data_type="Adhérents", status="À faire"))
 
 
@@ -149,10 +150,10 @@ def test_the_form_has_a_drive_field(app):
     assert 'name="drive"' in page and "ne lit jamais leur contenu" in page
 
 
-def test_without_drive_links_the_fiche_offers_to_add_them():
-    from deploy_hub.models import Deployment
-    html = main.templates.get_template("_stacks.html").render(d=Deployment(slug="acme", client="Acme", software="Pulse"))
-    assert '<a class="muted" href="/clients/acme/liens" title="Ajouter les liens Google Drive du client">+ Drive</a>' in html
+def test_without_drive_links_the_fiche_offers_to_add_them(app):
+    app.post("/clients/enregistrer", data={"client": "Acme", "page_id": PAGE})
+    fiche = app.get("/deploiements/acme/synthese").text
+    assert 'data-tip="Ajouter un lien Drive"' in fiche and 'class="stacks"' not in fiche  # le dock, plus de rangée en doublon
 
 
 def test_the_links_page_only_changes_the_links(app):
@@ -247,3 +248,10 @@ def test_automatic_sync_is_off_by_default_and_toggled_from_the_fiche(app, tmp_pa
     assert "Synchro auto : non" in off and "· prochaine" not in off
     assert client_config.load("acme", tmp_path).auto_sync is False
     assert app.post("/clients/inconnu/synchro-auto", data={"actif": "1"}).status_code == 404
+
+
+def test_the_other_notion_dashboards_of_a_client_are_in_the_dock(app):
+    """Ils n'étaient que dans la rangée de liens du haut de la fiche, retirée : le dock les reprend."""
+    app.post("/clients/enregistrer", data={"client": "Acme", "page_id": PAGE, "dashboards": f"Formation | https://app.notion.com/p/{PAGE}"})
+    fiche = app.get("/deploiements/acme/synthese").text
+    assert 'data-tip="Notion · Formation ↗"' in fiche

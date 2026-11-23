@@ -157,7 +157,7 @@ th[data-dir=desc]::after { content: " ▼"; }
 .theme-toggle { flex: none; background: none; color: var(--text); border-color: var(--border); }
 .theme-toggle:hover { border-color: var(--accent); }
 
-/* Stacks Padoa du client : toujours visibles en tête de fiche */
+/* Stacks et Drive du client sur les cartes de la vue d'ensemble (index.html) ; sur une fiche, ils sont dans le dock. */
 .stacks { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; }
 .stacks a { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 13px; white-space: nowrap; }
 .stacks a:hover { border-color: var(--accent); }
