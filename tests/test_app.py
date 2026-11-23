@@ -303,12 +303,13 @@ def test_christmas_theme_is_one_of_the_themes_and_has_its_palette():
     assert "Noël clair" in client.get("/palette", params={"q": ">thème"}).text
 
 
-def test_christmas_is_the_default_theme_until_another_one_is_chosen():
-    """Rien de retenu dans le navigateur : Noël (nuit ou clair selon le Mac) à partir du 1er décembre 2026, Auto avant.
-    Tout choix est retenu, Auto compris, donc Noël ne revient pas."""
+def test_christmas_is_forced_once_on_the_first_of_december_then_can_be_removed():
+    """À partir du 1er décembre 2026, Noël s'impose une fois à chaque navigateur (« theme-noel-2026 » retient que c'est fait), quel que
+    soit le thème retenu. Tout choix fait ensuite est retenu, Auto compris, donc Noël ne revient pas."""
     html = client.get("/").text
     head = html.split("</head>")[0]
-    assert "prefers-color-scheme: dark" in head and '"noel-clair"' in head and 'new Date("2026-12-01T00:00")' in head
+    assert 'new Date("2026-12-01T00:00")' in head and 'localStorage.setItem("theme-noel-2026", "1")' in head
+    assert '"noel-clair"' in head and "prefers-color-scheme: dark" in head
     assert 'localStorage.setItem("theme", next)' in html and 'removeItem("theme")' not in html  # Auto ("") est retenu, pas effacé
 
 

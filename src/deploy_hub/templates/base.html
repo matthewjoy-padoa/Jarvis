@@ -7,12 +7,20 @@
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=4">
   <meta name="theme-color" content="#001235">
   <script>
-    // Thème retenu dans le navigateur ("" : Auto, suit le Mac). Rien de retenu : Auto, puis Noël par défaut (nuit ou clair selon
-    // le Mac) à partir du 1er décembre 2026, à l'heure du navigateur.
+    // Thème retenu dans le navigateur ("" ou rien : Auto, suit le Mac). À partir du 1er décembre 2026 (heure du navigateur), Noël
+    // s'impose une fois à chaque navigateur, quel que soit le thème retenu : nuit si on était en Nuit (ou en Auto sur un Mac en mode
+    // nuit), clair sinon. « theme-noel-2026 » retient que c'est fait : ensuite le bouton de thème décide, et Noël ne revient pas.
     (function () {
       let t = null;
-      try { t = localStorage.getItem("theme"); } catch (e) {}
-      if (t === null && new Date() >= new Date("2026-12-01T00:00")) t = matchMedia("(prefers-color-scheme: dark)").matches ? "noel" : "noel-clair";
+      try {
+        t = localStorage.getItem("theme");
+        if (new Date() >= new Date("2026-12-01T00:00") && !localStorage.getItem("theme-noel-2026")) {
+          const night = t === "dark" || (t !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+          if (!/^noel/.test(t)) t = night ? "noel" : "noel-clair";
+          localStorage.setItem("theme", t);
+          localStorage.setItem("theme-noel-2026", "1");
+        }
+      } catch (e) {}
       if (t) document.documentElement.dataset.theme = t;
     })();
   </script>
@@ -103,7 +111,7 @@
   </header>
   <script>
     // Thème : Auto (suit le Mac) → Nuit → Clair → Noël nuit → Noël clair → Auto. Tout choix est retenu dans le navigateur, Auto compris
-    // ("") : le thème par défaut, Noël, ne revient pas une fois qu'on a choisi autre chose.
+    // ("") : Noël, imposé une fois le 1er décembre (script du <head>), ne revient pas une fois qu'on a choisi autre chose.
     (function () {
       const root = document.documentElement, button = document.getElementById("theme-toggle");
       const order = ["", "dark", "light", "noel", "noel-clair"], labels = { "": "Auto", dark: "Nuit", light: "Clair", noel: "Noël nuit", "noel-clair": "Noël clair" };
