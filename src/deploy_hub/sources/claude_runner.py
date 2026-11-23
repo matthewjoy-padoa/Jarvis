@@ -152,15 +152,29 @@ NUMBERED = re.compile(r"^\s*(?:\*\*)?\d+[.)](?:\*\*)?\s+(.*)$")  # « 1. … »,
 BULLET = re.compile(r"^[-*•]\s+(.*)$")  # puce en début de ligne ; une puce en retrait est un détail de la question
 
 
+HEADING = re.compile(r"^\s{0,3}#{1,6}\s+(.*)$")  # titre Markdown : « ## 3. Blocage n°2 : quel niveau de correctif ? »
+
+
 def _clean(text: str) -> str:
     return text.strip().strip("*_ ").strip()
+
+
+def _title(line: str) -> str:
+    """Intitulé d'une question, sans ce qui l'habille dans le compte rendu : « ## », puce, numéro (« 3. »), gras. L'app
+    numérote elle-même les questions et affiche l'intitulé sur une ligne : un « ## » y resterait tel quel."""
+    text = line.strip()
+    for wrapping in (HEADING, BULLET, NUMBERED):
+        if found := wrapping.match(text):
+            text = found.group(1).strip()
+    return _clean(text)
 
 
 def split_questions(summary: str) -> tuple[str, list[str]]:
     """(contexte, questions) du compte rendu. Contexte : ce que l'agent écrit avant ses questions (ce qu'il a compris, vérifié).
     Question : première ligne = la question, lignes suivantes = ses détails (contexte, options, recommandation), en Markdown.
     Après une ligne « Questions : » (consigne du brief), chaque élément numéroté ou à puce est une question ; sans cette ligne,
-    chaque ligne qui finit par « ? », le reste du texte faisant le contexte."""
+    chaque ligne qui finit par « ? », le reste du texte faisant le contexte. Une question posée en titre (« ## … ? ») emporte
+    sa section, jusqu'au titre suivant, comme détail."""
     lines = (summary or "").splitlines()
     start = next((i for i, line in enumerate(lines) if QUESTIONS_HEADING.match(_clean(line))), None)
     items: list[tuple[str, list[str]]] = []  # (question, lignes de détail telles quelles)
@@ -170,12 +184,19 @@ def split_questions(summary: str) -> tuple[str, list[str]]:
         elif items:
             items[-1][1].append(line)
         elif line.strip():
-            items.append((_clean(line), []))
+            items.append((_title(line), []))
     intro = lines[:start] if items else []
     if not items:  # sans « Questions : » : chaque ligne en « ? », le reste fait le contexte
-        asked = {i for i, line in enumerate(lines) if _clean(line).endswith("?")}
-        items = [(_clean(BULLET.sub(r"\1", lines[i].strip())), []) for i in sorted(asked)]
-        intro = [line for i, line in enumerate(lines) if i not in asked]
+        used: set[int] = set()  # lignes des questions et de leur section : hors du contexte
+        for i in (i for i, line in enumerate(lines) if _clean(line).endswith("?")):
+            if i in used:
+                continue  # un « ? » dans la section d'une question en titre : c'est son détail
+            end = i + 1
+            if HEADING.match(lines[i]):
+                end = next((j for j in range(i + 1, len(lines)) if HEADING.match(lines[j])), len(lines))
+            items.append((_title(lines[i]), lines[i + 1:end]))
+            used.update(range(i, end))
+        intro = [line for i, line in enumerate(lines) if i not in used]
     # détails sans leur retrait commun : les sous-listes restent des sous-listes
     return "\n".join(intro).strip(), [
         q + (f"\n{d}" if (d := textwrap.dedent("\n".join(detail)).strip()) else "") for q, detail in items]
@@ -233,7 +254,7 @@ def _structured_questions(summary: str) -> list[Question]:
         reco, labels = item.get("recommandation"), [label for label, _ in options]
         recommended = (labels.index(text(reco)) + 1 if text(reco) in labels
                        else reco if type(reco) is int and 0 < reco <= len(options) else 0)
-        questions.append(Question(text(item["question"]), text(item.get("contexte")), options, recommended, text(item.get("pourquoi"))))
+        questions.append(Question(_title(item["question"]), text(item.get("contexte")), options, recommended, text(item.get("pourquoi"))))
     return questions
 
 
