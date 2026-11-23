@@ -1,9 +1,27 @@
 {% extends "base.html" %}
+{# Page d'un outil externe (Flow Digger) quand Jarvis n'y emmène pas directement. Attend : tool, action, launch
+   (sources/flow_digger.Launch) : un échec (error, can_force), ou une mise à jour disponible (behind, can_restart). #}
 {% block title %}{{ tool }} · Jarvis{% endblock %}
 {% block content %}
 <h1>{{ tool }}</h1>
-<p class="tool-error" role="alert">{{ ic.icon("alert") }} {{ error }}</p>
-{% if can_force %}
+{% if launch.behind %}
+<p>Une mise à jour de {{ tool }} est disponible : <strong>{{ launch.behind }} commit{{ "s" if launch.behind > 1 }}</strong> de plus sur sa branche. La version en service continue de tourner tant que tu ne la relances pas.</p>
+<div class="tool-choice">
+  {% if launch.can_restart %}
+  <form method="post" action="{{ action }}">
+    <input type="hidden" name="relancer" value="1">
+    <button type="submit">Mettre à jour et relancer</button>
+  </form>
+  {% endif %}
+  <form method="post" action="{{ action }}">
+    <input type="hidden" name="actuelle" value="1">
+    <button type="submit" class="secondary">Ouvrir la version actuelle</button>
+  </form>
+</div>
+<p class="muted">{% if launch.can_restart %}Relancer coupe la session {{ tool }} en cours : enregistre d'abord ce qui doit l'être.{% else %}Cette session de {{ tool }} n'a pas été lancée par Jarvis (ou avant qu'il sache la relancer) : pour la mettre à jour, arrête-la (Ctrl+C dans son terminal), puis reclique sur le bouton {{ tool }} de la barre.{% endif %}</p>
+{% else %}
+<p class="tool-error" role="alert">{{ ic.icon("alert") }} {{ launch.error }}</p>
+{% if launch.can_force %}
 <p class="muted">Tu peux corriger le dépôt (par exemple <code>git status</code> puis <code>git pull</code> dans un terminal) et recliquer sur {{ tool }}, ou lancer la version déjà présente sur la machine.</p>
 <form method="post" action="{{ action }}">
   <input type="hidden" name="forcer" value="1">
@@ -11,5 +29,6 @@
 </form>
 {% else %}
 <p class="muted">Rien n'a été lancé. Corrige ce point puis reclique sur le bouton {{ tool }} de la barre.</p>
+{% endif %}
 {% endif %}
 {% endblock %}
