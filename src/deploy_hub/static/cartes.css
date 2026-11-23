@@ -1,0 +1,127 @@
+/* Cartes à collectionner (page Cartes, templates/_carte.html). Chargée par cartes.html seulement.
+   Une carte est un objet : elle garde ses couleurs (marine du logo, anneaux) dans tous les thèmes de Jarvis.
+   Tout y est mesuré en « em » d'une police réglée sur la largeur de la carte (unités de conteneur) : la même carte se
+   dessine dans le classeur, dans un booster et en grand, sans autre règle.
+   Famille → couleur d'accent ; rareté → nombre d'anneaux autour du portrait ; finition → matière (mate, irisée, dorée). */
+
+.tcg { container-type: inline-size; display: block; aspect-ratio: 5 / 7; width: 100%; }
+.tcg-in {
+  --tcg-accent: #5ce1ff; --tcg-ink: #eaf2ff; --tcg-dim: #a6b7d9; --tcg-deep: #081430; --tcg-edge: color-mix(in srgb, var(--tcg-accent) 45%, transparent);
+  position: relative; height: 100%; padding: 1em 1.1em .85em; display: flex; flex-direction: column; overflow: hidden;
+  font-size: 5.2cqw; line-height: 1.25; color: var(--tcg-ink); text-align: left;
+  background: radial-gradient(120% 75% at 50% 0%, #1d3d80 0%, #0d1d45 55%, var(--tcg-deep) 100%);
+  border: .12em solid var(--tcg-edge); border-radius: 1em; box-shadow: 0 .3em .9em rgba(0, 12, 40, .28);
+}
+.tcg.f-logiciel .tcg-in { --tcg-accent: #b9a2ff; }
+.tcg.f-client .tcg-in { --tcg-accent: #6fe0a8; }
+
+.tcg-top { display: flex; justify-content: space-between; gap: .5em; font-size: .62em; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--tcg-dim); }
+.tcg-rarity { color: var(--tcg-accent); }
+
+/* Portrait rond ; un anneau par cran de rareté (1 à 4), aux couleurs de la famille. */
+.tcg-art {
+  --ring: .16em; --gap: .34em;
+  flex: none; width: 7em; height: 7em; margin: 1.5em auto 1.45em; border-radius: 50%; display: grid; place-items: center; overflow: hidden;
+  background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--tcg-accent) 38%, #10224f), #0a1838 75%);
+  box-shadow: 0 0 0 var(--ring) var(--tcg-accent);
+}
+.tcg.r-rare .tcg-art { box-shadow: 0 0 0 var(--ring) var(--tcg-accent), 0 0 0 calc(var(--ring) + var(--gap)) var(--tcg-deep), 0 0 0 calc(2 * var(--ring) + var(--gap)) var(--tcg-accent); }
+.tcg.r-epique .tcg-art { box-shadow: 0 0 0 var(--ring) var(--tcg-accent), 0 0 0 calc(var(--ring) + var(--gap)) var(--tcg-deep), 0 0 0 calc(2 * var(--ring) + var(--gap)) var(--tcg-accent),
+  0 0 0 calc(2 * var(--ring) + 2 * var(--gap)) var(--tcg-deep), 0 0 0 calc(3 * var(--ring) + 2 * var(--gap)) var(--tcg-accent); }
+.tcg.r-legendaire .tcg-art { box-shadow: 0 0 0 var(--ring) var(--tcg-accent), 0 0 0 calc(var(--ring) + var(--gap)) var(--tcg-deep), 0 0 0 calc(2 * var(--ring) + var(--gap)) var(--tcg-accent),
+  0 0 0 calc(2 * var(--ring) + 2 * var(--gap)) var(--tcg-deep), 0 0 0 calc(3 * var(--ring) + 2 * var(--gap)) var(--tcg-accent),
+  0 0 0 calc(3 * var(--ring) + 3 * var(--gap)) var(--tcg-deep), 0 0 0 calc(4 * var(--ring) + 3 * var(--gap)) var(--tcg-accent), 0 0 1.6em .4em color-mix(in srgb, var(--tcg-accent) 45%, transparent); }
+.tcg-art img { width: 100%; height: 100%; object-fit: cover; }
+.tcg-art img.tcg-icon { width: 58%; height: 58%; object-fit: contain; }
+.tcg-emoji { font-size: 3.6em; line-height: 1; }
+.tcg-initials { font-size: 2.7em; font-weight: 700; letter-spacing: .02em; color: var(--tcg-ink); }
+
+.tcg-name { margin: 0; font-size: 1.3em; font-weight: 700; line-height: 1.15; color: var(--tcg-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tcg-role { margin: .1em 0 0; font-size: .72em; color: var(--tcg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.tcg-stats { margin: .7em 0 0; display: grid; gap: .3em; font-size: .7em; }
+.tcg-stats > div { display: grid; grid-template-columns: 7.2em 1fr auto; align-items: center; gap: .6em; }
+.tcg-stats dt { color: var(--tcg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tcg-stats dd { margin: 0; }
+.tcg-gauge { height: .42em; border-radius: 99px; background: rgba(255, 255, 255, .13); overflow: hidden; }
+.tcg-gauge span { display: block; height: 100%; border-radius: 99px; background: var(--tcg-accent); }
+.tcg-val { grid-column: 3; min-width: 1.8em; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tcg-stats > div:not(:has(.tcg-gauge)) { grid-template-columns: 1fr auto; }
+.tcg-stats > div:not(:has(.tcg-gauge)) .tcg-val { grid-column: 2; }
+
+.tcg-power { margin: .75em 0 0; padding: .5em .65em; border-radius: .6em; font-size: .7em; line-height: 1.3; background: rgba(255, 255, 255, .07); border: .08em solid rgba(255, 255, 255, .1);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.tcg-power strong { color: var(--tcg-accent); font-weight: 700; }
+.tcg-power span::before { content: " · "; color: var(--tcg-dim); }
+.tcg-quote { margin: .55em 0 0; font-size: .66em; font-style: italic; color: var(--tcg-dim); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.tcg-foot { margin-top: auto; padding-top: .5em; display: flex; justify-content: space-between; font-size: .58em; letter-spacing: .06em; text-transform: uppercase; color: var(--tcg-dim); font-variant-numeric: tabular-nums; }
+
+/* Finitions. Brillante : reflet irisé qui traverse la carte. Or : liseré et anneaux dorés, reflet chaud. */
+.tcg.fin-brillante .tcg-in { border-color: #bfe9ff; background: radial-gradient(120% 75% at 50% 0%, #27509c 0%, #12275a 55%, #0a1838 100%); }
+.tcg.fin-or .tcg-in { --tcg-accent: #f3cf7a; --tcg-dim: #cdbf9c; border-color: #f3cf7a; background: radial-gradient(120% 75% at 50% 0%, #4a3a12 0%, #1d1a26 55%, #0c0f1f 100%);
+  box-shadow: 0 .3em .9em rgba(0, 12, 40, .28), inset 0 0 0 .14em rgba(243, 207, 122, .35); }
+.tcg.fin-brillante .tcg-in::after, .tcg.fin-or .tcg-in::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; background-size: 300% 100%; background-position: 85% 0; mix-blend-mode: screen;
+  background-image: linear-gradient(110deg, transparent 30%, rgba(92, 225, 255, .30) 42%, rgba(185, 162, 255, .34) 50%, rgba(255, 200, 97, .28) 58%, transparent 70%);
+}
+.tcg.fin-or .tcg-in::after { background-image: linear-gradient(110deg, transparent 32%, rgba(255, 226, 150, .16) 44%, rgba(255, 244, 205, .42) 50%, rgba(255, 226, 150, .16) 56%, transparent 68%); }
+@media (prefers-reduced-motion: no-preference) {
+  .tcg.fin-brillante .tcg-in::after, .tcg.fin-or .tcg-in::after { animation: tcg-sheen 5.5s ease-in-out infinite; }
+  @keyframes tcg-sheen { 0%, 35% { background-position: 100% 0; } 85%, 100% { background-position: 0% 0; } }
+}
+
+/* Dos : carte à trouver (classeur) et carte pas encore retournée (booster). */
+.tcg-back .tcg-in { align-items: center; justify-content: center; border-style: dashed; border-color: rgba(166, 183, 217, .35); background: radial-gradient(90% 60% at 50% 45%, #14285c 0%, var(--tcg-deep) 100%); box-shadow: none; }
+.tcg-rings { width: 2.4em; height: 2.4em; border-radius: 50%; border: .16em solid rgba(166, 183, 217, .5);
+  box-shadow: 0 0 0 .5em var(--tcg-deep), 0 0 0 .66em rgba(166, 183, 217, .34), 0 0 0 1.16em var(--tcg-deep), 0 0 0 1.32em rgba(166, 183, 217, .2); }
+.tcg-back-n { position: absolute; bottom: 1.1em; left: 0; right: 0; text-align: center; font-size: .62em; letter-spacing: .08em; color: var(--tcg-dim); font-variant-numeric: tabular-nums; }
+.tcg-flip .tcg-back .tcg-in { border-style: solid; border-color: rgba(92, 225, 255, .45); }
+
+/* Page */
+.tcg-open { display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; font-size: 14px; }
+.tcg-open-n { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px; background: var(--on-accent); color: var(--accent); font-size: 12px; line-height: 22px; text-align: center; }
+.tcg-problem { margin: 8px 0; padding: 8px 12px; border-radius: 10px; background: var(--pa-todo); color: var(--text); font-size: 13px; }
+.tcg-rules { margin: 4px 0 8px; }
+.tcg-rules p { margin: 8px 0; max-width: 70ch; font-size: 13px; }
+.tcg-log { margin: 0; padding: 0; list-style: none; font-size: 13px; display: grid; gap: 2px; }
+.tcg-log strong { color: var(--ok); }
+
+.tcg-grid { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 18px 16px; }
+.tcg-link { display: block; border-radius: 12px; transition: transform .18s var(--ease, ease); }
+.tcg-link:hover, .tcg-link:focus-visible { transform: translateY(-4px); }
+.tcg-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.tcg-owned { margin: 6px 2px 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+.tcg-pips { display: inline-flex; gap: 5px; }
+.tcg-pip { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--border); }
+.tcg-pip.on.fin-standard { background: #2a55a8; border-color: #2a55a8; }
+.tcg-pip.on.fin-brillante { background: linear-gradient(135deg, #5ce1ff, #b9a2ff); border-color: transparent; }
+.tcg-pip.on.fin-or { background: #e2b54a; border-color: #e2b54a; }
+
+/* Booster ouvert : les cartes se retournent l'une après l'autre. */
+.tcg-opened { margin: 14px 0 6px; padding: 18px 16px 12px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); }
+.tcg-row { list-style: none; margin: 0 0 10px; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+.tcg-flip { position: relative; perspective: 900px; text-align: center; }
+.tcg-flip-in { position: relative; transform-style: preserve-3d; }
+.tcg-flip-front, .tcg-flip-back { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.tcg-flip-back { position: absolute; inset: 0; transform: rotateY(180deg); }
+.tcg-new { margin-top: 8px; }  /* pastille : .badge.g-done de style.css */
+@media (prefers-reduced-motion: no-preference) {
+  .tcg-flip-in { animation: tcg-flip .75s var(--ease, ease) both; animation-delay: calc(.3s + var(--i) * .32s); }
+  .tcg-new { animation: tcg-pop .3s var(--ease, ease) both; animation-delay: calc(.95s + var(--i) * .32s); }
+  @keyframes tcg-flip { from { transform: rotateY(180deg); } to { transform: rotateY(0); } }
+  @keyframes tcg-pop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
+}
+@media (max-width: 760px) {
+  .tcg-row { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
+  .tcg-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px 12px; }
+}
+
+/* Carte en grand (fenêtre de détail) */
+.tcg-detail { display: flex; flex-wrap: wrap; gap: 24px 32px; align-items: flex-start; justify-content: center; padding: 8px 4px; }
+.tcg-detail-card { flex: 0 1 320px; min-width: 220px; }
+.tcg-detail-side { flex: 1 1 200px; }
+.tcg-detail-side h2 { margin: 4px 0 2px; }
+.tcg-finishes { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 6px; }
+.tcg-finishes a, .tcg-finishes li > span { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--border); color: var(--text); }
+.tcg-finishes a:hover { border-color: var(--accent); }
+.tcg-finishes a.active { border-color: var(--accent); font-weight: 600; }

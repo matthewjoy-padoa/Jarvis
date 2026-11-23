@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% import "_carte.html" as c with context %}
+{% block title %}Cartes · Jarvis{% endblock %}
+{% block content %}
+{# Cartes à collectionner de l'équipe (sources/cards.py) : boosters en réserve, booster qu'on vient d'ouvrir, classeur.
+   « Ouvrir un booster » renvoie cette même page : htmx n'en remplace que #cartes (et la pastille de la barre). #}
+<link rel="stylesheet" href="/static/cartes.css?v=1">
+<div id="cartes">
+  <div class="page-head">
+    <div>
+      <h1>Cartes</h1>
+      <p class="muted">{{ progress[0] }} sur {{ progress[1] }} à trouver : {{ total }} carte{{ 's' if total > 1 }}, en {{ finishes | length }} finitions.</p>
+    </div>
+    <form method="post" action="/cartes/booster" hx-post="/cartes/booster" hx-target="#cartes" hx-select="#cartes" hx-swap="outerHTML" hx-select-oob="#nav-boosters">
+      <button type="submit" class="tcg-open"{% if not boosters %} disabled title="Le prochain arrive demain, ou au prochain DAG vert"{% endif %}>
+        {%- if boosters %}Ouvrir un booster <span class="tcg-open-n">{{ boosters }}</span>{% else %}Plus de booster{% endif %}</button>
+    </form>
+  </div>
+  {% if problem %}<p class="tcg-problem" role="status">{{ problem }}</p>{% endif %}
+
+  {% if pulled %}
+  <section class="tcg-opened" aria-label="Booster ouvert">
+    <ol class="tcg-row">
+      {% for p in pulled %}<li class="tcg-flip" style="--i: {{ loop.index0 }}">
+        <div class="tcg-flip-in"><div class="tcg-flip-front">{{ c.face(p.card, p.finish, numbers[p.card.id], total) }}</div><div class="tcg-flip-back">{{ c.back() }}</div></div>
+        {% if p.new %}<span class="badge g-done tcg-new">Nouvelle</span>{% endif %}
+      </li>{% endfor %}
+    </ol>
+    {% set fresh = pulled | selectattr("new") | list | length %}
+    <p class="muted">{{ fresh }} nouvelle{{ 's' if fresh > 1 }} sur {{ pulled | length }}, rangée{{ 's' if pulled | length > 1 }} dans le classeur.</p>
+  </section>
+  {% endif %}
+
+  <details class="tcg-rules">
+    <summary>Comment gagner des boosters</summary>
+    <p>Un booster ({{ booster_size }} cartes) par jour, et un de plus quand Jarvis voit un DAG finir vert, un agent terminer, un retour de recette passer à terminé ou une PR fusionnée ({{ daily_max }} par jour au plus). La collection reste sur ta machine.</p>
+    {% if log %}<ul class="tcg-log">
+      {% for g in log %}<li><span class="muted">{{ g.quand | quand_iso }}</span> {{ g.quoi }} <strong>+{{ g.boosters }}</strong></li>{% endfor %}
+    </ul>{% endif %}
+  </details>
+
+  {% for family, slots in groups %}
+  <h2>{{ slots[0].card.family_label }} <span class="muted">{{ slots | selectattr("owned") | list | length }}/{{ slots | length }}</span></h2>
+  <ul class="tcg-grid">
+    {% for s in slots %}<li class="tcg-slot">
+      {% if s.owned %}<a class="tcg-link" href="/cartes/{{ s.card.id }}" data-ticket aria-label="{{ s.card.name }} : voir la carte">{{ c.face(s.card, s.best, s.number, total) }}</a>
+      <p class="tcg-owned">{{ c.pips(s) }}<span class="muted">×{{ s.copies }}</span></p>
+      {% else %}{{ c.back(s.number) }}
+      <p class="tcg-owned muted">À trouver</p>{% endif %}
+    </li>{% endfor %}
+  </ul>
+  {% endfor %}
+</div>
+{% endblock %}

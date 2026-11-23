@@ -78,7 +78,7 @@
 </script>
 {% endif %}
 <table data-filterable>
-  <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>Sujet</th><th>Branche</th><th data-filter>État</th><th>Durée</th><th>Tokens</th><th>PR</th></tr></thead>
+  <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>Sujet</th><th>Branche</th><th data-filter title="Carte de l'équipe que l'agent incarne : elle entre dans ta collection à son lancement">Carte</th><th data-filter>État</th><th>Durée</th><th>Tokens</th><th>PR</th></tr></thead>
   <tbody>
   {% for r in runs %}
     <tr data-agent="{{ r.id }}">
@@ -86,6 +86,7 @@
       <td><a href="/deploiements/{{ r.slug }}/recette">{{ r.client }}</a></td>
       <td><a href="/agents/{{ r.id }}">{{ r.subject }}</a></td>
       <td><code>{{ r.branch }}</code></td>
+      <td>{% if agent_cards.get(r.id) %}<a href="/cartes" title="Carte débloquée par cet agent">{{ agent_cards[r.id].name }}</a>{% endif %}</td>
       <td><span class="badge g-{{ r.group }}">{{ r.status }}</span>{% if r.simulated %} {{ ic.icon("flask", "Simulation", "ic-muted") }}{% endif %}</td>
       <td data-sort="{{ r.duration.total_seconds() | int }}">{% if not r.simulated %}{{ r.duration | duree }}{% endif %}</td>
       <td data-sort="{{ r.tokens or 0 }}"{% if r.tokens is not none %} title="{% for label, n in r.token_parts %}{{ label }} {{ n | tokens }}{{ ' · ' if not loop.last }}{% endfor %}"{% endif %}>{{ r.tokens | tokens }}</td>

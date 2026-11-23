@@ -1,0 +1,88 @@
+# Cartes à collectionner de l'équipe (page Cartes de Jarvis) : familles « equipe » et « logiciel ».
+# Les cartes « client » ne sont pas ici : Jarvis en bâtit une par client suivi, sur sa machine.
+#
+# Une carte :
+#   id        ne change jamais (la collection de chacun s'y réfère) ; lettres, chiffres, tirets
+#   nom       affiché en tête
+#   role      ligne sous le nom
+#   rarete    commune | rare | epique | legendaire
+#   stats     trois au plus ; un entier de 0 à 100 est montré en jauge, un texte tel quel
+#   pouvoir   nom du pouvoir, effet : ce qu'il fait
+#   citation  en bas de carte
+#   photo     fichier de src/deploy_hub/static/cartes/ (facultatif ; sans photo : les initiales)
+#   emoji     à la place des initiales (facultatif)
+#
+# Ce dépôt est public : la carte d'une personne (nom, photo) n'y entre qu'avec son accord.
+# Pour essayer une carte sans la publier : config/cartes.yaml, même format, hors git.
+
+equipe:
+  - id: jarvis
+    nom: Jarvis
+    role: Majordome de l'équipe Integration
+    rarete: legendaire
+    emoji: "🤵"
+    stats: {Mémoire: 95, Patience: 100, Sommeil: 0}
+    pouvoir: Tout au même endroit
+    effet: Rassemble Notion, Airflow et l'orchestrator sur une seule page.
+    citation: Très bien, je m'en occupe.
+  - id: matthew
+    nom: Matthew
+    role: Intégration · reprise des données
+    rarete: epique
+    stats: {Mapping: 85, Délégation: 90, Sang-froid: 75}
+    pouvoir: Une branche par sujet
+    effet: Chaque idée part dans sa propre PR.
+    citation: Simplifier ne veut pas dire supprimer.
+  - id: agent
+    nom: L'agent
+    role: Renfort sur les retours de recette
+    rarete: rare
+    emoji: "🤖"
+    stats: {Vitesse: 90, Autonomie: 70, Questions: 60}
+    pouvoir: Worktree
+    effet: Travaille à côté, sans toucher à ton clone.
+    citation: J'ai une question avant de continuer.
+
+logiciel:
+  - id: preventiel
+    nom: Preventiel
+    role: Logiciel source
+    rarete: commune
+    stats: {Tables: 80, Mappings: 90, Volume: 60}
+    pouvoir: Table de correspondance
+    effet: Aucun code ne passe sans son mapping.
+  - id: kenora
+    nom: Kenora
+    role: Logiciel source
+    rarete: commune
+    stats: {Tables: 70, Mappings: 60, Volume: 50}
+    pouvoir: Requête en double
+    effet: Corrigée chez le client, à corriger aussi au niveau du logiciel.
+  - id: medtra
+    nom: Medtra
+    role: Logiciel source
+    rarete: commune
+    stats: {Tables: 75, Mappings: 65, Volume: 55}
+    pouvoir: Nouvelle version
+    effet: Le même logiciel, encore une fois, un peu différent.
+  - id: pulse
+    nom: Pulse
+    role: Logiciel source
+    rarete: rare
+    stats: {Tables: 60, Mappings: 55, Volume: 70}
+    pouvoir: Extraction
+    effet: Tout commence par un extract qui passe.
+  - id: uegar
+    nom: uEgar
+    role: Logiciel source
+    rarete: rare
+    stats: {Tables: 65, Mappings: 60, Volume: 75}
+    pouvoir: Filtre
+    effet: Ne garde que les lignes qui comptent.
+  - id: agirhe
+    nom: Agirhe
+    role: SIRH
+    rarete: rare
+    stats: {Fichiers: 85, Mappings: 70, Volume: 65}
+    pouvoir: Fichier du jour
+    effet: Un nouveau fichier arrive, le flux repart.

@@ -1,0 +1,32 @@
+{# Cartes à collectionner : la face d'une carte, son dos, et les pastilles des finitions possédées. Styles : static/cartes.css.
+   À importer « with context » : `finishes` (finition → libellé, poids) vient de la page.
+   La carte se dessine à n'importe quelle largeur (tailles en unités de conteneur) : classeur, booster, détail. #}
+{% macro face(card, finish, number, total) -%}
+<article class="tcg f-{{ card.family }} r-{{ card.rarity }} fin-{{ finish }}" aria-label="{{ card.name }}, {{ card.rarity_label | lower }}, finition {{ finishes[finish][0] | lower }}">
+  <div class="tcg-in">
+    <header class="tcg-top"><span>{{ card.family_label }}</span><span class="tcg-rarity">{{ card.rarity_label }}</span></header>
+    <div class="tcg-art">
+      {%- if card.photo %}<img src="/static/cartes/{{ card.photo }}" alt="">
+      {%- elif card.icon %}<img class="tcg-icon" src="{{ card.icon }}" alt="">
+      {%- elif card.emoji %}<span class="tcg-emoji" aria-hidden="true">{{ card.emoji }}</span>
+      {%- else %}<span class="tcg-initials" aria-hidden="true">{{ card.initials }}</span>{% endif -%}
+    </div>
+    <h3 class="tcg-name">{{ card.name }}</h3>
+    {% if card.role %}<p class="tcg-role">{{ card.role }}</p>{% endif %}
+    {% if card.stats %}<dl class="tcg-stats">
+      {% for s in card.stats %}<div><dt>{{ s.label }}</dt>{% if s.pct is not none %}<dd class="tcg-gauge" aria-hidden="true"><span style="width: {{ s.pct }}%"></span></dd>{% endif %}<dd class="tcg-val">{{ s.value }}</dd></div>
+      {% endfor %}</dl>{% endif %}
+    {% if card.power %}<p class="tcg-power"><strong>{{ card.power }}</strong>{% if card.effect %}<span>{{ card.effect }}</span>{% endif %}</p>{% endif %}
+    {% if card.quote %}<p class="tcg-quote">« {{ card.quote }} »</p>{% endif %}
+    <footer class="tcg-foot"><span>N° {{ "%02d" | format(number) }}/{{ "%02d" | format(total) }}</span><span>{{ finishes[finish][0] }}</span></footer>
+  </div>
+</article>
+{%- endmacro %}
+
+{% macro back(number=0) -%}
+<div class="tcg tcg-back"{% if not number %} aria-hidden="true"{% endif %}><div class="tcg-in"><span class="tcg-rings" aria-hidden="true"></span>{% if number %}<span class="tcg-back-n">N° {{ "%02d" | format(number) }}</span>{% endif %}</div></div>
+{%- endmacro %}
+
+{% macro pips(slot) -%}
+<span class="tcg-pips">{% for key, (label, _) in finishes.items() %}<span class="tcg-pip fin-{{ key }}{{ ' on' if key in slot.owned }}" title="{{ label }} : {{ '×' ~ slot.owned[key] if key in slot.owned else 'à trouver' }}"></span>{% endfor %}</span>
+{%- endmacro %}

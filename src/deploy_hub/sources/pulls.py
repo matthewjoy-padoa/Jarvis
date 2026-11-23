@@ -38,6 +38,7 @@ DETAILS = "reviewDecision,reviewRequests,statusCheckRollup"  # gh pr view <numé
 TTL = 300  # secondes
 SCOPE = re.compile(r"\]\(([^)]+)\)")
 SPLIT = re.compile(r"[,;/+&]")
+AGENT_KEY = "agent "  # clé de l'historique pour la PR d'un agent : « agent <adresse> »
 COMMON = "all"  # scope des PR qui touchent tous les clients : `[FIX](all) …`
 RED, PENDING, GREEN, NO_CI, UNKNOWN = "rouge", "en cours", "verte", "aucune", "inconnue"
 CI_GROUPS = {RED: KO, PENDING: IN_PROGRESS, GREEN: DONE, NO_CI: TODO, UNKNOWN: TODO}
@@ -160,6 +161,10 @@ class HistoryStore:
     def get(self, key: str) -> dict | None:
         with self._lock:
             return self._loaded().get(key)
+
+    def entries(self) -> dict:
+        with self._lock:
+            return dict(self._loaded())
 
     def put(self, key: str, entry: dict) -> None:
         with self._lock:
@@ -297,7 +302,7 @@ class PullRequests:
     def _agent_pr(self, url: str, fresh: bool) -> tuple[list[PullRequest], str, bool]:
         """PR d'un agent, lue par son lien (son titre peut ne pas porter la clé du client) ; gardée sur disque, relue toutes
         les cinq minutes tant qu'elle est ouverte."""
-        key = f"agent {url}"
+        key = AGENT_KEY + url
         entry = self.store.get(key)
         if fresh or not entry or (any(r.get("state") == "OPEN" for r in entry["prs"].values()) and _old(entry, self.ttl)):
             raw, error = self._raw(("gh", "pr", "view", url, "--json", ENDED))
@@ -331,6 +336,16 @@ class PullRequests:
                 if p.state != "OPEN" and p.number not in found and keep(p):
                     found[p.number] = replace(p, why=why)
         return sorted(found.values(), key=lambda p: p.ended or p.updated, reverse=True), error, updating
+
+    def merged(self, keys: set[str]) -> list[PullRequest]:
+        """PR fusionnées déjà gardées dans l'historique, sans rien demander à GitHub : celles dont le scope du titre est
+        une des clés (clients suivis), et celles des agents."""
+        found = {}
+        for query, entry in self.store.entries().items():
+            for p in _prs(entry):
+                if p.state == "MERGED" and (query.startswith(AGENT_KEY) or p.scopes & keys):
+                    found[p.url] = p
+        return list(found.values())
 
     def _detail(self, number: int, fresh: bool) -> dict:
         known = self._details.get(number)

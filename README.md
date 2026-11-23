@@ -87,6 +87,16 @@ L'onglet **PR** d'une fiche liste les PR ouvertes de l'orchestrator qui concerne
 - **Rattachement au client** : scope du titre (`[FIX](client) …`), PR ouverte par un de ses agents, ou scope égal à son logiciel.
 - **Lecture seule**, réponses gardées 5 minutes, bouton « Actualiser ». Code : [`sources/pulls.py`](src/deploy_hub/sources/pulls.py).
 
+## Cartes à collectionner
+
+La page **Cartes** est le jeu de cartes de l'équipe, à collectionner seulement (pas de partie, pas d'échange).
+- **Trois familles** : l'équipe et les logiciels sources, écrits à la main dans [`src/deploy_hub/cartes.yaml`](src/deploy_hub/cartes.yaml) (format en tête du fichier), et une carte par client que tu suis, bâtie sur sa fiche avec ses chiffres du jour.
+- **Finitions et rareté** : chaque carte existe en standard, brillante et or ; la rareté (commune, rare, épique, légendaire) se lit au nombre d'anneaux autour du portrait.
+- **Boosters** : cinq cartes différentes, la dernière jamais commune. Trois offerts à la première visite, un par jour, et un de plus quand Jarvis voit un DAG finir vert, un agent terminer, un retour de recette passer à terminé ou une PR fusionnée (cinq par jour au plus ; les PR sont celles que l'onglet PR a déjà lues).
+- **Agents** : chaque agent lancé incarne une carte de l'équipe, tirée au hasard. Elle entre aussitôt dans ta collection (finition standard) et son nom s'affiche dans **Agents** et sur la page de l'agent.
+- **Ajouter la carte d'un collègue** : une entrée dans `cartes.yaml`, et sa photo (carrée, facultative) dans `src/deploy_hub/static/cartes/`. Ce dépôt est public : seulement avec son accord. Pour essayer une carte sans la publier, `config/cartes.yaml` (même format, hors git).
+- La collection de chacun reste sur sa machine : `data/cartes.json`. Code : [`sources/cards.py`](src/deploy_hub/sources/cards.py).
+
 ## Perso
 
 Tout est dans `data/perso.json`, sur ta machine ; rien n'est écrit dans Notion.
@@ -104,6 +114,7 @@ Pour que les agents travaillent sans ton poste, avec en plus un shell de la VM d
 - `data/` et `config/` sont hors de git : rien de ce qui vient de Notion n'est versionné.
 - La synchro de la recette n'accepte qu'une liste fixe de colonnes ; le contenu des retours est rangé à part (`data/notion/<client>/contenu-recette.json`).
 - Le brief d'agent interdit toute donnée client dans le code, les tests ou la PR.
+- Les cartes des clients (page Cartes) sont bâties à l'affichage sur les fiches locales : seules les cartes de l'équipe et des logiciels sont dans le dépôt.
 
 ## Réglages (page Réglages, `.env`)
 

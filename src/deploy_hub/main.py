@@ -38,11 +38,12 @@ from deploy_hub.sources.client_directory import ClientDirectory, form_of, name_k
 from deploy_hub.sources.sync_routine import SyncRoutine
 from deploy_hub.sources import connections, flow_digger, notion_api, running_code
 from deploy_hub.sources.external import external_statuses
-from deploy_hub.sources.journal import changes_since, group_changes
+from deploy_hub.sources.journal import changes_since, group_changes, journal_path
+from deploy_hub.sources import cards as card_game
 from deploy_hub.sources import watchers
 from deploy_hub.sources.notifications import Notification, NotificationStore
 from deploy_hub.sources.personal import PersonalStore, remind_date
-from deploy_hub.sources.pulls import PullRequests, names
+from deploy_hub.sources.pulls import PullRequests, client_keys, names
 from deploy_hub.sources import review as agent_review
 from deploy_hub.sources.fiches import FicheSource
 from deploy_hub.sources.web_push import WebPush
@@ -69,6 +70,7 @@ dag_chains = ChainRunner(data_dir() / "airflow" / "chaines.json",
 dag_watch.on_end = dag_chains.watch_ended
 web_push = WebPush(data_dir() / "push")  # notifications du Mac même onglet fermé (voir sources/web_push.py)
 personal = PersonalStore(data_dir() / "perso.json")  # épingles, notes et rappels : à moi seul, jamais dans Notion
+card_store = card_game.CardStore(data_dir() / "cartes.json")  # cartes à collectionner : ma collection et mes boosters
 _refresh_lock = threading.Lock()  # un seul rafraîchissement Notion à la fois
 
 log = logging.getLogger("uvicorn.error")  # mêmes lignes que celles de uvicorn
@@ -220,6 +222,7 @@ def _push_round() -> None:
     _guarded("Connexion de Claude Code", _check_claude_login)
     _guarded("Code à jour", _check_restart)
     _guarded("Synchro Notion automatique", _auto_sync)
+    _guarded("Cartes : boosters gagnés", _card_rewards)
 
 
 async def _push_loop() -> None:
@@ -320,6 +323,7 @@ PAGES = [
     ("/clients", "Clients"),
     ("/deadlines", "Deadlines"),
     ("/agents", "Agents"),
+    ("/cartes", "Cartes"),
 ]
 NAV_PAGES = [p for p in PAGES if p[0] != "/clients"]
 CLIENT_COOKIE = "jarvis_client"  # client en cours : celui de la dernière fiche ouverte
@@ -433,6 +437,7 @@ def _render(request: Request, template: str, active: str, **context) -> HTMLResp
             "notion_ready": notion_api.load_token() is not None or sync_routine.problem() is None,  # jeton, ou routine via Claude
             "sync_running": sync_routine.running,  # synchro lancée avant ce chargement : le bouton reprend son avancement
             "today": date.today(),
+            "boosters": card_store.boosters,  # pastille de « Cartes » dans la barre
             **context,
         },
     )
@@ -825,7 +830,7 @@ def agents(request: Request):
     for run in claude.runs:
         claude.refresh_context(run)  # agents en cours : où en est leur contexte
     return _render(request, "agents.html", "/agents", runs=claude.runs,
-                   cards=board(dag_watch, dag_chains.chains, airflow.runs), usage=usage(claude.runs))
+                   cards=board(dag_watch, dag_chains.chains, airflow.runs), usage=usage(claude.runs), agent_cards=_agent_cards())
 
 
 def _run_or_404(run_id: int):
@@ -843,7 +848,7 @@ def _agent_context(run) -> dict:
     relaunch = claude.relaunched(run.id) if run.group == KO else None  # seul un agent en erreur peut avoir été relancé
     waiting = claude.can_reply(run, follow_up)
     intro, questions = agent_questions(run.summary) if waiting else ("", [])  # contexte écrit par l'agent, puis ses questions
-    return {"relaunch": relaunch, "relaunchable": run.group == KO and (relaunch is None or relaunch.group == KO),  # relance en échec : on peut réessayer
+    return {"agent_card": _agent_cards().get(run.id), "relaunch": relaunch, "relaunchable": run.group == KO and (relaunch is None or relaunch.group == KO),  # relance en échec : on peut réessayer
             "run": run, "log": read_log(path), "review": None if run.running or run.simulated else agent_review.build(run, path),
             "follow_up": follow_up, "waiting": waiting, "intro": intro, "questions": questions}
 
@@ -1522,6 +1527,91 @@ def _reminder_notes(deployments: list[Deployment], today: date) -> list[dict]:
     return [{"key": f"rappel:{r.id}:{r.due.isoformat()}", "kind": "rappel", "level": "info", "title": f"Rappel : {r.label}",
              "detail": names.get(r.slug, ""), "link": ticket_url(r.slug, r.kind, r.ref) if r.kind else "/", "client": names.get(r.slug, "")}
             for r in personal.due(today) if not r.slug or r.slug in names]  # rappel libre, ou d'un client suivi (pas archivé)
+
+
+# ============================================================ Cartes à collectionner
+def _written_cards() -> tuple[list[card_game.Card], str]:
+    """(cartes écrites à la main, problème du fichier local) : cartes.yaml du dépôt, puis config/cartes.yaml."""
+    return card_game.catalogue(clients_dir().parent / "cartes.yaml")
+
+
+_journals_seen: dict[str, int] = {}  # client → date du journal déjà relu pour les cartes
+
+
+def _card_rewards() -> None:
+    """Boosters gagnés par ce que Jarvis a vu depuis la création de la collection (sources/cards.py) : suivis de DAG finis
+    verts et agents terminés (notifications), retours de recette passés à terminé (journal des synchros), PR fusionnées
+    des clients suivis (historique gardé par l'onglet PR : aucun appel à GitHub ici). Un journal n'est relu que s'il a changé depuis le dernier relevé (une synchro est passée)."""
+    deployments = fiches.list_deployments()
+    _agent_cards()  # la carte d'un agent est débloquée dès son lancement, même sans ouvrir la page Agents
+    since = datetime.now() - timedelta(days=card_game.EVENT_DAYS)
+    changes = []
+    for d in deployments:
+        path = journal_path(settings.deployments_dir, d.slug)
+        mtime = path.stat().st_mtime_ns if path.is_file() else 0
+        if mtime != _journals_seen.get(d.slug):
+            changes += changes_since(d, settings.deployments_dir, since)
+            _journals_seen[d.slug] = mtime
+    keys = {k for d in deployments for k in client_keys(d.slug, d.orchestrator)}
+    card_store.earn(card_game.note_events(notifications.all()) + card_game.retour_events(changes) + card_game.pull_events(pulls.merged(keys)))
+
+
+def _agent_cards() -> dict[int, card_game.Card]:
+    """{numéro d'agent: sa carte} : chaque agent lancé incarne une carte de l'équipe tirée au hasard, qui entre dans la
+    collection (sources/cards.py). Les agents d'avant la collection n'en ont pas."""
+    team = {c.id: c for c in _written_cards()[0] if c.family == "equipe"}
+    linked = card_store.agent_cards([(r.id, r.started_at) for r in claude.runs if not r.simulated], list(team.values()))
+    return {run_id: team[card_id] for run_id, card_id in linked.items() if card_id in team}
+
+
+def _card_pool(request: Request) -> tuple[list[card_game.Card], str]:
+    """(cartes du jeu sur cette machine, problème du fichier local) : cartes écrites, puis une par client suivi."""
+    written, problem = _written_cards()
+    return card_game.pool(written, _deployments(request)), problem
+
+
+def _binder(request: Request) -> dict:
+    """Ce que montrent la page et le détail d'une carte : classeur du moment, nombre de cartes, finitions."""
+    cards, problem = _card_pool(request)
+    data = card_store.visit()
+    groups = card_game.binder(cards, data)
+    return {"groups": groups, "total": sum(len(found) for _, found in groups), "finishes": card_game.FINISHES, "problem": problem,
+            "log": list(reversed(data["journal"]))[:8]}
+
+
+def _cards_page(request: Request, pulled=()) -> HTMLResponse:
+    ctx = _binder(request)
+    return _render(request, "cartes.html", "/cartes", **ctx, progress=card_game.progress(ctx["groups"]), pulled=pulled,
+                   numbers={s.card.id: s.number for _, found in ctx["groups"] for s in found},
+                   booster_size=card_game.BOOSTER_SIZE, daily_max=card_game.DAILY_ACTIVITY_MAX)
+
+
+@app.get("/cartes", response_class=HTMLResponse)
+def cards_page(request: Request):
+    """Classeur des cartes à collectionner et boosters en réserve."""
+    _guarded("Cartes : boosters gagnés", _card_rewards)
+    return _cards_page(request)
+
+
+@app.post("/cartes/booster", response_class=HTMLResponse)
+def cards_open_booster(request: Request):
+    """Ouvre un booster : la page revient avec ses cartes en tête et le classeur à jour. Sans htmx (formulaire simple),
+    retour au classeur par redirection : recharger la page ne rouvre pas un booster."""
+    cards, _ = _card_pool(request)
+    pulled = card_store.open_booster(cards)
+    if "hx-request" not in request.headers:
+        return RedirectResponse("/cartes", status_code=303)
+    return _cards_page(request, pulled)
+
+
+@app.get("/cartes/{card_id}", response_class=HTMLResponse)
+def card_detail(request: Request, card_id: str, finition: str = ""):
+    """Une carte en grand (fenêtre de détail), dans une des finitions possédées."""
+    ctx = _binder(request)
+    slot = next((s for _, found in ctx["groups"] for s in found if s.card.id == card_id), None)
+    if not slot or not slot.owned:
+        raise HTTPException(404, "Carte inconnue, ou pas encore dans ta collection")
+    return templates.TemplateResponse(request, "_carte_detail.html", {**ctx, "slot": slot, "finish": finition if finition in slot.owned else slot.best})
 
 
 # ============================================================ Notifications

@@ -1,0 +1,15 @@
+{# Une carte en grand, dans la fenêtre de détail : finition choisie parmi celles qu'on possède. #}
+{% import "_carte.html" as c with context %}
+<div class="tcg-detail">
+  <div class="tcg-detail-card">{{ c.face(slot.card, finish, slot.number, total) }}</div>
+  <div class="tcg-detail-side">
+    <h2>{{ slot.card.name }}</h2>
+    <p class="muted">{{ slot.card.family_label }} · {{ slot.card.rarity_label }}</p>
+    <ul class="tcg-finishes">
+      {% for key, (label, _) in finishes.items() %}<li>
+        {% if key in slot.owned %}<a href="/cartes/{{ slot.card.id }}?finition={{ key }}" data-ticket{% if key == finish %} class="active" aria-current="true"{% endif %}><span class="tcg-pip fin-{{ key }} on"></span>{{ label }} <span class="muted">×{{ slot.owned[key] }}</span></a>
+        {% else %}<span class="muted"><span class="tcg-pip fin-{{ key }}"></span>{{ label }} · à trouver</span>{% endif %}
+      </li>{% endfor %}
+    </ul>
+  </div>
+</div>

@@ -421,6 +421,8 @@ code.res, code.req { border-radius: 6px; border-width: 1px; }
 .nav a.nav-item.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 18, 53, .10); }
 .nav-icon { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .nav a.nav-item.active .nav-icon { stroke: var(--accent); }
+/* Boosters à ouvrir, sur « Cartes » (page Cartes : static/cartes.css) */
+.nav-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; }
 .client-chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border: 2px solid var(--border); border-radius: 999px; color: var(--text); font-weight: 600; font-size: 14px; white-space: nowrap; background: var(--surface); transition: border-color .15s; }
 .client-chip:hover { border-color: var(--accent); }
 .client-chip .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); box-shadow: 0 0 0 2px var(--surface); }
@@ -432,7 +434,7 @@ code.res, code.req { border-radius: 6px; border-width: 1px; }
   .topbar { flex-wrap: wrap; position: static; }
   .topbar .nav { order: 3; flex-basis: 100%; }
   .topbar .brand { margin-right: auto; }
-  .nav a.nav-item span { display: none; }
+  .nav a.nav-item span:not(.nav-count) { display: none; }
   .nav a.nav-item { padding: 8px 11px; }
 }
 
@@ -1223,7 +1225,7 @@ a.stat-link:hover .stat-go, a.stat-link:focus-visible .stat-go { opacity: 1; }
 .client-menu a.client-menu-fiche { flex: none; font-size: 12px; font-weight: 600; color: var(--muted); padding: 4px 10px; border: 1px solid var(--border); border-radius: 99px; }
 .client-menu a.client-menu-fiche:hover { color: var(--accent); border-color: var(--accent); }
 /* Barre resserrée (901–1180 px) : onglets inactifs en icône seule, l'onglet actif garde son libellé */
-@media (min-width: 901px) and (max-width: 1180px) { .nav-item:not(.active) > span { display: none; } .nav-item:not(.active) { padding-left: 10px; padding-right: 10px; } }
+@media (min-width: 901px) and (max-width: 1180px) { .nav-item:not(.active) > span:not(.nav-count) { display: none; } .nav-item:not(.active) { padding-left: 10px; padding-right: 10px; } }
 
 /* Raccourcis du client en cours : dock de boutons ronds au bord droit, centré en hauteur ; nom en bulle au survol.
    Pas de rebond de défilement (Mac) : sinon la page rebondit et le dock, fixe, a l'air décroché. */
