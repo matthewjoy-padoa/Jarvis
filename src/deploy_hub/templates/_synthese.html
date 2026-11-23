@@ -49,12 +49,13 @@
   </ul>
 </section>
 
-{# Notes libres et to-do list de ce client : gardées dans data/perso.json, jamais envoyées dans Notion. #}
+{# Notes libres et to-do list de ce client : gardées dans data/perso.json, jamais envoyées dans Notion. Un seul état
+   d'enregistrement pour les deux, en bas du bloc (data-save-scope, notes.js). #}
 {% set note = perso.note(d.slug) %}{% set todo_left = perso.todos_left(d.slug) %}
-<details class="panel fold-panel my-notes">
+<details class="panel fold-panel my-notes" data-save-scope>
   <summary><h2>Mes notes</h2> <span class="muted">{% if todo_left %}· {{ todo_left }} à faire {% endif %}· {{ (note | truncate(70)) if note else "pour moi seulement, jamais envoyées dans Notion" }}</span></summary>
   <textarea name="texte" rows="5" maxlength="20000" placeholder="Ce que je veux retenir sur {{ d.client }} : contacts, décisions, pièges…" aria-label="Mes notes sur {{ d.client }}"
-            hx-post="/perso/note/{{ d.slug }}" hx-trigger="keyup changed delay:800ms, change" hx-target="next .note-out" hx-swap="innerHTML">{{ note }}</textarea>
-  <div class="note-out" role="status"></div>
+            hx-post="/perso/note/{{ d.slug }}" hx-trigger="keyup changed delay:800ms, change" hx-swap="none">{{ note }}</textarea>
   {% with todo_slug = d.slug %}{% include "_todo.html" %}{% endwith %}
+  <div class="save-status" data-save-status role="status"></div>
 </details>

@@ -141,7 +141,7 @@ def test_only_known_tickets_can_be_pinned(client, url):
 
 def test_a_client_note_is_saved_and_shown_on_its_synthese_only(client):
     r = client.post(f"/perso/note/{SLUG}", data={"texte": "Contact : la DSI <le lundi>"})
-    assert r.status_code == 200 and "Enregistré à" in r.text
+    assert r.status_code == 204  # l'état « Enregistré » est écrit par la page (notes.js)
     assert "Contact : la DSI &lt;le lundi&gt;" in client.get(f"/deploiements/{SLUG}/synthese").text
     assert "Contact : la DSI" not in client.get("/deploiements/client-exemple/synthese").text
     assert client.post("/perso/note/inconnu", data={"texte": "x"}).status_code == 404
@@ -156,7 +156,7 @@ def test_every_page_has_the_notes_button_and_its_panel_is_loaded_on_demand(clien
 
 def test_the_notes_panel_holds_the_current_client_note_and_a_general_one(client):
     client.post(f"/perso/note/{SLUG}", data={"texte": "Note du client"})
-    assert "Enregistré à" in client.post("/perso/note", data={"texte": "Penser au <daily>"}).text
+    assert client.post("/perso/note", data={"texte": "Penser au <daily>"}).status_code == 204
     client.cookies.set("jarvis_client", SLUG)
     panel = client.get("/perso/notes").text
     assert f'hx-post="/perso/note/{SLUG}"' in panel and "Note du client" in panel
@@ -259,3 +259,15 @@ def test_unknown_keys_of_the_personal_file_are_kept(tmp_path):
     path.write_text('{"plus_tard": {"x": 1}}', encoding="utf-8")  # donnée d'une version plus récente de Jarvis
     PersonalStore(path).set_note("acme", "Une note")
     assert '"plus_tard"' in path.read_text(encoding="utf-8")
+
+
+def test_every_page_says_when_an_action_did_not_go_through(client):
+    """errors.js : une action htmx qui écrit et échoue (Jarvis injoignable, erreur) le dit ; la to-do list l'accueille."""
+    for page in ("/", f"/deploiements/{SLUG}/synthese", "/reglages"):
+        assert '<script src="/static/errors.js?v=' in client.get(page).text
+    page = client.get(f"/deploiements/{SLUG}/synthese").text  # panneau Notes (base.html) et bloc « Mes notes » de la fiche
+    assert page.count("data-save-scope") == 2 and page.count("data-save-status") == 2  # un état commun par zone
+    panel = client.get("/perso/notes").text
+    assert "note-out" not in panel and 'hx-swap="none"' in panel  # plus d'état sous chaque note
+    script = client.get("/static/errors.js").text
+    assert "htmx:afterRequest" in script and "Non pris en compte" in script

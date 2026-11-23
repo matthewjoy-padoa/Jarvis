@@ -223,11 +223,11 @@ tbody tr:hover td { background: var(--bg); }
 .refresh { position: relative; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 /* Attente, avancement et résultat : dans un encart posé sous le bouton, par-dessus la page. Le bouton ne bouge plus
    (le texte d'attente le poussait de côté, le résultat élargissait la colonne) et rien ne se décale en dessous. */
-.refresh .refresh-out { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+/* Action de l'en-tête qui n'a pas abouti (errors.js, ex. « Synchro auto ») : même encart, un clic le ferme aussi. */
+.refresh .refresh-out, .refresh .request-error { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
   width: max-content; max-width: min(360px, calc(100vw - 32px)); text-align: left; }
-.refresh .refresh-out .result { margin: 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
-  background: var(--surface); box-shadow: var(--shadow-lift); font-size: 13px; }
-.refresh .refresh-out .result { cursor: pointer; }
+.refresh .refresh-out .result, .refresh .request-error { margin: 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); box-shadow: var(--shadow-lift); font-size: 13px; cursor: pointer; }
 .refresh.htmx-request .refresh-out { display: none; }
 .auto-sync-box { display: inline-flex; align-items: center; gap: 8px; }  /* « · prochaine vers 14:15 » puis le bouton */
 .auto-sync:not([aria-pressed="true"]) { color: var(--muted); }  /* petit bouton bascule : mêmes règles que « Vue simplifiée » */
@@ -250,7 +250,7 @@ tbody tr:hover td { background: var(--bg); }
 @media (prefers-reduced-motion: reduce) { .sync-btn::before { transition: none; } .refresh.htmx-request .sync-btn::before { animation: none; } }
 button:disabled { opacity: .5; cursor: not-allowed; }
 @media (max-width: 700px) { .head-side, .refresh { align-items: flex-start; justify-content: flex-start; }
-  .refresh .refresh-out { left: 0; right: auto; } }
+  .refresh .refresh-out, .refresh .request-error { left: 0; right: auto; } }
 
 /* Contenu d'un retour de recette */
 .retour .retour-content { grid-column: 1 / -1; }
@@ -1248,7 +1248,16 @@ html { overscroll-behavior-y: none; }
   background: var(--surface); color: var(--text); font-size: 14px; line-height: 1.55; resize: vertical; }
 .brief-text { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 12px 0; }
 .brief-text:focus, .my-notes textarea:focus, .remind-form input:focus { outline: none; border-color: var(--accent); }
-.note-out .result { margin: 4px 0 0; }
+/* État d'enregistrement commun des notes et to-do lists (notes.js, errors.js) : discret. « Enregistré » en gris s'efface
+   seul ; « Non enregistré » en rouge reste, la raison au survol. */
+.save-status { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.save-status.ok { animation: save-fade 3s ease-in forwards; }
+.save-status.ko { color: var(--danger); cursor: help; }
+@keyframes save-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .save-status.ok { animation: none; } }
+.notes-bar .save-status { margin-left: auto; }
+.notes-bar .save-status + button.notes-close { margin-left: 0; }
+.my-notes .save-status { display: block; min-height: 1.4em; margin-top: 4px; text-align: right; }
 .pin-btn.on { border-color: var(--accent); color: var(--accent); }
 .remind, .remind-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .remind { margin: 4px 0 8px; font-size: 13px; }

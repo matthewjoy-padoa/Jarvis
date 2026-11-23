@@ -1,7 +1,8 @@
 {# To-do list d'un client (todo_slug ; "" : la générale), dans ses notes : bloc-notes flottant et « Mes notes » de sa fiche.
    Gardée dans data/perso.json avec les notes, jamais envoyée dans Notion. Chaque action (ajouter, cocher, supprimer)
    renvoie la liste entière, qui se remplace elle-même. Attend : todo_slug ; todo_added (après un ajout : le champ garde
-   le curseur, htmx le lui rend grâce à autofocus). Échec d'enregistrement et seconde copie de la même liste : notes.js. #}
+   le curseur, htmx le lui rend grâce à autofocus). Seconde copie de la même liste, case remise après un échec et état
+   d'enregistrement commun aux notes : notes.js ; message d'échec : errors.js. #}
 {% set todos = perso.todos(todo_slug) %}{% set left = perso.todos_left(todo_slug) %}
 <div class="todo-box" data-todo-slug="{{ todo_slug }}">
   <p class="notes-todo-head"><strong>À faire</strong>{% if todos %} <span class="muted">· {{ left }} sur {{ todos | length }}</span>{% endif %}</p>

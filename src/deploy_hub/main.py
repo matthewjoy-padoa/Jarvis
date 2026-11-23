@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request, WebSocket
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
@@ -1435,18 +1435,19 @@ def notes_panel(request: Request):
     return templates.TemplateResponse(request, "_notes_panel.html", {"current": _current(request)})
 
 
-@app.post("/perso/note", response_class=HTMLResponse)
-def general_note_save(request: Request, texte: str = Form("")):
-    """Notes générales (sans client) : rangées sous la clé vide de data/perso.json."""
+@app.post("/perso/note", status_code=204)
+def general_note_save(texte: str = Form("")) -> Response:
+    """Notes générales (sans client) : rangées sous la clé vide de data/perso.json. Réponse vide : l'état « Enregistré »
+    est écrit par la page (notes.js), commun aux notes et aux to-do lists."""
     personal.set_note("", texte)
-    return _result(request, ActionResult(True, f"Enregistré à {datetime.now():%H:%M}", simulated=False))
+    return Response(status_code=204)
 
 
-@app.post("/perso/note/{slug}", response_class=HTMLResponse)
-def note_save(request: Request, slug: str, texte: str = Form("")):
+@app.post("/perso/note/{slug}", status_code=204)
+def note_save(slug: str, texte: str = Form("")) -> Response:
     _get(slug)
     personal.set_note(slug, texte)
-    return _result(request, ActionResult(True, f"Enregistré à {datetime.now():%H:%M}", simulated=False))
+    return Response(status_code=204)
 
 
 def _todo_list(request: Request, slug: str | None, added: bool = False) -> HTMLResponse:

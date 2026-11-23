@@ -31,18 +31,29 @@
   });
   // To-do list (_todo.html) : chaque action renvoie la liste, qui se remplace elle-même. La même liste peut être affichée
   // deux fois (ici et sur la fiche) : l'autre copie reçoit la même réponse. Si l'enregistrement échoue (Jarvis injoignable,
-  // erreur), la case revient comme avant et la liste le dit, au lieu de laisser croire que c'est fait.
+  // erreur), la case revient comme avant ; le message, lui, vient d'errors.js, comme pour toute action qui écrit.
   const todoBox = (elt) => elt?.closest?.(".todo-box");
   document.addEventListener("htmx:beforeRequest", (e) => {
     const box = todoBox(e.detail.elt);
     if (!box) return;
-    box.querySelector(".todo-error")?.remove();
     document.querySelectorAll(".todo-box").forEach((other) => {
       if (other !== box && other.dataset.todoSlug === box.dataset.todoSlug) other.dataset.todoStale = "1";
     });
   });
   document.addEventListener("htmx:afterRequest", (e) => {
-    // Repérée par son adresse : une fois la liste remplacée, htmx envoie cet événement au premier parent encore présent.
+    // État d'enregistrement commun : un seul par zone (le panneau, le bloc « Mes notes » de la fiche), pour les notes et
+    // les to-do lists qu'elle contient ([data-save-scope] → [data-save-status]) : « Enregistré », discret, qui s'efface
+    // (CSS) ; les échecs y sont écrits par errors.js. Une liste remplacée n'est plus dans la page : htmx envoie alors cet
+    // événement au premier parent encore présent (e.target), qui est dans la zone.
+    const status = e.target.closest?.("[data-save-scope]")?.querySelector("[data-save-status]");
+    if (status && e.detail.successful && (e.detail.requestConfig?.verb || "get").toLowerCase() !== "get") {
+      status.className = "save-status";
+      void status.offsetWidth;  // relance l'effacement à chaque enregistrement
+      status.className = "save-status ok";
+      status.textContent = "Enregistré";
+      status.removeAttribute("title");
+    }
+    // To-do list, repérée par son adresse (sa copie dans l'autre zone, case remise après un échec).
     if (!(e.detail.pathInfo?.requestPath || "").startsWith("/perso/todo")) return;
     const stale = document.querySelectorAll(".todo-box[data-todo-stale]");
     if (e.detail.successful) {
@@ -60,15 +71,7 @@
       return;
     }
     stale.forEach((other) => delete other.dataset.todoStale);
-    const box = todoBox(e.detail.elt);  // pas remplacée : l'élément cliqué est toujours là
-    if (!box) return;
-    if (e.detail.elt.matches("input[type=checkbox]")) e.detail.elt.checked = !e.detail.elt.checked;
-    const error = document.createElement("p");
-    error.className = "result ko todo-error";
-    error.setAttribute("role", "alert");
-    error.textContent = e.detail.xhr && e.detail.xhr.status ? "Pas enregistré : Jarvis a répondu par une erreur. Recharge la page."
-      : "Pas enregistré : Jarvis ne répond pas. Réessaie dans un instant.";
-    box.appendChild(error);
+    if (todoBox(e.detail.elt) && e.detail.elt.matches("input[type=checkbox]")) e.detail.elt.checked = !e.detail.elt.checked;
   });
   // La même note peut être affichée deux fois (ici et sur la fiche du client) : ce qui est tapé dans l'une est recopié dans l'autre.
   document.addEventListener("input", (e) => {
