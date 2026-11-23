@@ -3,7 +3,7 @@
 Tableau de bord des déploiements clients de l'équipe Integration : ce qui est éparpillé entre Notion, Airflow et l'orchestrator, au même endroit, jusqu'à la bascule.
 
 - **Accueil** : retards, échéances, injections KO, prochains jalons, « Quoi de neuf » depuis ta dernière visite.
-- **Une fiche par client** : synthèse et jalons, injections par ressource (une liste : l'état de chaque ressource, ce qui bloque en haut, la stack choisie une fois et un bouton « Lancer » par ligne, pour chaque ressource et chaque groupe de ressources), actions par équipe, retours de recette (avec brief pour un agent Claude), règles de reprise, CED.
+- **Une fiche par client** : synthèse et jalons, injections par ressource (une liste : l'état de chaque ressource, ce qui bloque en haut, la stack choisie une fois et un bouton « Lancer » par ligne, pour chaque ressource et chaque groupe de ressources ; ouvrir une ligne montre ses cartes et ses derniers DAG lancés, qui mènent à leur suivi), actions par équipe, retours de recette (avec brief pour un agent Claude), règles de reprise, CED.
 - **Notifications** : agent terminé, changements urgents, échéances, avancement qui se dégrade, rappels arrivés à échéance. Une fois « Activer les notifications du Mac » cliqué (**Réglages → Notifications du Mac**), elles arrivent sur le Mac même onglet fermé (Web Push, [`sources/web_push.py`](src/deploy_hub/sources/web_push.py)) : le navigateur doit rester lancé ; le contenu part chiffré de bout en bout vers le service de push du navigateur ; clé et abonnements dans `data/push/`.
 - **Pour moi seulement** : brief du matin à copier, tickets épinglés, notes, rappels (voir [Perso](#perso)).
 
