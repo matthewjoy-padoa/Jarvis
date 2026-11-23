@@ -340,9 +340,19 @@ class Deployment:
     @property
     def injection_blocks(self) -> list[dict]:
         """Cartes d'injection regroupées par ressources liées, les blocs à problème d'abord (KO, puis en cours…)."""
+        return self._injection_blocks(lambda a: [tuple(a.resources)])
+
+    @property
+    def injection_lines(self) -> list[dict]:
+        """Lignes de l'onglet Injections : comme injection_blocks, mais une ressource par ligne (donc un DAG à lancer) ;
+        une carte liée à plusieurs ressources est sous chacune. Les cartes sans ressource liée forment la dernière ligne."""
+        return self._injection_blocks(lambda a: [(r,) for r in a.resources] or [()])
+
+    def _injection_blocks(self, keys_of) -> list[dict]:
         blocks: dict[tuple[str, ...], list[Action]] = {}
         for a in self.injection_cards:
-            blocks.setdefault(tuple(a.resources), []).append(a)
+            for key in keys_of(a):
+                blocks.setdefault(key, []).append(a)
         rank = {KO: 0, IN_PROGRESS: 1, TODO: 2, DONE: 3}
         out = []
         for key, cards in blocks.items():
@@ -358,13 +368,21 @@ class Deployment:
             })
         return sorted(out, key=lambda b: (not b["resources"], b["worst"], b["label"]))
 
+    def injection_state(self, resources) -> dict:
+        """Où en sont les cartes d'injection liées à l'une de ces ressources (ligne d'un groupe, onglet Injections) :
+        {group: l'état le plus en retard, vide sans carte ; cards ; ko}."""
+        groups = [a.injection_group for a in self.injection_cards if set(a.resources) & set(resources)]
+        worst = next((g for g in (KO, IN_PROGRESS, TODO, DONE) if g in groups), "")
+        return {"group": worst, "cards": len(groups), "ko": groups.count(KO)}
+
     @property
     def blocking_points(self) -> list[dict]:
         """« Où ça coince » : blocs d'injection (cartes regroupées par ressources liées, comme l'onglet Injections) et types de
         retours de recette qui ont au moins un KO, les plus de KO d'abord, puis le plus d'éléments ouverts.
         Un KO d'injection et un KO de recette pèsent pareil. Chaque point mène à sa liste (bloc ou filtre « type »)."""
         points = [{"kind": "injection", "label": b["label"], "resources": b["resources"], "counts": b["counts"], "total": len(b["cards"]),
-                   "href": f"/deploiements/{self.slug}/injections?vue=ressources#{self.slug}-{b['id']}"} for b in self.injection_blocks]
+                   "href": f"/deploiements/{self.slug}/injections?vue=ressources#{self.slug}-{(b['resources'] or [b['id']])[0]}"}  # la ligne de sa première ressource
+                  for b in self.injection_blocks]
         by_type: dict[str, list[str]] = {}
         for r in self.retours:
             by_type.setdefault(r.data_type, []).append(r.group)

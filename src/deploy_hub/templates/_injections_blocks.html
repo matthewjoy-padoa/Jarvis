@@ -1,17 +1,133 @@
 {% import "_icons.html" as ic %}
-{# Attend : deployments, show_client. Cartes d'injection regroupées par ressources liées (Deployment.injection_blocks) :
-   un bloc par ressource, son état, le DAG à lancer une fois pour toutes les cartes du bloc. #}
-{% import "_charts.html" as charts with context %}
-<div class="toolbar blocks-toolbar" data-blocks-toolbar>
+{# Attend : deployments, show_client, padoa_envs. Vue « Par ressource » de l'onglet Injections : une liste, une ligne par
+   ressource (ses cartes d'injection, Deployment.injection_lines ; une carte liée à deux ressources est sous chacune), ce qui bloque en haut.
+   Se repérer : un point de couleur, l'état le plus en retard de ses cartes, la carte en KO nommée. Lancer vite : la stack
+   se choisit une fois, en haut ; « Lancer » lance le DAG affiché dans la liste à côté de lui : l'ETL de la ressource par
+   défaut, un autre au choix. Un clic sur la ligne montre ses cartes et ses derniers DAG lancés (état, stack, dernière
+   nouvelle d'air.py), chacun menant à la page de son suivi. Sous les ressources, une ligne par groupe de
+   ressources du catalogue (dags.groups_for) : « Lancer » y prend l'ETL du groupe ; un groupe ne se lance que de là. #}
+<div class="toolbar inj-toolbar" data-inj-toolbar>
   <input type="search" placeholder="Rechercher une ressource ou une carte…" aria-label="Rechercher">
-  <div class="segmented" role="group" aria-label="Filtrer les blocs">
-    <a href="#" data-show="" class="active">Tous</a><a href="#" data-show="ko">Avec KO</a><a href="#" data-show="in_progress">En cours</a><a href="#" data-show="todo">À faire</a><a href="#" data-show="done">Terminés</a>
-  </div>
-  <button type="button" class="secondary" data-toggle-all>Tout déplier</button>
+  <label class="inj-stack dag-form" data-dag-form>Lancer sur <select name="padoa_env" data-inj-stack aria-label="Stack cible">{% for e in padoa_envs %}<option value="{{ e }}">{{ e }}</option>{% endfor %}</select></label>
   <span class="muted count-label"></span>
 </div>
+{# Champ « dag_id » d'un formulaire de ligne : caché s'il n'y a qu'un DAG ; sinon une liste courte (« ETL », « Transform &
+   load », « ETL groupe … ») qui montre celui qui part, le premier proposé. inside_group : la ligne nomme déjà le groupe ;
+   customers : les clients orchestrator de la fiche (s'il y en a plusieurs, chaque DAG dit le sien). #}
+{% macro dag_field(choices, customers, inside_group=false) %}
+{% if choices | length > 1 %}<select name="dag_id" class="dag-pick" aria-label="DAG à lancer">{% for c in choices %}<option value="{{ c.dag_id }}" title="{{ c.dag_id }}">{{ c.short.replace(" groupe " ~ c.groupe, "") if inside_group else c.short }}{% if customers | length > 1 %} ({{ c.customer }}){% endif %}</option>{% endfor %}</select>
+{% else %}<input type="hidden" name="dag_id" value="{{ choices[0].dag_id }}">{% endif %}
+{% endmacro %}
+{# Derniers DAG lancés d'une ligne (runs_of : suivis d'air.py). last_run : pastille sur la ligne, le dernier seulement ;
+   last_runs : quand on ouvre la ligne, le dernier, puis « Voir plus » ajoute les précédents 3 par 3 (il peut y en avoir
+   beaucoup). Chacun mène à la page du suivi (journal, rapport de fin). #}
+{% macro last_run(runs) %}
+{% if runs %}{% set w = runs[0][0] %}<a class="badge g-{{ w.group }} inj-last" href="/agents/suivis/{{ w.id }}" title="Dernier DAG lancé : {{ runs[0][1].short }} sur {{ w.padoa_env }}, {{ w.started_at | quand }}. Ouvrir son suivi.">{{ w.padoa_env }} · {{ w.status }}</a>{% endif %}
+{% endmacro %}
+{% macro last_runs(runs) %}
+<p class="inj-sub">Dernier DAG lancé</p>
+{% if runs %}
+<ul class="inj-runs">
+  {% for w, dag in runs %}
+  <li{% if not loop.first %} hidden{% endif %}><a href="/agents/suivis/{{ w.id }}" title="Ouvrir le suivi #{{ w.id }} : journal et rapport de fin">
+    <span class="inj-run-when">{{ w.started_at | quand }}</span>
+    <span class="badge">{{ w.padoa_env }}</span>
+    <span class="badge g-{{ w.group }}">{{ w.status }}{% if w.ended_at %} · {{ (w.ended_at - w.started_at) | duree }}{% endif %}</span>
+    <span>{{ dag.short }}</span>
+    {% if w.summary %}<span class="muted">{{ w.summary | truncate(140) }}</span>{% endif %}
+  </a></li>
+  {% endfor %}
+  {% if runs | length >= RUNS_SHOWN %}<li hidden><a href="/agents#dags">Les runs plus anciens sont dans Agents → DAG</a></li>{% endif %}
+</ul>
+{% if runs | length > 1 %}<button type="button" class="secondary inj-more" data-inj-more>Voir plus</button>{% endif %}
+{% else %}<p class="muted inj-none">Aucun DAG lancé depuis Jarvis pour cette ligne.</p>{% endif %}
+{% endmacro %}
 {% for d in deployments %}
-{% if show_client and d.injection_blocks %}<h2>{{ d.client }}</h2>{% endif %}
+{% if show_client and (d.injection_lines or d.resources) %}<h2>{{ d.client }}</h2>{% endif %}
+{% if d.injection_lines or d.resources %}
+<ul class="inj-list">
+{% for b in d.injection_lines %}
+  {% set choices = dags_for(d.orchestrator, b.resources) %}
+  {% set worst = b.cards[0] %}{# cartes triées : la plus en retard d'abord #}
+  {% set runs = runs_of(choices) %}
+  <li class="inj-row" id="{{ d.slug }}-{{ b.id }}" data-group="{{ worst.injection_group }}">
+    <span class="key g-{{ worst.injection_group }}" aria-hidden="true"></span>
+    <details class="inj-what">
+      <summary>
+        <span class="res-name">{% for r in b.resources %}<code class="res">{{ r }}</code> {% else %}<span class="muted">{{ b.label }}</span>{% endfor %}</span>
+        <span class="inj-state">{{ worst.injection_status or "sans statut" }}{% if worst.injection_group == "ko" %} · {{ worst.title }}{% endif %}{% if b.cards | length > 1 %} · {{ b.cards | length }} cartes{% endif %}</span>
+        {{ last_run(runs) }}
+      </summary>
+      <table>
+        <tbody>
+        {% for a in b.cards %}
+          <tr><td>{% if a.notion_url %}<a href="{{ a.notion_url }}" target="_blank" rel="noopener">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}{% if a.vigilance %} {{ ic.icon("alert", "Point de vigilance", "ic-alert") }}{% endif %}</td>
+            <td><span class="badge g-{{ a.injection_group }}">{{ a.injection_status }}</span></td>
+            <td class="muted">{{ a.due.strftime("%d/%m/%Y") if a.due else "—" }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {{ last_runs(runs) }}
+    </details>
+    {% if choices %}
+    <form class="dag-form inj-go" hx-post="/actions/injection/{{ d.slug }}" hx-target="next .dag-out" data-dag-form>
+      <input type="hidden" name="card" value="{{ b.label }}">
+      <input type="hidden" name="padoa_env" value="{{ padoa_envs[0] }}" data-inj-env>
+      {{ dag_field(choices, d.orchestrator) }}
+      <button type="submit" title="{{ choices[0].label }}">Lancer</button>
+    </form>
+    {% elif b.resources %}<span class="muted inj-go" title="Aucun DAG de {{ d.orchestrator | join(', ') or d.client }} ne traite {{ b.label }} dans dags/config_deployment.py">aucun DAG{% if not d.orchestrator %} (client absent de l'orchestrator){% endif %}</span>
+    {% else %}<span class="muted inj-go" title="Ces cartes n'ont pas de ressource liée dans Notion (ni sur la carte, ni sur sa carte Bible)">pas de ressource liée</span>{% endif %}
+    <div class="dag-out"></div>
+  </li>
+{% endfor %}
+{% for r in d.resources %}
+  {% set out = "out-" ~ d.slug ~ "-" ~ r.name %}
+  <li class="inj-row" id="{{ d.slug }}-fiche-{{ r.name }}" data-group="{{ r.group }}">
+    <span class="key g-{{ r.group }}" aria-hidden="true"></span>
+    <div class="inj-what"><span class="res-name"><code class="res">{{ r.name }}</code></span> <span class="inj-state">{{ r.status }}{% if r.note %} · {{ r.note }}{% endif %}</span></div>
+    <span class="inj-go">
+      {% if r.dag_id %}<form class="dag-form" hx-post="/actions/dag/{{ r.dag_id }}" hx-target="#{{ out }}" data-dag-form>
+        <input type="hidden" name="dag_id" value="{{ r.dag_id }}">
+        <input type="hidden" name="padoa_env" value="{{ padoa_envs[0] }}" data-inj-env>
+        <button type="submit" title="{{ r.dag_id }}">Lancer</button></form>{% endif %}
+      <button class="secondary" hx-post="/actions/claude/{{ d.slug }}/{{ r.name }}" hx-target="#{{ out }}" hx-confirm="Lancer Claude sur {{ r.name }} ?">Claude</button>
+    </span>
+    <div class="dag-out" id="{{ out }}"></div>
+  </li>
+{% endfor %}
+</ul>
+{% endif %}
+{% set groups = groups_for(d.orchestrator) %}
+{% if groups %}
+<h3 class="inj-title">Groupes de ressources</h3>
+<ul class="inj-list">
+{% for g in groups %}
+  {% set state = d.injection_state(g.resources) %}
+  {% set runs = runs_of(g.dags) %}
+  <li class="inj-row" id="{{ d.slug }}-groupe-{{ g.customer }}-{{ g.groupe }}" data-group="{{ state.group }}">
+    <span class="key g-{{ state.group or 'other' }}" aria-hidden="true"></span>
+    <details class="inj-what">
+      <summary>
+        <span class="res-name"><strong>{{ g.groupe }}</strong>{% if d.orchestrator | length > 1 %} <span class="muted">({{ g.customer }})</span>{% endif %}</span>
+        <span class="inj-state">{{ g.resources | length }} ressource{{ "s" if g.resources | length > 1 }}{% if state.ko %} · {{ state.ko }} carte{{ "s" if state.ko > 1 }} en KO{% elif not state.cards %} · aucune carte d'injection{% endif %}</span>
+        {{ last_run(runs) }}
+      </summary>
+      <p class="inj-members">{% for r in g.resources %}<code class="res">{{ r }}</code> {% endfor %}</p>
+      {{ last_runs(runs) }}
+    </details>
+    <form class="dag-form inj-go" hx-post="/actions/injection/{{ d.slug }}" hx-target="next .dag-out" data-dag-form>
+      <input type="hidden" name="card" value="Groupe {{ g.groupe }}">
+      <input type="hidden" name="padoa_env" value="{{ padoa_envs[0] }}" data-inj-env>
+      {{ dag_field(g.dags, d.orchestrator, inside_group=true) }}
+      <button type="submit" title="{{ g.dags[0].label }}">Lancer</button>
+    </form>
+    <div class="dag-out"></div>
+  </li>
+{% endfor %}
+</ul>
+{% endif %}
+{% if not (d.injection_lines or d.resources or groups) %}<p class="muted">Aucune carte d'injection{% if show_client %} pour {{ d.client }}{% endif %}.</p>{% endif %}
 {% set all_dags = dags_for(d.orchestrator) %}
 {% if all_dags | length > 1 %}
 <details class="panel chain-box">
@@ -30,59 +146,6 @@
   <div class="dag-out"></div>
 </details>
 {% endif %}
-<div class="res-blocks">
-{% for b in d.injection_blocks %}
-  {% set choices = dags_for(d.orchestrator, b.resources) %}
-  <details class="res-block worst-{{ b.worst }}" id="{{ d.slug }}-{{ b.id }}" data-groups="{{ b.counts | dictsort | selectattr('1') | map(attribute='0') | join(' ') }}"{% if b.worst == 0 %} open{% endif %}>
-    <summary>
-      <span class="res-name">{% for r in b.resources %}<code class="res">{{ r }}</code> {% else %}<span class="muted">{{ b.label }}</span>{% endfor %}</span>
-      <span class="res-count muted">{{ b.cards | length }} carte(s)</span>
-      <span class="res-bar">{{ charts.segbar("", b.counts, thin=true) }}</span>
-      <span class="res-status">{% for g, n in b.counts.items() if n %}<span class="badge g-{{ g }}">{{ n }} {{ {"todo": "à faire", "in_progress": "en cours", "ko": "KO", "done": "terminé"}[g] }}</span>{% endfor %}</span>
-    </summary>
-    <div class="res-body">
-      {% if choices %}
-      <form class="dag-form" hx-post="/actions/injection/{{ d.slug }}" hx-target="next .dag-out" data-dag-form>
-        <input type="hidden" name="card" value="{{ b.label }}">
-        <span class="muted">Relancer :</span>
-        <select name="dag_id" aria-label="DAG">{% for c in choices %}<option value="{{ c.dag_id }}" title="{{ c.dag_id }}">{{ c.label }}</option>{% endfor %}</select>
-        <select name="padoa_env" aria-label="Stack cible">{% for e in padoa_envs %}<option value="{{ e }}">{{ e }}</option>{% endfor %}</select>
-        <button type="submit">Lancer</button>
-      </form>
-      <div class="dag-out"></div>
-      {% elif b.resources %}<p class="muted">Aucun DAG de {{ d.orchestrator | join(", ") or d.client }} ne traite {{ b.label }}.</p>
-      {% else %}<p class="muted">Ces cartes n'ont pas de ressource liée dans Notion (ni sur la carte, ni sur sa carte Bible).</p>{% endif %}
-      <table>
-        <tbody>
-        {% for a in b.cards %}
-          <tr><td>{% if a.notion_url %}<a href="{{ a.notion_url }}" target="_blank" rel="noopener">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}{% if a.vigilance %} {{ ic.icon("alert", "Point de vigilance", "ic-alert") }}{% endif %}</td>
-            <td><span class="badge g-{{ a.injection_group }}">{{ a.injection_status }}</span></td>
-            <td class="muted">{{ a.due.strftime("%d/%m/%Y") if a.due else "—" }}</td></tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </details>
-{% else %}{% if not d.resources %}<p class="muted">Aucune carte d'injection{% if show_client %} pour {{ d.client }}{% endif %}.</p>{% endif %}{% endfor %}
-</div>
-{% if d.resources %}
-<table>
-  <thead><tr><th>Ressource (fiche)</th><th>Statut</th><th data-nosort>Actions</th></tr></thead>
-  <tbody>
-  {% for r in d.resources %}
-    <tr><td><code class="res">{{ r.name }}</code>{% if r.note %} <span class="muted">{{ r.note }}</span>{% endif %}</td>
-      <td><span class="badge g-{{ r.group }}">{{ r.status }}</span></td>
-      <td class="actions">{% set out = "out-" ~ d.slug ~ "-" ~ r.name %}
-        {% if r.dag_id %}<form class="dag-form" hx-post="/actions/dag/{{ r.dag_id }}" hx-target="#{{ out }}" data-dag-form>
-          <input type="hidden" name="dag_id" value="{{ r.dag_id }}">
-          <select name="padoa_env" aria-label="Stack cible">{% for e in padoa_envs %}<option value="{{ e }}">{{ e }}</option>{% endfor %}</select>
-          <button type="submit" class="secondary">Lancer le DAG</button></form>{% endif %}
-        <button class="secondary" hx-post="/actions/claude/{{ d.slug }}/{{ r.name }}" hx-target="#{{ out }}" hx-confirm="Lancer Claude sur {{ r.name }} ?">Lancer Claude</button>
-        <div id="{{ out }}"></div></td></tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% endif %}
 {% endfor %}
 <script>
   // Enchaînement : l'ordre des clics devient l'ordre de passage (numéro devant chaque DAG coché, champ « ordre »).
@@ -100,43 +163,60 @@
       form.elements.ordre.value = picked.join(",");
     });
   });
-  // Blocs de ressources : recherche, filtre par état, tout déplier ; un lien #<client>-<ressource> ouvre le bloc.
-  // Recherche et état choisi sont gardés dans ce navigateur, par page (comme les filtres de filters.js), sauf arrivée
-  // par un lien vers un bloc : il doit rester visible.
+  // Liste des ressources : la stack choisie en haut vaut pour tous les boutons « Lancer » ; recherche ; un lien
+  // #<client>-<ressource> (« Où ça coince ») ouvre la ligne. La stack est gardée dans ce navigateur, sauf la prod :
+  // elle se rechoisit à chaque visite.
   (function () {
-    const bar = document.querySelector("[data-blocks-toolbar]"), blocks = [...document.querySelectorAll(".res-block")];
+    const bar = document.querySelector("[data-inj-toolbar]");
     if (!bar) return;
-    const search = bar.querySelector("input"), count = bar.querySelector(".count-label"), toggle = bar.querySelector("[data-toggle-all]");
-    const memory = `jarvis.filtres:${location.pathname}:blocs`;
-    const target = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
-    let show = "";
-    if (!target) try {
-      const saved = JSON.parse(localStorage.getItem(memory)) || {};
-      search.value = saved.q || "";
-      const pill = bar.querySelector(`[data-show="${CSS.escape(saved.show || "")}"]`);
-      if (pill) { show = pill.dataset.show; bar.querySelectorAll("[data-show]").forEach((x) => x.classList.toggle("active", x === pill)); }
+    const search = bar.querySelector("input"), stack = bar.querySelector("[data-inj-stack]"), count = bar.querySelector(".count-label");
+    const rows = [...document.querySelectorAll(".inj-row")], memory = "jarvis.injections.stack";
+    function setStack() {  // la liste du haut passe elle-même en alerte sur la prod (dag.js) ; ici, les boutons « Lancer »
+      const prod = stack.value === "prod";
+      document.querySelectorAll("[data-inj-env]").forEach((field) => {
+        field.value = stack.value;
+        field.closest("[data-dag-form]").classList.toggle("is-prod", prod);
+      });
+      try { prod ? localStorage.removeItem(memory) : localStorage.setItem(memory, stack.value); } catch (e) {}
+    }
+    try {
+      const saved = localStorage.getItem(memory);
+      if (saved && [...stack.options].some((o) => o.value === saved)) stack.value = saved;
     } catch (e) {}
+    stack.addEventListener("change", setStack);
+    setStack();
+    // Liste des DAG : large comme l'option choisie, pas comme la plus longue. Le CSS le fait (field-sizing) ; à défaut, on
+    // mesure le texte choisi.
+    if (!CSS.supports("field-sizing", "content")) {
+      const ruler = document.createElement("canvas").getContext("2d");
+      const fit = (pick) => {
+        const style = getComputedStyle(pick);
+        ruler.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+        pick.style.width = `${Math.ceil(ruler.measureText(pick.options[pick.selectedIndex].text).width) + 38}px`;  // + marges et flèche
+      };
+      document.querySelectorAll(".dag-pick").forEach((pick) => { fit(pick); pick.addEventListener("change", () => fit(pick)); });
+    }
+    // « Voir plus » : montre les 3 runs suivants de la ligne ; plus rien à montrer, le bouton disparaît.
+    document.addEventListener("click", (e) => {
+      const more = e.target.closest("[data-inj-more]");
+      if (!more) return;
+      const hidden = [...more.previousElementSibling.querySelectorAll("li[hidden]")];
+      hidden.slice(0, 3).forEach((li) => { li.hidden = false; });
+      if (hidden.length <= 3) more.remove();
+    });
+    const fold = (text) => text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");  // sans accents ni majuscules
     function apply() {
-      const q = search.value.toLowerCase(); let n = 0;
-      for (const b of blocks) {
-        const ok = (!q || b.textContent.toLowerCase().includes(q)) && (!show || b.dataset.groups.split(" ").includes(show));
-        b.hidden = !ok; n += ok;
-        if (q && ok) b.open = true;
-      }
-      count.textContent = `${n} / ${blocks.length} ressources`;
-      try { q || show ? localStorage.setItem(memory, JSON.stringify({ q: search.value, show })) : localStorage.removeItem(memory); } catch (e) {}
+      const q = fold(search.value); let n = 0;
+      for (const row of rows) { const ok = !q || fold(row.textContent).includes(q); row.hidden = !ok; n += ok; }
+      count.textContent = q ? `${n} / ${rows.length} lignes` : `${rows.length} lignes`;
     }
     search.addEventListener("input", apply);
-    bar.querySelectorAll("[data-show]").forEach((a) => a.addEventListener("click", (e) => {
-      e.preventDefault(); show = a.dataset.show;
-      bar.querySelectorAll("[data-show]").forEach((x) => x.classList.toggle("active", x === a)); apply();
-    }));
-    toggle.addEventListener("click", () => {
-      const open = toggle.textContent === "Tout déplier";
-      blocks.forEach((b) => { if (!b.hidden) b.open = open; });
-      toggle.textContent = open ? "Tout replier" : "Tout déplier";
-    });
-    if (target && target.classList.contains("res-block")) { target.open = true; target.scrollIntoView({ block: "start" }); }
     apply();
+    const target = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    if (target && target.classList.contains("inj-row")) {
+      const more = target.querySelector("details");
+      if (more) more.open = true;
+      target.scrollIntoView({ block: "center" });
+    }
   })();
 </script>

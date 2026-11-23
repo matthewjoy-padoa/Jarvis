@@ -285,6 +285,18 @@ templates.env.globals["RETOUR_STATUSES"] = RETOUR_STATUSES
 templates.env.globals["console_commands"] = list(console.COMMANDS)  # complétion par Tab dans la console
 
 
+RUNS_SHOWN = 25  # runs d'une ligne de l'onglet Injections : le dernier s'affiche, « Voir plus » ajoute les suivants 3 par 3
+
+
+def _runs_of(choices, limit: int = RUNS_SHOWN) -> list[tuple]:
+    """Derniers runs suivis (air.py) des DAG d'une ligne de l'onglet Injections, le plus récent d'abord : (suivi, DAG).
+    Au-delà de la limite, la ligne renvoie à Agents → DAG, qui les a tous."""
+    by_id = {c.dag_id: c for c in choices}
+    return [(w, by_id[w.dag_id]) for w in dag_watch.watches if w.dag_id in by_id][:limit]
+
+
+templates.env.globals["runs_of"] = _runs_of
+templates.env.globals["RUNS_SHOWN"] = RUNS_SHOWN
 templates.env.globals["dag_source_status"] = lambda: dag_source.status(dag_catalogue.CATALOGUE)  # bandeau Injections
 
 # Pages globales et onglets d'une fiche, calqués sur les blocs du dashboard Notion.
@@ -403,6 +415,7 @@ def _render(request: Request, template: str, active: str, **context) -> HTMLResp
             "airflow": airflow,
             "dags_for": dag_catalogue.dags_for,
             "ced_for": dag_catalogue.ced_for,
+            "groups_for": dag_catalogue.groups_for,
             "padoa_envs": PADOA_ENVS,
             "notion_ready": notion_api.load_token() is not None or sync_routine.problem() is None,  # jeton, ou routine via Claude
             "sync_running": sync_routine.running,  # synchro lancée avant ce chargement : le bouton reprend son avancement

@@ -34,6 +34,12 @@ class DagChoice:
         what = f"groupe {self.groupe}" if self.groupe else ", ".join(self.resources)
         return f"{TYPE_LABELS.get(self.type, self.type)} · {what} ({self.customer})"
 
+    @property
+    def short(self) -> str:
+        """Libellé court, là où la ligne dit déjà la ressource : « ETL », « Transform & load », « ETL groupe medical »."""
+        kind = TYPE_LABELS.get(self.type, self.type)
+        return f"{kind} {self.groupe}" if self.groupe else kind.removesuffix(" ressource")
+
 
 @lru_cache(maxsize=4)
 def _load(path: str, mtime: float) -> dict:
@@ -60,6 +66,17 @@ def dags_for(customers: list[str], resources: list[str] | None = None, path: Pat
             if hit:
                 choices.append(DagChoice(dag_id, customer, dag["type"], dag.get("groupe", ""), hit))
     return sorted(choices, key=lambda c: (TYPE_ORDER.get(c.type, 9), c.customer, c.dag_id))
+
+
+def groups_for(customers: list[str], path: Path | None = None) -> list[dict]:
+    """Groupes de ressources des clients orchestrator, d'après leurs DAG de groupe :
+    {groupe, customer, resources, dags: [DagChoice]} (l'ETL du groupe d'abord, puis son transform & load)."""
+    groups: dict[tuple[str, str], dict] = {}
+    for c in dags_for(customers, path=path):
+        if c.groupe:
+            group = groups.setdefault((c.customer, c.groupe), {"groupe": c.groupe, "customer": c.customer, "resources": c.resources, "dags": []})
+            group["dags"].append(c)
+    return sorted(groups.values(), key=lambda g: (g["customer"], g["groupe"]))
 
 
 def ced_for(customers: list[str], path: Path | None = None) -> list[dict]:

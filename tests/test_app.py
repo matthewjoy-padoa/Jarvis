@@ -114,7 +114,7 @@ def test_deadlines_skip_done_actions_and_closed_retours():
     ("tab", "expected"),
     [
         ("synthese", "Points de vigilance"),
-        ("injections", "Lancer le DAG"),
+        ("injections", "Lancer sur"),
         ("actions", "Volume de documents CED"),
         ("recette", "Lancer un agent"),
         ("regles", "Ne pas reprendre les visites sans date"),
@@ -211,8 +211,8 @@ def test_filters_are_remembered_per_page_in_the_browser():
     assert "if (s.value && !isClient(k)) f[k] = s.value; else delete f[k];" in js
     assert "const saved = fromAnchor ? {} : recall(entry.memory);" in js
     assert "s.options.some((o) => o.value === v)" in js  # une valeur disparue des données n'est pas remise
-    blocs = client.get("/deploiements/client-demo/injections").text  # vue « Par ressource » : sa recherche et son état aussi
-    assert "`jarvis.filtres:${location.pathname}:blocs`" in blocs and "localStorage.setItem(memory" in blocs
+    blocs = client.get("/deploiements/client-demo/injections").text  # vue « Par ressource » : la stack choisie est gardée, sauf la prod
+    assert 'memory = "jarvis.injections.stack"' in blocs and "prod ? localStorage.removeItem(memory) : localStorage.setItem(memory" in blocs
 
 
 def test_each_filter_accepts_several_values():
@@ -228,7 +228,7 @@ def test_each_filter_accepts_several_values():
     ("path", "expected"),
     [
         ("/deploiements/client-demo/synthese", ["Avancement dans le calendrier", "Injections (cartes)", "Retours de recette"]),
-        ("/deploiements/client-demo/injections", ["Répartition des injections", 'class="segbar"']),
+        ("/deploiements/client-demo/injections?vue=liste", ["Répartition des injections", 'class="segbar"']),
         ("/deploiements/client-demo/recette", ["Statut des retours", "Retours ouverts par type de données"]),
         ("/deploiements/client-demo/regles", ["Règles par type"]),
         ("/actions", ['class="counts"', "en retard", "point(s) de vigilance", "date(s) clé(s) à venir"]),

@@ -59,6 +59,54 @@ def test_injection_tab_offers_the_card_dags_and_the_stacks(app):
         assert f'<option value="{env}">' in html
 
 
+def test_resource_groups_have_their_own_line(app, monkeypatch):
+    groups = dag_catalogue.groups_for(["acme-uegar", "acme-pulse"])
+    assert [(g["customer"], g["groupe"], g["resources"]) for g in groups] == [("acme-pulse", "firm_base", ("firm",)), ("acme-uegar", "firm_base", ("firm", "firm_status"))]
+    html = app.get("/deploiements/acme/injections").text
+    assert "Groupes de ressources" in html and 'id="acme-groupe-acme-uegar-firm_base" data-group="todo"' in html  # état : celui des cartes de ses ressources
+    line = html[html.index('id="acme-groupe-acme-uegar-firm_base"'):]
+    assert 'name="card" value="Groupe firm_base"' in line and 'name="dag_id" value="acme-uegar-etl_group-firm_base"' in line
+
+
+def test_a_card_with_several_resources_is_under_each_of_them(app, monkeypatch):
+    d = Deployment(slug="acme", client="Acme", software="Uegar", orchestrator=["acme-uegar"],
+                   actions=[Action(title="Firms et statuts", injection=True, injection_status="A faire", resources=["firm", "firm_status"])])
+    monkeypatch.setattr(main.fiches, "get_deployment", lambda slug: d)
+    assert [(b["id"], b["resources"], len(b["cards"])) for b in d.injection_lines] == [("firm", ["firm"], 1), ("firm_status", ["firm_status"], 1)]
+    page = app.get("/deploiements/acme/injections").text
+    firm = page[page.index('id="acme-firm"'):page.index('id="acme-firm_status"')]
+    assert firm.index('<option value="acme-uegar-etl-firm"') < firm.index('<option value="acme-uegar-etl_group-firm_base"')  # l'ETL de la ressource d'abord
+    assert ">ETL</option>" in firm and ">ETL groupe firm_base</option>" in firm and ">Lancer</button>" in firm  # la liste dit ce qui part
+    assert "Lancer le groupe" not in page  # un groupe ne se lance que de sa ligne, section « Groupes de ressources »
+
+
+def test_a_line_shows_its_last_runs_and_leads_to_their_watch(app, monkeypatch, tmp_path):
+    from datetime import datetime, timedelta
+    from deploy_hub.sources.dag_watch import DagWatch, DagWatcher
+    watcher = DagWatcher(tmp_path / "airflow", None, {})
+    now = datetime.now()
+    watcher.watches = [
+        DagWatch(3, "acme", "Acme", "acme-uegar", "acme-uegar-etl_group-firm_base", "manual__3", "recette", "Groupe firm_base", now, "suivi en cours"),
+        DagWatch(2, "acme", "Acme", "acme-uegar", "acme-uegar-etl-vaccine", "manual__2", "snap", "Vaccins", now - timedelta(hours=1), "vert", now),
+        DagWatch(1, "acme", "Acme", "acme-uegar", "acme-uegar-etl-firm", "manual__1", "snap", "Firms", now - timedelta(hours=2), "en échec ou incomplet",
+                 now - timedelta(hours=1, minutes=50), "firm en échec · voir le rapport"),
+    ]
+    monkeypatch.setattr(main, "dag_watch", watcher)
+    page = app.get("/deploiements/acme/injections").text
+    firm = page[page.index('id="acme-firm"'):page.index("Groupes de ressources")]
+    # ligne de firm : son ETL (#1) et son groupe (#3), pas l'ETL d'une autre ressource (#2) ; la pastille dit le plus récent
+    assert 'class="badge g-in_progress inj-last" href="/agents/suivis/3"' in firm and "recette · suivi en cours" in firm
+    assert firm.index('href="/agents/suivis/3" title="Ouvrir') < firm.index('href="/agents/suivis/1" title="Ouvrir') and "/agents/suivis/2" not in firm
+    assert "firm en échec · voir le rapport" in firm and "en échec ou incomplet · 10 min" in firm
+    assert '<li><a href="/agents/suivis/3"' in firm and '<li hidden><a href="/agents/suivis/1"' in firm  # le dernier seul ; les autres attendent
+    assert firm.count("data-inj-more>Voir plus</button>") == 1 and "hidden.slice(0, 3)" in page  # « Voir plus » : 3 de plus à chaque clic
+    group = page[page.index('id="acme-groupe-acme-uegar-firm_base"'):]
+    assert 'href="/agents/suivis/3" title="Ouvrir' in group and "/agents/suivis/1" not in group  # la ligne du groupe : ses DAG seulement
+    assert "data-inj-more>Voir plus" not in group  # un seul run : pas de bouton
+    monkeypatch.setattr(main, "dag_watch", DagWatcher(tmp_path / "vide", None, {}))
+    assert "Aucun DAG lancé depuis Jarvis pour cette ligne." in app.get("/deploiements/acme/injections").text
+
+
 def test_launch_on_a_chosen_stack(app, fake_airflow):
     r = app.post("/actions/injection/acme", data={"dag_id": "acme-uegar-etl-firm", "padoa_env": "snap", "card": "Injection des firms"})
     assert "acme-uegar-etl-firm lancé sur snap" in r.text

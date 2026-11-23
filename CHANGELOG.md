@@ -10,9 +10,17 @@ Ainsi la version affichée en bas de chaque page change à chaque fusion (et le 
 
 Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
-## [0.3.0] · 2026-11-20
+## [0.5.0] · 2026-11-23
 
 - Agents → DAG : une carte par run lancé depuis Jarvis, à la place des trois tableaux (suivis, enchaînements, lancements) qui racontaient le même run trois fois. Les cartes sont rangées par état (en cours, en échec ou arrêtés, terminés, simulations) ; chaque carte donne le client, le DAG en clair (« administratif · ETL groupe »), la stack, l'état et la durée, la dernière nouvelle du suivi, le nombre de relances automatiques et le lien vers le journal ou le rapport de fin. Un enchaînement tient sur une seule carte, avec ses étapes numérotées. Recherche et filtres par client, stack et état.
+
+## [0.4.0] · 2026-11-20
+
+- Onglet Injections : chaque ligne (ressource ou groupe) montre ses derniers DAG lancés depuis Jarvis. Sur la ligne, une pastille donne le dernier (stack et état) ; en ouvrant la ligne, le dernier avec sa date, sa stack, son état, sa durée et la dernière nouvelle d'`air.py`, puis « Voir plus » ajoute les précédents trois par trois. Chacun mène à la page de son suivi (journal, rapport de fin).
+
+## [0.3.0] · 2026-11-20
+
+- Onglet Injections, vue par ressource : une liste simple à la place des blocs à déplier. Une ligne par ressource, avec un point de couleur, l'état de sa carte la plus en retard et le nom de la carte en KO ; ce qui bloque est en haut. La stack se choisit une fois en haut (gardée dans le navigateur, sauf la prod), puis « Lancer » en face de la ressource lance le DAG affiché dans la liste à côté (« ETL » par défaut, « Transform & load » ou le groupe au choix) ; un clic sur la ligne montre ses cartes. Sous les ressources, une ligne par groupe de ressources du catalogue, avec son bouton « Lancer » (l'ETL du groupe) ; une carte liée à plusieurs ressources apparaît sous chacune d'elles, et un groupe ne se lance que depuis sa ligne. Le graphique de répartition reste dans la vue Liste et sur la page de tous les clients.
 
 ## [0.2.0] · 2026-11-20
 
