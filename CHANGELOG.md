@@ -1,26 +1,19 @@
 # Historique des versions
 
-Jarvis est numéroté `0.X.Y` et ne passe jamais en v1 : le premier chiffre reste 0. Une version **regroupe plusieurs PR** : le numéro ne monte plus à chaque fusion, mais quand une version est publiée.
+Jarvis est numéroté `0.X.Y` et ne passe jamais en v1 : le premier chiffre reste 0. Chaque PR monte le numéro selon l'ampleur du changement, sauf une correction ou un détail :
+- **changement majeur** → chiffre du milieu, le dernier revient à 0 (0.2.4 → 0.3.0) : une nouvelle fonctionnalité, une nouvelle page, un changement visible de comportement ;
+- **changement mineur** → dernier chiffre (0.3.0 → 0.3.1) : une amélioration ou un ajout dans une fonctionnalité existante ;
+- **correction ou changement trop petit** (un bug corrigé, un texte, un style, un détail) → **pas de nouveau numéro** : la ligne de la PR s'ajoute à la section de la version en cours, en tête de cet historique.
 
-**Chaque PR** ajoute sa ligne sous « À venir », en tête de cet historique, sans toucher au numéro.
+Pour une PR qui monte le numéro :
+1. `version` dans `pyproject.toml`, puis `uv lock` (le numéro est aussi dans `uv.lock`) ;
+2. une section `## [0.x.y] · AAAA-MM-JJ` en tête de cet historique, avec la ligne de la PR.
 
-**Publier une version** : par une PR dédiée, fusionnée juste avant le déploiement sur la VM (ou quand Matthew le demande), jamais en modifiant les fichiers sur la VM :
-1. « À venir » devient `## [0.X.Y] · AAAA-MM-JJ`, numéro monté selon le plus gros changement du lot :
-   - au moins un **changement majeur** (une nouvelle fonctionnalité, une nouvelle page, un changement visible de comportement) → chiffre du milieu, le dernier revient à 0 (0.5.6 → 0.6.0) ;
-   - sinon, que des **changements mineurs** (correction, ajustement de texte ou de style, détail) → dernier chiffre (0.6.0 → 0.6.1) ;
-2. `version` dans `pyproject.toml`, puis `uv lock` (le numéro est aussi dans `uv.lock`) ;
-3. une nouvelle section « À venir » vide en tête.
-
-La version affichée en bas de chaque page est donc celle publiée ; entre deux versions, le bandeau « Jarvis est à relancer » compare les commits. Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
-
-Jusqu'à la 0.5.6, chaque PR montait le numéro : d'où les nombreuses petites versions ci-dessous.
-
-## À venir
-
-- Versions groupées : le numéro monte quand une version est publiée, plus à chaque PR.
+La version affichée en bas de chaque page change donc avec chaque fonctionnalité ; après une simple correction, le bandeau « Jarvis est à relancer » compare les commits. Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
 ## [0.5.6] · 2026-11-23
 
+- Règle de version : une correction ou un changement trop petit ne monte plus le numéro ; sa ligne s'ajoute à la version en cours.
 - Flow Digger : à chaque clic, Jarvis regarde s'il y a des commits à récupérer (`git fetch`). Arrêté, il ne met à jour que s'il y a du nouveau (des modifications locales ne bloquent plus le lancement quand rien n'a changé) ; déjà lancé mais en retard, il propose « Mettre à jour et relancer » ou « Ouvrir la version actuelle » au lieu d'ouvrir une vieille version sans rien dire. Il ne coupe jamais un Flow Digger qu'il n'a pas lancé lui-même.
 
 ## [0.5.5] · 2026-11-23
