@@ -6,11 +6,19 @@
   <title>{% block title %}Jarvis{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=4">
   <meta name="theme-color" content="#001235">
-  <script>try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+  <script>
+    // Thème retenu dans le navigateur. Rien de retenu : Noël par défaut (nuit ou clair selon le Mac). "" retenu : Auto, suit le Mac.
+    (function () {
+      let t = null;
+      try { t = localStorage.getItem("theme"); } catch (e) {}
+      t ??= matchMedia("(prefers-color-scheme: dark)").matches ? "noel" : "noel-clair";
+      if (t) document.documentElement.dataset.theme = t;
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=169">
+  <link rel="stylesheet" href="/static/style.css?v=168">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=11" defer></script>
   <script src="/static/dag.js?v=3" defer></script>
@@ -93,7 +101,8 @@
     </div>
   </header>
   <script>
-    // Thème : Auto (suit le Mac) → Nuit → Clair → Noël nuit → Noël clair → Auto. Retenu dans le navigateur.
+    // Thème : Auto (suit le Mac) → Nuit → Clair → Noël nuit → Noël clair → Auto. Tout choix est retenu dans le navigateur, Auto compris
+    // ("") : le thème par défaut, Noël, ne revient pas une fois qu'on a choisi autre chose.
     (function () {
       const root = document.documentElement, button = document.getElementById("theme-toggle");
       const order = ["", "dark", "light", "noel", "noel-clair"], labels = { "": "Auto", dark: "Nuit", light: "Clair", noel: "Noël nuit", "noel-clair": "Noël clair" };
@@ -115,7 +124,7 @@
       button.addEventListener("click", () => {
         const next = order[(order.indexOf(root.dataset.theme || "") + 1) % order.length];
         if (next) root.dataset.theme = next; else delete root.dataset.theme;
-        try { next ? localStorage.setItem("theme", next) : localStorage.removeItem("theme"); } catch (e) {}
+        try { localStorage.setItem("theme", next); } catch (e) {}
         show();
       });
       show();

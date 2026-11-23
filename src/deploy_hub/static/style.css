@@ -33,7 +33,7 @@
   --shadow: none; color-scheme: dark;
 }
 :root[data-theme="light"] { color-scheme: light; }
-/* Thèmes « Noël » (2026-11-23), choisis au bouton de thème, jamais par le Mac : « noel » (nuit) et « noel-clair ».
+/* Thèmes « Noël » (2026-11-23), « noel » (nuit) et « noel-clair » : choisis au bouton de thème, et thème par défaut tant que rien n'est choisi (base.html).
    Le rouge reste aux KO dans les deux. Nuit de sapin : accent or, « à faire » en clémentine pour ne pas se confondre avec lui.
    Matin de neige : accent sapin (l'or est illisible sur blanc). Décor (neige, guirlande, bonnet) en fin de fichier, peint avec
    --snow (flocons), --wire (fil) et --bulb-1 à 4 (ampoules). Le clair part du thème clair et ne dit que ses différences : le mode

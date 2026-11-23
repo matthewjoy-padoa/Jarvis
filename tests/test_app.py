@@ -303,6 +303,14 @@ def test_christmas_theme_is_one_of_the_themes_and_has_its_palette():
     assert "Noël clair" in client.get("/palette", params={"q": ">thème"}).text
 
 
+def test_christmas_is_the_default_theme_until_another_one_is_chosen():
+    """Rien de retenu dans le navigateur : Noël (nuit ou clair selon le Mac). Tout choix est retenu, Auto compris, donc Noël ne revient pas."""
+    html = client.get("/").text
+    head = html.split("</head>")[0]
+    assert "prefers-color-scheme: dark" in head and '"noel-clair"' in head
+    assert 'localStorage.setItem("theme", next)' in html and 'removeItem("theme")' not in html  # Auto ("") est retenu, pas effacé
+
+
 def test_navigation_shows_the_current_client_and_the_others_in_its_menu():
     """Un client à la fois : le client en cours dans la barre, les autres seulement dans le menu du sélecteur."""
     html = TestClient(app).get("/deploiements/client-demo/synthese").text

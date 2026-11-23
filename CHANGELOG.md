@@ -13,7 +13,7 @@ La version affichée en bas de chaque page change donc avec chaque fonctionnalit
 
 ## [0.5.7] · 2026-11-23
 
-- Thèmes « Noël » : deux choix de plus au bouton de thème (Auto → Nuit → Clair → Noël nuit → Noël clair) et dans la commande « Changer de thème » de la palette. Nuit de sapin à l'accent or, ou matin de neige à l'accent sapin ; statuts gardés lisibles dans les deux (KO en rouge). Neige derrière le contenu, guirlande qui scintille sous la barre, bonnet sur le logo, « Joyeuses fêtes » en pied de page. Décor sans animation si le Mac demande moins de mouvement ; il ne s'active jamais tout seul.
+- Thèmes « Noël » : deux choix de plus au bouton de thème (Auto → Nuit → Clair → Noël nuit → Noël clair) et dans la commande « Changer de thème » de la palette. Nuit de sapin à l'accent or, ou matin de neige à l'accent sapin ; statuts gardés lisibles dans les deux (KO en rouge). Neige derrière le contenu, guirlande qui scintille sous la barre, bonnet sur le logo, « Joyeuses fêtes » en pied de page. Décor sans animation si le Mac demande moins de mouvement. Noël est le thème par défaut (nuit ou clair selon le Mac) tant qu'on n'a rien choisi ; tout choix au bouton est retenu, Auto compris, et Noël ne revient pas.
 
 ## [0.5.6] · 2026-11-23
 
