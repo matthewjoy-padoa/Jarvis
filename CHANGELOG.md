@@ -10,11 +10,11 @@ Ainsi la version affichée en bas de chaque page change à chaque fusion (et le 
 
 Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
-## [0.6.1] · 2026-11-23
+## [0.5.3] · 2026-11-23
 
 - Action qui n'a pas abouti (Jarvis injoignable ou en erreur) annoncée partout au lieu d'échouer en silence : note tapée, rappel, épingle, tâche, « Tout marquer comme lu », lancements, agents, Rafraîchir, tests des Réglages. Le message « Non pris en compte : … » s'affiche dans la zone de résultat de l'action, sinon juste après le bouton ou le formulaire, et disparaît au prochain essai (`static/errors.js`). Notes et to-do lists : un seul état d'enregistrement par zone, discret (« Enregistré » en gris qui s'efface ; « Non enregistré » en rouge, la raison au survol), dans la barre du panneau Notes et en bas du bloc « Mes notes » de la fiche, au lieu d'un message sous chaque note.
 
-## [0.6.0] · 2026-11-23
+## [0.5.2] · 2026-11-23
 
 - To-do list dans les notes : sous les notes d'un client (bloc-notes flottant et « Mes notes » de sa fiche, avec le nombre de tâches à faire dans son titre replié) et sous les notes générales ; ajouter, cocher (la tâche faite passe en bas, barrée), supprimer. Gardée dans `data/perso.json` avec les notes, jamais envoyée dans Notion.
 
