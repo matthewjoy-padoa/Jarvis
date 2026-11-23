@@ -157,7 +157,7 @@ th[data-dir=desc]::after { content: " ▼"; }
 .theme-toggle { flex: none; background: none; color: var(--text); border-color: var(--border); }
 .theme-toggle:hover { border-color: var(--accent); }
 
-/* Stacks Padoa du client : toujours visibles en tête de fiche */
+/* Stacks et Drive du client sur les cartes de la vue d'ensemble (index.html) ; sur une fiche, ils sont dans le dock. */
 .stacks { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; }
 .stacks a { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 13px; white-space: nowrap; }
 .stacks a:hover { border-color: var(--accent); }
@@ -223,11 +223,11 @@ tbody tr:hover td { background: var(--bg); }
 .refresh { position: relative; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 /* Attente, avancement et résultat : dans un encart posé sous le bouton, par-dessus la page. Le bouton ne bouge plus
    (le texte d'attente le poussait de côté, le résultat élargissait la colonne) et rien ne se décale en dessous. */
-.refresh .refresh-out { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+/* Action de l'en-tête qui n'a pas abouti (errors.js, ex. « Synchro auto ») : même encart, un clic le ferme aussi. */
+.refresh .refresh-out, .refresh .request-error { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
   width: max-content; max-width: min(360px, calc(100vw - 32px)); text-align: left; }
-.refresh .refresh-out .result { margin: 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
-  background: var(--surface); box-shadow: var(--shadow-lift); font-size: 13px; }
-.refresh .refresh-out .result { cursor: pointer; }
+.refresh .refresh-out .result, .refresh .request-error { margin: 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); box-shadow: var(--shadow-lift); font-size: 13px; cursor: pointer; }
 .refresh.htmx-request .refresh-out { display: none; }
 .auto-sync-box { display: inline-flex; align-items: center; gap: 8px; }  /* « · prochaine vers 14:15 » puis le bouton */
 .auto-sync:not([aria-pressed="true"]) { color: var(--muted); }  /* petit bouton bascule : mêmes règles que « Vue simplifiée » */
@@ -250,7 +250,7 @@ tbody tr:hover td { background: var(--bg); }
 @media (prefers-reduced-motion: reduce) { .sync-btn::before { transition: none; } .refresh.htmx-request .sync-btn::before { animation: none; } }
 button:disabled { opacity: .5; cursor: not-allowed; }
 @media (max-width: 700px) { .head-side, .refresh { align-items: flex-start; justify-content: flex-start; }
-  .refresh .refresh-out { left: 0; right: auto; } }
+  .refresh .refresh-out, .refresh .request-error { left: 0; right: auto; } }
 
 /* Contenu d'un retour de recette */
 .retour .retour-content { grid-column: 1 / -1; }
@@ -1212,8 +1212,8 @@ html { overscroll-behavior-y: none; }
 .dock-btn { position: relative; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--border);
   background: var(--surface); color: var(--text); text-decoration: none; transition: transform .15s var(--ease, ease), border-color .15s, color .15s; }
 .dock-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.dock-btn svg.dock-logo { stroke: none; }  /* logos Google Drive et Notion : pleins, sans trait */
 .dock-btn:hover, .dock-btn:focus-visible { transform: scale(1.08); border-color: var(--accent); color: var(--accent); text-decoration: none; }
-.dock-drive { color: var(--st-done); }
 /* Bouton Environnements : à part au-dessus du dock ; au survol ou au clavier, les environnements s'ouvrent en éventail à sa gauche.
    Chaque pastille part du centre du bouton et va sur un arc de rayon --r, à l'angle --a (écart --step entre deux pastilles, l'éventail centré sur l'horizontale). */
 .dock-envs { position: relative; }
@@ -1248,7 +1248,16 @@ html { overscroll-behavior-y: none; }
   background: var(--surface); color: var(--text); font-size: 14px; line-height: 1.55; resize: vertical; }
 .brief-text { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 12px 0; }
 .brief-text:focus, .my-notes textarea:focus, .remind-form input:focus { outline: none; border-color: var(--accent); }
-.note-out .result { margin: 4px 0 0; }
+/* État d'enregistrement commun des notes et to-do lists (notes.js, errors.js) : discret. « Enregistré » en gris s'efface
+   seul ; « Non enregistré » en rouge reste, la raison au survol. */
+.save-status { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.save-status.ok { animation: save-fade 3s ease-in forwards; }
+.save-status.ko { color: var(--danger); cursor: help; }
+@keyframes save-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .save-status.ok { animation: none; } }
+.notes-bar .save-status { margin-left: auto; }
+.notes-bar .save-status + button.notes-close { margin-left: 0; }
+.my-notes .save-status { display: block; min-height: 1.4em; margin-top: 4px; text-align: right; }
 .pin-btn.on { border-color: var(--accent); color: var(--accent); }
 .remind, .remind-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .remind { margin: 4px 0 8px; font-size: 13px; }
@@ -1257,6 +1266,14 @@ html { overscroll-behavior-y: none; }
 .remind-form input, .remind-form select { font-size: 13px; padding: 4px 8px; border: 2px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
 .remind-form input[type=text] { flex: 1 1 160px; min-width: 0; }
 #reminders .remind-form { margin-top: 8px; }
+/* To-do list des notes (_todo.html) : case à cocher, tâche barrée dès qu'elle est cochée (sans attendre Jarvis), × pour la supprimer. */
+.todo-box { margin-top: 12px; }
+.notes-todo-head { margin: 0 0 2px; font-size: 13px; }
+ul.todo-items { margin: 0 0 6px; }
+ul.todo-items li { flex-wrap: nowrap; align-items: center; padding: 5px 0; font-size: 13.5px; }
+ul.todo-items label { display: flex; align-items: baseline; gap: 8px; flex: 1; min-width: 0; font-weight: 400; cursor: pointer; overflow-wrap: anywhere; }
+ul.todo-items input[type=checkbox] { flex: none; accent-color: var(--accent); }
+ul.todo-items li:has(input:checked) span { color: var(--muted); text-decoration: line-through; }
 .remind-set { display: inline-flex; align-items: center; gap: 4px; }
 button.remind-drop, button.remind-drop:hover:not(:disabled) { min-height: 0; padding: 0 4px; border: 0; background: none; box-shadow: none; color: var(--muted); font-size: 15px; line-height: 1; transform: none; }
 button.remind-drop:hover:not(:disabled) { color: var(--text); }

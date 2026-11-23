@@ -100,7 +100,7 @@ def _normalize(slug: str, data: dict) -> ClientConfig:
         orchestrator=_list(data.get("orchestrator")),
         stacks=[dict(s) for s in data.get("stacks") or [] if isinstance(s, dict) and s.get("url")],
         drive=[{"label": str(l.get("label") or "Drive"), "url": str(l["url"])} for l in data.get("drive") or []
-               if isinstance(l, dict) and _is_drive(str(l.get("url") or ""))],
+               if isinstance(l, dict) and is_drive(str(l.get("url") or ""))],
         dashboards=[{"label": str(l.get("label") or "Notion"), "url": str(l["url"])} for l in data.get("dashboards") or []
                     if isinstance(l, dict) and is_notion(str(l.get("url") or ""))],
         archived=bool(data.get("archived")), archived_at=_day(data.get("archived_at")) if data.get("archived") else None,
@@ -134,7 +134,8 @@ DRIVE_HOSTS = ("drive.google.com", "docs.google.com")
 NOTION_HOSTS = ("app.notion.com", "www.notion.so", "notion.so")
 
 
-def _is_drive(url: str) -> bool:
+def is_drive(url: str) -> bool:
+    """Adresse Google Drive (drive.google.com, docs.google.com) : seules acceptées comme liens Drive ; logo Drive dans le dock."""
     return any(url.startswith(f"https://{host}/") for host in DRIVE_HOSTS)
 
 
@@ -167,7 +168,7 @@ def parse_drive(text: str) -> list[dict]:
     Jarvis n'en fait que des liens à ouvrir dans le navigateur, il ne lit jamais le contenu."""
     links = []
     for line, label, url in _labelled_links(text):
-        if not _is_drive(url):
+        if not is_drive(url):
             raise ConfigError(f"Lien Drive « {line} » : adresse https://drive.google.com/… ou https://docs.google.com/… attendue")
         links.append({"label": label or "Drive", "url": url})
     return links

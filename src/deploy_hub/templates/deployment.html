@@ -9,8 +9,7 @@
       {% if d.go_live %}Déploiement le <strong class="text">{{ d.go_live.strftime("%d/%m/%Y") }}</strong> <span class="badge {{ 'g-ko' if 0 <= d.days_left < 14 }}">J{{ '%+d' % (-d.days_left) }}</span> · {% endif %}{{ d.progress }} % intégré
     </p>
   </div>
-  <div class="head-side">
-    {% include "_stacks.html" %}
+  <div class="head-side">{# liens du client (Notion, stacks, Drive) : dans le dock, à droite de l'écran (base.html) #}
     <div class="refresh">
   <span class="muted last-sync" title="Dernière fois que Jarvis a lu Notion pour ce client">{% if d.last_sync %}Dernière synchro : {{ d.last_sync | quand }}{% else %}Jamais synchronisé{% endif %}</span>
   {% if not d.archived %}{# archivé : plus synchronisé, le bandeau propose de le désarchiver #}

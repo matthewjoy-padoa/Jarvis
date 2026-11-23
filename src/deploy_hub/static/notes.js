@@ -29,6 +29,50 @@
     e.preventDefault();
     panel.hidden ? open() : close();
   });
+  // To-do list (_todo.html) : chaque action renvoie la liste, qui se remplace elle-même. La même liste peut être affichée
+  // deux fois (ici et sur la fiche) : l'autre copie reçoit la même réponse. Si l'enregistrement échoue (Jarvis injoignable,
+  // erreur), la case revient comme avant ; le message, lui, vient d'errors.js, comme pour toute action qui écrit.
+  const todoBox = (elt) => elt?.closest?.(".todo-box");
+  document.addEventListener("htmx:beforeRequest", (e) => {
+    const box = todoBox(e.detail.elt);
+    if (!box) return;
+    document.querySelectorAll(".todo-box").forEach((other) => {
+      if (other !== box && other.dataset.todoSlug === box.dataset.todoSlug) other.dataset.todoStale = "1";
+    });
+  });
+  document.addEventListener("htmx:afterRequest", (e) => {
+    // État d'enregistrement commun : un seul par zone (le panneau, le bloc « Mes notes » de la fiche), pour les notes et
+    // les to-do lists qu'elle contient ([data-save-scope] → [data-save-status]) : « Enregistré », discret, qui s'efface
+    // (CSS) ; les échecs y sont écrits par errors.js. Une liste remplacée n'est plus dans la page : htmx envoie alors cet
+    // événement au premier parent encore présent (e.target), qui est dans la zone.
+    const status = e.target.closest?.("[data-save-scope]")?.querySelector("[data-save-status]");
+    if (status && e.detail.successful && (e.detail.requestConfig?.verb || "get").toLowerCase() !== "get") {
+      status.className = "save-status";
+      void status.offsetWidth;  // relance l'effacement à chaque enregistrement
+      status.className = "save-status ok";
+      status.textContent = "Enregistré";
+      status.removeAttribute("title");
+    }
+    // To-do list, repérée par son adresse (sa copie dans l'autre zone, case remise après un échec).
+    if (!(e.detail.pathInfo?.requestPath || "").startsWith("/perso/todo")) return;
+    const stale = document.querySelectorAll(".todo-box[data-todo-stale]");
+    if (e.detail.successful) {
+      if (!stale.length) return;
+      const tpl = document.createElement("template");
+      tpl.innerHTML = e.detail.xhr.responseText;
+      const fresh = tpl.content.querySelector(".todo-box");
+      if (!fresh) return;
+      fresh.querySelectorAll("[autofocus]").forEach((el) => el.removeAttribute("autofocus"));  // le curseur reste où il est
+      stale.forEach((other) => {
+        const copy = fresh.cloneNode(true);
+        other.replaceWith(copy);
+        htmx.process(copy);
+      });
+      return;
+    }
+    stale.forEach((other) => delete other.dataset.todoStale);
+    if (todoBox(e.detail.elt) && e.detail.elt.matches("input[type=checkbox]")) e.detail.elt.checked = !e.detail.elt.checked;
+  });
   // La même note peut être affichée deux fois (ici et sur la fiche du client) : ce qui est tapé dans l'une est recopié dans l'autre.
   document.addEventListener("input", (e) => {
     const url = e.target.matches && e.target.matches("textarea[hx-post^='/perso/note']") && e.target.getAttribute("hx-post");

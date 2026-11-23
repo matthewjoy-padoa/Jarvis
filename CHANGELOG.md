@@ -14,6 +14,18 @@ Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant
 
 - Agents sur un retour de recette : la branche dit le sujet au lieu du numéro du retour (`fix-presoa-ced-ged-factures-multi-version` plutôt que `fix-presoa-23aa58`) : client, ressource ou type de données, premiers mots de la ligne du cahier de recette, chiffres retirés. Une reprise ou une relance garde la branche déjà lancée ; le numéro ne s'ajoute que si le retour n'a ni ligne ni type, ou qu'une autre branche d'agent porte déjà ce nom.
 
+## [0.5.4] · 2026-11-23
+
+- Fiche d'un client : plus de rangée de liens en haut (Notion, stacks, Drive, « + Stacks », « + Drive »), en doublon avec le dock à droite de l'écran ; le dock reprend aussi les autres dashboards Notion du client et ses autres liens, qui n'étaient que dans cette rangée. Les liens Google Drive (drive.google.com, docs.google.com) y ont le logo Google Drive, les liens Notion le logo Notion.
+
+## [0.5.3] · 2026-11-23
+
+- Action qui n'a pas abouti (Jarvis injoignable ou en erreur) annoncée partout au lieu d'échouer en silence : note tapée, rappel, épingle, tâche, « Tout marquer comme lu », lancements, agents, Rafraîchir, tests des Réglages. Le message « Non pris en compte : … » s'affiche dans la zone de résultat de l'action, sinon juste après le bouton ou le formulaire, et disparaît au prochain essai (`static/errors.js`). Notes et to-do lists : un seul état d'enregistrement par zone, discret (« Enregistré » en gris qui s'efface ; « Non enregistré » en rouge, la raison au survol), dans la barre du panneau Notes et en bas du bloc « Mes notes » de la fiche, au lieu d'un message sous chaque note.
+
+## [0.5.2] · 2026-11-23
+
+- To-do list dans les notes : sous les notes d'un client (bloc-notes flottant et « Mes notes » de sa fiche, avec le nombre de tâches à faire dans son titre replié) et sous les notes générales ; ajouter, cocher (la tâche faite passe en bas, barrée), supprimer. Gardée dans `data/perso.json` avec les notes, jamais envoyée dans Notion.
+
 ## [0.5.1] · 2026-11-23
 
 - Questions d'un agent : l'intitulé ne montre plus le Markdown du compte rendu (« ## 3. Blocage n°2 : quel niveau de correctif ? » s'affiche « Blocage n°2 : quel niveau de correctif ? »). Une question posée en titre emporte sa section comme détail, au lieu de la laisser dans le contexte.

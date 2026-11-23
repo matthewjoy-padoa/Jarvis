@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request, WebSocket
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
@@ -277,6 +277,8 @@ templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STAT
 templates.env.globals["kanban_columns"] = kanban_columns
 templates.env.globals["auto_sync_every"] = auto_sync_every  # bouton « Synchro auto » d'une fiche
 templates.env.globals["auto_sync_note"] = auto_sync_note
+templates.env.tests["drive"] = client_config.is_drive  # {% if l.url is drive %} : logo Google Drive dans le dock
+templates.env.tests["notion"] = client_config.is_notion  # {% if l.url is notion %} : logo Notion dans le dock
 templates.env.globals["jarvis_version"] = _version_started  # pied de page ; historique dans CHANGELOG.md
 templates.env.globals["jarvis_commit"] = _code_started[:7]
 templates.env.globals["restart_for"] = lambda: _restart  # bandeau « Jarvis est à relancer » (base.html)
@@ -1435,18 +1437,46 @@ def notes_panel(request: Request):
     return templates.TemplateResponse(request, "_notes_panel.html", {"current": _current(request)})
 
 
-@app.post("/perso/note", response_class=HTMLResponse)
-def general_note_save(request: Request, texte: str = Form("")):
-    """Notes générales (sans client) : rangées sous la clé vide de data/perso.json."""
+@app.post("/perso/note", status_code=204)
+def general_note_save(texte: str = Form("")) -> Response:
+    """Notes générales (sans client) : rangées sous la clé vide de data/perso.json. Réponse vide : l'état « Enregistré »
+    est écrit par la page (notes.js), commun aux notes et aux to-do lists."""
     personal.set_note("", texte)
-    return _result(request, ActionResult(True, f"Enregistré à {datetime.now():%H:%M}", simulated=False))
+    return Response(status_code=204)
 
 
-@app.post("/perso/note/{slug}", response_class=HTMLResponse)
-def note_save(request: Request, slug: str, texte: str = Form("")):
+@app.post("/perso/note/{slug}", status_code=204)
+def note_save(slug: str, texte: str = Form("")) -> Response:
     _get(slug)
     personal.set_note(slug, texte)
-    return _result(request, ActionResult(True, f"Enregistré à {datetime.now():%H:%M}", simulated=False))
+    return Response(status_code=204)
+
+
+def _todo_list(request: Request, slug: str | None, added: bool = False) -> HTMLResponse:
+    """La to-do list de ce client ("" : générale), qui remplace celle où l'on vient de cliquer ; tâche inconnue : 404.
+    added : le champ garde le curseur, pour enchaîner les tâches."""
+    if slug is None:
+        raise HTTPException(404, "Tâche introuvable")
+    return templates.TemplateResponse(request, "_todo.html", {"todo_slug": slug, "todo_added": added})
+
+
+@app.post("/perso/todo", response_class=HTMLResponse)
+def todo_add(request: Request, slug: str = Form(""), label: str = Form("")):
+    """Ajoute une tâche à la to-do list d'un client (slug), ou à la générale (slug vide)."""
+    if slug:
+        _get(slug)
+    personal.add_todo(slug, label)
+    return _todo_list(request, slug, added=True)
+
+
+@app.post("/perso/todo/{todo_id}/cocher", response_class=HTMLResponse)
+def todo_toggle(request: Request, todo_id: int):
+    return _todo_list(request, personal.toggle_todo(todo_id))
+
+
+@app.post("/perso/todo/{todo_id}/supprimer", response_class=HTMLResponse)
+def todo_remove(request: Request, todo_id: int):
+    return _todo_list(request, personal.remove_todo(todo_id))
 
 
 @app.post("/perso/rappel", response_class=HTMLResponse)
