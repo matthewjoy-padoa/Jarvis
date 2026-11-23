@@ -514,7 +514,7 @@ wheels = [
 
 [[package]]
 name = "deploy-hub"
-version = "0.5.1"
+version = "0.5.5"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },

@@ -77,7 +77,7 @@ class D:  # fiche minimale
 
 
 class R:
-    id, software, status, data_type, type_retour, resource, due, notion_url, content = "R-7", "", "Ouvert", "", "", "", None, "", []
+    id, software, status, data_type, type_retour, resource, due, notion_url, content, ligne = "R-7", "", "Ouvert", "", "", "", None, "", [], ""
 
 
 def _runner(repo: Path, claude: Path, tmp_path: Path, **kw) -> ClaudeRunner:
@@ -473,3 +473,18 @@ def test_a_question_asked_as_a_heading_shows_without_its_markdown_and_takes_its_
     block = '<questions>{"questions": [{"question": "## 3. Blocage n°2 : quel niveau ?", "options": [{"libelle": "Client"}]}]}</questions>'
     assert agent_questions("Compte rendu.\n" + block)[1][0].text == "Blocage n°2 : quel niveau ?"  # bloc JSON : même nettoyage
     assert [q.text for q in agent_questions("Contexte.\n1. Faut-il garder la colonne ?\n- **Et la date ?**")[1]] == ["Faut-il garder la colonne ?", "Et la date ?"]
+
+
+def test_retour_branch_says_the_subject_without_numbers():
+    """Branche d'un agent sur un retour : le sujet en clair, sans numéro ; même branche pour une reprise ; numéro en dernier recours."""
+    from types import SimpleNamespace as S
+    from deploy_hub.sources.claude_runner import AgentRun, retour_branch
+    d = S(slug="presoa")
+    r = S(id="23AA58", resource="", data_type="CED/GED", ligne="Factures multi version 2024 du salarié 200082222 et autres pièces")
+    assert retour_branch(d, r) == "fix-presoa-ced-ged-factures-multi-version-du-salarie-et"
+    assert len(retour_branch(d, S(id="X", resource="visit_histo", data_type="", ligne="mot " * 40))) <= 60
+    assert retour_branch(d, S(id="R-9", resource="", data_type="", ligne="")) == "fix-presoa-r-9"  # rien de parlant
+    older = AgentRun(1, "presoa", "Presoa", "retour 23AA58", "fix-presoa-23aa58", "x", datetime(2026, 11, 18, 9), "terminé")
+    assert retour_branch(d, r, [older]) == "fix-presoa-23aa58"  # reprise : la branche déjà lancée
+    other = AgentRun(2, "presoa", "Presoa", "retour 11BB22", retour_branch(d, r), "x", datetime(2026, 11, 18, 9), "terminé")
+    assert retour_branch(d, r, [other]) == "fix-presoa-ced-ged-factures-multi-version-du-salarie-et-23aa58"

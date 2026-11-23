@@ -10,6 +10,10 @@ Ainsi la version affichée en bas de chaque page change à chaque fusion (et le 
 
 Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
+## [0.5.5] · 2026-11-23
+
+- Agents sur un retour de recette : la branche dit le sujet au lieu du numéro du retour (`fix-presoa-ced-ged-factures-multi-version` plutôt que `fix-presoa-23aa58`) : client, ressource ou type de données, premiers mots de la ligne du cahier de recette, chiffres retirés. Une reprise ou une relance garde la branche déjà lancée ; le numéro ne s'ajoute que si le retour n'a ni ligne ni type, ou qu'une autre branche d'agent porte déjà ce nom.
+
 ## [0.5.1] · 2026-11-23
 
 - Questions d'un agent : l'intitulé ne montre plus le Markdown du compte rendu (« ## 3. Blocage n°2 : quel niveau de correctif ? » s'affiche « Blocage n°2 : quel niveau de correctif ? »). Une question posée en titre emporte sa section comme détail, au lieu de la laisser dans le contexte.

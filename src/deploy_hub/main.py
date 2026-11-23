@@ -27,7 +27,7 @@ from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
 from deploy_hub.rendu import md, md_inline
-from deploy_hub.sources.claude_runner import (TO_FILL, WAITING, ClaudeRunner, agent_branch, agent_questions, answer_text, chosen_answer,
+from deploy_hub.sources.claude_runner import (TO_FILL, WAITING, ClaudeRunner, agent_questions, answer_text, chosen_answer,
                                               duration_text, read_log, retour_prompt, tokens_text, usage)
 from deploy_hub.sources.dag_board import board
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
@@ -1285,11 +1285,11 @@ def agent_brief(request: Request, slug: str, retour_id: str):
     """Formulaire de l'agent, brief pré-rempli : chargé à l'ouverture du bloc pour ne pas alourdir la page."""
     d, r = _retour(slug, retour_id)
     # Ce qui empêcherait le lancement, et l'agent déjà lancé sur ce retour : dits avant le clic, pas après.
-    branch = agent_branch("fix", d.slug, r.id)
+    branch = claude.retour_branch(d, r)
     previous, problem = claude.latest_on(branch), claude.problem()
     blocker = problem or (f"Un agent travaille déjà sur la branche {branch} : attends sa fin ou arrête-le." if previous and previous.running else "")
     return templates.TemplateResponse(request, "_agent_form.html", {
-        "d": d, "r": r, "brief": retour_prompt(d, r), "to_fill": TO_FILL, "branch": branch, "problem": problem, "blocker": blocker,
+        "d": d, "r": r, "brief": retour_prompt(d, r, branch=branch), "to_fill": TO_FILL, "branch": branch, "problem": problem, "blocker": blocker,
         "previous": previous, "waiting": bool(previous) and previous.status == WAITING})
 
 

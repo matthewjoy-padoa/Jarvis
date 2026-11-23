@@ -127,7 +127,7 @@ def test_the_ticket_type_is_kept_at_launch(tmp_path):
         slug, client, software = "acme", "Acme", "Uegar"
 
     class R:
-        id, software, status, data_type, type_retour, resource, due, notion_url, content = "R-7", "", "Ouvert", "AMT", "", "amt", None, "", []
+        id, software, status, data_type, type_retour, resource, due, notion_url, content, ligne = "R-7", "", "Ouvert", "AMT", "", "amt", None, "", [], ""
 
     runner = instant_agents(ClaudeRunner(tmp_path, tmp_path / "agents"))  # doublure : l'agent finit aussitôt
     runner.launch_retour(D, R, prompt="Brief")
