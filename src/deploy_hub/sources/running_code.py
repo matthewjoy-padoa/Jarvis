@@ -4,7 +4,7 @@ Jarvis se met à jour par « git pull » dans son dossier, puis il faut relancer
 l'ancien code en mémoire alors que les gabarits et les fichiers statiques sont relus sur le disque : la mise à jour n'est
 pas appliquée, et une page dont le gabarit appelle une fonction pas encore chargée s'affiche en erreur. Ce module compare
 le commit extrait au lancement à celui du moment ; main.py en fait un bandeau « Jarvis est à relancer », qui cite les
-numéros de version (pyproject.toml, monté à chaque PR) et les commits seulement quand le numéro n'a pas bougé."""
+numéros de version (pyproject.toml, monté à chaque version publiée) et les commits seulement quand le numéro n'a pas bougé."""
 import subprocess
 import tomllib
 from pathlib import Path

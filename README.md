@@ -134,7 +134,7 @@ uv run pytest
 uv run uvicorn deploy_hub.main:app --port 8765 --reload --reload-dir src
 ```
 
-Versions : numéro dans `pyproject.toml`, historique et règle de numérotation dans [`CHANGELOG.md`](CHANGELOG.md) (chaque PR monte le numéro `0.X.Y` : X pour un changement majeur, Y pour un mineur, jamais de v1 ; `pyproject.toml`, `uv lock`, une section en tête du CHANGELOG ; il s'affiche en bas de chaque page).
+Versions : numéro dans `pyproject.toml`, affiché en bas de chaque page ; règle et historique dans [`CHANGELOG.md`](CHANGELOG.md) (chaque PR ajoute sa ligne sous « À venir »).
 
 Routes dans `src/deploy_hub/main.py`, pages dans `templates/` et `static/`, synchro Notion dans `sync_notion.py` (consigne de la routine : `sync/routine.md`, lanceur : `sources/sync_routine.py`), sources (Notion, Airflow, agents, PR GitHub, perso, notifications) dans `sources/`.
 
