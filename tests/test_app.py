@@ -460,6 +460,17 @@ def test_an_agent_with_questions_can_be_answered_from_its_page():
     assert f'href="/agents/{run.id}"' in client.get(f"/agents/{follow_up.id}").text  # « Reprend l'agent #… »
 
 
+def test_each_agent_draws_a_head_and_keeps_it():
+    from deploy_hub.main import pick
+    heads = ["a", "b"]
+    drawn = [pick(heads, agent_id) for agent_id in range(1, 40)]
+    assert set(drawn) == {"a", "b"} and drawn == [pick(heads, agent_id) for agent_id in range(1, 40)]  # au hasard, mais sans retirage
+    claude.runs.clear()
+    client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief"})
+    assert client.get("/agents").text.count('<image class="im-face" href="/static/agent-face') == 1  # l'armure de l'agent porte une photo
+    assert all(client.get(f"/static/{name}").status_code == 200 for name in ("agent-face.webp", "agent-face-2.webp"))
+
+
 @pytest.mark.parametrize("path", ["/actions?vue=kanban&tous=true", "/recette?vue=kanban&tous=true",
                                   "/deploiements/client-demo/actions?vue=kanban", "/deploiements/client-demo/recette?vue=kanban&tous=true"])
 def test_kanban_views(path):

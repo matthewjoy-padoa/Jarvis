@@ -4,11 +4,21 @@
 {% block title %}Agents · Jarvis{% endblock %}
 {% block content %}
 {# Petite armure d'un agent, une par état (colonne du schéma) : en cours = rouge et or, elle vole d'un bord à l'autre, réacteurs
-   allumés ; terminé = argent, à l'arrêt, elle dort ; PR ouverte = tout or, elle saute, répulseur levé ; échec = ferraille grise
-   au casque carré, sur le dos. Un agent arrêté sur des questions reste parmi les « en cours », posé au sol, en bleu et argent,
-   main levée, un « ? » au-dessus de la tête. La macro choisit les pièces de l'armure, le CSS ses couleurs et ses gestes. Décoratif : le numéro et la bulle de détail portent l'information. #}
-{% macro bot(suit) %}
-<svg class="bot" viewBox="0 0 48 46" width="48" height="46" aria-hidden="true">
+   allumés ; terminé = argent, à l'arrêt, elle dort ; PR ouverte = tout or, elle saute, répulseur levé ; échec = ferraille grise,
+   sur le dos. Un agent arrêté sur des questions reste parmi les « en cours », posé au sol, en bleu et argent,
+   main levée, un « ? » au-dessus de la tête. La tête est une photo détourée (fond transparent), une de `heads`, tirée au hasard
+   par agent (toujours la même pour un même numéro) ; le casque en suit le contour, élargi, dans la couleur de l'armure.
+   La macro choisit les pièces de l'armure, le CSS ses couleurs et ses gestes. Décoratif : le numéro et la bulle de détail portent l'information. #}
+{# Têtes des armures : photo (96 px de haut, affichée sur 32 unités, menton à y=24, centrée sur x=24) et tracé de son casque.
+   Ajouter une tête = une photo détourée dans static/, sa place (x, largeur) et le contour de sa silhouette élargi de 2 unités. #}
+{% set heads = [
+  {"src": "/static/agent-face.webp?v=1", "x": 12.3, "w": 23.3,
+   "helmet": "M24.8-9.8Q21.5-10.0 19.2-9.2Q16.9-8.5 15.5-7.2Q14.0-5.9 12.8-4.1Q11.7-2.3 11.0-0.4Q10.4 1.5 10.4 2.7Q10.4 4.0 11.1 5.6Q11.9 7.3 11.9 7.8Q11.9 8.4 12.3 9.1Q12.8 9.7 13.1 12.8Q13.3 16.0 14.6 18.7Q16.0 21.5 17.0 22.7Q18.1 23.8 19.3 24.6Q20.6 25.3 22.9 25.6Q25.1 25.8 27.4 24.8Q29.6 23.8 30.6 22.7Q31.7 21.5 32.7 19.7Q33.7 17.9 34.3 15.7Q34.8 13.5 34.8 11.8Q34.8 10.1 35.6 9.8Q36.3 9.6 36.9 8.7Q37.5 7.9 37.5 4.3Q37.5 0.7 36.2-2.0Q35.0-4.7 33.5-6.3Q32.0-7.8 30.1-8.7Q28.1-9.6 24.8-9.8z"},
+  {"src": "/static/agent-face-2.webp?v=1", "x": 9.9, "w": 28.3,
+   "helmet": "M27-9.6Q24.5-10 21.2-9Q17.8-8 15-6.1Q12.1-4.3 10.4-2.6Q8.7-0.9 8.4-0.2Q8.1 0.5 7.9 2.2Q7.8 3.9 8.5 7.1Q9.2 10.3 9 12.1Q8.8 13.9 9.8 16.1Q10.9 18.3 13.6 21.1Q16.3 23.9 19.3 24.9Q22.2 25.8 25.9 25.8Q29.7 25.8 31.7 25.3Q33.7 24.8 35.5 23.5Q37.2 22.3 38 20Q38.7 17.7 38.6 14.4Q38.4 11.1 39.2 9.4Q40.1 7.6 40.1 6.8Q40.1 6 39.5 5.3Q39 4.5 37.9 4.2Q36.7 3.9 36.2 1.4Q35.6-1 35.6-2.1Q35.6-3.3 34.8-4.6Q34-6 33.1-6.9Q32.2-7.8 30.8-8.5Q29.5-9.2 27-9.6z"},
+] %}
+{% macro bot(suit, head) %}
+<svg class="bot" viewBox="0 -10 48 56" width="48" height="56" aria-hidden="true">
   {% if suit == "in_progress" %}<g class="im-jets"><path class="im-fire" d="M17 44.5h5.4l-2.7 8zM25.6 44.5h5.4l-2.7 8z"/><path class="im-spark" d="M18.5 44.5h2.4l-1.2 4.4zM27.1 44.5h2.4l-1.2 4.4z"/></g>{% endif %}
   <g class="im-leg-a"><rect class="im-b" x="17.3" y="33.5" width="4.8" height="6.5"/><rect class="im-a" x="16.5" y="38.4" width="6.4" height="6.6" rx="2"/></g>
   <g class="im-leg-b"><rect class="im-b" x="25.9" y="33.5" width="4.8" height="6.5"/><rect class="im-a" x="25.1" y="38.4" width="6.4" height="6.6" rx="2"/></g>
@@ -17,18 +27,8 @@
   <path class="im-a" d="M15.6 26q0-2.3 2.3-2.3h12.2q2.3 0 2.3 2.3l-1.5 7.7q-.4 1.9-2.3 1.9h-9.2q-1.9 0-2.3-1.9z"/>
   <path class="im-b" d="M19.6 31.6h8.8l-1 4h-6.8z"/>
   {% if suit in ("waiting", "in_progress", "pr") %}<circle class="im-halo" cx="24" cy="27.4" r="3.7"/>{% endif %}<circle class="im-glow im-core" cx="24" cy="27.4" r="2.1"/>
-  {% if suit == "ko" %}
-  <rect class="im-a" x="13.5" y="3.5" width="21" height="19.6" rx="4.5"/>
-  <path class="im-line" d="M13.5 8.6h21M20.6 17.6v3.2M24 17.6v3.2M27.4 17.6v3.2"/>
-  <path class="im-slot" d="M16.4 10.6h5.8v3.4h-5.8zM25.8 10.6h5.8v3.4h-5.8z"/>
-  <path class="im-glow im-eyes" d="M17.4 11.5h3.8v1.6h-3.8zM26.8 11.5h3.8v1.6h-3.8z"/>
-  <path class="im-b" d="M14.8 6h1.6v1.6h-1.6zM31.6 6h1.6v1.6h-1.6zM17.8 25.4h1.6v1.6h-1.6zM28.6 25.4h1.6v1.6h-1.6z"/>
-  {% else %}
-  <path class="im-a" d="M13 12.5a11 10.5 0 0 1 22 0v4.5q0 6.5-11 6.5t-11-6.5z"/>
-  <path class="im-b" d="M16.4 11.2q7.6-3.6 15.2 0v5.6l-3 5h-9.2l-3-5z"/>
-  <path class="im-glow im-eyes" d="M18.2 14.2l5 1.3v1.3h-5zM29.8 14.2l-5 1.3v1.3h5z"/>
-  <path class="im-line" d="M21.6 19.6h4.8"/>
-  {% endif %}
+  <path class="im-a" d="{{ head.helmet }}"/>
+  <image class="im-face" href="{{ head.src }}" x="{{ head.x }}" y="-8" width="{{ head.w }}" height="32"/>
   {% if suit == "pr" %}<circle class="im-blast" cx="40.5" cy="16.4" r="3"/>{% endif %}
 </svg>
 {% endmacro %}
@@ -54,7 +54,7 @@
       {% for r in found[:24] %}
       {% set waiting = r.group == "todo" %}
       <a class="flow-node flow-bot{{ ' is-sim' if r.simulated }}{{ ' is-waiting' if waiting }}" href="/agents/{{ r.id }}" data-agent="{{ r.id }}" style="--i: {{ loop.index0 }}">
-        <span class="bot-wrap">{{ bot("waiting" if waiting else key) }}</span><span class="bot-id">#{{ r.id }}</span>
+        <span class="bot-wrap">{{ bot("waiting" if waiting else key, heads | au_hasard(r.id)) }}</span><span class="bot-id">#{{ r.id }}</span>
         <span class="flow-tip" role="tooltip"><strong>{{ r.subject }}</strong>
           <span>{{ r.client }} · {{ r.status }}{{ " (simulé)" if r.simulated }}</span>
           <span>Lancé le {{ r.started_at.strftime("%d/%m à %H:%M") }}{% if not r.simulated %} · {{ r.duration | duree }}{% endif %}</span>
