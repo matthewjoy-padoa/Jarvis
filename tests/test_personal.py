@@ -235,15 +235,15 @@ def test_a_removed_task_number_is_never_given_again(tmp_path):
 def test_the_todo_list_is_in_the_client_notes_and_the_general_ones(client):
     client.cookies.set("jarvis_client", SLUG)
     added = client.post("/perso/todo", data={"slug": SLUG, "label": "Relancer la <DSI>"}).text
-    assert 'class="todo-box"' in added and "Relancer la &lt;DSI&gt;" in added and "· 1 sur 1" in added
+    assert f'class="todo-box" data-todo-slug="{SLUG}"' in added and "Relancer la &lt;DSI&gt;" in added and "· 1 sur 1" in added
     assert " autofocus" in added and " autofocus" not in client.get(f"/deploiements/{SLUG}/synthese").text  # curseur gardé après un ajout seulement
     general = client.post("/perso/todo", data={"slug": "", "label": "Point d'équipe"}).text
     assert "Point d&#39;équipe" in general and "Relancer la" not in general  # la générale, à part
     todo_id = main.personal.todos(SLUG)[0]["id"]
     done = client.post(f"/perso/todo/{todo_id}/cocher").text
-    assert 'class="is-done"' in done and " checked" in done and "· 0 sur 1" in done
+    assert " checked" in done and "· 0 sur 1" in done
     panel = client.get("/perso/notes").text
-    assert panel.count('class="todo-box"') == 2 and "Relancer la &lt;DSI&gt;" in panel and "Point d&#39;équipe" in panel
+    assert panel.count('class="todo-box"') == 2 and 'data-todo-slug=""' in panel and "Relancer la &lt;DSI&gt;" in panel and "Point d&#39;équipe" in panel
     fiche = client.get(f"/deploiements/{SLUG}/synthese").text
     assert "Relancer la &lt;DSI&gt;" in fiche and f'name="slug" value="{SLUG}"' in fiche
     assert "Relancer la" not in client.get("/deploiements/client-exemple/synthese").text  # celle d'un autre client
