@@ -10,6 +10,10 @@ Ainsi la version affichée en bas de chaque page change à chaque fusion (et le 
 
 Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
+## [0.5.0] · 2026-11-23
+
+- Agents → DAG : une carte par run lancé depuis Jarvis, à la place des trois tableaux (suivis, enchaînements, lancements) qui racontaient le même run trois fois. Les cartes sont rangées par état (en cours, en échec ou arrêtés, terminés, simulations) ; chaque carte donne le client, le DAG en clair (« administratif · ETL groupe »), la stack, l'état et la durée, la dernière nouvelle du suivi, le nombre de relances automatiques et le lien vers le journal ou le rapport de fin. Un enchaînement tient sur une seule carte, avec ses étapes numérotées. Recherche et filtres par client, stack et état.
+
 ## [0.4.0] · 2026-11-20
 
 - Onglet Injections : chaque ligne (ressource ou groupe) montre ses derniers DAG lancés depuis Jarvis. Sur la ligne, une pastille donne le dernier (stack et état) ; en ouvrant la ligne, le dernier avec sa date, sa stack, son état, sa durée et la dernière nouvelle d'`air.py`, puis « Voir plus » ajoute les précédents trois par trois. Chacun mène à la page de son suivi (journal, rapport de fin).

@@ -515,7 +515,7 @@ def test_agents_page_shows_tokens_chart(monkeypatch):
     assert "Coût" not in page and "badge example" not in page  # ni coût en argent, ni agents fictifs
     assert page.count('<svg class="ring') <= 1 and "ring-cell" not in page  # au plus un anneau : le bilan
     assert "Tokens et durée" in page and "Cache relu" in page and "4,6 M" in page  # 2 agents finis : 3 421 000 + 1 221 000
-    assert 'href="#dags" data-pane="pane-dags"' in page and page.index('id="pane-dags"') < page.index("<h2>Suivis de DAG</h2>")  # onglet DAG
+    assert 'href="#dags" data-pane="pane-dags"' in page and page.index('id="pane-dags"') < page.index("Aucun DAG lancé depuis Jarvis")  # onglet DAG
     assert 'class="flow-lane flow-in_progress"' in page and page.count('<a class="flow-node') == 3 and '<tr data-agent="2">' in page
 
 

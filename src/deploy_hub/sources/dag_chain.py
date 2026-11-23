@@ -21,13 +21,14 @@ WAITING, RUNNING, GREEN, SIMULATED, SKIPPED = "en attente", "en cours", "vert", 
 STEP_STATUSES = {WAITING: TODO, RUNNING: IN_PROGRESS, GREEN: DONE, SIMULATED: DONE}  # tout autre état (échec, arrêté…) : KO
 CHAIN_STATUSES = {"en cours": IN_PROGRESS, "terminée": DONE}  # « arrêtée… » : KO
 MAX_STEPS = 20
+STEP_CARD = "Enchaînement #"  # début de la « carte » d'un lancement fait par une chaîne (sources/dag_board.py le reconnaît)
 
 
 @dataclass
 class Step:
     dag_id: str
     status: str = WAITING
-    watch_id: int | None = None  # suivi du run (Agents → Suivis de DAG) ; None en simulation
+    watch_id: int | None = None  # suivi du run (Agents → DAG) ; None en simulation
     message: str = ""  # pourquoi l'étape n'est pas verte
 
     @property
@@ -98,7 +99,7 @@ class ChainRunner:
                 if not step:
                     self._finish(chain, "terminée", "info", f"Les {len(chain.steps)} DAG sont passés, dans l'ordre.")
                     break
-                result, watch = self.launch(step.dag_id, chain.padoa_env, chain.slug, f"Enchaînement #{chain.id}, étape {n}")
+                result, watch = self.launch(step.dag_id, chain.padoa_env, chain.slug, f"{STEP_CARD}{chain.id}, étape {n}")
                 if not result.ok:
                     self._stop_at(chain, n, step, "non lancé : refusé", result.message)
                 elif watch:
@@ -164,4 +165,4 @@ class ChainRunner:
         chain.status, chain.ended_at = status, datetime.now()
         if self.notifications:
             self.notifications.add(f"chaine:{chain.id}:{chain.started_at.isoformat()}", "dag", level,
-                                   f"Enchaînement #{chain.id} {status} · {chain.padoa_env}", detail[:400], "/agents#chaines", chain.client)
+                                   f"Enchaînement #{chain.id} {status} · {chain.padoa_env}", detail[:400], f"/agents#chaine-{chain.id}", chain.client)

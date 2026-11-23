@@ -1,0 +1,54 @@
+{% import "_icons.html" as ic %}
+{# Onglet DAG de la page Agents : une carte par run lancé depuis Jarvis (sources/dag_board.py). Attend : cards.
+   Une carte dit qui, quoi, où (client, DAG, stack), où ça en est (état, durée), ce qui s'est passé (dernière nouvelle du
+   suivi, relances automatiques) et mène au suivi. Un enchaînement est une seule carte, avec ses étapes.
+   Les cartes sont rangées par état : en cours, en échec ou arrêtés, terminés, simulations. #}
+<p class="muted">Une carte par run lancé depuis Jarvis. Après chaque lancement réel, <code>air.py</code> suit le run : relances automatiques des erreurs passagères, notifications, rapport à la fin.</p>
+{% if cards %}
+{# Une section par état, celles qui demandent un regard d'abord ; une section vide (ou vidée par les filtres) ne s'affiche pas. #}
+<div class="run-board" data-filterable data-items=".run-card" data-filters="Client:client,Stack:stack">
+  {% for group, heading in (("in_progress", "En cours"), ("ko", "En échec ou arrêtés"), ("done", "Terminés"), ("other", "Simulations")) %}
+  {% set found = cards | selectattr("group", "equalto", group) | list %}
+  {% if found %}
+  <section class="run-section" aria-label="{{ heading }}">
+  <h2>{{ heading }} <span class="muted">· {{ found | length }}</span></h2>
+  <div class="run-cards">
+  {% for c in found %}
+  {% set suivi = ("/agents/suivis/" ~ c.watch_id) if c.watch_id else "" %}
+  <article class="run-card g-{{ c.group }}" id="{{ c.key }}" data-group="{{ c.group }}" data-client="{{ c.client }}" data-stack="{{ c.padoa_env }}">
+    <header>
+      <h3>{% if c.client %}<span class="run-client">{{ c.client }}</span> · {% endif %}{% if suivi and not c.steps %}<a href="{{ suivi }}" title="{{ c.dag_id }}">{{ c.title }}</a>{% else %}<span{% if c.dag_id %} title="{{ c.dag_id }}"{% endif %}>{{ c.title }}</span>{% endif %}</h3>
+      <span class="run-tags">
+        {% if c.kind %}<span class="badge">{{ c.kind }}</span>{% endif %}
+        <span class="badge {{ 'g-ko' if c.padoa_env == 'prod' }}">{{ c.padoa_env }}</span>
+        <span class="badge g-{{ c.group }}">{{ c.status }}{% if c.watch_id or c.steps %} · {{ c.duration | duree }}{% endif %}</span>
+        {% if c.simulated %}{{ ic.icon("flask", "Simulation", "ic-muted") }}{% endif %}
+      </span>
+    </header>
+    {% if c.steps %}
+    <ol class="run-steps" aria-label="Étapes de l'enchaînement">
+      {% for s in c.steps %}
+      <li class="g-{{ s.group }}"><span class="run-dot" aria-hidden="true">{{ loop.index }}</span>
+        {% if s.watch_id %}<a href="/agents/suivis/{{ s.watch_id }}" title="{{ s.dag_id }}">{{ s.name }}</a>{% else %}<span title="{{ s.dag_id }}">{{ s.name }}</span>{% endif %} <span class="muted"{% if s.message %} title="{{ s.message }}"{% endif %}>{{ s.status }}</span></li>
+      {% endfor %}
+    </ol>
+    {% endif %}
+    {% if c.summary %}<p class="run-news">{{ c.summary | truncate(220) }}</p>{% endif %}
+    <footer class="run-foot">
+      <span title="{{ c.started_at.strftime('%d/%m/%Y %H:%M') }}">Lancé {{ c.started_at | quand }}</span>
+      {% if c.card and c.slug %}<a href="/deploiements/{{ c.slug }}/injections">{{ c.card }}</a>{% elif c.card %}<span>{{ c.card }}</span>{% endif %}
+      {% if c.clears %}<span class="run-clears">{{ ic.icon("sync") }} {{ c.clears }} relance{{ "s" if c.clears > 1 }} automatique{{ "s" if c.clears > 1 }}</span>{% endif %}
+      {% if c.report %}<a href="{{ suivi }}">Rapport de fin</a>{% elif suivi %}<a href="{{ suivi }}">Journal du suivi</a>{% endif %}
+      {% if c.running and c.chain_id %}<form method="post" action="/agents/chaines/{{ c.chain_id }}/arreter"><button type="submit" class="secondary" title="Le run en cours continue ; les DAG suivants ne partent pas">Arrêter la chaîne</button></form>
+      {% elif c.running and c.watch_id %}<form method="post" action="/agents/suivis/{{ c.watch_id }}/arreter" onsubmit="return confirm('Arrêter le suivi #{{ c.watch_id }} ? Le run continue dans Airflow, sans relances automatiques.')"><button type="submit" class="secondary">Arrêter le suivi</button></form>{% endif %}
+    </footer>
+  </article>
+  {% endfor %}
+  </div>
+  </section>
+  {% endif %}
+  {% endfor %}
+</div>
+{% else %}
+<p class="muted">Aucun DAG lancé depuis Jarvis. Lance-en un depuis l'onglet Injections d'un client : sa carte apparaîtra ici, avec son suivi.</p>
+{% endif %}
