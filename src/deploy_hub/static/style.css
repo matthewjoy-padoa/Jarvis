@@ -1212,7 +1212,7 @@ html { overscroll-behavior-y: none; }
 .dock-btn { position: relative; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--border);
   background: var(--surface); color: var(--text); text-decoration: none; transition: transform .15s var(--ease, ease), border-color .15s, color .15s; }
 .dock-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.dock-btn svg.dock-logo { stroke: none; }  /* logo Google Drive : ses couleurs, sans trait */
+.dock-btn svg.dock-logo { stroke: none; }  /* logos Google Drive et Notion : pleins, sans trait */
 .dock-btn:hover, .dock-btn:focus-visible { transform: scale(1.08); border-color: var(--accent); color: var(--accent); text-decoration: none; }
 /* Bouton Environnements : à part au-dessus du dock ; au survol ou au clavier, les environnements s'ouvrent en éventail à sa gauche.
    Chaque pastille part du centre du bouton et va sur un arc de rayon --r, à l'angle --a (écart --step entre deux pastilles, l'éventail centré sur l'horizontale). */
