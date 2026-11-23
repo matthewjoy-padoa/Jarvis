@@ -7,11 +7,12 @@
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=4">
   <meta name="theme-color" content="#001235">
   <script>
-    // Thème retenu dans le navigateur. Rien de retenu : Noël par défaut (nuit ou clair selon le Mac). "" retenu : Auto, suit le Mac.
+    // Thème retenu dans le navigateur ("" : Auto, suit le Mac). Rien de retenu : Auto, puis Noël par défaut (nuit ou clair selon
+    // le Mac) à partir du 1er décembre 2026, à l'heure du navigateur.
     (function () {
       let t = null;
       try { t = localStorage.getItem("theme"); } catch (e) {}
-      t ??= matchMedia("(prefers-color-scheme: dark)").matches ? "noel" : "noel-clair";
+      if (t === null && new Date() >= new Date("2026-12-01T00:00")) t = matchMedia("(prefers-color-scheme: dark)").matches ? "noel" : "noel-clair";
       if (t) document.documentElement.dataset.theme = t;
     })();
   </script>
