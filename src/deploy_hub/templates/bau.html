@@ -48,12 +48,12 @@
   <a href="{{ base }}{{ '?vue=kanban' if kanban }}" class="{{ 'active' if not show_all }}" data-view="bau.tous:false">Ouvertes</a><a href="{{ base }}?tous=true{{ '&vue=kanban' if kanban }}" class="{{ 'active' if show_all }}" data-view="bau.tous:true">Toutes</a>
 </div>
 </div>
-{# Mêmes attributs data-* dans les deux vues : les filtres gardés valent pour la liste et pour le kanban.
-   « clientlie » et non « client » : ce filtre-là suit le client du menu (filters.js), ce qui viderait la liste. #}
+{# Mêmes attributs data-* dans les deux vues : les filtres gardés valent pour la liste et pour le kanban. Pas de filtre
+   sur le client lié ni la ressource : peu de demandes en ont, ils restent affichés sur la carte et trouvés par la recherche. #}
 {% macro attrs(x) -%}
-data-group="{{ x.group }}" data-statut="{{ x.status }}" data-priorite="{{ x.priority or 'Sans priorité' }}" data-responsable="{{ x.owners | join('|') if x.owners else 'Sans responsable' }}" data-referent="{{ x.referents | join('|') if x.referents else 'Sans référent' }}" data-clientlie="{{ x.clients | join('|') if x.clients else 'Sans client' }}" data-ressource="{{ x.resources | join('|') if x.resources else 'Sans ressource' }}" data-echeance="{{ x.due.isoformat() if x.due else '' }}" data-cree="{{ x.created.isoformat() if x.created else '' }}"
+data-group="{{ x.group }}" data-statut="{{ x.status }}" data-priorite="{{ x.priority or 'Sans priorité' }}" data-responsable="{{ x.owners | join('|') if x.owners else 'Sans responsable' }}" data-referent="{{ x.referents | join('|') if x.referents else 'Sans référent' }}" data-echeance="{{ x.due.isoformat() if x.due else '' }}" data-cree="{{ x.created.isoformat() if x.created else '' }}"
 {%- endmacro %}
-{% set filters = "Priorité:priorite,Responsable:responsable,Référent inté:referent,Client lié:clientlie,Ressource:ressource" %}
+{% set filters = "Priorité:priorite,Responsable:responsable,Référent inté:referent" %}
 {% if kanban %}
 {% call(_d, x) kb.board(columns, filters, "Demandes par statut", "terminée(s)") %}
 <article class="kb-card" data-ticket-card{% if not show_all and not x.is_open %} hidden data-out{% endif %} {{ attrs(x) }}>
