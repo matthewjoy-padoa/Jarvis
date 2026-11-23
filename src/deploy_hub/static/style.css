@@ -15,7 +15,7 @@
 }
 /* Mode nuit « Marine doux » (2026-11-19) : marine et cyan du logo, désaturés pour ne plus agresser l'œil ; statuts adoucis. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme]) {
     --bg: #0f1a2e; --surface: #172440; --text: #d6e0f0; --muted: #8d9bb5; --border: #26365a;
     --accent: #7cc3dc; --accent-soft: #1d3a55; --on-accent: #0f1a2e; --cyan: #7cc3dc; --on-status: #0f1a2e;
     --st-todo: #d6aa50; --st-progress: #7cc3dc; --st-ko: #e6808f; --st-done: #6cbf8e;
@@ -33,6 +33,28 @@
   --shadow: none; color-scheme: dark;
 }
 :root[data-theme="light"] { color-scheme: light; }
+/* Thèmes « Noël » (2026-11-23), « noel » (nuit) et « noel-clair » : choisis au bouton de thème, et imposés une fois le 1er décembre 2026 (base.html).
+   Le rouge reste aux KO dans les deux. Nuit de sapin : accent or, « à faire » en clémentine pour ne pas se confondre avec lui.
+   Matin de neige : accent sapin (l'or est illisible sur blanc). Décor (neige, guirlande, bonnet) en fin de fichier, peint avec
+   --snow (flocons), --wire (fil) et --bulb-1 à 4 (ampoules). Le clair part du thème clair et ne dit que ses différences : le mode
+   nuit du Mac ne vaut qu'en Auto (:root:not([data-theme])), un thème choisi au bouton porte seul ses couleurs. */
+:root[data-theme="noel"] {
+  --bg: #0d1f19; --surface: #15302a; --text: #f1ebdd; --muted: #9fb5aa; --border: #28493f;
+  --accent: #e6c06a; --accent-soft: #3a3a20; --on-accent: #1c1704; --cyan: #a9d8e8; --on-status: #0d1f19;
+  --st-todo: #f0a35e; --st-progress: #a9d8e8; --st-ko: #f0828a; --st-done: #7ed3a0;
+  --pa-todo: rgba(240, 163, 94, .2); --pa-progress: rgba(169, 216, 232, .18); --pa-ko: rgba(240, 130, 138, .2); --pa-done: rgba(126, 211, 160, .2);
+  --brand-grad: linear-gradient(100deg, #e6c06a 0%, #f6ecd0 40%, #f0878d 70%, #e6c06a 100%);
+  --snow: #fff; --wire: #3d5c50; --bulb-1: #f0626c; --bulb-2: #7ed3a0; --bulb-3: #e6c06a; --bulb-4: #a9d8e8;
+  --shadow: none; color-scheme: dark;
+}
+:root[data-theme="noel-clair"] {
+  --bg: #f0f5f2; --text: #13302a; --muted: #5b7068; --border: #dbe6e0;
+  --accent: #17684f; --accent-soft: #d6ebe2; --cyan: #24789f;
+  --st-todo: #bd7410; --st-progress: #24789f; --st-done: #1f8a4c;
+  --pa-todo: #fdeccb; --pa-progress: #d8ecf5;
+  --brand-grad: linear-gradient(100deg, #c22f3b 0%, #c08a12 40%, #17684f 70%, #c22f3b 100%);
+  --snow: #8ea8c4; --wire: #a9bfb3; --bulb-1: #d8323f; --bulb-2: #2e9b63; --bulb-3: #e0a92e; --bulb-4: #3f9fcf;
+}
 * { box-sizing: border-box; }
 body { margin: 0; font: 14px/1.55 'Inter', system-ui, sans-serif; font-feature-settings: "cv11"; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
 a { color: var(--accent); text-decoration: none; }
@@ -541,7 +563,7 @@ a.wn-title:hover { color: var(--accent); }
   box-shadow: 0 0 0 3px color-mix(in srgb, #5ccb4d 25%, transparent); }
 :root[data-theme="dark"] .brand-name { background-image: var(--brand-grad); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .brand-name { background-image: var(--brand-grad); }
+  :root:not([data-theme]) .brand-name { background-image: var(--brand-grad); }
 }
 @media (prefers-reduced-motion: no-preference) {
   .brand-name { animation: jarvis-sheen 9s ease-in-out infinite; }
@@ -601,8 +623,8 @@ a.wn-title:hover { color: var(--accent); }
   --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
   --ease: cubic-bezier(.2, .7, .3, 1);
 }
-:root[data-theme="dark"] { --shadow-card: none; --shadow-lift: 0 8px 22px -8px rgba(0, 0, 0, .55); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --shadow-card: none; --shadow-lift: 0 8px 22px -8px rgba(0, 0, 0, .55); } }
+:root[data-theme="dark"], :root[data-theme="noel"] { --shadow-card: none; --shadow-lift: 0 8px 22px -8px rgba(0, 0, 0, .55); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) { --shadow-card: none; --shadow-lift: 0 8px 22px -8px rgba(0, 0, 0, .55); } }
 
 /* --- Boutons ---------------------------------------------------------------------------------------- */
 button, .btn-primary, .btn-link {
@@ -1691,3 +1713,73 @@ details.filter.multi { position: relative; font-size: 13px; }
 .restart-note p { margin: 0; }
 .archived-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 8px 0 12px; border-style: dashed; }
 .archived-note p { margin: 0; flex: 1 1 320px; }
+
+/* ============================================================ Thèmes « Noël » (nuit et clair) : le décor (palettes en tête de fichier)
+   Tout est décoratif et ne capte aucun clic : neige derrière le contenu (visible entre les cartes), guirlande sous la barre,
+   bonnet sur le logo. Sans animation si le Mac demande moins de mouvement. */
+/* Neige : deux nappes de flocons (près, loin) plus hautes que l'écran d'une tuile (--tile), qui descendent d'une tuile puis recommencent. */
+:root[data-theme^="noel"] body::before, :root[data-theme^="noel"] body::after {
+  content: ""; position: fixed; left: 0; right: 0; bottom: 0; top: calc(-1 * var(--tile)); z-index: -1; pointer-events: none;
+}
+:root[data-theme^="noel"] body::before {
+  --tile: 380px; opacity: .8;
+  background-image:
+    radial-gradient(circle at 34px 46px, var(--snow) 0 2px, transparent 2.6px),
+    radial-gradient(circle at 181px 22px, var(--snow) 0 1.6px, transparent 2.2px),
+    radial-gradient(circle at 287px 118px, var(--snow) 0 2.3px, transparent 2.9px),
+    radial-gradient(circle at 96px 163px, var(--snow) 0 1.5px, transparent 2.1px),
+    radial-gradient(circle at 228px 247px, var(--snow) 0 2px, transparent 2.6px),
+    radial-gradient(circle at 52px 301px, var(--snow) 0 2.4px, transparent 3px),
+    radial-gradient(circle at 318px 342px, var(--snow) 0 1.6px, transparent 2.2px);
+  background-size: 347px var(--tile);
+}
+:root[data-theme^="noel"] body::after {
+  --tile: 520px; opacity: .45;
+  background-image:
+    radial-gradient(circle at 71px 38px, var(--snow) 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 263px 91px, var(--snow) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 412px 57px, var(--snow) 0 1.3px, transparent 1.9px),
+    radial-gradient(circle at 158px 176px, var(--snow) 0 1.4px, transparent 2px),
+    radial-gradient(circle at 349px 229px, var(--snow) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 27px 268px, var(--snow) 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 221px 337px, var(--snow) 0 1.3px, transparent 1.9px),
+    radial-gradient(circle at 438px 392px, var(--snow) 0 1.1px, transparent 1.7px),
+    radial-gradient(circle at 109px 461px, var(--snow) 0 1.4px, transparent 2px);
+  background-size: 463px var(--tile);
+}
+/* Guirlande : ampoules rouge, or, verte et givre pendues au bas de la barre, en deux rangs qui scintillent à tour de rôle ; halo dessiné dans l'image (pas de filtre). */
+@media (max-width: 900px) { :root[data-theme^="noel"] .topbar { position: relative; } }  /* « static » sous 900 px : repère des ampoules */
+:root[data-theme^="noel"] .topbar { border-bottom-color: var(--wire); }
+:root[data-theme^="noel"] .topbar::before, :root[data-theme^="noel"] .topbar::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 14px; pointer-events: none;
+  background-size: 96px 14px; background-repeat: repeat-x;
+}
+:root[data-theme^="noel"] .topbar::before {
+  background-image:
+    radial-gradient(ellipse 3.5px 4.5px at 12px 6px, var(--bulb-1) 0 98%, transparent),
+    radial-gradient(ellipse 3.5px 4.5px at 60px 6px, var(--bulb-2) 0 98%, transparent),
+    radial-gradient(circle 8px at 12px 6px, color-mix(in srgb, var(--bulb-1) 45%, transparent), transparent),
+    radial-gradient(circle 8px at 60px 6px, color-mix(in srgb, var(--bulb-2) 40%, transparent), transparent);
+}
+:root[data-theme^="noel"] .topbar::after {
+  background-image:
+    radial-gradient(ellipse 3.5px 4.5px at 36px 6px, var(--bulb-3) 0 98%, transparent),
+    radial-gradient(ellipse 3.5px 4.5px at 84px 6px, var(--bulb-4) 0 98%, transparent),
+    radial-gradient(circle 8px at 36px 6px, color-mix(in srgb, var(--bulb-3) 45%, transparent), transparent),
+    radial-gradient(circle 8px at 84px 6px, color-mix(in srgb, var(--bulb-4) 40%, transparent), transparent);
+}
+/* Bonnet posé de travers sur le logo ; liseré gris pour que la fourrure se détache d'une barre blanche. */
+:root[data-theme^="noel"] .brand { position: relative; }
+:root[data-theme^="noel"] .brand::before {
+  content: ""; position: absolute; left: -5px; top: -9px; width: 23px; height: 20px; z-index: 1; pointer-events: none; transform: rotate(-18deg);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 28'%3E%3Cpath d='M4 21C4 11 10 3 18 3c6 0 10 5 10 11h-3c-.5-3-2-4.5-4-5 3 3 5 8 5 12z' fill='%23d8323f'/%3E%3Cg fill='%23fff' stroke='%23b9c6cf' stroke-width='.8'%3E%3Crect x='1.5' y='19' width='27' height='7' rx='3.5'/%3E%3Ccircle cx='27.5' cy='15.5' r='3.5'/%3E%3C/g%3E%3C/svg%3E") no-repeat center / contain;
+}
+:root[data-theme^="noel"] .footer::before { content: "🎄 Joyeuses fêtes · "; }
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme^="noel"] body::before { animation: noel-snow 22s linear infinite; }
+  :root[data-theme^="noel"] body::after { animation: noel-snow 44s linear infinite; }
+  @keyframes noel-snow { to { transform: translateY(var(--tile)); } }
+  :root[data-theme^="noel"] .topbar::before { animation: noel-twinkle 2.4s ease-in-out infinite; }
+  :root[data-theme^="noel"] .topbar::after { animation: noel-twinkle 2.4s ease-in-out -1.2s infinite; }
+  @keyframes noel-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+}

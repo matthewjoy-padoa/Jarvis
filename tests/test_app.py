@@ -293,6 +293,26 @@ def test_theme_switch_is_in_every_page():
     assert 'id="theme-toggle"' in html and 'localStorage.getItem("theme")' in html
 
 
+def test_christmas_theme_is_one_of_the_themes_and_has_its_palette():
+    """« Noël » (nuit et clair) se choisit au bouton de thème et par la commande de la palette ; palettes dans la feuille de style."""
+    html = client.get("/").text
+    assert 'noel: "Noël nuit"' in html and '"noel-clair": "Noël clair"' in html
+    css = client.get("/static/style.css").text
+    assert ':root[data-theme="noel"] {' in css and ':root[data-theme="noel-clair"] {' in css
+    assert ':root[data-theme^="noel"] body::before' in css  # le décor vaut pour les deux
+    assert "Noël clair" in client.get("/palette", params={"q": ">thème"}).text
+
+
+def test_christmas_is_forced_once_on_the_first_of_december_then_can_be_removed():
+    """À partir du 1er décembre 2026, Noël s'impose une fois à chaque navigateur (« theme-noel-2026 » retient que c'est fait), quel que
+    soit le thème retenu. Tout choix fait ensuite est retenu, Auto compris, donc Noël ne revient pas."""
+    html = client.get("/").text
+    head = html.split("</head>")[0]
+    assert 'new Date("2026-12-01T00:00")' in head and 'localStorage.setItem("theme-noel-2026", "1")' in head
+    assert '"noel-clair"' in head and "prefers-color-scheme: dark" in head
+    assert 'localStorage.setItem("theme", next)' in html and 'removeItem("theme")' not in html  # Auto ("") est retenu, pas effacé
+
+
 def test_navigation_shows_the_current_client_and_the_others_in_its_menu():
     """Un client à la fois : le client en cours dans la barre, les autres seulement dans le menu du sélecteur."""
     html = TestClient(app).get("/deploiements/client-demo/synthese").text

@@ -11,6 +11,10 @@ Pour une PR qui monte le numéro :
 
 La version affichée en bas de chaque page change donc avec chaque fonctionnalité ; après une simple correction, le bandeau « Jarvis est à relancer » compare les commits. Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
+## [0.5.7] · 2026-11-23
+
+- Thèmes « Noël » : deux choix de plus au bouton de thème (Auto → Nuit → Clair → Noël nuit → Noël clair) et dans la commande « Changer de thème » de la palette. Nuit de sapin à l'accent or, ou matin de neige à l'accent sapin ; statuts gardés lisibles dans les deux (KO en rouge). Neige derrière le contenu, guirlande qui scintille sous la barre, bonnet sur le logo, « Joyeuses fêtes » en pied de page. Décor sans animation si le Mac demande moins de mouvement. À partir du 1er décembre 2026, Noël s'impose une fois à chaque navigateur, quel que soit le thème choisi avant (nuit si on était en Nuit, clair si on était en Clair, selon le Mac en Auto) ; on peut ensuite l'enlever au bouton : tout choix est retenu, Auto compris, et Noël ne revient pas.
+
 ## [0.5.6] · 2026-11-23
 
 - Règle de version : une correction ou un changement trop petit ne monte plus le numéro ; sa ligne s'ajoute à la version en cours.

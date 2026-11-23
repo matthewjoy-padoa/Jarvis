@@ -278,7 +278,7 @@ def _client_items(d: Deployment, tabs) -> list[Item]:
 
 
 COMMANDS = [
-    ("Changer de thème : auto, nuit, clair", "#", "theme"),
+    ("Changer de thème : auto, nuit, clair, Noël nuit, Noël clair", "#", "theme"),
     ("Ajouter un client", "/clients/nouveau", ""),
     ("Kanban des retours de recette", "/recette?vue=kanban", ""),
     ("Kanban des actions", "/actions?vue=kanban", ""),
