@@ -1055,6 +1055,7 @@ img.client-icon { width: 1em; height: 1em; object-fit: contain; vertical-align: 
 .tool-launch .ic { width: 16px; height: 16px; margin: 0; }
 .tool-launch-ext { margin-left: -4px; font-size: 12px; line-height: 1; }
 @media (max-width: 1440px) { .tool-launch-label { display: none; } }
+.tool-choice { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }  /* Flow Digger : mettre à jour et relancer, ou ouvrir */
 .tool-error { display: flex; gap: 8px; align-items: flex-start; color: var(--st-ko); }
 .tool-error .ic { flex: none; width: 18px; height: 18px; margin-top: 2px; }
 

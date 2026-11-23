@@ -65,7 +65,7 @@ L'onglet Injections propose les DAGs de l'orchestrator qui traitent chaque resso
 
 ## Flow Digger
 
-Le bouton **Flow Digger ↗** de la barre ouvre [integration-flow-digger](https://github.com/padoa/integration-flow-digger) dans sa propre fenêtre, et le démarre d'abord sur la VM s'il ne tourne pas (`uv run main.py --start --no-browser`). Son installation (outils, 1Password, Google Drive, configs client) se fait une fois, selon son README.
+Le bouton **Flow Digger ↗** de la barre ouvre [integration-flow-digger](https://github.com/padoa/integration-flow-digger) dans sa propre fenêtre, et le démarre d'abord sur la VM s'il ne tourne pas (`uv run main.py --start --no-browser`). À chaque clic, Jarvis regarde si sa branche a des commits que le dossier n'a pas (`git fetch`) : arrêté, il ne le met à jour (avance rapide, jamais de fusion) que s'il y en a ; déjà lancé, il propose « Mettre à jour et relancer » (seulement un Flow Digger qu'il a lui-même lancé) ou « Ouvrir la version actuelle ». Son installation (outils, 1Password, Google Drive, configs client) se fait une fois, selon son README.
 
 ## Lancer des agents Claude
 

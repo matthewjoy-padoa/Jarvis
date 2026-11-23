@@ -10,6 +10,10 @@ Ainsi la version affichée en bas de chaque page change à chaque fusion (et le 
 
 Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
+## [0.5.6] · 2026-11-23
+
+- Flow Digger : à chaque clic, Jarvis regarde s'il y a des commits à récupérer (`git fetch`). Arrêté, il ne met à jour que s'il y a du nouveau (des modifications locales ne bloquent plus le lancement quand rien n'a changé) ; déjà lancé mais en retard, il propose « Mettre à jour et relancer » ou « Ouvrir la version actuelle » au lieu d'ouvrir une vieille version sans rien dire. Il ne coupe jamais un Flow Digger qu'il n'a pas lancé lui-même.
+
 ## [0.5.5] · 2026-11-23
 
 - Agents sur un retour de recette : la branche dit le sujet au lieu du numéro du retour (`fix-presoa-ced-ged-factures-multi-version` plutôt que `fix-presoa-23aa58`) : client, ressource ou type de données, premiers mots de la ligne du cahier de recette, chiffres retirés. Une reprise ou une relance garde la branche déjà lancée ; le numéro ne s'ajoute que si le retour n'a ni ligne ni type, ou qu'une autre branche d'agent porte déjà ce nom.

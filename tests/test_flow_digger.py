@@ -4,6 +4,7 @@ import socket
 import os
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +13,8 @@ from deploy_hub.main import app
 from deploy_hub.sources import flow_digger
 
 REAL_UPDATE = flow_digger.update
+REAL_BEHIND = flow_digger.behind
+FAKE_PROC = SimpleNamespace(pid=999_999)  # processus « lancé » des tests qui ne lancent rien pour de vrai
 
 
 def free_port() -> int:
@@ -31,7 +34,8 @@ def repo(tmp_path, monkeypatch):
     monkeypatch.delenv("FLOW_DIGGER_URL", raising=False)
     monkeypatch.setenv("JARVIS_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setattr(flow_digger, "data_dir", lambda: tmp_path / "data")
-    monkeypatch.setattr(flow_digger, "update", lambda repo: (True, ""))  # le pull a ses propres tests, sur de vrais dépôts
+    monkeypatch.setattr(flow_digger, "update", lambda repo: (True, ""))  # la mise à jour a ses propres tests, sur de vrais dépôts
+    monkeypatch.setattr(flow_digger, "behind", lambda repo, **k: (0, ""))
     return folder
 
 
@@ -87,7 +91,7 @@ def test_a_real_start_waits_for_the_port_and_hides_jarvis_secrets(repo, monkeypa
 
 
 def test_a_server_that_never_listens_is_reported(repo, monkeypatch):
-    monkeypatch.setattr(flow_digger.subprocess, "Popen", lambda *a, **k: None)
+    monkeypatch.setattr(flow_digger.subprocess, "Popen", lambda *a, **k: FAKE_PROC)
     launch = flow_digger.start(wait=0.5)
     assert not launch.url and "ne répond pas" in launch.error and "flow-digger.log" in launch.error
 
@@ -113,10 +117,10 @@ def test_another_site_cannot_start_it(monkeypatch):
 def test_the_route_redirects_or_explains(monkeypatch):
     client = TestClient(app)
     same = {"origin": "http://testserver"}
-    monkeypatch.setattr(flow_digger, "start", lambda force=False: flow_digger.Launch(url="http://localhost:4004"))
+    monkeypatch.setattr(flow_digger, "start", lambda **k: flow_digger.Launch(url="http://localhost:4004"))
     r = client.post("/outils/flow-digger", headers=same, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "http://localhost:4004"
-    monkeypatch.setattr(flow_digger, "start", lambda force=False: flow_digger.Launch(error="Flow Digger introuvable : clone le dépôt"))
+    monkeypatch.setattr(flow_digger, "start", lambda **k: flow_digger.Launch(error="Flow Digger introuvable : clone le dépôt"))
     r = client.post("/outils/flow-digger", headers=same)
     assert r.status_code == 200 and "Flow Digger introuvable" in r.text
 
@@ -167,7 +171,7 @@ def test_a_diverged_clone_is_never_merged_nor_forced(remote_and_clone):
     (clone / "main.py").write_text("local\n")
     git(clone, "commit", "-qam", "local")
     ok, detail = REAL_UPDATE(clone)
-    assert not ok and "git pull a échoué" in detail
+    assert not ok and "sans fusion" in detail and "fast-forward" in detail
     assert (clone / "main.py").read_text() == "local\n"  # rien de fusionné ni d'écrasé
 
 
@@ -181,12 +185,12 @@ def test_a_failed_pull_launches_nothing_unless_forced(repo, monkeypatch):
     monkeypatch.setattr(flow_digger.subprocess, "Popen", no_launch)
     launch = flow_digger.start(wait=0.2)
     assert not launch.url and launch.can_force and "fast-forward" in launch.error
-    monkeypatch.setattr(flow_digger.subprocess, "Popen", lambda *a, **k: None)  # forcé : on lance sans pull
+    monkeypatch.setattr(flow_digger.subprocess, "Popen", lambda *a, **k: FAKE_PROC)  # forcé : on lance sans pull
     assert "ne répond pas" in flow_digger.start(wait=0.2, force=True).error
 
 
 def test_no_pull_when_already_running(repo, monkeypatch):
-    monkeypatch.setattr(flow_digger, "update", lambda r: (_ for _ in ()).throw(AssertionError("pas de pull")))
+    monkeypatch.setattr(flow_digger, "update", lambda r: (_ for _ in ()).throw(AssertionError("pas de mise à jour")))
     with socket.socket() as server:
         server.bind(("127.0.0.1", flow_digger.port()))
         server.listen()
@@ -195,7 +199,7 @@ def test_no_pull_when_already_running(repo, monkeypatch):
 
 def test_the_failure_page_offers_to_launch_anyway(monkeypatch):
     calls = []
-    def fake(force=False):
+    def fake(force=False, **k):
         calls.append(force)
         return flow_digger.Launch(error="Mise à jour de Flow Digger impossible", can_force=True) if not force else flow_digger.Launch(url="http://localhost:4004")
     monkeypatch.setattr(flow_digger, "start", fake)
@@ -204,3 +208,88 @@ def test_the_failure_page_offers_to_launch_anyway(monkeypatch):
     assert "Lancer quand même la version actuelle" in page.text and 'name="forcer" value="1"' in page.text
     r = client.post("/outils/flow-digger", data={"forcer": "1"}, headers={"origin": "http://testserver"}, follow_redirects=False)
     assert r.status_code == 303 and calls == [False, True]
+
+
+# --- Besoin de mettre à jour ? (git fetch, puis commits de la branche suivie que le dossier n'a pas) -----------------
+
+def test_behind_counts_the_new_commits_of_the_tracked_branch(remote_and_clone, tmp_path):
+    origin, clone = remote_and_clone
+    assert REAL_BEHIND(clone) == (0, "")
+    for v in ("v2", "v3"):
+        (origin / "main.py").write_text(v + "\n")
+        git(origin, "commit", "-qam", v)
+    assert REAL_BEHIND(clone) == (2, "") and (clone / "main.py").read_text() == "v1\n"  # regardé, rien de changé
+    git(tmp_path, "init", "-q", str(tmp_path / "seul"))
+    assert REAL_BEHIND(tmp_path / "seul") == (None, "")  # sans branche suivie : rien à regarder
+
+
+def test_nothing_new_means_no_pull_so_local_changes_do_not_block(remote_and_clone):
+    """Avant, le pull était tenté à chaque lancement : des modifications locales en conflit bloquaient sans raison."""
+    clone = remote_and_clone[1]
+    (clone / "main.py").write_text("modifié à la main\n")
+    assert REAL_UPDATE(clone) == (True, "") and (clone / "main.py").read_text() == "modifié à la main\n"
+
+
+def test_a_fetch_that_fails_is_explained(remote_and_clone):
+    origin, clone = remote_and_clone
+    git(clone, "remote", "set-url", "origin", str(origin.parent / "disparu"))
+    count, error = REAL_BEHIND(clone)
+    assert count is None and "git fetch a échoué" in error
+    assert REAL_UPDATE(clone)[0] is False  # arrêté : rien n'est lancé sans savoir, sauf « Lancer quand même »
+
+
+def listening():
+    server = socket.socket()
+    server.bind(("127.0.0.1", flow_digger.port()))
+    server.listen()
+    return server
+
+
+def test_already_running_and_behind_proposes_the_update(repo, monkeypatch):
+    monkeypatch.setattr(flow_digger, "behind", lambda r, **k: (3, ""))
+    monkeypatch.setattr(flow_digger.subprocess, "Popen", no_launch)
+    with listening():
+        launch = flow_digger.start()
+        assert launch.url and launch.behind == 3 and not launch.can_restart  # pas lancé par Jarvis : rien à relancer
+        assert flow_digger.start(current=True).behind == 0  # « Ouvrir la version actuelle » : sans rien vérifier
+        assert "lancé hors de Jarvis" in flow_digger.start(restart=True).error  # jamais coupé sans savoir ce que c'est
+    monkeypatch.setattr(flow_digger, "behind", lambda r, **k: (None, "git fetch a échoué : réseau"))
+    with listening():
+        assert flow_digger.start().behind == 0  # réseau absent : on ouvre la version en service, sans bloquer
+
+
+def test_the_update_page_offers_to_restart_or_open_the_current_version(monkeypatch):
+    calls = []
+    def fake(force=False, restart=False, current=False):
+        calls.append((restart, current))
+        if restart or current:
+            return flow_digger.Launch(url="http://localhost:4004")
+        return flow_digger.Launch(url="http://localhost:4004", behind=2, can_restart=True)
+    monkeypatch.setattr(flow_digger, "start", fake)
+    client, same = TestClient(app), {"origin": "http://testserver"}
+    page = client.post("/outils/flow-digger", headers=same).text
+    assert "<strong>2 commits</strong>" in page and 'name="relancer" value="1"' in page and 'name="actuelle" value="1"' in page
+    for field in ("relancer", "actuelle"):
+        r = client.post("/outils/flow-digger", data={field: "1"}, headers=same, follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"] == "http://localhost:4004"
+    assert calls == [(False, False), (True, False), (False, True)]
+
+
+def test_restart_stops_the_flow_digger_jarvis_launched_then_starts_it_updated(repo, monkeypatch):
+    """Un vrai processus détaché qui écoute, comme main.py --start : Jarvis note son numéro, l'arrête puis relance."""
+    serve = "import socket,sys,time; s=socket.socket(); s.bind(('127.0.0.1', int(sys.argv[3]))); s.listen(); time.sleep(60)"
+    monkeypatch.setattr(flow_digger, "command", lambda r: [sys.executable, "-c", serve, str(r / "main.py"), "--start", str(flow_digger.port())])
+    updates = []
+    monkeypatch.setattr(flow_digger, "update", lambda r: updates.append(r) or (True, "a1b2c3d → e4f5a6b"))
+    first = flow_digger.start(wait=10)
+    try:
+        assert first.url and len(updates) == 1
+        old_pid = int((repo.parent / "data" / flow_digger.PID_FILE).read_text())
+        monkeypatch.setattr(flow_digger, "behind", lambda r, **k: (1, ""))
+        assert flow_digger.start().can_restart  # lancé par Jarvis : il peut le relancer
+        again = flow_digger.start(restart=True, wait=10)
+        new_pid = int((repo.parent / "data" / flow_digger.PID_FILE).read_text())
+        assert again.url and new_pid != old_pid and len(updates) == 2  # arrêté, mis à jour, relancé
+        assert subprocess.run(["ps", "-p", str(old_pid)], capture_output=True).returncode != 0
+    finally:
+        flow_digger.stop(repo)

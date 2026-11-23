@@ -955,16 +955,17 @@ def flow_digger_reloaded():
 
 
 @app.post("/outils/flow-digger")
-def open_flow_digger(request: Request, forcer: str = Form("")):
-    """Démarre Flow Digger sur la VM s'il ne tourne pas (après un git pull de son dépôt), puis y emmène.
-    forcer=1 (bouton de la page d'échec) : lance la version actuelle sans tenter le pull."""
+def open_flow_digger(request: Request, forcer: str = Form(""), relancer: str = Form(""), actuelle: str = Form("")):
+    """Démarre Flow Digger sur la VM s'il ne tourne pas (mis à jour s'il y a du nouveau), puis y emmène ; déjà lancé
+    mais en retard sur sa branche : propose de le mettre à jour et le relancer, ou d'ouvrir la version en service.
+    forcer=1 (page d'échec) : lance la version actuelle sans mise à jour ; relancer=1 : arrête, met à jour et relance ;
+    actuelle=1 : ouvre la version en service sans rien vérifier."""
     if not _from_jarvis(request):
         raise HTTPException(403, "Lancement refusé : la demande ne vient pas de Jarvis.")
-    launch = flow_digger.start(force=forcer == "1")
-    if launch.url:
+    launch = flow_digger.start(force=forcer == "1", restart=relancer == "1", current=actuelle == "1")
+    if launch.url and not launch.behind:
         return RedirectResponse(launch.url, status_code=303)
-    return _render(request, "outil.html", "", tool="Flow Digger", error=launch.error, can_force=launch.can_force,
-                   action="/outils/flow-digger")
+    return _render(request, "outil.html", "", tool="Flow Digger", launch=launch, action="/outils/flow-digger")
 
 
 # ---- Réglages : .env, connexions et 1Password depuis l'app -------------------------------------------------------
