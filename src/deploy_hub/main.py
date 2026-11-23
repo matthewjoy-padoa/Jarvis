@@ -129,7 +129,7 @@ def _check_claude_login(startup: bool = False) -> None:
 
 
 _code_started = running_code.head()  # commit du code chargé par ce processus ("" : dossier hors de git)
-_version_started = running_code.version()  # son numéro de version (pyproject.toml), en pied de page ; monté à chaque PR
+_version_started = running_code.version()  # son numéro de version (pyproject.toml), en pied de page ; monté à chaque PR, sauf correction
 _restart: tuple[str, ...] = ()  # Jarvis à relancer : (installée, en service), en numéros de version, en commits si le numéro n'a pas bougé
 
 

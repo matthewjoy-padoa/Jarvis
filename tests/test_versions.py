@@ -1,4 +1,4 @@
-"""Le numéro de version monte à chaque PR : pyproject.toml, uv.lock et la première section du CHANGELOG concordent."""
+"""Numéro de version (monté à chaque PR, sauf correction) : pyproject.toml, uv.lock et la première section du CHANGELOG concordent."""
 import re
 import tomllib
 
@@ -15,4 +15,4 @@ def test_pyproject_lock_and_changelog_carry_the_same_version():
     changelog = (PROJECT_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     first = re.search(r"^## (.+)$", changelog, re.M).group(1)
     assert re.fullmatch(rf"\[{re.escape(version)}\] · \d{{4}}-\d{{2}}-\d{{2}}", first), \
-        "chaque PR monte le numéro : la première section du CHANGELOG est « ## [<numéro de pyproject.toml>] · AAAA-MM-JJ »"
+        "la première section du CHANGELOG est « ## [<numéro de pyproject.toml>] · AAAA-MM-JJ » (une correction s'y ajoute sans nouveau numéro)"
