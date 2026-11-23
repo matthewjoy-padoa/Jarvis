@@ -3,6 +3,7 @@ import calendar
 import dataclasses
 import logging
 import os
+import random
 import re
 from contextlib import asynccontextmanager
 import threading
@@ -262,6 +263,16 @@ def settings_links(text) -> Markup:
 templates.env.filters["reglages"] = settings_links
 templates.env.filters["duree"] = duration_text
 templates.env.filters["tokens"] = tokens_text
+
+
+def pick(items, seed):
+    """Élément tiré au hasard, toujours le même pour une même graine : la tête d'un agent ne change pas d'une page à l'autre."""
+    return random.Random(seed).choice(items)
+
+
+templates.env.filters["au_hasard"] = pick
+
+
 def when_iso(iso: str) -> str:
     """when_text d'une date ISO (fichier d'état) ; vide si elle manque ou est illisible."""
     try:
