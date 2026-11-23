@@ -1,4 +1,5 @@
-{# Détail d'une demande BAU (bau.Demande). Attend : x, fiche_of (client lié → fiche suivie dans Jarvis), today. #}
+{# Détail d'une demande BAU (bau.Demande). Attend : x, fiche_of (client lié → fiche suivie dans Jarvis), today, runs (ses agents),
+   et d, kind, ref pour l'épingle et les rappels (bau.SPACE, « demande », x.ref). #}
 {% import "_icons.html" as ic %}
 <article class="ticket" data-group="{{ x.group }}">
   <header class="ticket-head">
@@ -9,9 +10,12 @@
       {% if x.priority %}<span class="badge" title="Priorité">{{ x.priority }}</span>{% endif %}
     </div>
     <div class="ticket-actions">
+      {% if x.is_open %}<button type="button" class="ticket-agent-btn" onclick="const a = this.closest('.ticket').querySelector('details.agent'); a.open = true; a.scrollIntoView({behavior: 'smooth', block: 'start'})">{{ ic.icon("bot") }} Lancer un agent</button>{% endif %}
+      {% include "_pin_button.html" %}
       {% if x.notion_url %}<a class="btn-link" href="{{ x.notion_url }}" target="_blank" rel="noopener">Ouvrir dans Notion ↗</a>{% endif %}
       <a class="btn-link" href="/bau/demande/{{ x.ref }}" target="_blank" rel="noopener" title="Ouvrir cette demande dans un nouvel onglet">Nouvel onglet ↗</a>
     </div>
+    {% include "_ticket_remind.html" %}
   </header>
 
   <section class="ticket-section">
@@ -30,5 +34,20 @@
   <section class="ticket-section">
     <h3>Détail</h3>
     <p class="muted">Le détail d'une demande est écrit dans sa page Notion, que la synchro ne lit pas{% if x.notion_url %} : <a href="{{ x.notion_url }}" target="_blank" rel="noopener">ouvre-la dans Notion ↗</a>{% endif %}.</p>
+  </section>
+
+  <section class="ticket-section">
+    <h3>Agents</h3>
+    {% for run in runs %}
+    <p class="ticket-run"><a href="/agents/{{ run.id }}">Agent #{{ run.id }}</a> <span class="badge g-{{ run.group }}">{{ run.status }}</span>
+      <span class="muted">{{ run.started_at.strftime("%d/%m %H:%M") }} · <code>{{ run.branch }}</code></span>
+      {% if run.pr_url %}<a href="{{ run.pr_url }}" target="_blank" rel="noopener">PR ↗</a>{% endif %}</p>
+    {% else %}<p class="muted">Aucun agent lancé sur cette demande.</p>{% endfor %}
+    {% if x.is_open %}
+    <details class="agent" hx-get="/bau/demande/{{ x.ref }}/brief" hx-target="find .agent-body" hx-trigger="toggle once">
+      <summary>{{ ic.icon("bot") }} Lancer un agent</summary>
+      <div class="agent-body"><p class="muted">Jarvis prépare le brief…</p></div>
+    </details>
+    {% endif %}
   </section>
 </article>

@@ -59,6 +59,7 @@ La consigne vit dans le dépôt : un `git pull` met à jour la tâche planifiée
 Pour l'équipe qui traite des demandes plutôt qu'un déploiement : la page **BAU** affiche les actions de la base Notion « Equipes OPS - Actions internes » liées à une page projet ou BAU, par exemple « BAU équipe intégration - TECHNIQUE ».
 - **Mise en place** : dans **Réglages → Notion**, colle le lien de la page dans `JARVIS_NOTION_BAU` (••• → Copier le lien, celui de la page elle-même, pas d'une vue). « BAU » apparaît dans la barre du haut ; « Rafraîchir depuis Notion » charge les demandes (une minute environ la première fois). Aucun client n'est nécessaire.
 - **Ce qu'on y voit** : les demandes en liste ou en kanban (une colonne par statut Notion), ouvertes ou toutes, les plus prioritaires d'abord (P0, P1, P2), puis les échéances les plus proches. Filtres : statut, priorité, responsable, référent inté, client lié, ressource ; recherche ; tout est gardé d'une visite à l'autre. Une demande s'ouvre en panneau : responsables, référents, clients liés (avec le lien vers leur fiche s'ils sont suivis dans Jarvis), ressources, échéance, lien Notion. L'accueil résume où en est l'équipe (demandes ouvertes, en retard).
+- **Comme un retour de recette** : « Lancer un agent » sur une demande ouverte (liste ou panneau) prépare un brief pour Claude Code, sur une branche `bau-<client>-<premiers mots de l'intitulé>` ; l'agent se suit dans **Agents** (journal, questions, PR) et apparaît dans le panneau de sa demande. Jarvis ne lisant pas le corps de la page Notion, le brief attend que tu y colles le détail de la demande : il ne part pas tant que « À COMPLÉTER » y figure. Une demande s'épingle (page BAU et accueil) et se rappelle comme un ticket.
 - **Synchro** : par la routine Claude Code seulement (connecteur Notion, lecture seule), même avec un `NOTION_TOKEN` : le bouton de la page BAU ne relit que les demandes ; « Tout rafraîchir », `/jarvis-sync` et la tâche planifiée les relisent avec les clients. Une requête d'empreinte, puis seulement les demandes modifiées ; tout est relu quand des demandes ont disparu de la page, et tous les 7 jours.
 - **Ce que Jarvis ne lit pas** : le corps des pages. Le détail d'une demande reste dans Notion, à un clic. Rien n'est écrit dans Notion ; les demandes restent sur ta machine (`data/notion/_bau/`).
 
@@ -150,7 +151,7 @@ Routes dans `src/deploy_hub/main.py`, pages dans `templates/` et `static/`, sync
 
 ## Limites connues
 
-- Demandes BAU : pas d'agent Claude, d'épingle ni de rappel sur une demande, pas de synchro automatique ni par jeton Notion ; elles ne sont pas dans la recherche ⌘K ni dans « Quoi de neuf ».
+- Demandes BAU : le détail d'une demande (corps de sa page Notion) n'est pas lu, il se colle dans le brief de l'agent ; pas de synchro automatique ni par jeton Notion ; elles ne sont pas dans la recherche ⌘K, la commande `>agent` ni « Quoi de neuf ».
 - Après un changement du clone orchestrator, la liste des DAGs est à jour au plus une minute plus tard (ou tout de suite avec « Régénérer ») ; une page Injections déjà ouverte ne se recharge pas seule.
 - Les runs lancés par `/air` n'apparaissent pas dans **Agents → DAG** (leurs rapports sont dans `data/airflow/`).
 - Un changement fait seulement sur une carte Bible n'est vu qu'à la synchro complète suivante (7 jours au plus).

@@ -10,7 +10,11 @@ from fastapi.testclient import TestClient
 import deploy_hub.sync_notion as sn
 from deploy_hub import bau, main
 from deploy_hub.config import data_dir
+from datetime import datetime
+
 from deploy_hub.sources import ActionResult
+from deploy_hub.sources.claude_runner import TO_FILL, AgentRun, demande_branch
+from deploy_hub.sources.personal import PersonalStore
 from test_sync_passage import FINGERPRINT, SESSION, answer, run
 
 PAGE = "5" * 32
@@ -278,3 +282,60 @@ def test_home_without_any_client_talks_about_the_requests_instead_of_asking_for_
     monkeypatch.setattr(main.fiches, "list_deployments", lambda: [])
     home = client.get("/").text
     assert "demande(s) BAU ouverte(s)" in home and "Ajoute ton premier client" not in home
+
+
+# ------------------------------------------------------------------------------------- agent, épingle, rappel : comme un retour
+def test_the_brief_of_a_request_waits_for_its_detail_and_names_a_branch_from_its_title(board):
+    x = board.demandes[0]
+    panel = client.get(f"/bau/demande/{x.ref}", headers={"HX-Request": "true"}).text
+    assert f'hx-get="/bau/demande/{x.ref}/brief"' in panel and "Aucun agent lancé sur cette demande" in panel
+    form = client.get(f"/bau/demande/{x.ref}/brief").text
+    assert f'hx-post="/bau/demande/{x.ref}/agent"' in form and "Lancer un agent sur la demande" in form
+    assert TO_FILL in form and "bau-client-demo-corriger-le-mapping-des-contrats" in form
+    assert "Corriger le mapping des contrats" in form and "firm, visit_histo" in form and "[FEAT](" in form
+
+
+def test_an_agent_starts_on_a_request_once_its_detail_is_written_and_shows_up_everywhere(board):
+    x = board.demandes[0]
+    refused = client.post(f"/bau/demande/{x.ref}/agent", data={"description": ""})
+    assert "colle le détail de la demande" in refused.text
+    started = client.post(f"/bau/demande/{x.ref}/agent", data={"description": "Le contrat type X doit être repris en CDI."})
+    assert "lancé sur demande" in started.text
+    run = main.claude.runs[0]
+    assert (run.slug, run.client, run.subject, run.category) == (bau.KEY, "BAU", f"demande {x.ref}", "firm")
+    assert run.branch == "bau-client-demo-corriger-le-mapping-des-contrats" and "repris en CDI" in run.prompt and TO_FILL not in run.prompt
+    assert main.claude.demande_branch(x) == run.branch  # un nouvel agent repart sur la même branche
+    assert f"Agent #{run.id}" in client.get(f"/bau/demande/{x.ref}", headers={"HX-Request": "true"}).text
+    assert f'href="/bau/demande/{x.ref}"' in client.get(f"/agents/{run.id}").text  # l'agent renvoie à sa demande
+    assert client.get("/agents").status_code == 200
+
+
+def test_a_closed_request_gets_no_agent(board):
+    done = board.demandes[2]
+    assert not done.is_open and "déjà close" in client.post(f"/bau/demande/{done.ref}/agent", data={"description": "x"}).text
+    assert "Lancer un agent" not in client.get(f"/bau/demande/{done.ref}", headers={"HX-Request": "true"}).text
+    assert client.post("/bau/demande/INCONNUE/agent", data={"description": "x"}).status_code == 404
+
+
+def test_two_requests_with_the_same_title_get_two_branches():
+    same = [bau.Demande(ref=ref, title="Revoir l'import 2027") for ref in ("AAAA1111", "BBBB2222")]
+    first = demande_branch(same[0])
+    taken = [AgentRun(1, bau.KEY, "BAU", "demande AAAA1111", first, "", datetime.now(), "terminé")]
+    assert first == "bau-revoir-l-import" and demande_branch(same[1], taken) == "bau-revoir-l-import-bbbb2222"
+    assert demande_branch(bau.Demande(ref="CCCC3333", title="2027"), taken) == "bau-cccc3333"  # intitulé sans mot
+
+
+def test_a_request_can_be_pinned_and_reminded_like_a_ticket(board, monkeypatch, tmp_path):
+    monkeypatch.setattr(main, "personal", PersonalStore(tmp_path / "perso.json"))
+    monkeypatch.setitem(main.templates.env.globals, "perso", main.personal)
+    x = board.demandes[1]
+    assert 'aria-pressed="true"' in client.post(f"/perso/epingle/{bau.KEY}/demande/{x.ref}").text
+    for page in ("/bau", "/"):
+        assert "Épinglés" in client.get(page).text and x.title in client.get(page).text
+    reminded = client.post("/perso/rappel", data={"quand": "demain", "slug": bau.KEY, "kind": "demande", "ref": x.ref})
+    assert "Rappel le" in reminded.text
+    reminder = main.personal.reminders_for(bau.KEY, "demande", x.ref)[0]
+    assert reminder.label == x.title and main.ticket_url(reminder.slug, reminder.kind, reminder.ref) == f"/bau/demande/{x.ref}"
+    notes = main._reminder_notes([], reminder.due)  # arrivé à échéance : notification, sans aucun client suivi
+    assert [n["link"] for n in notes] == [f"/bau/demande/{x.ref}"] and notes[0]["client"] == "BAU"
+    assert client.post(f"/perso/epingle/{bau.KEY}/demande/INCONNUE").status_code == 404

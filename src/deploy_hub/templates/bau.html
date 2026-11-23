@@ -39,6 +39,7 @@
 <section class="chart-row">
   {{ charts.segbar("Statut des demandes", board.groups, "demandes", slim=true, filter_key="groupe", hrefs={} if show_all else {"done": base ~ "?tous=true"}) }}
 </section>
+{% include "_pins.html" %}
 <div class="view-bar">
 <div class="segmented" role="group" aria-label="Présentation">
   <a href="{{ base }}{{ '?tous=true' if show_all }}" class="{{ 'active' if not kanban }}" data-view="bau.vue:liste">Liste</a><a href="{{ base }}?vue=kanban{{ '&tous=true' if show_all }}" class="{{ 'active' if kanban }}" data-view="bau.vue:kanban">Kanban</a>
@@ -80,6 +81,14 @@ data-group="{{ x.group }}" data-statut="{{ x.status }}" data-priorite="{{ x.prio
   <div class="retour-actions">
     {% if x.notion_url %}<a class="btn-link" href="{{ x.notion_url }}" target="_blank" rel="noopener">Notion ↗</a>{% endif %}
   </div>
+  {% if x.is_open %}
+  <div class="retour-more">
+  <details class="agent" hx-get="/bau/demande/{{ x.ref }}/brief" hx-trigger="toggle once" hx-target="find .agent-body">
+    <summary>{{ ic.icon("bot") }} Lancer un agent</summary>
+    <div class="agent-body"><p class="muted">Jarvis prépare le brief…</p></div>
+  </details>
+  </div>
+  {% endif %}
 </article>
 {% endfor %}
 </div>

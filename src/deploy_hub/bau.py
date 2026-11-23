@@ -14,6 +14,7 @@ connaît que les propriétés de la base.
 import hashlib
 import os
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from datetime import date, datetime
 from pathlib import Path
 
@@ -28,6 +29,8 @@ from deploy_hub.sync_notion import SyncError
 KEY = "_bau"  # clé des demandes dans un passage et dossier data/notion/_bau : jamais un identifiant de client (pas de « _ »)
 LABEL = "BAU"  # nom des demandes dans les comptes rendus et les messages de synchro
 SETTING = "JARVIS_NOTION_BAU"
+# Ce qui tient lieu de client aux demandes là où Jarvis en attend un (épingles, rappels, agents) : slug et nom seulement.
+SPACE = SimpleNamespace(slug=KEY, client=LABEL)
 TEMPLATE_NAMES = ("bau", "bau-delta", "bau-empreinte")
 # Colonnes admises : tout autre champ arrête la fusion (comme pour les retours de recette).
 COLUMNS = {"url", "intitule", "statut", "priorite", "echeance", "responsables", "referents", "cree_le", "modifie", "clients", "ressources"}

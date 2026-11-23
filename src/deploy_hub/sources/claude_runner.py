@@ -22,6 +22,7 @@ from statistics import median
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from deploy_hub.bau import KEY as BAU_KEY, LABEL as BAU_LABEL, Demande
 from deploy_hub.safe_write import write_json
 from deploy_hub.config import child_environment
 from deploy_hub.models import DONE, IN_PROGRESS, KO, TODO, Deployment, RetourRecette, status_group
@@ -362,6 +363,15 @@ def _tag(name: str, text: str) -> str:
     return f"<{name}>\n{text.strip()}\n</{name}>"
 
 
+# Fin du compte rendu d'un agent qui s'arrête sur des questions : le bloc que lit « Répondre et relancer » (agent_questions).
+QUESTIONS_FORMAT = ("Termine par un bloc <questions>…</questions> "
+                    "qui ne contient que du JSON valide : {\"questions\": [{\"question\": \"en une phrase\", \"contexte\": "
+                    "\"ce que tu as constaté et où, en Markdown\", \"options\": [{\"libelle\": \"court\", \"consequence\": "
+                    "\"ce que ce choix implique\"}], \"recommandation\": \"le libellé de l'option que tu recommandes\", "
+                    "\"pourquoi\": \"en une phrase\"}]}. La personne verra chaque question avec ses options à cocher et ta "
+                    "recommandation pré-cochée ; tu reprendras ensuite là où tu t'es arrêté, avec ses réponses.")
+
+
 def retour_prompt(d: Deployment, r: RetourRecette, description: str = "", branch: str = "") -> str:
     """Brief pré-rempli de l'agent sur un retour de recette, pensé pour Claude Code dans integration-orchestrator.
 
@@ -428,12 +438,80 @@ def retour_prompt(d: Deployment, r: RetourRecette, description: str = "", branch
                              "(commande et résultat), le lien de la PR, et ce qu'il faudra vérifier en recette. "
                              "Si tu t'arrêtes sur des questions (retour trop flou, choix métier), ne modifie rien, n'ouvre pas de PR et "
                              "écris d'abord en Markdown ce que tu as compris de l'écart et ce que tu as vérifié (fichiers, requêtes, "
-                             "fichier:ligne, sans donnée client), sans lister tes questions. Termine par un bloc <questions>…</questions> "
-                             "qui ne contient que du JSON valide : {\"questions\": [{\"question\": \"en une phrase\", \"contexte\": "
-                             "\"ce que tu as constaté et où, en Markdown\", \"options\": [{\"libelle\": \"court\", \"consequence\": "
-                             "\"ce que ce choix implique\"}], \"recommandation\": \"le libellé de l'option que tu recommandes\", "
-                             "\"pourquoi\": \"en une phrase\"}]}. La personne verra chaque question avec ses options à cocher et ta "
-                             "recommandation pré-cochée ; tu reprendras ensuite là où tu t'es arrêté, avec ses réponses."),
+                             "fichier:ligne, sans donnée client), sans lister tes questions. " + QUESTIONS_FORMAT),
+    ]
+    return "\n\n".join(parts)
+
+
+def demande_branch(x: Demande, runs: list[AgentRun] = ()) -> str:
+    """Branche d'un agent sur une demande BAU, sur le modèle de retour_branch : celle du dernier agent lancé sur cette
+    demande, sinon bau-<client lié s'il n'y en a qu'un>-<premiers mots de l'intitulé>, chiffres retirés ; la référence de
+    la demande ne s'ajoute que si le nom ne dit rien ou qu'une autre branche d'agent le porte déjà."""
+    subject = f"demande {x.ref}"
+    if (previous := next((run for run in runs if run.slug == BAU_KEY and run.subject == subject), None)):
+        return previous.branch
+    client = x.clients[0].split(".")[0] if len(x.clients) == 1 else ""
+    branch = agent_branch("bau", client, *re.sub(r"\d+", " ", x.title).split()[:BRANCH_WORDS])
+    if len(branch) > BRANCH_MAX:
+        branch = branch[:BRANCH_MAX].rsplit("-", 1)[0]
+    taken = {run.branch for run in runs if (run.slug, run.subject) != (BAU_KEY, subject)}
+    if branch == agent_branch("bau", client) or branch in taken:
+        branch = agent_branch(branch, x.ref)
+    return branch
+
+
+def demande_prompt(x: Demande, description: str = "", branch: str = "") -> str:
+    """Brief pré-rempli de l'agent sur une demande BAU, sur le modèle de retour_prompt. La synchro ne lit pas le corps de
+    la page Notion : sans descriptif, le brief garde TO_FILL et la personne y colle le détail de la demande."""
+    branch = branch or demande_branch(x)
+    context = [
+        f"Demande BAU : {x.title}",
+        f"Référence Jarvis : {x.ref} · statut Notion : {x.status}" + (f" · priorité : {x.priority}" if x.priority else ""),
+        f"Client(s) lié(s) : {', '.join(x.clients)}" if x.clients else "Client lié : aucun dans Notion (à identifier d'après la demande, ou demande transverse)",
+        f"Ressource(s) orchestrator : {', '.join(x.resources)}" if x.resources else "Ressource orchestrator : à identifier d'après la demande",
+    ]
+    if x.due:
+        context.append(f"Échéance : {x.due.strftime('%d/%m/%Y')}")
+    if x.notion_url:
+        context.append(f"Page Notion de la demande (tu n'y as pas accès : son détail est recopié ci-dessous) : {x.notion_url}")
+    detail = description.strip() or (f"{TO_FILL} : Jarvis ne lit pas le corps de la page Notion. Colle ici le détail de la demande "
+                                     "(ce qui est demandé, l'attendu, un exemple ou un cas), puis retire cette consigne.")
+    parts = [
+        "Tu traites une demande BAU de l'équipe intégration de Padoa (correctif ou évolution sur la reprise de données d'un client), "
+        "dans le dépôt integration-orchestrator. Lis tout le brief avant d'agir.",
+        _tag("contexte", "\n".join(context)),
+        _tag("demande", detail),
+        _tag("demarche", "\n".join([
+            "1. Reformule en deux lignes ce qui est demandé et ce qui existe aujourd'hui. Si la demande ne permet pas de le dire, "
+            "arrête-toi et pose tes questions au lieu de deviner (voir <compte_rendu>).",
+            "2. Trouve les fichiers qui interviennent pour le client et la ressource concernés à chaque étape (extract SQL, mapping, "
+            "settings, composant, transform, tests). Le code existe à deux niveaux : logiciel (`src/extract/softwares/<logiciel>/`, "
+            "`src/mappings/software/<logiciel>/`, `src/lib/steps/transform/software/<logiciel>/`) et client en surcharge "
+            "(`src/extract/customers/<client>/`, `src/lib/components/<logiciel ou version>/<client>/`). La clé du client et de sa "
+            "version de logiciel sont dans `src/shared/constants/customers.py`.",
+            "3. Avant de modifier une requête logiciel, vérifie qu'aucun client n'en a une copie : "
+            "`git ls-files 'src/extract/customers/*/queries/<chemin relatif>.sql'`. Toutes les copies sont à traiter ensemble.",
+            "4. Choisis le niveau du changement : client s'il est propre à un client, logiciel s'il vient du logiciel "
+            "(liste alors les autres clients concernés). Ne modifie `clean`, `compare` ou `load` que si c'est indispensable : "
+            "ces étapes sont communes à tous les clients.",
+            "5. Fais le plus petit changement qui répond à la demande, puis ajoute ou adapte un test qui échoue avant et passe après, "
+            "avec des valeurs fictives.",
+        ])),
+        _tag("contrat", "\n".join([
+            "- Entrée : ce brief, le code du client et de son logiciel dans integration-orchestrator, à jour de main.",
+            f"- Sortie : un changement sur la branche `{branch}` et une PR intitulée `[FIX](<scope>) <résumé>` pour un correctif ou "
+            "`[FEAT](<scope>) <résumé>` pour une évolution (scope = le client concerné, ou le logiciel si le changement est au niveau logiciel).",
+            "- Validation : `uv run pytest tests/src/lib/steps/extract tests/src/lib/components/<logiciel>` vert, "
+            "plus les tests que tu as ajoutés ; cite la commande et son résultat.",
+            "- Limites : ne lis pas les logs des DAGs Airflow ; ne pousse pas sur main et ne force pas de push ; aucune donnée client "
+            "(matricule, nom, exemple de la demande) dans le code, les tests, les commits ou la PR ; pas de modification hors du périmètre de la demande.",
+            "- Résultat : la PR ouverte, ou un rapport qui dit précisément ce qui manque pour traiter la demande.",
+        ])),
+        _tag("compte_rendu", "Termine par : ce qui a été changé et où (fichier:ligne), son niveau (client ou logiciel), les tests "
+                             "(commande et résultat), le lien de la PR, et ce qu'il faudra vérifier ensuite. "
+                             "Si tu t'arrêtes sur des questions (demande trop floue, choix métier), ne modifie rien, n'ouvre pas de PR et "
+                             "écris d'abord en Markdown ce que tu as compris de la demande et ce que tu as vérifié (fichiers, requêtes, "
+                             "fichier:ligne, sans donnée client), sans lister tes questions. " + QUESTIONS_FORMAT),
     ]
     return "\n\n".join(parts)
 
@@ -720,6 +798,16 @@ class ClaudeRunner:
         branch = self.retour_branch(d, r)
         return self._launch(d.slug, d.client, f"retour {r.id}", branch,
                             prompt.strip() or retour_prompt(d, r, description, branch), r.data_type or r.resource or "")
+
+    def launch_demande(self, x: Demande, description: str = "", prompt: str = "") -> ActionResult:
+        """Agent sur une demande BAU : même parcours qu'un retour (worktree, suivi, questions) ; son « client » est BAU."""
+        branch = self.demande_branch(x)
+        return self._launch(BAU_KEY, BAU_LABEL, f"demande {x.ref}", branch,
+                            prompt.strip() or demande_prompt(x, description, branch), x.resources[0] if x.resources else BAU_LABEL)
+
+    def demande_branch(self, x: Demande) -> str:
+        with self._lock:
+            return demande_branch(x, list(self.runs))
 
     def retour_branch(self, d: Deployment, r: RetourRecette) -> str:
         with self._lock:

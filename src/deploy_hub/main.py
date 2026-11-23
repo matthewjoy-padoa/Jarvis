@@ -29,7 +29,7 @@ from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
 from deploy_hub.rendu import md, md_inline
 from deploy_hub.sources.claude_runner import (TO_FILL, WAITING, ClaudeRunner, agent_questions, answer_text, chosen_answer,
-                                              duration_text, read_log, retour_prompt, tokens_text, usage)
+                                              demande_prompt, duration_text, read_log, retour_prompt, tokens_text, usage)
 from deploy_hub.sources.dag_board import board
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_source import DagSource
@@ -518,7 +518,7 @@ def today_page(request: Request):
         links=links,
         ko_url=ko_url,
         milestones=[i for i in items if i["kind"] == "Jalon" and today <= i["date"] <= today + timedelta(days=21)],
-        pins=_pinned(current) if current else [],
+        pins=(_pinned(current) if current else []) + _bau_pins(),
         bau_board=bau.load(),
         **_reminders_context(current.slug if current else ""),
     )
@@ -1264,7 +1264,17 @@ TICKET_KINDS = ("retour", "action")
 
 
 def ticket_url(slug: str, kind: str, ref: str) -> str:
-    return f"/deploiements/{slug}/ticket/{kind}/{ref}"
+    return f"/bau/demande/{ref}" if slug == bau.KEY else f"/deploiements/{slug}/ticket/{kind}/{ref}"
+
+
+def run_origin(run) -> str:
+    """D'où vient un agent : la demande BAU qu'il traite, ou la recette de son client."""
+    if run.slug == bau.KEY:
+        return f"/bau/demande/{run.subject.removeprefix('demande ')}" if run.subject.startswith("demande ") else "/bau"
+    return f"/deploiements/{run.slug}/recette"
+
+
+templates.env.globals["run_origin"] = run_origin
 
 
 templates.env.globals["ticket_url"] = ticket_url
@@ -1277,7 +1287,9 @@ def _find_ticket(d: Deployment, kind: str, ref: str):
 
 
 def _ticket_item(slug: str, kind: str, ref: str):
-    """(fiche, retour ou carte) ; 404 si le type, le client ou le ticket est inconnu."""
+    """(fiche, retour ou carte) ; 404 si le type, le client ou le ticket est inconnu. Une demande BAU (slug bau.KEY) : (bau.SPACE, demande)."""
+    if slug == bau.KEY:
+        return bau.SPACE, _demande(ref)
     if kind not in TICKET_KINDS:
         raise HTTPException(404, f"Type inconnu : {kind}")
     d = _get(slug)
@@ -1296,6 +1308,8 @@ def ticket(request: Request, slug: str, kind: str, ref: str, agent: bool = False
     """Tout ce qu'on sait d'un retour ou d'une carte d'action : fiche, contenu, agents, historique.
     Panneau latéral quand la page l'appelle (htmx), page entière sinon (lien ouvert dans un nouvel onglet).
     agent=1 (commande « >agent » de la palette) : le bloc « Lancer un agent » arrive déplié, brief chargé, et prend le focus."""
+    if slug == bau.KEY:  # une demande BAU a sa propre page
+        return RedirectResponse(ticket_url(slug, kind, ref))
     d, item = _ticket_item(slug, kind, ref)
     history = [c for c in changes_since(d, settings.deployments_dir, datetime.min) if c.notion_url == notion_link(item.notion_url)]
     runs = [r for r in claude.runs if r.slug == slug and r.subject == f"retour {ref.upper()}"] if kind == "retour" else []
@@ -1309,13 +1323,19 @@ def ticket(request: Request, slug: str, kind: str, ref: str, agent: bool = False
 def agent_brief(request: Request, slug: str, retour_id: str):
     """Formulaire de l'agent, brief pré-rempli : chargé à l'ouverture du bloc pour ne pas alourdir la page."""
     d, r = _retour(slug, retour_id)
-    # Ce qui empêcherait le lancement, et l'agent déjà lancé sur ce retour : dits avant le clic, pas après.
     branch = claude.retour_branch(d, r)
+    return _agent_form(request, retour_prompt(d, r, branch=branch), branch, f"agent-{d.slug}-{r.id}",
+                       f"/actions/agent-retour/{d.slug}/{r.id}", f"le retour {r.id}", "ce retour")
+
+
+def _agent_form(request: Request, brief_text: str, branch: str, out: str, post_url: str, what: str, this: str) -> HTMLResponse:
+    """Formulaire de lancement d'un agent (retour de recette ou demande BAU). Ce qui empêcherait le lancement, et l'agent
+    déjà lancé sur la branche, sont dits avant le clic, pas après. out : id du bloc de résultat ; what : « le retour R-02 »."""
     previous, problem = claude.latest_on(branch), claude.problem()
     blocker = problem or (f"Un agent travaille déjà sur la branche {branch} : attends sa fin ou arrête-le." if previous and previous.running else "")
     return templates.TemplateResponse(request, "_agent_form.html", {
-        "d": d, "r": r, "brief": retour_prompt(d, r, branch=branch), "to_fill": TO_FILL, "branch": branch, "problem": problem, "blocker": blocker,
-        "previous": previous, "waiting": bool(previous) and previous.status == WAITING})
+        "brief": brief_text, "to_fill": TO_FILL, "branch": branch, "problem": problem, "blocker": blocker, "out": out, "post_url": post_url,
+        "what": what, "this": this, "previous": previous, "waiting": bool(previous) and previous.status == WAITING})
 
 
 @app.post("/actions/agent-retour/{slug}/{retour_id}", response_class=HTMLResponse)
@@ -1421,20 +1441,51 @@ def bau_page(request: Request):
     view = _list_view(request, "bau")
     columns = kanban_columns([(None, x) for x in board.demandes], bau.STATUSES) if view["vue"] == "kanban" else []
     return _render(request, "bau.html", "/bau", board=board, columns=columns, fiche_of=_bau_fiches(request, board),
-                   bau_ready=sync_routine.problem() is None, setting=bau.SETTING, **view)
+                   bau_ready=sync_routine.problem() is None, setting=bau.SETTING, pins=_bau_pins(), **view)
+
+
+def _demande(ref: str) -> bau.Demande:
+    x = bau.load().get(ref)
+    if x is None:
+        raise HTTPException(404, f"Demande {ref} introuvable")
+    return x
+
+
+def _bau_pins() -> list[dict]:
+    """Demandes épinglées ; « item » vaut None quand la demande n'est plus dans la page BAU (reste à désépingler)."""
+    board = bau.load()
+    return [{**p, "item": (x := board.get(p["ref"])), "label": x.title if x else p["ref"]} for p in personal.pins(bau.KEY)]
 
 
 @app.get("/bau/demande/{ref}", response_class=HTMLResponse)
 def bau_demande(request: Request, ref: str):
     """Ce qu'on sait d'une demande : panneau latéral quand la page l'appelle (htmx), page entière sinon."""
-    board = bau.load()
-    x = board.get(ref)
-    if x is None:
-        raise HTTPException(404, f"Demande {ref} introuvable")
-    context = {"x": x, "fiche_of": _bau_fiches(request, board), "today": date.today()}
+    x = _demande(ref)
+    runs = [r for r in claude.runs if r.slug == bau.KEY and r.subject == f"demande {x.ref}"]
+    context = {"x": x, "fiche_of": _bau_fiches(request, bau.load()), "today": date.today(),
+               "d": bau.SPACE, "kind": "demande", "ref": x.ref, "runs": runs}  # d, kind, ref : épingle et rappels
     if request.headers.get("HX-Request"):
         return templates.TemplateResponse(request, "_demande.html", context)
     return _render(request, "demande.html", "/bau", **context)
+
+
+@app.get("/bau/demande/{ref}/brief", response_class=HTMLResponse)
+def bau_agent_brief(request: Request, ref: str):
+    """Formulaire de l'agent sur une demande, brief pré-rempli : chargé à l'ouverture du bloc, comme pour un retour."""
+    x = _demande(ref)
+    branch = claude.demande_branch(x)
+    return _agent_form(request, demande_prompt(x, branch=branch), branch, f"agent-bau-{x.ref}", f"/bau/demande/{x.ref}/agent",
+                       f"la demande {x.ref}", "cette demande")
+
+
+@app.post("/bau/demande/{ref}/agent", response_class=HTMLResponse)
+def launch_agent_on_demande(request: Request, ref: str, description: str = Form(""), prompt: str = Form("")):
+    x = _demande(ref)
+    if not x.is_open:
+        return _result(request, ActionResult(False, f"Demande {x.ref} déjà close ({x.status})", simulated=False))
+    if TO_FILL in (prompt.strip() or demande_prompt(x, description)):
+        return _result(request, ActionResult(False, f"Le brief contient encore « {TO_FILL} » : colle le détail de la demande avant de lancer.", simulated=False))
+    return _result(request, claude.launch_demande(x, description, prompt))
 
 
 @app.post("/bau/rafraichir", response_class=HTMLResponse)
@@ -1568,7 +1619,7 @@ def reminder_done(reminder_id: int):
 
 def _reminder_notes(deployments: list[Deployment], today: date) -> list[dict]:
     """Rappels arrivés à échéance : une notification chacun, qui mène au ticket (ou à l'accueil pour un rappel libre)."""
-    names = {d.slug: d.client for d in deployments}
+    names = {d.slug: d.client for d in deployments} | ({bau.KEY: bau.LABEL} if bau.enabled() else {})
     return [{"key": f"rappel:{r.id}:{r.due.isoformat()}", "kind": "rappel", "level": "info", "title": f"Rappel : {r.label}",
              "detail": names.get(r.slug, ""), "link": ticket_url(r.slug, r.kind, r.ref) if r.kind else "/", "client": names.get(r.slug, "")}
             for r in personal.due(today) if not r.slug or r.slug in names]  # rappel libre, ou d'un client suivi (pas archivé)
