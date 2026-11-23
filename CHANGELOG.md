@@ -10,6 +10,10 @@ Ainsi la version affichée en bas de chaque page change à chaque fusion (et le 
 
 Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
+## [0.6.0] · 2026-11-23
+
+- To-do list dans les notes : sous les notes d'un client (bloc-notes flottant et « Mes notes » de sa fiche, avec le nombre de tâches à faire dans son titre replié) et sous les notes générales ; ajouter, cocher (la tâche faite passe en bas, barrée), supprimer. Gardée dans `data/perso.json` avec les notes, jamais envoyée dans Notion.
+
 ## [0.5.0] · 2026-11-23
 
 - Agents → DAG : une carte par run lancé depuis Jarvis, à la place des trois tableaux (suivis, enchaînements, lancements) qui racontaient le même run trois fois. Les cartes sont rangées par état (en cours, en échec ou arrêtés, terminés, simulations) ; chaque carte donne le client, le DAG en clair (« administratif · ETL groupe »), la stack, l'état et la durée, la dernière nouvelle du suivi, le nombre de relances automatiques et le lien vers le journal ou le rapport de fin. Un enchaînement tient sur une seule carte, avec ses étapes numérotées. Recherche et filtres par client, stack et état.

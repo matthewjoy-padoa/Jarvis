@@ -1257,6 +1257,14 @@ html { overscroll-behavior-y: none; }
 .remind-form input, .remind-form select { font-size: 13px; padding: 4px 8px; border: 2px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
 .remind-form input[type=text] { flex: 1 1 160px; min-width: 0; }
 #reminders .remind-form { margin-top: 8px; }
+/* To-do list des notes (_todo.html) : case à cocher, tâche barrée une fois faite, × pour la supprimer. */
+.todo-box { margin-top: 12px; }
+.notes-todo-head { margin: 0 0 2px; font-size: 13px; }
+ul.todo-items { margin: 0 0 6px; }
+ul.todo-items li { flex-wrap: nowrap; align-items: center; padding: 5px 0; font-size: 13.5px; }
+ul.todo-items label { display: flex; align-items: baseline; gap: 8px; flex: 1; min-width: 0; font-weight: 400; cursor: pointer; overflow-wrap: anywhere; }
+ul.todo-items input[type=checkbox] { flex: none; accent-color: var(--accent); }
+ul.todo-items li.is-done span { color: var(--muted); text-decoration: line-through; }
 .remind-set { display: inline-flex; align-items: center; gap: 4px; }
 button.remind-drop, button.remind-drop:hover:not(:disabled) { min-height: 0; padding: 0 4px; border: 0; background: none; box-shadow: none; color: var(--muted); font-size: 15px; line-height: 1; transform: none; }
 button.remind-drop:hover:not(:disabled) { color: var(--text); }

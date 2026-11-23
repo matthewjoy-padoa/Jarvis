@@ -1,0 +1,24 @@
+{# To-do list d'un client (todo_slug ; "" : la générale), dans ses notes : bloc-notes flottant et « Mes notes » de sa fiche.
+   Gardée dans data/perso.json avec les notes, jamais envoyée dans Notion. Chaque action (ajouter, cocher, supprimer)
+   renvoie la liste entière, qui se remplace elle-même. Attend : todo_slug ; todo_added (après un ajout : le champ garde
+   le curseur, htmx le lui rend grâce à autofocus). #}
+{% set todos = perso.todos(todo_slug) %}{% set left = perso.todos_left(todo_slug) %}
+<div class="todo-box">
+  <p class="notes-todo-head"><strong>À faire</strong>{% if todos %} <span class="muted">· {{ left }} sur {{ todos | length }}</span>{% endif %}</p>
+  {% if todos %}
+  <ul class="todo todo-items">
+    {% for t in todos %}
+    <li class="{{ 'is-done' if t.done }}">
+      <label><input type="checkbox"{% if t.done %} checked{% endif %} hx-post="/perso/todo/{{ t.id }}/cocher" hx-target="closest .todo-box" hx-swap="outerHTML"> <span>{{ t.label }}</span></label>
+      <button type="button" class="remind-drop" hx-post="/perso/todo/{{ t.id }}/supprimer" hx-target="closest .todo-box" hx-swap="outerHTML"
+              title="Supprimer la tâche" aria-label="Supprimer la tâche « {{ t.label }} »">×</button>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <form class="remind-form todo-add" hx-post="/perso/todo" hx-target="closest .todo-box" hx-swap="outerHTML">
+    <input type="hidden" name="slug" value="{{ todo_slug }}">
+    <input type="text" name="label" maxlength="200" required placeholder="Ajouter une tâche…" aria-label="Nouvelle tâche"{% if todo_added %} autofocus{% endif %}>
+    <button type="submit" class="secondary">Ajouter</button>
+  </form>
+</div>
