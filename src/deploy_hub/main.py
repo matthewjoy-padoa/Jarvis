@@ -277,6 +277,7 @@ templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STAT
 templates.env.globals["kanban_columns"] = kanban_columns
 templates.env.globals["auto_sync_every"] = auto_sync_every  # bouton « Synchro auto » d'une fiche
 templates.env.globals["auto_sync_note"] = auto_sync_note
+templates.env.tests["drive"] = client_config.is_drive  # {% if l.url is drive %} : logo Google Drive dans le dock
 templates.env.globals["jarvis_version"] = _version_started  # pied de page ; historique dans CHANGELOG.md
 templates.env.globals["jarvis_commit"] = _code_started[:7]
 templates.env.globals["restart_for"] = lambda: _restart  # bandeau « Jarvis est à relancer » (base.html)

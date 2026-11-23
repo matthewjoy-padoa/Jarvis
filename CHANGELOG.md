@@ -12,7 +12,7 @@ Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant
 
 ## [0.5.4] · 2026-11-23
 
-- Fiche d'un client : plus de rangée de liens en haut (Notion, stacks, Drive, « + Stacks », « + Drive »), en doublon avec le dock à droite de l'écran ; le dock reprend aussi les autres dashboards Notion du client et ses autres liens, qui n'étaient que dans cette rangée.
+- Fiche d'un client : plus de rangée de liens en haut (Notion, stacks, Drive, « + Stacks », « + Drive »), en doublon avec le dock à droite de l'écran ; le dock reprend aussi les autres dashboards Notion du client et ses autres liens, qui n'étaient que dans cette rangée. Les liens Google Drive (drive.google.com, docs.google.com) y ont le logo Google Drive.
 
 ## [0.5.3] · 2026-11-23
 

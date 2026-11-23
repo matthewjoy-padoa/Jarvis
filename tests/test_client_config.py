@@ -141,6 +141,7 @@ def test_drive_links_are_shown_as_links_and_never_given_to_agents(app):
     app.post("/clients/enregistrer", data={"client": "Acme", "page_id": PAGE, "drive": f"Dossier client | {DRIVE}"})
     fiche = app.get("/deploiements/acme/synthese").text
     assert f'href="{DRIVE}" target="_blank" rel="noopener noreferrer" data-tip="Drive · Dossier client ↗"' in fiche  # dans le dock
+    assert fiche.split(f'href="{DRIVE}"')[1].split("</a>")[0].count('class="dock-logo"') == 1  # avec le logo Google Drive
     d = Deployment(slug="acme", client="Acme", software="Pulse", drive=[Link("Dossier client", DRIVE)])
     assert DRIVE not in retour_prompt(d, RetourRecette(id="0001AB", data_type="Adhérents", status="À faire"))
 
@@ -255,3 +256,11 @@ def test_the_other_notion_dashboards_of_a_client_are_in_the_dock(app):
     app.post("/clients/enregistrer", data={"client": "Acme", "page_id": PAGE, "dashboards": f"Formation | https://app.notion.com/p/{PAGE}"})
     fiche = app.get("/deploiements/acme/synthese").text
     assert 'data-tip="Notion · Formation ↗"' in fiche
+
+
+def test_a_drive_address_among_the_other_links_gets_the_drive_logo():
+    from deploy_hub.models import Deployment, Link
+    d = Deployment(slug="acme", client="Acme", software="Pulse", links=[Link("Drive client", DRIVE), Link("Wiki", "https://exemple.invalid/wiki")])
+    page = main.templates.env.from_string(  # le test « drive » qu'utilise le dock (base.html) pour choisir l'icône
+        "{% for l in d.links %}[{{ 'drive' if l.url is drive else 'link' }}]{% endfor %}").render(d=d)
+    assert page == "[drive][link]"
