@@ -1,4 +1,4 @@
-"""Ce qui n'appartient qu'à moi : tickets épinglés, notes libres par client, rappels.
+"""Ce qui n'appartient qu'à moi : tickets épinglés, notes libres et to-do list par client, rappels.
 
 Tout est dans data/perso.json (hors git : titres de tickets et notes). Rien n'est écrit dans Notion.
 """
@@ -56,7 +56,9 @@ class PersonalStore:
 
     def _read(self) -> dict:
         data = json.loads(self.path.read_text(encoding="utf-8")) if self.path.is_file() else {}
-        return {"pins": data.get("pins", []), "notes": data.get("notes", {}), "reminders": data.get("reminders", [])}
+        # Les clés inconnues sont gardées : une version de Jarvis qui ne les connaît pas encore ne les efface pas en réécrivant.
+        return {**data, "pins": data.get("pins", []), "notes": data.get("notes", {}), "reminders": data.get("reminders", []),
+                "todos": data.get("todos", {}), "todo_seq": data.get("todo_seq", 0)}
 
     def _load(self) -> dict:
         """Contenu pour lecture seule (ne pas le modifier : il est partagé entre les appels)."""
@@ -110,6 +112,47 @@ class PersonalStore:
             else:
                 data["notes"].pop(slug, None)
         self._change(edit)
+
+    # ------------------------------------------------------------ To-do list
+    def todos(self, slug: str) -> list[dict]:
+        """Tâches d'un client ("" : générales), {id, label, done} : à faire d'abord, puis faites, chacune dans l'ordre d'ajout."""
+        return sorted(self._load()["todos"].get(slug, []), key=lambda t: t["done"])
+
+    def todos_left(self, slug: str) -> int:
+        return sum(not t["done"] for t in self._load()["todos"].get(slug, []))
+
+    def add_todo(self, slug: str, label: str) -> None:
+        label = " ".join(label.split())[:LABEL_MAX]
+        if not label:
+            return
+
+        def edit(data):
+            data["todo_seq"] += 1  # compteur gardé : le numéro d'une tâche supprimée n'est jamais redonné (une autre vue
+            # de la même liste, restée ouverte, ne doit pas cocher une nouvelle tâche à la place de l'ancienne)
+            data["todos"].setdefault(slug, []).append({"id": data["todo_seq"], "label": label, "done": False})
+        self._change(edit)
+
+    def _edit_todo(self, todo_id: int, drop: bool) -> str | None:
+        """Coche ou décoche cette tâche (drop : la supprime) ; renvoie son client (None : tâche inconnue)."""
+        def edit(data):
+            for slug, items in data["todos"].items():
+                for t in items:
+                    if t["id"] == todo_id:
+                        if drop:
+                            items.remove(t)
+                        else:
+                            t["done"] = not t["done"]
+                        if not items:
+                            del data["todos"][slug]
+                        return slug
+            return None
+        return self._change(edit)
+
+    def toggle_todo(self, todo_id: int) -> str | None:
+        return self._edit_todo(todo_id, drop=False)
+
+    def remove_todo(self, todo_id: int) -> str | None:
+        return self._edit_todo(todo_id, drop=True)
 
     # ------------------------------------------------------------ Rappels
     def reminders(self, slug: str | None = None) -> list[Reminder]:

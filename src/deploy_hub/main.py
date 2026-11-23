@@ -1449,6 +1449,33 @@ def note_save(request: Request, slug: str, texte: str = Form("")):
     return _result(request, ActionResult(True, f"Enregistré à {datetime.now():%H:%M}", simulated=False))
 
 
+def _todo_list(request: Request, slug: str | None, added: bool = False) -> HTMLResponse:
+    """La to-do list de ce client ("" : générale), qui remplace celle où l'on vient de cliquer ; tâche inconnue : 404.
+    added : le champ garde le curseur, pour enchaîner les tâches."""
+    if slug is None:
+        raise HTTPException(404, "Tâche introuvable")
+    return templates.TemplateResponse(request, "_todo.html", {"todo_slug": slug, "todo_added": added})
+
+
+@app.post("/perso/todo", response_class=HTMLResponse)
+def todo_add(request: Request, slug: str = Form(""), label: str = Form("")):
+    """Ajoute une tâche à la to-do list d'un client (slug), ou à la générale (slug vide)."""
+    if slug:
+        _get(slug)
+    personal.add_todo(slug, label)
+    return _todo_list(request, slug, added=True)
+
+
+@app.post("/perso/todo/{todo_id}/cocher", response_class=HTMLResponse)
+def todo_toggle(request: Request, todo_id: int):
+    return _todo_list(request, personal.toggle_todo(todo_id))
+
+
+@app.post("/perso/todo/{todo_id}/supprimer", response_class=HTMLResponse)
+def todo_remove(request: Request, todo_id: int):
+    return _todo_list(request, personal.remove_todo(todo_id))
+
+
 @app.post("/perso/rappel", response_class=HTMLResponse)
 def reminder_add(request: Request, quand: str = Form(""), jour: str = Form(""), slug: str = Form(""), kind: str = Form(""),
                  ref: str = Form(""), label: str = Form("")):

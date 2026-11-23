@@ -193,3 +193,69 @@ def test_a_due_reminder_becomes_one_notification_until_done(client):
     assert [(n.title, n.link, n.client, n.icon) for n in notes] == [("Rappel : Relancer la DSI", TICKET, "Client Démo", "bell")]
     assert client.post(f"/perso/rappel/{due.id}/fait").text == ""
     assert [r.label for r in main.personal.reminders()] == ["Pas encore"]
+
+
+# ------------------------------------------------------------ To-do list des notes
+def test_store_keeps_a_todo_list_per_client(tmp_path):
+    store = PersonalStore(tmp_path / "perso.json")
+    store.add_todo("acme", "  Relancer   la DSI ")
+    store.add_todo("acme", "Valider le mapping")
+    store.add_todo("", "Préparer le point d'équipe")
+    store.add_todo("acme", "   ")  # vide : ignorée
+    again = PersonalStore(tmp_path / "perso.json")  # relu depuis le fichier
+    assert [(t["label"], t["done"]) for t in again.todos("acme")] == [("Relancer la DSI", False), ("Valider le mapping", False)]
+    assert [t["label"] for t in again.todos("")] == ["Préparer le point d'équipe"]
+    assert again.todos("autre") == [] and again.todos_left("acme") == 2
+
+
+def test_a_done_task_goes_last_and_can_be_unchecked_or_removed(tmp_path):
+    store = PersonalStore(tmp_path / "perso.json")
+    store.add_todo("acme", "Relancer la DSI")
+    store.add_todo("acme", "Valider le mapping")
+    first, second = store.todos("acme")
+    assert store.toggle_todo(first["id"]) == "acme"
+    assert [(t["label"], t["done"]) for t in store.todos("acme")] == [("Valider le mapping", False), ("Relancer la DSI", True)]
+    assert store.todos_left("acme") == 1
+    store.toggle_todo(first["id"])
+    assert store.todos_left("acme") == 2  # décochée
+    assert store.remove_todo(second["id"]) == "acme"
+    assert [t["label"] for t in store.todos("acme")] == ["Relancer la DSI"]
+    assert store.toggle_todo(999) is None and store.remove_todo(999) is None  # tâche inconnue
+
+
+def test_a_removed_task_number_is_never_given_again(tmp_path):
+    store = PersonalStore(tmp_path / "perso.json")
+    store.add_todo("acme", "A")
+    store.add_todo("acme", "B")
+    store.remove_todo(store.todos("acme")[1]["id"])
+    store.add_todo("acme", "C")
+    assert [t["id"] for t in store.todos("acme")] == [1, 3]
+
+
+def test_the_todo_list_is_in_the_client_notes_and_the_general_ones(client):
+    client.cookies.set("jarvis_client", SLUG)
+    added = client.post("/perso/todo", data={"slug": SLUG, "label": "Relancer la <DSI>"}).text
+    assert f'class="todo-box" data-todo-slug="{SLUG}"' in added and "Relancer la &lt;DSI&gt;" in added and "· 1 sur 1" in added
+    assert " autofocus" in added and " autofocus" not in client.get(f"/deploiements/{SLUG}/synthese").text  # curseur gardé après un ajout seulement
+    general = client.post("/perso/todo", data={"slug": "", "label": "Point d'équipe"}).text
+    assert "Point d&#39;équipe" in general and "Relancer la" not in general  # la générale, à part
+    todo_id = main.personal.todos(SLUG)[0]["id"]
+    done = client.post(f"/perso/todo/{todo_id}/cocher").text
+    assert " checked" in done and "· 0 sur 1" in done
+    panel = client.get("/perso/notes").text
+    assert panel.count('class="todo-box"') == 2 and 'data-todo-slug=""' in panel and "Relancer la &lt;DSI&gt;" in panel and "Point d&#39;équipe" in panel
+    fiche = client.get(f"/deploiements/{SLUG}/synthese").text
+    assert "Relancer la &lt;DSI&gt;" in fiche and f'name="slug" value="{SLUG}"' in fiche
+    assert "Relancer la" not in client.get("/deploiements/client-exemple/synthese").text  # celle d'un autre client
+    client.post(f"/perso/todo/{todo_id}/cocher")
+    assert "· 1 à faire" in client.get(f"/deploiements/{SLUG}/synthese").text  # compteur dans le titre replié de « Mes notes »
+    assert "Relancer la" not in client.post(f"/perso/todo/{todo_id}/supprimer").text
+    assert client.post(f"/perso/todo/{todo_id}/cocher").status_code == 404
+    assert client.post("/perso/todo", data={"slug": "inconnu", "label": "x"}).status_code == 404
+
+
+def test_unknown_keys_of_the_personal_file_are_kept(tmp_path):
+    path = tmp_path / "perso.json"
+    path.write_text('{"plus_tard": {"x": 1}}', encoding="utf-8")  # donnée d'une version plus récente de Jarvis
+    PersonalStore(path).set_note("acme", "Une note")
+    assert '"plus_tard"' in path.read_text(encoding="utf-8")
