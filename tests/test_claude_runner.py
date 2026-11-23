@@ -458,3 +458,18 @@ def test_an_agent_that_only_gives_json_questions_waits_for_an_answer():
     run = AgentRun(1, "acme", "Acme", "retour R-1", "fix-acme-r-1", "x", datetime(2026, 11, 18, 9), "en cours",
                    summary=_block({"questions": [{"question": "Quelle date de bascule"}]}))  # sans « ? » : seul le JSON la signale
     assert final_status(run) == "question en attente" and run.report == "J'ai lu `a.py`."
+
+
+def test_a_question_asked_as_a_heading_shows_without_its_markdown_and_takes_its_section():
+    from deploy_hub.sources.claude_runner import agent_questions
+    report = ("J'ai lu le ticket.\n\n## 1. Ce que j'ai vérifié\nLe transform lit la colonne.\n\n"
+              "## 2. Blocage n°1 : quelle source ?\nDeux colonnes :\n- `a`\n- `b`\n\nLaquelle est la bonne ?\n\n"
+              "## 3. Blocage n°2 : quel niveau de correctif ?\n**Recommandation** : le logiciel.\n\n## 4. Suite\nJe reprends ensuite.")
+    intro, questions = agent_questions(report)
+    assert [q.text for q in questions] == ["Blocage n°1 : quelle source ?", "Blocage n°2 : quel niveau de correctif ?"]  # ni « ## » ni numéro
+    assert questions[0].detail == "Deux colonnes :\n- `a`\n- `b`\n\nLaquelle est la bonne ?"  # sa section, « ? » compris
+    assert questions[1].detail == "**Recommandation** : le logiciel."
+    assert "Blocage" not in intro and "## 1. Ce que j'ai vérifié" in intro and "## 4. Suite" in intro  # le reste fait le contexte
+    block = '<questions>{"questions": [{"question": "## 3. Blocage n°2 : quel niveau ?", "options": [{"libelle": "Client"}]}]}</questions>'
+    assert agent_questions("Compte rendu.\n" + block)[1][0].text == "Blocage n°2 : quel niveau ?"  # bloc JSON : même nettoyage
+    assert [q.text for q in agent_questions("Contexte.\n1. Faut-il garder la colonne ?\n- **Et la date ?**")[1]] == ["Faut-il garder la colonne ?", "Et la date ?"]
