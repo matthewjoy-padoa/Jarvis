@@ -22,7 +22,7 @@ from deploy_hub import client_config
 from deploy_hub.config import PROCESS_KEYS, PROJECT_ROOT, clients_dir, data_dir, ensure_private_dirs, forget_secrets, load_settings, secret_problem
 from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, KO, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
                                kanban_columns, notion_link, status_group)
-from deploy_hub import brief, console, env_file, onepassword, shell, sync_notion
+from deploy_hub import bau, brief, console, env_file, onepassword, shell, sync_notion
 from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
@@ -320,8 +320,18 @@ PAGES = [
     ("/clients", "Clients"),
     ("/deadlines", "Deadlines"),
     ("/agents", "Agents"),
+    ("/bau", "BAU"),
 ]
 NAV_PAGES = [p for p in PAGES if p[0] != "/clients"]
+
+
+def _nav_pages() -> list[tuple[str, str]]:
+    """Barre du haut. « BAU » n'y est que si une page BAU est réglée (JARVIS_NOTION_BAU), même mal réglée : la page dit
+    alors quoi corriger. Relu à chaque page : le réglage s'applique sans relancer Jarvis."""
+    shown = bau.enabled() or bool(bau.problem())
+    return [p for p in NAV_PAGES if p[0] != "/bau" or shown]
+
+
 CLIENT_COOKIE = "jarvis_client"  # client en cours : celui de la dernière fiche ouverte
 # Vues tous clients, proposées sur la page Clients (et toujours joignables par leur URL).
 CROSS_PAGES = [
@@ -418,7 +428,7 @@ def _render(request: Request, template: str, active: str, **context) -> HTMLResp
         request,
         template,
         {
-            "pages": NAV_PAGES,
+            "pages": _nav_pages(),
             "current": _current(request),
             "shell_token": shell.TOKEN if shell.enabled() else "",  # onglet « Shell » de la console (JARVIS_SHELL=1, VM)
             "cross_pages": CROSS_PAGES,
@@ -509,6 +519,7 @@ def today_page(request: Request):
         ko_url=ko_url,
         milestones=[i for i in items if i["kind"] == "Jalon" and today <= i["date"] <= today + timedelta(days=21)],
         pins=_pinned(current) if current else [],
+        bau_board=bau.load(),
         **_reminders_context(current.slug if current else ""),
     )
 
@@ -1393,6 +1404,45 @@ def refresh_one(request: Request, slug: str):
     if ok:
         response.headers["HX-Refresh"] = "true"
     return response
+
+
+# ============================================================ BAU : demandes de l'équipe (bau.py)
+def _bau_fiches(request: Request, board: bau.Board) -> dict[str, str]:
+    """Client lié à une demande (son nom de domaine Padoa) → identifiant de sa fiche, quand ce client est suivi ici."""
+    slugs = {d.slug for d in _deployments(request)}
+    names = {name for x in board.demandes for name in x.clients}
+    return {name: slug for name in names if (slug := client_config.slugify(name.split(".")[0])) in slugs}
+
+
+@app.get("/bau", response_class=HTMLResponse)
+def bau_page(request: Request):
+    """Demandes de la page BAU suivie (base Notion « Equipes OPS - Actions internes »), en liste ou en kanban."""
+    board = bau.load()
+    view = _list_view(request, "bau")
+    columns = kanban_columns([(None, x) for x in board.demandes], bau.STATUSES) if view["vue"] == "kanban" else []
+    return _render(request, "bau.html", "/bau", board=board, columns=columns, fiche_of=_bau_fiches(request, board),
+                   bau_ready=sync_routine.problem() is None, setting=bau.SETTING, **view)
+
+
+@app.get("/bau/demande/{ref}", response_class=HTMLResponse)
+def bau_demande(request: Request, ref: str):
+    """Ce qu'on sait d'une demande : panneau latéral quand la page l'appelle (htmx), page entière sinon."""
+    board = bau.load()
+    x = board.get(ref)
+    if x is None:
+        raise HTTPException(404, f"Demande {ref} introuvable")
+    context = {"x": x, "fiche_of": _bau_fiches(request, board), "today": date.today()}
+    if request.headers.get("HX-Request"):
+        return templates.TemplateResponse(request, "_demande.html", context)
+    return _render(request, "demande.html", "/bau", **context)
+
+
+@app.post("/bau/rafraichir", response_class=HTMLResponse)
+def bau_refresh(request: Request):
+    """Relit les demandes dans Notion, elles seules. Toujours par la routine Claude Code : un jeton Notion ne lit que les
+    bases du déploiement (notion_api)."""
+    r = sync_routine.start(bau.KEY, "les demandes BAU")
+    return _sync_status(request, r.ok and not r.simulated, r.ok, r.message, r.simulated)
 
 
 # ============================================================ Perso : brief, épingles, notes, rappels

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}BAU · Jarvis{% endblock %}
+{% import "_icons.html" as ic %}
+{% block content %}
+{# Demandes de l'équipe BAU (bau.py). Attend : board, columns (vue kanban), fiche_of, bau_ready, setting, vue, show_all. #}
+{% import "_charts.html" as charts with context %}
+{% import "_kanban.html" as kb %}
+{% set base = request.url.path %}
+{% set kanban = vue == "kanban" %}
+<div class="page-head">
+  <div>
+    <h1>BAU <span class="muted">· demandes de l'équipe</span></h1>
+    {% if board.configured %}<p class="muted last-sync">{% if board.checked_at %}Dernière synchro : {{ board.checked_at | quand }}{% else %}Jamais synchronisé{% endif %}</p>{% endif %}
+  </div>
+  {% if board.configured %}
+  <div class="refresh">
+    <button type="button" class="secondary sync-btn" hx-post="/bau/rafraichir" hx-target="next .refresh-out" hx-indicator="closest .refresh" hx-disabled-elt="this"{% if not bau_ready %} disabled title="Claude Code en ligne de commande introuvable : voir docs/routine-synchro.md"{% endif %}><span class="btn-face"><span class="btn-idle">{{ ic.icon("sync") }} Rafraîchir depuis Notion</span><span class="btn-busy" aria-hidden="true">Synchro…</span></span></button>
+    <div class="refresh-out">{% if sync_running %}<div hx-get="/actions/rafraichir/etat" hx-trigger="load" hx-swap="outerHTML"></div>{% endif %}</div>
+  </div>
+  <a class="btn-link" href="{{ board.notion_url }}" target="_blank" rel="noopener">Page Notion ↗</a>
+  {% endif %}
+</div>
+
+{% if not board.configured %}
+<section class="panel empty-state">
+  <h2>{{ "Page BAU à corriger" if board.problem else "Aucune page BAU suivie" }}</h2>
+  {% if board.problem %}<p class="result ko">{{ board.problem | reglages }}</p>{% endif %}
+  <p>Jarvis peut suivre les demandes d'une page projet ou BAU de la base Notion « Equipes OPS - Projets et BAU », par exemple « BAU équipe intégration - TECHNIQUE » : colle le lien de la page dans {{ setting | reglages }}, puis reviens ici et lance « Rafraîchir depuis Notion ».</p>
+  <a class="btn-primary" href="/reglages#reglage-{{ setting }}">Ouvrir les réglages</a>
+</section>
+{% elif not board.synced %}
+<section class="panel empty-state">
+  <h2>Demandes pas encore synchronisées</h2>
+  <p>Lance « Rafraîchir depuis Notion » : Claude Code lit les demandes liées à la page (lecture seule), une minute environ la première fois.</p>
+</section>
+{% elif not board.demandes %}
+<p class="muted">Aucune demande liée à cette page dans Notion : vérifie le lien dans {{ setting | reglages }} (celui de la page projet ou BAU elle-même, pas d'une vue).</p>
+{% else %}
+<section class="chart-row">
+  {{ charts.segbar("Statut des demandes", board.groups, "demandes", slim=true, filter_key="groupe", hrefs={} if show_all else {"done": base ~ "?tous=true"}) }}
+</section>
+<div class="view-bar">
+<div class="segmented" role="group" aria-label="Présentation">
+  <a href="{{ base }}{{ '?tous=true' if show_all }}" class="{{ 'active' if not kanban }}" data-view="bau.vue:liste">Liste</a><a href="{{ base }}?vue=kanban{{ '&tous=true' if show_all }}" class="{{ 'active' if kanban }}" data-view="bau.vue:kanban">Kanban</a>
+</div>
+<div class="segmented" role="group" aria-label="Demandes affichées">
+  <a href="{{ base }}{{ '?vue=kanban' if kanban }}" class="{{ 'active' if not show_all }}" data-view="bau.tous:false">Ouvertes</a><a href="{{ base }}?tous=true{{ '&vue=kanban' if kanban }}" class="{{ 'active' if show_all }}" data-view="bau.tous:true">Toutes</a>
+</div>
+</div>
+{# Mêmes attributs data-* dans les deux vues : les filtres gardés valent pour la liste et pour le kanban.
+   « clientlie » et non « client » : ce filtre-là suit le client du menu (filters.js), ce qui viderait la liste. #}
+{% macro attrs(x) -%}
+data-group="{{ x.group }}" data-statut="{{ x.status }}" data-priorite="{{ x.priority or 'Sans priorité' }}" data-responsable="{{ x.owners | join('|') if x.owners else 'Sans responsable' }}" data-referent="{{ x.referents | join('|') if x.referents else 'Sans référent' }}" data-clientlie="{{ x.clients | join('|') if x.clients else 'Sans client' }}" data-ressource="{{ x.resources | join('|') if x.resources else 'Sans ressource' }}" data-echeance="{{ x.due.isoformat() if x.due else '' }}" data-cree="{{ x.created.isoformat() if x.created else '' }}"
+{%- endmacro %}
+{% set filters = "Priorité:priorite,Responsable:responsable,Référent inté:referent,Client lié:clientlie,Ressource:ressource" %}
+{% if kanban %}
+{% call(_d, x) kb.board(columns, filters, "Demandes par statut", "terminée(s)") %}
+<article class="kb-card" data-ticket-card{% if not show_all and not x.is_open %} hidden data-out{% endif %} {{ attrs(x) }}>
+  <p class="kb-title"><a data-ticket href="/bau/demande/{{ x.ref }}">{{ x.title }}</a></p>
+  <p class="kb-meta">{% if x.priority %}<span class="badge">{{ x.priority }}</span>{% endif %}
+    {% if x.clients %}<span class="muted">{{ x.clients | join(", ") }}</span>{% endif %}</p>
+  <p class="kb-meta">{% if x.owners %}<span class="muted">{{ ic.icon("user") }} {{ x.owners | join(", ") }}</span>{% endif %}
+    {% if x.due %}<span class="{{ 'late' if x.is_late(today) else 'muted' }}">{{ ic.icon("calendar") }} {{ x.due.strftime("%d/%m") }}</span>{% endif %}
+    {% if x.notion_url %}<a href="{{ x.notion_url }}" target="_blank" rel="noopener">Notion ↗</a>{% endif %}</p>
+</article>
+{% endcall %}
+{% else %}
+<div data-filterable data-fold-filters data-items=".retour" data-filters="Statut:statut,{{ filters }}" data-sorts="Priorité:priorite,Échéance:echeance,Création:cree,Statut:statut" data-out-label="terminée(s)">
+{# Toutes les demandes sont envoyées : en vue « Ouvertes », les terminées sont masquées (data-out) et la recherche propose de les afficher. #}
+{% for x in board.demandes %}
+<article id="{{ x.ref }}" data-ticket-card class="retour {{ 'done' if not x.is_open }}"{% if not show_all and not x.is_open %} hidden data-out{% endif %} {{ attrs(x) }}>
+  <div class="retour-main">
+    <header>
+      <span class="badge g-{{ x.group }}">{{ x.status }}</span>
+      {% if x.priority %}<span class="badge">{{ x.priority }}</span>{% endif %}
+      <strong><a data-ticket href="/bau/demande/{{ x.ref }}">{{ x.title }}</a></strong>
+    </header>
+    <p class="muted"><code>{{ x.ref }}</code>{% if x.owners %} · {{ ic.icon("user") }} {{ x.owners | join(", ") }}{% endif %}{% if x.referents %} · référent {{ x.referents | join(", ") }}{% endif %}{% if x.clients %} · {{ x.clients | join(", ") }}{% endif %}{% for r in x.resources %} · <code>{{ r }}</code>{% endfor %}{% if x.due %} · <span class="{{ 'late' if x.is_late(today) }}">échéance {{ x.due.strftime("%d/%m/%Y") }}</span>{% endif %}{% if x.created %} · créée le {{ x.created.strftime("%d/%m/%Y") }}{% endif %}</p>
+  </div>
+  <div class="retour-actions">
+    {% if x.notion_url %}<a class="btn-link" href="{{ x.notion_url }}" target="_blank" rel="noopener">Notion ↗</a>{% endif %}
+  </div>
+</article>
+{% endfor %}
+</div>
+{% endif %}
+<p class="muted small-note" title="Les demandes sont gardées sur cette machine (data/notion/_bau/) : elles ne sont jamais versionnées dans git.">Demandes lues dans Notion (lecture seule) et gardées en local, hors GitHub. Leur détail reste dans la page Notion de chacune.</p>
+{% endif %}
+{% endblock %}
