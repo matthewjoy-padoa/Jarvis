@@ -672,11 +672,11 @@ def test_agents_are_archived_from_their_page_or_by_drag_and_drop_and_can_be_reor
     for run in (first, second):
         run.status = "terminé"
     page = client.get("/agents").text
-    assert "data-archive-zone" in page and 'draggable="true"' in page and 'href="/agents/archives">Archivés (' in page
+    assert "data-archive-zone" in page and "data-fly" in page and 'href="/agents/archives">Archivés (' in page
     assert f'hx-post="/agents/{first.id}/archiver"' in client.get(f"/agents/{first.id}").text
     assert client.post("/agents/ordre", data={"ids": f"{first.id},{second.id}"}).status_code == 204
     page = client.get("/agents").text
-    assert page.index(f'data-agent="{first.id}" draggable') < page.index(f'data-agent="{second.id}" draggable')  # ordre choisi
+    assert page.index(f'data-agent="{first.id}" data-fly') < page.index(f'data-agent="{second.id}" data-fly')  # ordre choisi
     done = client.post(f"/agents/{first.id}/archiver")
     assert done.status_code == 200 and done.headers["HX-Redirect"] == "/agents" and claude.get(first.id) is None
     assert f'href="/agents/{first.id}"' in client.get("/agents/archives").text
@@ -704,7 +704,7 @@ def test_an_agent_is_renamed_and_pinned_from_its_page_and_pinned_ones_lead_the_s
     assert first.pinned and "Désépingler" in client.get(f"/agents/{first.id}").text
     listing = client.get("/agents").text
     assert "Champ de vision" in listing and 'class="bot-pin"' in listing
-    assert listing.index(f'data-agent="{first.id}" draggable') < listing.index(f'data-agent="{second.id}" draggable')  # épinglé d'abord
+    assert listing.index(f'data-agent="{first.id}" data-fly') < listing.index(f'data-agent="{second.id}" data-fly')  # épinglé d'abord
 
 
 def test_dragging_an_agent_is_animated_and_calm_when_motion_is_reduced():
@@ -713,6 +713,7 @@ def test_dragging_an_agent_is_animated_and_calm_when_motion_is_reduced():
     claude.runs[0].status = "terminé"
     page = client.get("/agents").text
     assert "const flip = " in page and "is-dragging-agent" in page and "is-swallowing" in page  # voisins, zone éveillée, archive
+    assert "takeOff" in page and "im-jets" in page and "bot-puff" in page  # il s'envole, réacteurs allumés, fumée
     assert 'matchMedia("(prefers-reduced-motion: reduce)")' in page
     css = (__import__("pathlib").Path(__file__).parents[1] / "src" / "deploy_hub" / "static" / "style.css").read_text()
     assert "@keyframes archive-ready" in css and "@keyframes archive-swallow" in css
