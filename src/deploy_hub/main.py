@@ -11,6 +11,7 @@ import time
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -21,19 +22,21 @@ from markupsafe import Markup, escape
 from deploy_hub import client_config
 from deploy_hub.config import PROCESS_KEYS, PROJECT_ROOT, clients_dir, data_dir, ensure_private_dirs, forget_secrets, load_settings, secret_problem
 from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, KO, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
-                               kanban_columns, notion_link, status_group)
-from deploy_hub import brief, console, env_file, onepassword, shell, sync_notion
+                               group_counts, kanban_columns, notion_link, status_group)
+from deploy_hub import bau, brief, console, env_file, onepassword, shell, sync_notion
 from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
 from deploy_hub.rendu import md, md_inline
 from deploy_hub.sources.claude_runner import (AGENT_STATUSES, TO_FILL, WAITING, ClaudeRunner, agent_questions, answer_text, chosen_answer,
-                                              duration_text, read_log, report_of, retour_prompt, tokens_text, usage)
+                                              demande_prompt, duration_text, read_log, report_of, retour_prompt, tokens_text,
+                                              usage)
 from deploy_hub.sources.dag_board import board
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_source import DagSource
 from deploy_hub.sources.dag_watch import DagWatcher
+from deploy_hub.sources.bau_details import DescriptionReader
 from deploy_hub.sources.client_directory import ClientDirectory, form_of, name_key
 from deploy_hub.sources.sync_routine import SyncRoutine
 from deploy_hub.sources import connections, flow_digger, notion_api, running_code
@@ -58,6 +61,7 @@ claude = ClaudeRunner.from_env(settings.orchestrator_dir, notifications, data_di
 # Synchro Notion sans jeton : le bouton « Rafraîchir depuis Notion » fait suivre sync/routine.md à Claude Code (claude -p).
 sync_routine = SyncRoutine(notifications)
 client_directory = ClientDirectory()
+descriptions = DescriptionReader()  # description d'une demande BAU (corps de sa page Notion), lue à son ouverture
 pulls = PullRequests(settings.orchestrator_dir)  # PR ouvertes de l'orchestrator (gh), gardées cinq minutes
 # Suivi des runs lancés (air.py d'Arthur) ; les suivis en cours au démarrage reprennent si Airflow est configuré.
 dag_watch = DagWatcher(data_dir() / "airflow", notifications, airflow.air_env())
@@ -170,16 +174,19 @@ def auto_sync_plan() -> tuple[list[str], datetime | None]:
     main compte, et un redémarrage de Jarvis ne remet rien à zéro. Jamais avant _auto_sync_next."""
     every = auto_sync_every()
     wanted = [c.slug for c in client_config.active_configs() if c.auto_sync] if every else []
+    if every and bau.enabled() and bau.auto_sync():  # demandes BAU en synchro auto (bouton de la page BAU)
+        wanted.append(bau.KEY)
     if not wanted:
         return [], None
     return wanted, max(sync_notion.next_check(every, wanted), _auto_sync_next)
 
 
-def auto_sync_note(d: Deployment) -> str:
+def auto_sync_note(d) -> str:
     """« prochaine vers 14:15 », à côté de la dernière synchro d'une fiche : l'heure prévue de la synchro automatique de
-    ce client. Vide s'il ne l'a pas demandée, si rien n'est prévu, ou pendant qu'une synchro tourne (règle d'affichage :
-    le bouton « Rafraîchir » porte alors l'avancement)."""
-    if not d.auto_sync or sync_routine.running or _refresh_lock.locked():
+    ce client (ou des demandes BAU : bau.SPACE et bau.auto_sync()). Vide s'il ne l'a pas demandée, si rien n'est prévu,
+    ou pendant qu'une synchro tourne (règle d'affichage : le bouton « Rafraîchir » porte alors l'avancement)."""
+    on = bau.auto_sync() if d.slug == bau.KEY else d.auto_sync
+    if not on or sync_routine.running or _refresh_lock.locked():
         return ""
     wanted, due = auto_sync_plan()
     if due is None or d.slug not in wanted:
@@ -198,9 +205,13 @@ def _auto_sync() -> None:
     wanted, due = auto_sync_plan()
     if due is None or due > datetime.now():
         return
-    if notion_api.load_token():
-        threading.Thread(target=_refresh, args=(wanted,), name="jarvis-sync-auto", daemon=True).start()
+    clients = [slug for slug in wanted if slug != bau.KEY]
+    if notion_api.load_token() and clients:  # les demandes BAU ne se lisent que par la routine (notion_api ne les connaît pas)
+        threading.Thread(target=_refresh, args=(clients,), name="jarvis-sync-auto", daemon=True).start()
         started, message = True, "lancée par l'API"
+        if bau.KEY in wanted:
+            r = sync_routine.start([bau.KEY], auto=True)
+            message += f" ; demandes BAU : {r.message}"
     else:
         r = sync_routine.start(wanted, auto=True)
         started, message = r.ok, r.message
@@ -220,7 +231,16 @@ def _push_round() -> None:
     _guarded("Connexion de Claude Code", _check_claude_login)
     _guarded("Code à jour", _check_restart)
     _guarded("Synchro Notion automatique", _auto_sync)
+    _guarded("Descriptions des demandes BAU", _bau_descriptions)
     _guarded("Rangement des agents", claude.tidy)  # une fois par jour : archives, journaux anciens, worktrees
+
+
+def _bau_descriptions() -> None:
+    """Descriptions des demandes BAU lues en fond (lots enchaînés), une fois la synchro terminée (elle charge d'abord les
+    demandes) : jusqu'à ce que toutes les demandes ouvertes soient à jour, puis seulement celles qui changent. Regardé
+    chaque minute."""
+    if bau.enabled() and not sync_routine.running and (board := bau.load()).synced:
+        descriptions.catch_up(board.demandes)
 
 
 async def _push_loop() -> None:
@@ -289,6 +309,7 @@ templates.env.filters["md"] = md
 templates.env.filters["md_inline"] = md_inline
 templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STATUSES)
 templates.env.globals["kanban_columns"] = kanban_columns
+templates.env.filters["group_counts"] = group_counts  # [groupe, …] → {groupe: nombre} (barre de répartition)
 templates.env.globals["auto_sync_every"] = auto_sync_every  # bouton « Synchro auto » d'une fiche
 templates.env.globals["auto_sync_note"] = auto_sync_note
 templates.env.tests["drive"] = client_config.is_drive  # {% if l.url is drive %} : logo Google Drive dans le dock
@@ -323,8 +344,18 @@ PAGES = [
     ("/clients", "Clients"),
     ("/deadlines", "Deadlines"),
     ("/agents", "Agents"),
+    ("/bau", "BAU"),
 ]
 NAV_PAGES = [p for p in PAGES if p[0] != "/clients"]
+
+
+def _nav_pages() -> list[tuple[str, str]]:
+    """Barre du haut. « BAU » n'y est que si une page BAU est réglée (JARVIS_NOTION_BAU), même mal réglée : la page dit
+    alors quoi corriger. Relu à chaque page : le réglage s'applique sans relancer Jarvis."""
+    shown = bau.enabled() or bool(bau.problem())
+    return [p for p in NAV_PAGES if p[0] != "/bau" or shown]
+
+
 CLIENT_COOKIE = "jarvis_client"  # client en cours : celui de la dernière fiche ouverte
 # Vues tous clients, proposées sur la page Clients (et toujours joignables par leur URL).
 CROSS_PAGES = [
@@ -421,8 +452,10 @@ def _render(request: Request, template: str, active: str, **context) -> HTMLResp
         request,
         template,
         {
-            "pages": NAV_PAGES,
+            "pages": _nav_pages(),
             "current": _current(request),
+            # Dock de l'équipe BAU (ses liens) : sur ses pages, et partout quand aucun client n'est suivi (sinon : celui du client).
+            "bau_dock": bau.load_links() if bau.enabled() and (active == "/bau" or _current(request) is None) else None,
             "shell_token": shell.TOKEN if shell.enabled() else "",  # onglet « Shell » de la console (JARVIS_SHELL=1, VM)
             "cross_pages": CROSS_PAGES,
             "clients": _deployments(request),
@@ -511,7 +544,8 @@ def today_page(request: Request):
         links=links,
         ko_url=ko_url,
         milestones=[i for i in items if i["kind"] == "Jalon" and today <= i["date"] <= today + timedelta(days=21)],
-        pins=_pinned(current) if current else [],
+        pins=(_pinned(current) if current else []) + _bau_pins(),
+        bau_board=bau.load(),
         **_reminders_context(current.slug if current else ""),
     )
 
@@ -1308,7 +1342,17 @@ TICKET_KINDS = ("retour", "action")
 
 
 def ticket_url(slug: str, kind: str, ref: str) -> str:
-    return f"/deploiements/{slug}/ticket/{kind}/{ref}"
+    return f"/bau/demande/{ref}" if slug == bau.KEY else f"/deploiements/{slug}/ticket/{kind}/{ref}"
+
+
+def run_origin(run) -> str:
+    """D'où vient un agent : la demande BAU qu'il traite, ou la recette de son client."""
+    if run.slug == bau.KEY:
+        return f"/bau/demande/{run.subject.removeprefix('demande ')}" if run.subject.startswith("demande ") else "/bau"
+    return f"/deploiements/{run.slug}/recette"
+
+
+templates.env.globals["run_origin"] = run_origin
 
 
 templates.env.globals["ticket_url"] = ticket_url
@@ -1321,7 +1365,9 @@ def _find_ticket(d: Deployment, kind: str, ref: str):
 
 
 def _ticket_item(slug: str, kind: str, ref: str):
-    """(fiche, retour ou carte) ; 404 si le type, le client ou le ticket est inconnu."""
+    """(fiche, retour ou carte) ; 404 si le type, le client ou le ticket est inconnu. Une demande BAU (slug bau.KEY) : (bau.SPACE, demande)."""
+    if slug == bau.KEY:
+        return bau.SPACE, _demande(ref)
     if kind not in TICKET_KINDS:
         raise HTTPException(404, f"Type inconnu : {kind}")
     d = _get(slug)
@@ -1340,6 +1386,8 @@ def ticket(request: Request, slug: str, kind: str, ref: str, agent: bool = False
     """Tout ce qu'on sait d'un retour ou d'une carte d'action : fiche, contenu, agents, historique.
     Panneau latéral quand la page l'appelle (htmx), page entière sinon (lien ouvert dans un nouvel onglet).
     agent=1 (commande « >agent » de la palette) : le bloc « Lancer un agent » arrive déplié, brief chargé, et prend le focus."""
+    if slug == bau.KEY:  # une demande BAU a sa propre page
+        return RedirectResponse(ticket_url(slug, kind, ref))
     d, item = _ticket_item(slug, kind, ref)
     history = [c for c in changes_since(d, settings.deployments_dir, datetime.min) if c.notion_url == notion_link(item.notion_url)]
     runs = [r for r in claude.runs if r.slug == slug and r.subject == f"retour {ref.upper()}"] if kind == "retour" else []
@@ -1353,13 +1401,19 @@ def ticket(request: Request, slug: str, kind: str, ref: str, agent: bool = False
 def agent_brief(request: Request, slug: str, retour_id: str):
     """Formulaire de l'agent, brief pré-rempli : chargé à l'ouverture du bloc pour ne pas alourdir la page."""
     d, r = _retour(slug, retour_id)
-    # Ce qui empêcherait le lancement, et l'agent déjà lancé sur ce retour : dits avant le clic, pas après.
     branch = claude.retour_branch(d, r)
+    return _agent_form(request, retour_prompt(d, r, branch=branch), branch, f"agent-{d.slug}-{r.id}",
+                       f"/actions/agent-retour/{d.slug}/{r.id}", f"le retour {r.id}", "ce retour")
+
+
+def _agent_form(request: Request, brief_text: str, branch: str, out: str, post_url: str, what: str, this: str) -> HTMLResponse:
+    """Formulaire de lancement d'un agent (retour de recette ou demande BAU). Ce qui empêcherait le lancement, et l'agent
+    déjà lancé sur la branche, sont dits avant le clic, pas après. out : id du bloc de résultat ; what : « le retour R-02 »."""
     previous, problem = claude.latest_on(branch), claude.problem()
     blocker = problem or (f"Un agent travaille déjà sur la branche {branch} : attends sa fin ou arrête-le." if previous and previous.running else "")
     return templates.TemplateResponse(request, "_agent_form.html", {
-        "d": d, "r": r, "brief": retour_prompt(d, r, branch=branch), "to_fill": TO_FILL, "branch": branch, "problem": problem, "blocker": blocker,
-        "previous": previous, "waiting": bool(previous) and previous.status == WAITING})
+        "brief": brief_text, "to_fill": TO_FILL, "branch": branch, "problem": problem, "blocker": blocker, "out": out, "post_url": post_url,
+        "what": what, "this": this, "previous": previous, "waiting": bool(previous) and previous.status == WAITING})
 
 
 @app.post("/actions/agent-retour/{slug}/{retour_id}", response_class=HTMLResponse)
@@ -1448,6 +1502,128 @@ def refresh_one(request: Request, slug: str):
     if ok:
         response.headers["HX-Refresh"] = "true"
     return response
+
+
+# ============================================================ BAU : demandes de l'équipe (bau.py)
+def _bau_fiches(request: Request, board: bau.Board) -> dict[str, str]:
+    """Client lié à une demande (son nom de domaine Padoa) → identifiant de sa fiche, quand ce client est suivi ici."""
+    slugs = {d.slug for d in _deployments(request)}
+    names = {name for x in board.demandes for name in x.clients}
+    return {name: slug for name in names if (slug := client_config.slugify(name.split(".")[0])) in slugs}
+
+
+@app.get("/bau", response_class=HTMLResponse)
+def bau_page(request: Request):
+    """Demandes de la page BAU suivie (base Notion « Equipes OPS - Actions internes »), en liste ou en kanban."""
+    board = bau.load()
+    view = _list_view(request, "bau")
+    # Squad choisie (vue Notion de la squad, lue par la synchro) ; gardée comme Liste / Kanban, à part : « ?squad= » = toute l'équipe.
+    squad = board.squad(_views(request, "bau", "squad")["squad"])
+    demandes = squad[1] if squad else board.demandes
+    columns = kanban_columns([(None, x) for x in demandes], bau.STATUSES) if view["vue"] == "kanban" else []
+    return _render(request, "bau.html", "/bau", board=board, demandes=demandes, space=_bau_space(),
+                   descriptions_progress=descriptions.progress(board.demandes), squad=squad[0] if squad else "",
+                   squads=[(bau.squad_slug(name), name) for name in board.squads], columns=columns,
+                   fiche_of=_bau_fiches(request, board), bau_ready=sync_routine.problem() is None, setting=bau.SETTING,
+                   pins=_bau_pins(), **view)
+
+
+def _demande(ref: str) -> bau.Demande:
+    x = bau.load().get(ref)
+    if x is None:
+        raise HTTPException(404, f"Demande {ref} introuvable")
+    return x
+
+
+def _bau_pins() -> list[dict]:
+    """Demandes épinglées ; « item » vaut None quand la demande n'est plus dans la page BAU (reste à désépingler)."""
+    board = bau.load()
+    return [{**p, "item": (x := board.get(p["ref"])), "label": x.title if x else p["ref"]} for p in personal.pins(bau.KEY)]
+
+
+@app.get("/bau/demande/{ref}", response_class=HTMLResponse)
+def bau_demande(request: Request, ref: str):
+    """Ce qu'on sait d'une demande : panneau latéral quand la page l'appelle (htmx), page entière sinon."""
+    x = _demande(ref)
+    runs = [r for r in claude.runs if r.slug == bau.KEY and r.subject == f"demande {x.ref}"]
+    context = {"x": x, "fiche_of": _bau_fiches(request, bau.load()), "today": date.today(),
+               "d": bau.SPACE, "kind": "demande", "ref": x.ref, "runs": runs}  # d, kind, ref : épingle et rappels
+    if request.headers.get("HX-Request"):
+        return templates.TemplateResponse(request, "_demande.html", context)
+    return _render(request, "demande.html", "/bau", **context)
+
+
+def _bau_links_page(request: Request, links: bau.Links, vers: str, error: str = "", form: dict | None = None) -> HTMLResponse:
+    return _render(request, "bau_links.html", "/bau", links=links, vers=vers, error=error, form=form or {})
+
+
+@app.get("/bau/liens", response_class=HTMLResponse)
+def bau_links(request: Request, vers: str = ""):
+    """Liens de l'équipe BAU (Drive, pages Notion, autres) : ce que porte la fiche d'un client, pour une équipe sans client."""
+    return _bau_links_page(request, bau.load_links(), _local_path(vers, "/bau"))
+
+
+@app.post("/bau/liens", response_class=HTMLResponse)
+async def bau_links_save(request: Request):
+    form = dict(await request.form())
+    vers = _local_path(str(form.get("vers") or ""), "/bau")
+    try:
+        bau.save_links(bau.links_from_form(form))
+    except client_config.ConfigError as e:
+        return _bau_links_page(request, bau.load_links(), vers, str(e), form)
+    return RedirectResponse(vers, status_code=303)
+
+
+@app.get("/bau/demande/{ref}/description", response_class=HTMLResponse)
+def bau_description(request: Request, ref: str, relire: bool = False):
+    """Description de la demande (corps de sa page Notion) : celle gardée si elle est à jour, sinon Jarvis la fait lire
+    et la page redemande toutes les 3 secondes jusqu'à ce qu'elle arrive. relire : relit même si elle est à jour."""
+    x = _demande(ref)
+    descriptions.ensure(x, again=relire)
+    return templates.TemplateResponse(request, "_demande_description.html", {
+        "x": x, "saved": descriptions.saved(x.ref), "fresh": descriptions.is_fresh(x), "reading": descriptions.reading(x.ref),
+        "problem": descriptions.problem()})
+
+
+@app.get("/bau/demande/{ref}/brief", response_class=HTMLResponse)
+def bau_agent_brief(request: Request, ref: str):
+    """Formulaire de l'agent sur une demande, brief pré-rempli (avec sa description si Jarvis l'a lue) : chargé à
+    l'ouverture du bloc, comme pour un retour."""
+    x = _demande(ref)
+    branch = claude.demande_branch(x)
+    return _agent_form(request, demande_prompt(x, descriptions.text(x), branch=branch), branch, f"agent-bau-{x.ref}", f"/bau/demande/{x.ref}/agent",
+                       f"la demande {x.ref}", "cette demande")
+
+
+@app.post("/bau/demande/{ref}/agent", response_class=HTMLResponse)
+def launch_agent_on_demande(request: Request, ref: str, description: str = Form(""), prompt: str = Form("")):
+    x = _demande(ref)
+    if not x.is_open:
+        return _result(request, ActionResult(False, f"Demande {x.ref} déjà close ({x.status})", simulated=False))
+    description = description.strip() or descriptions.text(x)
+    if TO_FILL in (prompt.strip() or demande_prompt(x, description)):
+        return _result(request, ActionResult(False, f"Le brief contient encore « {TO_FILL} » : colle le détail de la demande avant de lancer.", simulated=False))
+    return _result(request, claude.launch_demande(x, description, prompt))
+
+
+@app.post("/bau/synchro-auto", response_class=HTMLResponse)
+def bau_auto_sync(request: Request, actif: str = Form("")):
+    """Bouton « Synchro auto » de la page BAU : Jarvis relit les demandes tout seul, ou non (non par défaut)."""
+    bau.set_auto_sync(actif == "1")
+    return templates.TemplateResponse(request, "_auto_sync.html", {"d": _bau_space()})
+
+
+def _bau_space():
+    """Ce que le bouton « Synchro auto » attend d'un client (_auto_sync.html), pour les demandes BAU."""
+    return SimpleNamespace(slug=bau.KEY, client="les demandes BAU", auto_sync=bau.auto_sync())
+
+
+@app.post("/bau/rafraichir", response_class=HTMLResponse)
+def bau_refresh(request: Request):
+    """Relit les demandes dans Notion, elles seules. Toujours par la routine Claude Code : un jeton Notion ne lit que les
+    bases du déploiement (notion_api)."""
+    r = sync_routine.start(bau.KEY, "les demandes BAU")
+    return _sync_status(request, r.ok and not r.simulated, r.ok, r.message, r.simulated)
 
 
 # ============================================================ Perso : brief, épingles, notes, rappels
@@ -1573,7 +1749,7 @@ def reminder_done(reminder_id: int):
 
 def _reminder_notes(deployments: list[Deployment], today: date) -> list[dict]:
     """Rappels arrivés à échéance : une notification chacun, qui mène au ticket (ou à l'accueil pour un rappel libre)."""
-    names = {d.slug: d.client for d in deployments}
+    names = {d.slug: d.client for d in deployments} | ({bau.KEY: bau.LABEL} if bau.enabled() else {})
     return [{"key": f"rappel:{r.id}:{r.due.isoformat()}", "kind": "rappel", "level": "info", "title": f"Rappel : {r.label}",
              "detail": names.get(r.slug, ""), "link": ticket_url(r.slug, r.kind, r.ref) if r.kind else "/", "client": names.get(r.slug, "")}
             for r in personal.due(today) if not r.slug or r.slug in names]  # rappel libre, ou d'un client suivi (pas archivé)

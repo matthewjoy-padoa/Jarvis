@@ -27,7 +27,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=175">
+  <link rel="stylesheet" href="/static/style.css?v=176">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=11" defer></script>
   <script src="/static/dag.js?v=3" defer></script>
@@ -53,6 +53,7 @@
       "/clients": '<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
       "/deadlines": '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
       "/agents": '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9.5 13h.01M14.5 13h.01M9.5 16.5h5"/>',
+      "/bau": '<path d="M4 6.5h16l-1.5 12a1 1 0 0 1-1 .9h-11a1 1 0 0 1-1-.9z"/><path d="M4 12.5h4.5l1 2h5l1-2H20"/>',
     } %}
     {# Le client en cours : on travaille sur un client à la fois ; les autres sont dans le menu, pas à côté. #}
     {% if current %}
@@ -280,7 +281,7 @@
   <footer class="footer muted">Jarvis · <em>Just A Rather Very Intelligent System</em>, au service de l'équipe Integration · <a href="/sources">État des systèmes</a>{% if jarvis_version %} · <a href="https://github.com/matthewjoy-padoa/Jarvis/blob/main/CHANGELOG.md" title="Historique des versions{% if jarvis_commit %} · commit {{ jarvis_commit }}{% endif %}">v{{ jarvis_version }}</a>{% endif %}</footer>
   {# Raccourcis du client en cours : dock de boutons ronds au bord droit, nom du lien en bulle au survol.
      Liens ouverts dans le navigateur : Jarvis ne lit jamais leur contenu. #}
-  {% if current %}
+  {% if current or bau_dock is not none %}
   {% set here = (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode %}
   {% macro dock_icon(kind) -%}
   {%- if kind == "drive" %}{# logos (Google Drive, Notion) : pleins (fill), sans le trait des autres icônes #}
@@ -293,6 +294,15 @@
   {%- else %}<path d="M12 6v12M6 12h12"/>{% endif %}</svg>
   {%- endif %}
   {%- endmacro %}
+  {% if bau_dock is not none %}
+  {# Raccourcis de l'équipe BAU : ses liens (config/bau.yaml), sur ses pages et quand aucun client n'est suivi. #}
+  <div class="dock-wrap">
+  <nav class="dock" aria-label="Raccourcis de l'équipe BAU">
+    {% for l in bau_dock.all %}<a class="dock-btn" href="{{ l.url }}" target="_blank" rel="noopener noreferrer" data-tip="{{ l.label }} ↗" aria-label="{{ l.label }} (nouvel onglet)">{{ dock_icon("drive" if l.url is drive else ("notion" if l.url is notion else "link")) }}</a>{% endfor %}
+    <a class="dock-btn dock-add" href="/bau/liens?vers={{ here }}" data-tip="Ajouter ou modifier les liens de l'équipe" aria-label="Ajouter ou modifier les liens de l'équipe BAU">{{ dock_icon("add") }}</a>
+  </nav>
+  </div>
+  {% else %}
   <div class="dock-wrap">
   {# Environnements Padoa du client : bouton à part, au-dessus du dock ; trois adresses bâties sur le modèle PADOA_ENV_URL. #}
   <div class="dock-envs">
@@ -313,6 +323,7 @@
     <a class="dock-btn dock-add" href="/clients/{{ current.slug }}/liens?vers={{ here }}" data-tip="{{ 'Ajouter un lien Drive' if not current.drive else 'Ajouter ou modifier les liens' }}" aria-label="Ajouter ou modifier les liens de {{ current.client }}">{{ dock_icon("add") }}</a>
   </nav>
   </div>
+  {% endif %}
   {% endif %}
 </body>
 </html>

@@ -56,6 +56,12 @@ FIELDS = (
     Field("JARVIS_NOTION_DASHBOARDS", "Liste des dashboards clients", "text",
           "Id de la page Notion qui liste les dashboards des clients (annuaire de « Ajouter un client »). Vide : « Liste des dashboards "
           "pour le déploiement des nouveaux clients »", section=NOTION),
+    Field("JARVIS_NOTION_BAU", "Page des demandes BAU", "text",
+          "Lien (ou id) d'une page projet ou BAU de la base Notion « Equipes OPS - Projets et BAU », par exemple « BAU équipe "
+          "intégration - TECHNIQUE » : ses actions deviennent la page « BAU » de Jarvis. Vide : pas de page BAU", section=NOTION),
+    Field("JARVIS_BAU_SQUADS", "Vues de squad (BAU)", "text",
+          "Vues Notion lues telles quelles pour le sélecteur de squad de la page BAU, « nom | lien de la vue » séparées par « ; ». "
+          "Vide : SPSTA et Plateform, les vues « Action squad » de la page BAU de l'équipe intégration", section=NOTION),
     Field("ORCHESTRATOR_DIR", "Dossier de integration-orchestrator", "path", "Clone local de integration-orchestrator : DAGs proposés, onglet PR, agents Claude. Vide : ~/integration-orchestrator", live=False, section=FOLDERS),
     Field("FLOW_DIGGER_DIR", "Dossier de Flow Digger", "path", "Vide : cherché aux emplacements habituels", section=FOLDERS),
     Field("JARVIS_TZ", "Fuseau horaire", "text", "Vide : Europe/Paris, quelle que soit l'heure du serveur (la VM est en UTC). "

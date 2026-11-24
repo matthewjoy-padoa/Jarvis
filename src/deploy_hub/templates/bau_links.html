@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Liens de l'équipe · BAU · Jarvis{% endblock %}
+{% block content %}
+{# Liens de l'équipe BAU (bau.Links), dans config/bau.yaml : l'équipe n'a pas de client pour porter les siens. #}
+{% macro val(name, default) -%}{{ form[name] if name in form else default }}{%- endmacro %}
+<div class="page-head">
+  <h1>Liens de l'équipe <span class="muted">· BAU</span></h1>
+  <a href="{{ vers }}" class="btn-link">← Retour</a>
+</div>
+<p class="muted">Ils s'affichent en haut de la page BAU et dans les raccourcis à droite. Jarvis ne fait que les ouvrir dans ton navigateur : il ne lit jamais leur contenu. Ils restent sur cette machine (configuration locale, hors GitHub).</p>
+{% if error %}<p class="result ko">{{ error | reglages }}</p>{% endif %}
+<form class="panel client-form" method="post" action="/bau/liens">
+  <input type="hidden" name="vers" value="{{ vers }}">
+  <label class="field">Google Drive
+    <textarea name="drive" rows="4" placeholder="un par ligne : libellé | adresse&#10;Dossier de l'équipe | https://drive.google.com/drive/folders/…">{{ val('drive', links.text(links.drive)) }}</textarea>
+    <small class="muted">Adresses https://drive.google.com/… ou https://docs.google.com/… ; s'ouvrent avec ton compte Google.</small></label>
+  <label class="field">Pages Notion
+    <textarea name="notion" rows="3" placeholder="un par ligne : libellé | adresse&#10;Process de l'équipe | https://app.notion.com/p/…">{{ val('notion', links.text(links.notion)) }}</textarea></label>
+  <label class="field">Autres liens
+    <textarea name="other" rows="4" placeholder="un par ligne : libellé | adresse&#10;Airflow recette | https://…&#10;Canal Slack | https://padoa.slack.com/archives/…">{{ val('other', links.text(links.other)) }}</textarea>
+    <small class="muted">Toute adresse https://… : outils, tableaux de bord, canaux Slack, dépôts GitHub…</small></label>
+  <div class="form-actions"><button type="submit">Enregistrer</button></div>
+</form>
+{% endblock %}

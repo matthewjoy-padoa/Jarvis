@@ -1,14 +1,14 @@
 {% import "_icons.html" as ic %}
-{# Formulaire de l'agent sur un retour : brief pré-rempli par retour_prompt (sources/claude_runner.py), modifiable avant envoi. #}
-{% set out = "agent-" ~ d.slug ~ "-" ~ r.id %}
+{# Formulaire de l'agent sur un retour de recette ou une demande BAU : brief pré-rempli (retour_prompt, demande_prompt dans
+   sources/claude_runner.py), modifiable avant envoi. Attend (main._agent_form) : brief, branch, out, post_url, what, this. #}
 {% if problem %}<p class="result ko" role="alert">L'agent ne peut pas partir : {{ problem | reglages }} <a href="/reglages">Ouvrir les Réglages</a></p>{% endif %}
-{% if previous %}<p class="result{{ ' ko' if waiting }}">Un agent existe déjà sur ce retour :
+{% if previous %}<p class="result{{ ' ko' if waiting }}">Un agent existe déjà sur {{ this }} :
   <a href="/agents/{{ previous.id }}">agent #{{ previous.id }}</a>, {{ previous.status }}.
   {% if waiting %}Il attend tes réponses : réponds-lui sur sa page plutôt que d'en relancer un.
   {% elif previous.running %}Attends sa fin ou arrête-le avant d'en lancer un autre.
   {% else %}Un nouvel agent repartira sur la même branche et le même worktree.{% endif %}</p>{% endif %}
-<form class="agent-form" hx-post="/actions/agent-retour/{{ d.slug }}/{{ r.id }}" hx-target="#{{ out }}" hx-confirm="Lancer un agent sur le retour {{ r.id }} ?">
-  <label for="brief-{{ out }}">Brief de l'agent : relis-le, complète si besoin la partie <code>&lt;precisions&gt;</code>{% if to_fill in brief %}, et remplace <strong>{{ to_fill }}</strong>{% endif %}.</label>
+<form class="agent-form" hx-post="{{ post_url }}" hx-target="#{{ out }}" hx-confirm="Lancer un agent sur {{ what }} ?">
+  <label for="brief-{{ out }}">Brief de l'agent : relis-le{% if '<precisions>' in brief %}, complète si besoin la partie <code>&lt;precisions&gt;</code>{% endif %}{% if to_fill in brief %}, et remplace <strong>{{ to_fill }}</strong>{% endif %}.</label>
   <textarea id="brief-{{ out }}" name="prompt" rows="18" spellcheck="false">{{ brief }}</textarea>
   <div class="agent-actions">
     <button type="submit"{% if blocker %} disabled title="{{ blocker }}"{% endif %}>{{ ic.icon("bot") }} Lancer l'agent</button>

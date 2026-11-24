@@ -1395,6 +1395,12 @@ html.palette-open .notes, html.drawer-open .notes, html.term-open .notes { displ
 .glance { display: grid; grid-template-columns: minmax(220px, 1fr) 1.4fr 1.4fr; gap: 4px 16px; align-items: start; padding: 16px 18px; }
 .glance-title { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px; font-size: 14px; }
 .glance .chart { background: none; border: 0; box-shadow: none; padding: 0; margin: 0; }
+.glance-wide { grid-column: 1 / -1; }
+.bau-links { justify-content: flex-start; margin: 2px 0 12px; }  /* liens de l'équipe BAU, sous le titre */
+.bau-links a.muted { border-style: dashed; }
+.demande-description .md { max-height: 60vh; overflow-y: auto; }  /* longue description : défile dans le panneau */
+.demande-description .md :is(h2, h3, h4, h5, h6) { font-size: 14.5px; margin: .9em 0 .3em; text-transform: none; letter-spacing: normal; color: var(--text); }  /* pas le style des titres de section du panneau */
+.demande-description .md h2 { font-size: 15.5px; }  /* bloc d'une seule barre (demandes BAU) : toute la largeur */
 @media (max-width: 900px) { .glance { grid-template-columns: 1fr; } }
 .panel.whats-new-panel #whats-new-body { max-height: 560px; overflow-y: auto; }
 .glance-title a { color: var(--text); }
