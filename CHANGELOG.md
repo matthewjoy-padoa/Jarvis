@@ -13,7 +13,7 @@ La version affichée en bas de chaque page change donc avec chaque fonctionnalit
 
 ## [0.7.2] · 2026-11-24
 
-- Page Agents : attraper un agent le fait s'envoler comme une armure d'Iron Man. Il garde son armure et ses couleurs, réacteurs allumés et halo qui pulse, suit la souris (ou le doigt) avec un léger retard, se penche dans le sens du vol et laisse une traînée de fumée. Lâché ailleurs dans sa colonne, il atterrit à la nouvelle place (ses voisins glissent pour lui faire place, ordre gardé) ; lâché sur « Archiver », qui s'éveille pendant le vol, il plonge dedans en vrille ; refusé (agent en cours ou en attente) ou lâché ailleurs, il rentre se poser chez lui et la zone secoue la tête. Un simple clic ouvre toujours l'agent ; rien ne bouge si le système demande moins d'animations.
+- Page Agents : attraper un agent le fait s'envoler comme une armure d'Iron Man. Il garde son armure et ses couleurs, réacteurs allumés et halo qui pulse, suit la souris (ou le doigt) avec un léger retard, se penche dans le sens du vol et laisse une traînée de fumée. Lâché ailleurs dans sa colonne, il atterrit à la nouvelle place (ses voisins glissent pour lui faire place, ordre gardé) ; lâché sur « Archiver », qui s'éveille pendant le vol, il plonge dedans en vrille ; refusé (agent en cours ou en attente) ou lâché ailleurs, il rentre se poser chez lui et la zone secoue la tête. Échap (ou quitter la fenêtre) le renvoie chez lui ; un nouveau vol peut partir pendant qu'un autre atterrit. Un simple clic ouvre toujours l'agent ; rien ne bouge si le système demande moins d'animations.
 
 ## [0.7.1] · 2026-11-24
 

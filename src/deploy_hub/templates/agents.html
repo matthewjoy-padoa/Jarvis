@@ -146,64 +146,85 @@
                                        {duration: vanish ? 480 : 380, easing: vanish ? "cubic-bezier(.5, 0, .75, 0)" : ease, fill: "forwards"}).finished;
     };
     const finish = (d) => {
+      if (d.done) return;
+      d.done = true;
+      d.flyer?.getAnimations().forEach((a) => a.cancel());
       d.flyer?.remove();
       d.el.classList.remove("is-dragging");
       document.body.classList.remove("is-dragging-agent");
       zone.classList.remove("is-over");
-      drag = null;
+      if (drag === d) drag = null;
     };
+    const goHome = async (d) => {  // rentre se poser à sa place (nouvelle ou ancienne) ; quoi qu'il arrive, le vol se termine
+      try {
+        if (d.flyer) await landOn(d, d.el.querySelector(".bot"));
+      } catch { /* animation interrompue */ } finally {
+        const landed = !!d.flyer;
+        finish(d);
+        if (landed && !calm) d.el.querySelector(".bot").animate([{scale: "1.15 .85"}, {scale: ".95 1.06"}, {scale: "1"}], {duration: 360, easing: "cubic-bezier(.3, 1.5, .5, 1)"});
+      }
+    };
+    const move = (d, e) => {
+      if (!d.moved) {
+        if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 6) return;  // en dessous : un clic
+        d.moved = true;
+        takeOff(d);
+      }
+      d.tx = e.clientX; d.ty = e.clientY;
+      const hit = under(d, e.clientX, e.clientY);
+      zone.classList.toggle("is-over", !!hit?.closest("[data-archive-zone]"));
+      const target = hit?.closest(".flow-bot[data-agent]");
+      if (target && target !== d.el && target.parentElement === d.lane) {  // une colonne suit l'état : on ne change pas de colonne
+        const box = target.getBoundingClientRect();
+        const ref = e.clientX > box.left + box.width / 2 ? target.nextSibling : target;
+        if (ref !== d.el && ref !== d.el.nextSibling) flip(d.lane, () => d.lane.insertBefore(d.el, ref));
+      }
+    };
+    const drop = async (d, e) => {
+      d.landing = true;
+      const el = d.el;
+      const hit = under(d, e.clientX, e.clientY);
+      if (hit?.closest("[data-archive-zone]")) {
+        const r = await post(`/agents/${el.dataset.agent}/archiver`, "").catch(() => null);
+        if (r && r.ok) {
+          zone.classList.add("is-swallowing");
+          try { await landOn(d, zone.querySelector("svg") || zone, {spin: true, vanish: true}); } catch { /* interrompue */ }
+          return location.reload();
+        }
+        out.textContent = r ? await r.text() : "Jarvis injoignable : l'agent n'a pas été archivé.";
+        if (!calm) zone.animate([{translate: "0"}, {translate: "-8px"}, {translate: "7px"}, {translate: "-5px"}, {translate: "3px"}, {translate: "0"}], {duration: 420});
+      } else if (el.parentElement === d.lane) {
+        post("/agents/ordre", "ids=" + [...d.lane.querySelectorAll(".flow-bot[data-agent]")].map((n) => n.dataset.agent).join(",")).catch(() => {
+          out.textContent = "Jarvis injoignable : la nouvelle place n'est pas enregistrée.";
+        });
+      }
+      await goHome(d);
+    };
+
+    // Les mouvements se suivent sur toute la fenêtre, pas sur l'agent : quand il change de place dans sa colonne, il sort
+    // un instant de la page et le navigateur lâchait le pointeur ; l'armure restait figée et plus rien ne bougeait.
+    addEventListener("pointermove", (e) => { if (drag && !drag.landing && e.pointerId === drag.pointerId) move(drag, e); });
+    addEventListener("pointerup", (e) => {
+      const d = drag;
+      if (!d || d.landing || e.pointerId !== d.pointerId) return;
+      if (!d.moved) { finish(d); return; }  // un clic : le lien ouvre l'agent
+      d.el.dataset.justFlew = "1";  // le clic qui suit ce lâcher n'ouvre pas l'agent
+      setTimeout(() => delete d.el.dataset.justFlew, 0);
+      drop(d, e);
+    });
+    const abort = () => { if (drag && !drag.landing) { drag.landing = true; goHome(drag); } };  // il rentre chez lui
+    addEventListener("pointercancel", (e) => { if (drag && e.pointerId === drag.pointerId) abort(); });
+    addEventListener("blur", abort);
+    addEventListener("keydown", (e) => { if (e.key === "Escape") abort(); });
 
     document.querySelectorAll(".flow-bot[data-fly]").forEach((el) => {
       el.addEventListener("dragstart", (e) => e.preventDefault());  // pas de glisser natif : c'est l'armure qui vole
       el.addEventListener("pointerdown", (e) => {
-        if (e.button !== 0 || drag) return;
-        drag = {el, lane: el.parentElement, startX: e.clientX, startY: e.clientY, moved: false};
-        try { el.setPointerCapture(e.pointerId); } catch { /* pointeur simulé */ }
+        if (e.button !== 0) return;
+        if (drag) finish(drag);  // un vol encore en train d'atterrir : il se pose tout de suite, le nouveau part
+        drag = {el, lane: el.parentElement, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, moved: false};
       });
-      el.addEventListener("pointermove", (e) => {
-        const d = drag;
-        if (!d || d.el !== el || d.landing) return;
-        if (!d.moved) {
-          if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 6) return;  // en dessous : un clic
-          d.moved = true;
-          takeOff(d);
-        }
-        d.tx = e.clientX; d.ty = e.clientY;
-        const hit = under(d, e.clientX, e.clientY);
-        zone.classList.toggle("is-over", !!hit?.closest("[data-archive-zone]"));
-        const target = hit?.closest(".flow-bot[data-agent]");
-        if (target && target !== el && target.parentElement === d.lane) {  // une colonne suit l'état : on ne change pas de colonne
-          const box = target.getBoundingClientRect();
-          const ref = e.clientX > box.left + box.width / 2 ? target.nextSibling : target;
-          if (ref !== el && ref !== el.nextSibling) flip(d.lane, () => d.lane.insertBefore(el, ref));
-        }
-      });
-      el.addEventListener("click", (e) => { if (el.dataset.justFlew) { e.preventDefault(); delete el.dataset.justFlew; } });
-      el.addEventListener("pointercancel", () => drag && drag.el === el && (drag.flyer ? landOn(drag, el).then(() => finish(drag)) : finish(drag)));
-      el.addEventListener("pointerup", async (e) => {
-        const d = drag;
-        if (!d || d.el !== el) return;
-        if (!d.moved) { drag = null; return; }  // un clic : le lien ouvre l'agent
-        el.dataset.justFlew = "1";
-        const hit = under(d, e.clientX, e.clientY);
-        if (hit?.closest("[data-archive-zone]")) {
-          const r = await post(`/agents/${el.dataset.agent}/archiver`, "").catch(() => null);
-          if (r && r.ok) {
-            zone.classList.add("is-swallowing");
-            await landOn(d, zone.querySelector("svg") || zone, {spin: true, vanish: true});
-            return location.reload();
-          }
-          out.textContent = r ? await r.text() : "Jarvis injoignable : l'agent n'a pas été archivé.";
-          if (!calm) zone.animate([{translate: "0"}, {translate: "-8px"}, {translate: "7px"}, {translate: "-5px"}, {translate: "3px"}, {translate: "0"}], {duration: 420});
-        } else if (el.parentElement === d.lane) {
-          post("/agents/ordre", "ids=" + [...d.lane.querySelectorAll(".flow-bot[data-agent]")].map((n) => n.dataset.agent).join(",")).catch(() => {
-            out.textContent = "Jarvis injoignable : la nouvelle place n'est pas enregistrée.";
-          });
-        }
-        await landOn(d, el.querySelector(".bot"));  // il rentre se poser à sa place (nouvelle ou ancienne)
-        finish(d);
-        if (!calm) el.querySelector(".bot").animate([{scale: "1.15 .85"}, {scale: ".95 1.06"}, {scale: "1"}], {duration: 360, easing: "cubic-bezier(.3, 1.5, .5, 1)"});
-      });
+      el.addEventListener("click", (e) => { if (el.dataset.justFlew) e.preventDefault(); });
     });
   })();
 
