@@ -1,0 +1,3 @@
+{# Réponse du bouton « Mettre à jour et redémarrer » (main.jarvis_update) : refus, ou attente du redémarrage (base.html). #}
+{% if error %}<p class="result ko">{{ error|reglages }}</p>
+{% else %}<p class="result ok" data-wait-boot="{{ boot }}">Redémarrage de Jarvis… la page se recharge dès qu'il répond.</p>{% endif %}

@@ -5,6 +5,7 @@ import logging
 import os
 import random
 import re
+import secrets
 from contextlib import asynccontextmanager
 import threading
 import time
@@ -98,6 +99,7 @@ async def lifespan(_app):
     yield
     pusher.cancel()
     dag_watch.shutdown()  # à l'arrêt (rechargement compris) : coupe les air.py, que le Jarvis suivant reprendra
+    running_code.exec_if_requested()  # bouton « Redémarrer » : le processus se relance lui-même, ici, une fois tout arrêté
 
 
 PUSH_EVERY = 60  # secondes, comme le panneau des notifications
@@ -146,14 +148,76 @@ def _check_restart() -> None:
     if not newer:
         _restart = ()
         return
-    disk = running_code.version()
-    if disk and _version_started and disk != _version_started:
-        _restart = (f"v{disk}", f"v{_version_started}")
-    else:  # numéro pas monté (ou illisible) : les commits, faute de mieux
-        _restart = (newer, _code_started[:7])
+    _restart = _labels(running_code.version(), newer)
     detail = f"La version {_restart[0]} est installée, mais c'est encore la {_restart[1]} qui tourne : relance le serveur pour l'appliquer."
     if notifications.add(f"relance:{newer}", "sync", "urgent", "Jarvis est à relancer", detail, "/sources"):  # clé déjà vue : rien
         log.warning(f"Jarvis est à relancer. {detail}")
+
+
+PUBLISHED_EVERY_S = 600  # git fetch toutes les 10 minutes : une nouvelle version publiée se voit sans git pull
+_published = running_code.Published()  # dernière version publiée vue (rien : à jour, ou pas encore regardé)
+_published_checked = time.monotonic() - PUBLISHED_EVERY_S  # premier regard au premier tour de la boucle de fond
+_boot = secrets.token_hex(4)  # change à chaque démarrage : la page qui attend le redémarrage sait quand recharger
+_updating = threading.Lock()  # un seul « Mettre à jour et redémarrer » à la fois
+
+
+def _labels(version: str, commit: str) -> tuple[str, str]:
+    """(nouvelle, en service) : les numéros de version (« v0.9.0 », « v0.8.1 ») s'ils diffèrent ; sinon les commits
+    (correction ajoutée à la version en cours, ou numéro illisible), faute de mieux."""
+    if version and _version_started and version != _version_started:
+        return f"v{version}", f"v{_version_started}"
+    return commit[:7], _code_started[:7]
+
+
+def _check_published() -> None:
+    """Toutes les 10 minutes : la branche suivie (main sur GitHub) a-t-elle du code que le dossier n'a pas ? Regardé à
+    part (git fetch, réseau), pour ne pas retarder la boucle de fond ; puis _look_published."""
+    global _published_checked
+    if time.monotonic() - _published_checked >= PUBLISHED_EVERY_S:
+        _published_checked = time.monotonic()
+        threading.Thread(target=_guarded, args=("Nouvelle version publiée", _look_published), name="jarvis-version",
+                         daemon=True).start()
+
+
+def _look_published() -> None:
+    """Bandeau « Nouvelle version disponible » sur toutes les pages et notification, une fois par commit publié."""
+    global _published
+    _published = found = running_code.published()
+    if found.error:
+        log.info(f"Nouvelle version de Jarvis : pas pu regarder ({found.error}).")
+    new, running = _labels(found.version, found.commit)
+    if found.commit and notifications.add(f"publiee:{found.commit}", "sync", "info", "Nouvelle version de Jarvis disponible",
+                                          f"La version {new} est publiée, c'est encore la {running} qui tourne : "
+                                          "« Mettre à jour et redémarrer » en haut de chaque page.", "/"):
+        log.info(f"Nouvelle version de Jarvis disponible : {new}.")
+
+
+def update_for() -> dict:
+    """Code de Jarvis, pour le bandeau du haut de page (base.html) et État des systèmes : à relancer après un git pull,
+    sinon nouvelle version publiée ; vide s'il est à jour."""
+    if _restart:
+        return {"kind": "restart", "new": _restart[0], "running": _restart[1]}
+    if _published.commit:
+        new, running = _labels(_published.version, _published.commit)
+        return {"kind": "published", "new": new, "running": running}
+    return {}
+
+
+def _sync_running() -> bool:
+    """Une synchro Notion tourne : routine Claude Code, ou rafraîchissement par l'API."""
+    return sync_routine.running or _refresh_lock.locked()
+
+
+def _restart_blockers() -> list[str]:
+    """Ce qu'un redémarrage couperait en route : refusé tant que ça tourne."""
+    out = []
+    if agents := sum(r.running and not r.simulated for r in claude.runs):
+        out.append(f"{agents} agent{'s' if agents > 1 else ''} Claude en cours")
+    if _sync_running():
+        out.append("une synchro Notion")
+    if client_directory.running:
+        out.append("la lecture de l'annuaire des clients")
+    return out
 
 
 SYNC_EVERY_MIN = 60  # réglage JARVIS_SYNC_EVERY_MIN (minutes ; 0 : jamais)
@@ -186,7 +250,7 @@ def auto_sync_note(d) -> str:
     ce client (ou des demandes BAU : bau.SPACE et bau.auto_sync()). Vide s'il ne l'a pas demandée, si rien n'est prévu,
     ou pendant qu'une synchro tourne (règle d'affichage : le bouton « Rafraîchir » porte alors l'avancement)."""
     on = bau.auto_sync() if d.slug == bau.KEY else d.auto_sync
-    if not on or sync_routine.running or _refresh_lock.locked():
+    if not on or _sync_running():
         return ""
     wanted, due = auto_sync_plan()
     if due is None or d.slug not in wanted:
@@ -233,6 +297,7 @@ def _push_round() -> None:
     _guarded("Synchro Notion automatique", _auto_sync)
     _guarded("Descriptions des demandes BAU", _bau_descriptions)
     _guarded("Rangement des agents", claude.tidy)  # une fois par jour : archives, journaux anciens, worktrees
+    _guarded("Nouvelle version publiée", _check_published)
 
 
 def _bau_descriptions() -> None:
@@ -316,7 +381,7 @@ templates.env.tests["drive"] = client_config.is_drive  # {% if l.url is drive %}
 templates.env.tests["notion"] = client_config.is_notion  # {% if l.url is notion %} : logo Notion dans le dock
 templates.env.globals["jarvis_version"] = _version_started  # pied de page ; historique dans CHANGELOG.md
 templates.env.globals["jarvis_commit"] = _code_started[:7]
-templates.env.globals["restart_for"] = lambda: _restart  # bandeau « Jarvis est à relancer » (base.html)
+templates.env.globals["update_for"] = update_for  # bandeau « à relancer » ou « nouvelle version » (base.html)
 templates.env.globals["ACTION_STATUSES"] = ACTION_STATUSES
 templates.env.globals["RETOUR_STATUSES"] = RETOUR_STATUSES
 templates.env.globals["console_commands"] = list(console.COMMANDS)  # complétion par Tab dans la console
@@ -1039,6 +1104,48 @@ def _from_jarvis(request: Request) -> bool:
     """Requête envoyée par une page de Jarvis (même origine) : un autre site ne peut pas déclencher un lancement."""
     origin = request.headers.get("origin") or request.headers.get("referer") or ""
     return bool(origin) and urlsplit(origin).netloc == request.headers.get("host", "")
+
+
+@app.post("/jarvis/mise-a-jour", response_class=HTMLResponse)
+def jarvis_update(request: Request):
+    """Bouton du bandeau : met le dossier à jour (avance rapide de la branche suivie, comme pour Flow Digger ; rien à
+    tirer après un git pull fait à la main), synchronise les dépendances, puis redémarre Jarvis. Refusé tant qu'un agent,
+    une synchro ou la lecture de l'annuaire tourne."""
+    global _published
+    if not _from_jarvis(request):
+        raise HTTPException(403, "Mise à jour refusée : la demande ne vient pas de Jarvis.")
+
+    def answer(error: str = ""):
+        return templates.TemplateResponse(request, "_update_result.html", {"error": error, "boot": _boot})
+
+    if blockers := _restart_blockers():
+        return answer(f"Pas maintenant : {', '.join(blockers)}, que le redémarrage couperait. Réessaie quand ce sera fini.")
+    if not _updating.acquire(blocking=False):
+        return answer("Une mise à jour est déjà en cours.")
+    try:
+        if running_code.restarting():
+            return answer()  # déjà demandé (autre onglet, second clic) : on attend le même redémarrage
+        if not _restart:  # sinon le code est déjà sur le disque (git pull fait à la main) : le redémarrage suffit
+            ok, moved = flow_digger.update(PROJECT_ROOT)  # avance rapide seulement : jamais de fusion ni de mise à jour forcée
+            if not ok:
+                return answer(f"Mise à jour impossible : {moved}.")
+            if moved:
+                log.info(f"Jarvis mis à jour depuis l'app : {moved}.")
+        if error := running_code.sync_dependencies(_code_started):
+            return answer(f"Code mis à jour, mais pas les dépendances ({error}) : Jarvis n'est pas redémarré.")
+        _published = running_code.Published()
+        if not running_code.reloads_itself():  # avec « uvicorn --reload », le surveillant relance déjà le serveur
+            log.warning("Redémarrage de Jarvis demandé depuis l'app.")
+            running_code.restart()
+        return answer()
+    finally:
+        _updating.release()
+
+
+@app.get("/jarvis/demarrage")
+def jarvis_boot():
+    """Identifiant de ce démarrage : la page qui attend le redémarrage recharge dès qu'il change."""
+    return {"boot": _boot}
 
 
 @app.get("/outils/flow-digger")

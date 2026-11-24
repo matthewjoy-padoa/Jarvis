@@ -27,7 +27,7 @@ Jarvis tourne en service systemd utilisateur sur la VM (les agents travaillent s
 5. **Secrets** : `AIRFLOW_USER`, `AIRFLOW_PASSWORD` et, si besoin, `NOTION_TOKEN` dans le `.env` du dossier de Jarvis, puis `systemctl --user restart jarvis`.
 6. **Ouvrir** : transfert du port 8765 (onglet Ports de VS Code ou `ssh -L 8765:localhost:8765 <vm>`), puis http://localhost:8765.
 
-Suivi : `systemctl --user status jarvis`, `journalctl --user -u jarvis -f`. Mise à jour : `git pull && uv sync && systemctl --user restart jarvis`. Après un `git pull` sans relance, Jarvis le dit lui-même en une minute : bandeau « Jarvis est à relancer » sur toutes les pages et notification (le code de l'app ou ses dépendances ont changé, le serveur tourne encore sur l'ancien commit).
+Suivi : `systemctl --user status jarvis`, `journalctl --user -u jarvis -f`. Mise à jour : `git pull && uv sync && systemctl --user restart jarvis`. Plus simple : le bandeau « Nouvelle version de Jarvis disponible » (vérifié toutes les dix minutes par `git fetch`) et son bouton **Mettre à jour et redémarrer** font tout cela depuis l'app ; le service garde son PID (le processus se relance lui-même). Après un `git pull` sans relance, Jarvis le dit lui-même en une minute : bandeau « Jarvis est à relancer » sur toutes les pages, avec un bouton **Redémarrer**, et notification (le code de l'app ou ses dépendances ont changé, le serveur tourne encore sur l'ancien commit).
 
 ## Bon à savoir
 

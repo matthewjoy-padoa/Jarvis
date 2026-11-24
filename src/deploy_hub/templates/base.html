@@ -27,7 +27,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=177">
+  <link rel="stylesheet" href="/static/style.css?v=178">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=11" defer></script>
   <script src="/static/dag.js?v=3" defer></script>
@@ -141,12 +141,22 @@
     })();
   </script>
   <main>
-  {# Mis à jour par « git pull » sans relance du serveur : l'ancien code tourne encore (sources/running_code.py).
-     « is defined » : ce gabarit est relu sur le disque avant la relance, par un processus qui peut ne pas connaître restart_for. #}
-  {% set restart = restart_for() if restart_for is defined else () %}{# (installée, en service) : « v0.3.0 », « v0.2.0 » #}
-  {% if restart %}
-  <section class="panel restart-note" role="alert">
-    <p><strong>Jarvis est à relancer.</strong> La version <code>{{ restart[0] }}</code> est installée, mais c'est encore la <code>{{ restart[1] }}</code> qui tourne : tant que le serveur n'est pas relancé, la mise à jour n'est pas appliquée et des pages peuvent s'afficher en erreur.</p>
+  {# Mis à jour par « git pull » sans relance du serveur : l'ancien code tourne encore ; ou nouvelle version publiée sur
+     GitHub, pas encore tirée (sources/running_code.py). « is defined » : ce gabarit est relu sur le disque avant la relance,
+     par un processus qui peut ne pas connaître update_for. #}
+  {% set update = update_for() if update_for is defined else {} %}
+  {% if update %}
+  <section class="panel restart-note{{ ' is-news' if update.kind == 'published' }}" role="{{ 'alert' if update.kind == 'restart' else 'status' }}">
+    {% if update.kind == 'restart' %}
+    <p><strong>Jarvis est à relancer.</strong> La version <code>{{ update.new }}</code> est installée, mais c'est encore la <code>{{ update.running }}</code> qui tourne : tant que le serveur n'est pas relancé, la mise à jour n'est pas appliquée et des pages peuvent s'afficher en erreur.</p>
+    {% else %}
+    <p><strong>Nouvelle version de Jarvis disponible.</strong> La version <code>{{ update.new }}</code> est publiée, c'est encore la <code>{{ update.running }}</code> qui tourne.</p>
+    {% endif %}
+    <form class="update-form" hx-post="/jarvis/mise-a-jour" hx-target="find .update-out" hx-swap="innerHTML" hx-disabled-elt="find button">
+      <button type="submit" class="secondary"><span class="btn-idle">{{ 'Redémarrer' if update.kind == 'restart' else 'Mettre à jour et redémarrer' }}</span><span class="btn-busy">Mise à jour…</span></button>
+      <span class="muted">Refusé tant qu'un agent, une synchro ou la lecture de l'annuaire tourne.</span>
+      <div class="update-out" aria-live="polite"></div>
+    </form>
   </section>
   {% endif %}
   {% block content %}{% endblock %}</main>
@@ -156,6 +166,18 @@
     document.querySelectorAll("form[data-own-window]").forEach((form) => form.addEventListener("submit", () => {
       const win = window.open("", form.target, "popup,width=1440,height=900");
       if (win) { win.opener = null; win.focus(); }  // la page ouverte ne peut pas piloter Jarvis
+    }));
+    // « Mettre à jour et redémarrer » : la page attend que Jarvis réponde de nouveau (identifiant de démarrage changé), puis
+    // se recharge sur la nouvelle version ; au bout de deux minutes, elle dit de regarder le terminal de Jarvis.
+    document.addEventListener("htmx:afterSwap", () => document.querySelectorAll("[data-wait-boot]:not([data-armed])").forEach((el) => {
+      el.dataset.armed = "1";
+      const started = Date.now(), old = el.dataset.waitBoot;
+      const poll = () => fetch("/jarvis/demarrage", {cache: "no-store"}).then((r) => r.ok ? r.json() : null).catch(() => null).then((r) => {
+        if (r && r.boot !== old) return location.reload();
+        if (Date.now() - started > 120000) { el.textContent = "Jarvis ne répond toujours pas : regarde son terminal."; return; }
+        setTimeout(poll, 1500);
+      });
+      setTimeout(poll, 1500);
     }));
     // Synchro réussie : le message reste visible quelques secondes, puis la page se recharge avec les données.
     document.addEventListener("htmx:afterSwap", () => document.querySelectorAll("[data-reload-after]:not([data-armed])").forEach((el) => {
