@@ -12,7 +12,9 @@
   <div>
     <h1>BAU <span class="muted">· demandes de l'équipe</span></h1>
     {% if board.configured %}<p class="muted last-sync">{% if board.checked_at %}Dernière synchro : {{ board.checked_at | quand }}{% else %}Jamais synchronisé{% endif %}
-      {% with d = space %}{% include "_auto_sync.html" %}{% endwith %}</p>{% endif %}
+      {% with d = space %}{% include "_auto_sync.html" %}{% endwith %}</p>
+    {% set dp = descriptions_progress %}{% if board.synced and dp.total and dp.lues < dp.total %}
+    <p class="muted last-sync" title="Les demandes sont chargées d'abord ; leurs descriptions (corps des pages Notion) se lisent ensuite en fond, par lots de 15, une demande ouverte s'ouvrant tout de suite si besoin.">Descriptions : {{ dp.lues }} / {{ dp.total }} demandes ouvertes{{ " · lecture en cours…" if dp.en_cours }}</p>{% endif %}{% endif %}
   </div>
   {% if board.configured %}
   <div class="refresh">

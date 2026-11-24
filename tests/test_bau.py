@@ -61,28 +61,10 @@ def view_answer(url: str, rows: list[dict]) -> None:
         f.write("".join(json.dumps(line) + "\n" for line in lines))
 
 
-def page_answer(url: str, text: str) -> None:
-    """Ce que Claude Code écrit dans son transcript quand le modèle lit une page entière (notion-fetch)."""
-    folder = sn.CLAUDE_PROJECTS / "projet"
-    folder.mkdir(parents=True, exist_ok=True)
-    stamp = (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat().replace("+00:00", "Z")
-    call = f"toolu_page_{abs(hash((url, stamp, text)))}"
-    lines = [{"type": "assistant", "timestamp": stamp, "message": {"content": [
-                {"type": "tool_use", "id": call, "name": "mcp__claude_ai_Notion__notion-fetch", "input": {"id": url}}]}},
-             {"type": "user", "timestamp": stamp, "message": {"content": [{"type": "tool_result", "tool_use_id": call, "content": text}]}}]
-    with (folder / f"{SESSION}.jsonl").open("a", encoding="utf-8") as f:
-        f.write("".join(json.dumps(line) + "\n" for line in lines))
-
-
-def page_text(body: str) -> str:
-    return json.dumps({"text": f"<page url=\"x\">\n<content>\n{body}\n</content>\n</page>"})
-
-
 def passage(root: Path, fingerprint: str, answers: dict[str, list[dict]] | None = None, only: str = "",
-            views: dict[str, list[dict]] | None = None, pages: dict[str, str] | None = None) -> dict:
+            views: dict[str, list[dict]] | None = None) -> dict:
     """Un passage des seules demandes : empreinte, puis les requêtes du plan, auxquelles Notion répond « answers »
-    ({nom du modèle de requête: lignes}), et les vues de squad, qui répondent « views » ({lien de la vue: lignes}). Les pages
-    des demandes à décrire répondent « pages » ({adresse: description}) ; une page absente de « pages » ne répond pas."""
+    ({nom du modèle de requête: lignes}), et les vues de squad, qui répondent « views » ({lien de la vue: lignes})."""
     asked = sn.first_queries(root, only)
     answer(asked["requetes"][0]["requete"], results([{"cle": bau.KEY, "demandes": fingerprint}]))
     out = sn.advance(root)
@@ -91,10 +73,6 @@ def passage(root: Path, fingerprint: str, answers: dict[str, list[dict]] | None 
         for q in out["requetes"]:
             if "vue" in q:
                 view_answer(q["vue"], (views or {}).get(q["vue"], []))
-                continue
-            if "page" in q:
-                if pages is None or q["page"] in pages:
-                    page_answer(q["page"], page_text((pages or {}).get(q["page"], f"Description de {q['page'][-4:]}")))
                 continue
             name = known[q["requete"].split("\nLIMIT ")[0]]
             rows = (answers or {}).get(name, []) if "OFFSET" not in q["requete"] else []
@@ -126,16 +104,16 @@ def test_queries_are_written_for_the_followed_page(root):
 # ------------------------------------------------------------------------------------------------------------ synchro
 def test_first_passage_reads_everything_then_only_what_changed(root):
     done = passage(root, "2|2027-03-02 10:00:00Z", {"bau": [row(1), row(2, responsables=json.dumps([f"user://{USER}"]))]})
-    assert done["compte_rendu"] == ["BAU : demandes complet · 0 changement(s) · 2 demandes", "BAU : 2 description(s) lue(s)"]
+    assert done["compte_rendu"] == ["BAU : demandes complet · 0 changement(s) · 2 demandes"]  # les descriptions : en fond, après
     assert done["utilisateurs"] == [USER]  # responsable sans nom : traduit par l'étape 4 de la routine
     assert len(bau.load(root).demandes) == 2 and bau.load(root).checked_at is not None
     assert not list(bau.folder(root).glob("demandes*.json"))  # réponses fusionnées : retirées
 
-    assert passage(root, "2|2027-03-02 10:00:00Z")["compte_rendu"] == ["BAU : inchangé"]  # descriptions à jour : aucune page lue
+    assert passage(root, "2|2027-03-02 10:00:00Z")["compte_rendu"] == ["BAU : inchangé"]
 
     changed = row(2, statut="En cours", modifie="2027-03-05 08:00:00Z")
     done = passage(root, "3|2027-03-05 08:00:00Z", {"bau-delta": [changed, row(3, modifie="2027-03-04 08:00:00Z")]})
-    assert done["compte_rendu"] == ["BAU : demandes delta · 2 changement(s) · 3 demandes", "BAU : 2 description(s) lue(s)"]  # 2 et 3
+    assert done["compte_rendu"] == ["BAU : demandes delta · 2 changement(s) · 3 demandes"]
     assert {x.title: x.status for x in bau.load(root).demandes} == {"Demande 1": "Pas commencé", "Demande 2": "En cours", "Demande 3": "Pas commencé"}
 
 
@@ -199,11 +177,8 @@ def test_requests_ride_along_with_clients_but_not_with_one_client(root):
     for q in mine[1:]:
         view_answer(q["vue"], [])
     run(root, {"requetes": [q for q in out["requetes"] if q not in mine]})
-    pages = sn.advance(root)["requetes"]  # puis la description de la demande, lue entière
-    assert [list(q) for q in pages] == [["page"]]
-    page_answer(pages[0]["page"], page_text("Texte"))
     done = sn.advance(root)
-    assert [line.split(" : ")[0] for line in done["compte_rendu"]] == ["demo", "BAU", "BAU"]
+    assert [line.split(" : ")[0] for line in done["compte_rendu"]] == ["demo", "BAU"]
 
     assert len(sn.first_queries(root, "demo")["requetes"]) == 1  # la fiche d'un client ne relit que lui
     state = json.loads((root / "data" / "notion" / sn.PASSAGE).read_text(encoding="utf-8"))
@@ -491,7 +466,7 @@ def fake_session(projects: Path, session: str, text: str, saved: bool = False, e
         file.parent.mkdir(parents=True, exist_ok=True)
         file.write_text(text, encoding="utf-8")
         text = f"Error: result (72,000 characters) exceeds maximum allowed tokens. Output has been saved to {file}.\nFormat: JSON"
-    lines = [{"message": {"content": [{"type": "tool_use", "id": "t1", "name": "mcp__claude_ai_Notion__notion-fetch", "input": {"id": "x"}}]}},
+    lines = [{"message": {"content": [{"type": "tool_use", "id": "t1", "name": "mcp__claude_ai_Notion__notion-fetch", "input": {"id": f"https://app.notion.com/p/{PAGE}"}}]}},
              {"message": {"content": [{"type": "tool_result", "tool_use_id": "t1", "is_error": error, "content": [{"type": "text", "text": text}]}]}}]
     (folder / f"{session}.jsonl").write_text("".join(json.dumps(l) + "\n" for l in lines), encoding="utf-8")
 
@@ -500,46 +475,54 @@ def fake_session(projects: Path, session: str, text: str, saved: bool = False, e
 def test_the_fetched_page_is_found_in_the_session_inline_or_saved_to_a_file(tmp_path, monkeypatch, saved):
     monkeypatch.setattr(bau_details, "_saved_text", lambda path: path.read_text(encoding="utf-8"))
     fake_session(tmp_path, "s1", FETCHED, saved=saved)
-    assert "<content>" in bau_details.fetched_in_session("s1", tmp_path)
+    assert "<content>" in bau_details.fetched_pages_in_session("s1", tmp_path)[PAGE]
     fake_session(tmp_path, "s2", "Notion : accès refusé", error=True)
-    assert bau_details.fetched_in_session("s2", tmp_path) is None and bau_details.fetched_in_session("absente", tmp_path) is None
+    assert bau_details.fetched_pages_in_session("s2", tmp_path) == {} == bau_details.fetched_pages_in_session("absente", tmp_path)
 
 
-def reader(tmp_path, monkeypatch, fetched: str | None = FETCHED) -> bau_details.DescriptionReader:
-    """Lecteur sans vrai Claude Code : la lecture « répond » aussitôt ce que Notion aurait renvoyé."""
+def reader(tmp_path, monkeypatch, fetched: str | None = FETCHED, answers=None) -> bau_details.DescriptionReader:
+    """Lecteur sans vrai Claude Code : chaque lecture « répond » aussitôt ce que Notion aurait renvoyé (fetched pour toute
+    page, ou answers {réf: réponse} ; une page absente d'answers ne répond pas). r.calls : les lots lus (leurs réf.)."""
     r = bau_details.DescriptionReader(folder=tmp_path / "descriptions", projects=tmp_path)
     monkeypatch.setattr(r, "problem", lambda: "")
     calls = []
 
-    def read(x):
-        calls.append(x.ref)
-        r._save(x, texte=bau_details.description_of(fetched)) if fetched else r._save(x, erreur="page non lue")
-    monkeypatch.setattr(r, "_read", read)
+    def fetch(todo):
+        calls.append([x.ref for x in todo])
+        pages = {sn._page_id(x.notion_url): (answers or {}).get(x.ref) if answers is not None else fetched for x in todo}
+        pages = {k: v for k, v in pages.items() if v}
+        return pages, "" if pages else "page non lue"
+    monkeypatch.setattr(r, "_fetch", fetch)
     r.calls = calls
     return r
 
 
-def wait(r, ref):
-    while r.reading(ref):
+def wait(r, ref=None):
+    while (r.reading(ref) if ref else False) or r.batch_running:
         pass
+
+
+def demande(n: int, **over) -> bau.Demande:
+    return bau.Demande(**{"ref": f"{n:08X}", "title": f"Demande {n}", "notion_url": f"https://app.notion.com/p/{n:032x}",
+                          "modified": f"2027-03-0{n % 9 + 1} 10:00:00Z", "status": "Pas commencé", **over})
 
 
 def test_a_description_is_read_once_then_again_when_the_request_changes_in_notion(tmp_path, monkeypatch):
     r = reader(tmp_path, monkeypatch)
-    x = bau.Demande(ref="ABCD1234", title="t", notion_url="https://app.notion.com/p/x", modified="2027-03-02 10:00:00Z")
+    x = demande(1)
     assert r.ensure(x) and (wait(r, x.ref) or True)
     assert "**deux notes**" in r.text(x) and r.is_fresh(x)
-    assert not r.ensure(x) and r.calls == ["ABCD1234"]  # à jour : pas relue
+    assert not r.ensure(x) and r.calls == [[x.ref]]  # à jour : pas relue
     x.modified = "2027-03-05 08:00:00Z"
     assert not r.is_fresh(x) and r.text(x)  # modifiée dans Notion : l'ancien texte reste affiché pendant la relecture
-    assert r.ensure(x) and (wait(r, x.ref) or True) and r.is_fresh(x) and r.calls == ["ABCD1234"] * 2
+    assert r.ensure(x) and (wait(r, x.ref) or True) and r.is_fresh(x) and r.calls == [[x.ref]] * 2
 
 
 def test_a_failed_read_keeps_the_previous_text_and_is_not_retried_in_a_loop(tmp_path, monkeypatch):
     r = reader(tmp_path, monkeypatch)
-    x = bau.Demande(ref="ABCD1234", title="t", notion_url="https://app.notion.com/p/x", modified="a")
+    x = demande(1, modified="a")
     r.ensure(x); wait(r, x.ref)
-    monkeypatch.setattr(r, "_read", lambda y: r._save(y, erreur="délai dépassé"))
+    monkeypatch.setattr(r, "_fetch", lambda todo: ({}, "délai dépassé"))
     x.modified = "b"
     r.ensure(x); wait(r, x.ref)
     assert r.saved(x.ref)["erreur"] == "délai dépassé" and "deux notes" in r.text(x) and r.is_fresh(x)
@@ -580,27 +563,38 @@ def test_a_page_without_description_says_so_and_the_brief_still_asks_for_one(boa
 
 
 
-def test_the_sync_reads_only_the_descriptions_of_open_requests_changed_since_their_last_reading(root, monkeypatch):
-    rows = [row(1), row(2), row(3, statut="Terminé")]
-    url = lambda n: f"https://app.notion.com/p/{n:032x}"
-    done = passage(root, "3|2027-03-02 10:00:00Z", {"bau": rows}, pages={url(1): "Relier <b>deux notes</b>."})
-    assert done["compte_rendu"][-1] == "BAU : 1 description(s) lue(s) sur 2"  # la page 2 n'a pas répondu ; la 3 est terminée
-    assert bau_details.saved(f"{1:08X}", root)["texte"] == "Relier **deux notes**."
-    assert not bau_details.saved(f"{2:08X}", root) and not list(bau_details.pages_dir(root).glob("*.json"))
-    done = passage(root, "3|2027-03-02 10:00:00Z", pages={url(2): "Autre"})  # rien n'a changé : seule la 2 reste à lire
-    assert done["compte_rendu"] == ["BAU : inchangé", "BAU : 1 description(s) lue(s)"]
-    changed = row(1, modifie="2027-03-09 08:00:00Z")
-    done = passage(root, "3|2027-03-09 08:00:00Z", {"bau-delta": [changed]}, pages={url(1): "Nouvelle version"})
-    assert done["compte_rendu"][-1] == "BAU : 1 description(s) lue(s)" and bau_details.saved(f"{1:08X}", root)["texte"] == "Nouvelle version"
+def test_descriptions_are_read_in_the_background_batch_after_batch_the_most_recent_first(tmp_path, monkeypatch):
+    monkeypatch.setattr(bau_details, "BATCH_SIZE", 2)
+    r = reader(tmp_path, monkeypatch)
+    demandes = [demande(n) for n in range(1, 6)] + [demande(6, status="Terminé")]
+    assert r.progress(demandes) == {"lues": 0, "total": 5, "en_cours": False}
+    while r.catch_up(demandes):  # ce que Jarvis fait chaque minute
+        wait(r)
+    assert r.calls == [[f"{5:08X}", f"{4:08X}"], [f"{3:08X}", f"{2:08X}"], [f"{1:08X}"]]  # lots de 2, les plus récentes d'abord
+    assert r.progress(demandes)["lues"] == 5 and not r.saved(f"{6:08X}")  # une demande terminée n'est pas lue
+    demandes[2].modified = "2027-03-09 12:00:00Z"  # modifiée dans Notion : seule elle est relue
+    assert r.catch_up(demandes) and (wait(r) or True) and r.calls[-1] == [demandes[2].ref] and not r.catch_up(demandes)
 
 
-def test_a_passage_reads_at_most_a_few_pages_the_most_recent_first(root, monkeypatch):
-    monkeypatch.setattr(bau_details, "PAGES_PER_PASSAGE", 2)
-    rows = [row(n, modifie=f"2027-03-0{n} 10:00:00Z") for n in range(1, 5)]
-    done = passage(root, "4|2027-03-04 10:00:00Z", {"bau": rows})
-    assert done["compte_rendu"][-1] == "BAU : 2 description(s) lue(s)"
-    assert sorted(p.stem for p in bau_details.descriptions_dir(root).glob("*.json")) == [f"{3:08X}", f"{4:08X}"]
+def test_a_batch_without_any_answer_waits_before_trying_again_and_a_missing_page_is_noted(tmp_path, monkeypatch):
+    r = reader(tmp_path, monkeypatch, answers={})
+    demandes = [demande(1), demande(2)]
+    assert r.catch_up(demandes) and (wait(r) or True)
+    assert not r.saved(demandes[0].ref) and not r.catch_up(demandes)  # rien de noté ; pas d'autre essai tout de suite
+    r._batch_failed -= bau_details.RETRY_AFTER
+    monkeypatch.setattr(r, "_fetch", lambda todo: ({sn._page_id(demandes[0].notion_url): FETCHED}, ""))
+    assert r.catch_up(demandes) and (wait(r) or True)
+    assert "deux notes" in r.text(demandes[0]) and r.saved(demandes[1].ref)["erreur"] == "page non lue"
+    assert not r.catch_up(demandes)  # notée : pas relue en boucle, seulement si elle change (ou sur « Réessayer »)
 
+
+def test_the_bau_page_tells_how_far_the_descriptions_are(board, monkeypatch, tmp_path):
+    r = reader(tmp_path, monkeypatch)
+    monkeypatch.setattr(main, "descriptions", r)
+    assert "Descriptions : 0 / 2 demandes ouvertes" in client.get("/bau").text
+    main._bau_descriptions()  # tour de fond de Jarvis
+    wait(r)
+    assert "Descriptions :" not in client.get("/bau").text  # toutes lues : plus rien à dire
 
 
 # ------------------------------------------------------------------------------------- synchro automatique des demandes

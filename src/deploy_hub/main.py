@@ -230,6 +230,14 @@ def _push_round() -> None:
     _guarded("Connexion de Claude Code", _check_claude_login)
     _guarded("Code à jour", _check_restart)
     _guarded("Synchro Notion automatique", _auto_sync)
+    _guarded("Descriptions des demandes BAU", _bau_descriptions)
+
+
+def _bau_descriptions() -> None:
+    """Descriptions des demandes BAU lues en fond, un lot par minute, une fois la synchro terminée (elle charge d'abord
+    les demandes) : jusqu'à ce que toutes les demandes ouvertes soient à jour, puis seulement celles qui changent."""
+    if bau.enabled() and not sync_routine.running and (board := bau.load()).synced:
+        descriptions.catch_up(board.demandes)
 
 
 async def _push_loop() -> None:
@@ -1456,7 +1464,8 @@ def bau_page(request: Request):
     squad = board.squad(_views(request, "bau", "squad")["squad"])
     demandes = squad[1] if squad else board.demandes
     columns = kanban_columns([(None, x) for x in demandes], bau.STATUSES) if view["vue"] == "kanban" else []
-    return _render(request, "bau.html", "/bau", board=board, demandes=demandes, space=_bau_space(), squad=squad[0] if squad else "",
+    return _render(request, "bau.html", "/bau", board=board, demandes=demandes, space=_bau_space(),
+                   descriptions_progress=descriptions.progress(board.demandes), squad=squad[0] if squad else "",
                    squads=[(bau.squad_slug(name), name) for name in board.squads], columns=columns,
                    fiche_of=_bau_fiches(request, board), bau_ready=sync_routine.problem() is None, setting=bau.SETTING,
                    pins=_bau_pins(), **view)

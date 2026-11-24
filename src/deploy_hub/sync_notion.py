@@ -549,7 +549,6 @@ def _notion_rows(text: str, name: str = "la réponse") -> list:
 # ------------------------------------------------------------------------------------------------------------------
 # Passage piloté par « suite » : Python donne les requêtes, le modèle les exécute, Python récolte les réponses.
 NOTION_QUERY = "notion-query-data-sources"  # fin du nom de l'outil du connecteur (mcp__claude_ai_Notion__…)
-NOTION_FETCH = "notion-fetch"  # lecture d'une page entière (description d'une demande BAU)
 SAVED_TO = re.compile(r"Output has been saved to (\S+?\.(?:txt|json))")  # avis de Claude Code quand il range une grosse réponse
 MAX_ASKS = 3  # « suite » redemande une requête restée sans réponse ; à la troisième fois, le passage s'arrête
 NEXT = "uv run python -m deploy_hub.sync_notion suite"
@@ -586,20 +585,6 @@ def expected_view(client: str, url: str, out: Path) -> dict:
             "sql": "", "sortie": str(out), "vue": url}
 
 
-PAGE_PREFIX = "page:"  # « requete » d'une page Notion lue entière (notion-fetch) : son id, ainsi préfixé
-
-
-def page_key(url: str) -> tuple:
-    """Ce qui identifie la lecture d'une page (notion-fetch) : son id, quelle que soit la forme de l'adresse donnée."""
-    return _sql_key(PAGE_PREFIX + (_page_id(url) or url.strip()), [])
-
-
-def expected_page(client: str, url: str, out: Path) -> dict:
-    """Page Notion à lire entière (notion-fetch) : pour la description d'une demande BAU, que les requêtes ne voient pas."""
-    return {"client": client, "nom": out.stem, "page": 1, "requete": PAGE_PREFIX + (_page_id(url) or url), "params": [],
-            "sources": [], "sql": "", "sortie": str(out), "lecture": url}
-
-
 def _expected(client: str | None, query: dict, page: int = 1) -> dict:
     """Requête attendue par « suite » : son texte exact, et où ranger sa réponse. Les pages suivantes reprennent la requête
     avec « LIMIT 100 OFFSET n » et vont dans <nom>-2.json, <nom>-3.json… (voir _rows)."""
@@ -628,16 +613,13 @@ def _transcripts(since: datetime, session: str = "") -> list[Path]:
     return [p for p in CLAUDE_PROJECTS.glob("*/*.jsonl") if p.stat().st_mtime >= since.timestamp()]
 
 
-def _answer(content, page: bool = False) -> str | None:
+def _answer(content) -> str | None:
     """Texte brut d'une réponse Notion valable, rendue en ligne ou rangée dans un fichier par Claude Code (grosse réponse) ;
-    None pour tout le reste (erreur Notion, délai dépassé, fichier disparu) : la requête sera redemandée.
-    page : réponse de notion-fetch (une page lue entière), valable si elle contient la page."""
+    None pour tout le reste (erreur Notion, délai dépassé, fichier disparu) : la requête sera redemandée."""
     text = content if isinstance(content, str) else "".join(p.get("text", "") for p in content or [] if isinstance(p, dict))
     try:
         if not text.lstrip().startswith("{") and (m := SAVED_TO.search(text[:2000])):
             text = _saved_text(Path(m[1]))
-        if page:
-            return text if "<page" in text else None
         _notion_rows(text)
     except (SyncError, OSError):
         return None
@@ -667,25 +649,20 @@ def notion_answers(since: datetime, session: str = "") -> dict[tuple, str]:
             for part in content:
                 if not isinstance(part, dict):
                     continue
-                name = str(part.get("name", ""))
-                if part.get("type") == "tool_use" and name.endswith(NOTION_QUERY):
+                if part.get("type") == "tool_use" and str(part.get("name", "")).endswith(NOTION_QUERY):
                     data = part.get("input") or {}
                     data = data.get("data") if isinstance(data.get("data"), dict) else data
                     asked[part.get("id")] = (view_key(data["view_url"]) if data.get("mode") == "view" and data.get("view_url")
-                                             else _sql_key(data.get("query", ""), data.get("params")), False)
-                elif part.get("type") == "tool_use" and name.endswith(NOTION_FETCH) and (part.get("input") or {}).get("id"):
-                    asked[part.get("id")] = (page_key(str(part["input"]["id"])), True)
+                                             else _sql_key(data.get("query", ""), data.get("params")))
                 elif part.get("type") == "tool_result" and part.get("tool_use_id") in asked:
-                    key, page = asked[part["tool_use_id"]]
-                    if (text := _answer(part.get("content"), page)) is not None:
-                        answers[key] = text
+                    if (text := _answer(part.get("content"))) is not None:
+                        answers[asked[part["tool_use_id"]]] = text
     return answers
 
 
 def _shown(q: dict, lost: bool = False) -> dict:
-    if q.get("vue") or q.get("lecture"):
-        shown = {"vue": q["vue"]} if q.get("vue") else {"page": q["lecture"]}
-        return {**shown, **({"sortie": q["sortie"]} if lost else {})}
+    if q.get("vue"):
+        return {"vue": q["vue"], **({"sortie": q["sortie"]} if lost else {})}
     return {"requete": q["requete"], "sources": q["sources"], **({"params": q["params"]} if q["params"] else {}),
             **({"sortie": q["sortie"]} if lost else {})}
 
@@ -752,7 +729,7 @@ def _next_pages(state: dict) -> list[dict]:
             last[key] = q
     more = []
     for q in last.values():
-        if q.get("vue") or q.get("lecture"):  # une vue se lit en une page, une page Notion d'un coup : pas de suite par OFFSET
+        if q.get("vue"):  # une vue se lit en une page : pas de suite par OFFSET
             continue
         rows = _notion_rows(Path(q["sortie"]).read_text(encoding="utf-8"), Path(q["sortie"]).name)
         if len(rows) >= PAGE_SIZE and q["page"] < MAX_PAGES:
@@ -808,9 +785,7 @@ def advance(root: Path = PROJECT_ROOT) -> dict:
     if not state or state.get("etape") == "fini":
         raise SyncError("Aucun passage en cours : lance d'abord « preparer »")
     slugs = _followed(root, state["clients"])  # un client archivé en cours de passage n'est plus traité
-    if (missing := _collect(state)) and state["etape"] == "pages" and state["demandes"] >= 1:
-        missing = []  # descriptions : une seule relance ; une page restée sans réponse sera lue à l'ouverture de sa demande
-    if missing:
+    if (missing := _collect(state)):
         state["demandes"] += 1
         write_json(path, state)
         if state["demandes"] >= MAX_ASKS:
@@ -832,45 +807,14 @@ def advance(root: Path = PROJECT_ROOT) -> dict:
     if batch:
         write_json(path, state)
         return _ask(batch)
-    if state["etape"] == "pages":  # descriptions reçues (ou abandonnées) : rangées, puis fin du passage
-        return _finish(state, path, root, state["compte_rendu"] + _bau_descriptions(state, root))
     plan_errors = _load_json(data_dir(root) / "notion" / PLAN_ERRORS, {})  # écrites par plan_all
     merged = merge_all(root, slugs)
     errors = {**plan_errors, **{slug: f"fusion : {r['erreur']}" for slug, r in merged.items() if "erreur" in r}}
     bau_line = _bau_merged(state, root, errors)
     write_json(data_dir(root) / "notion" / PLAN_ERRORS, errors)  # Jarvis les affiche, quel que soit le compte rendu du modèle
-    report = _report(slugs, plan_errors, merged) + bau_line
-    if (pages := _bau_pages(state, root, bau_line)):  # demandes fusionnées : leurs descriptions à relire, puis la fin
-        state.update(etape="pages", attendues=pages, compte_rendu=report, demandes=0)
-        batch = _hand(state)
-        write_json(path, state)
-        return _ask(batch)
-    return _finish(state, path, root, report)
-
-
-def _finish(state: dict, path: Path, root: Path, report: list[str]) -> dict:
     state.update(etape="fini", attendues=[])
     write_json(path, state)
-    return {"termine": True, "compte_rendu": report, "utilisateurs": unknown_users(root)}
-
-
-def _bau_pages(state: dict, root: Path, bau_line: list[str]) -> list[dict]:
-    """Pages des demandes BAU dont la description est à relire (modifiées depuis leur dernière lecture), si les demandes
-    sont du passage et ont été fusionnées ; les plus récemment modifiées d'abord, bau_details.PAGES_PER_PASSAGE au plus."""
-    if not bau_line or bau_line[0].startswith("ÉCHEC"):
-        return []
-    from deploy_hub.sources import bau_details
-    stale = bau_details.stale(root)
-    state["pages_modifie"] = {x.ref: x.modified for x in stale}
-    return [expected_page("_bau", x.notion_url, bau_details.pages_dir(root) / f"{x.ref}.json") for x in stale]
-
-
-def _bau_descriptions(state: dict, root: Path) -> list[str]:
-    """Range les descriptions reçues ; leur ligne de compte rendu (des comptes)."""
-    from deploy_hub.sources import bau_details
-    read = bau_details.store_pages(state.get("pages_modifie") or {}, root)
-    asked = len(state.get("pages_modifie") or {})
-    return [f"BAU : {read} description(s) lue(s)" + (f" sur {asked}" if read < asked else "")]
+    return {"termine": True, "compte_rendu": _report(slugs, plan_errors, merged) + bau_line, "utilisateurs": unknown_users(root)}
 
 
 BAU_ERRORS = (SyncError, ConfigError, OSError, KeyError, ValueError)  # un échec des demandes BAU n'arrête pas les clients
