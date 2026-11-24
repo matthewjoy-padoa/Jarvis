@@ -473,9 +473,10 @@ def demande_prompt(x: Demande, description: str = "", branch: str = "") -> str:
     if x.due:
         context.append(f"Échéance : {x.due.strftime('%d/%m/%Y')}")
     if x.notion_url:
-        context.append(f"Page Notion de la demande (tu n'y as pas accès : son détail est recopié ci-dessous) : {x.notion_url}")
-    detail = description.strip() or (f"{TO_FILL} : Jarvis ne lit pas le corps de la page Notion. Colle ici le détail de la demande "
-                                     "(ce qui est demandé, l'attendu, un exemple ou un cas), puis retire cette consigne.")
+        context.append(f"Page Notion de la demande (tu n'y as pas accès : sa description est recopiée ci-dessous) : {x.notion_url}")
+    detail = description.strip() or (f"{TO_FILL} : la page Notion de cette demande n'a pas de description, ou Jarvis ne l'a pas encore "
+                                     "lue. Colle ici le détail de la demande (ce qui est demandé, l'attendu, un exemple ou un cas), "
+                                     "puis retire cette consigne.")
     parts = [
         "Tu traites une demande BAU de l'équipe intégration de Padoa (correctif ou évolution sur la reprise de données d'un client), "
         "dans le dépôt integration-orchestrator. Lis tout le brief avant d'agir.",

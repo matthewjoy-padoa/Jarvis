@@ -31,9 +31,9 @@
     </dl>
   </section>
 
-  <section class="ticket-section">
-    <h3>Détail</h3>
-    <p class="muted">Le détail d'une demande est écrit dans sa page Notion, que la synchro ne lit pas{% if x.notion_url %} : <a href="{{ x.notion_url }}" target="_blank" rel="noopener">ouvre-la dans Notion ↗</a>{% endif %}.</p>
+  <section class="ticket-section" hx-get="/bau/demande/{{ x.ref }}/description" hx-trigger="load" hx-swap="outerHTML">
+    <h3>Description</h3>
+    <p class="muted">Jarvis lit la page Notion de la demande…</p>
   </section>
 
   <section class="ticket-section">

@@ -438,3 +438,117 @@ def test_a_hand_broken_links_file_shows_no_link_instead_of_an_error(tmp_path):
     assert bau.load_links(tmp_path).all == []
     (tmp_path / "config" / bau.LINKS_FILE).write_text("autres:\n  - {label: Ok, url: 'https://ok.test'}\n  - {label: Non, url: 'javascript:alert(1)'}\n", encoding="utf-8")
     assert bau.load_links(tmp_path).all == [{"label": "Ok", "url": "https://ok.test"}]
+
+
+# ------------------------------------------------------------------------------------- description (corps de la page)
+from deploy_hub.sources import bau_details  # noqa: E402
+
+FETCHED = json.dumps({"metadata": {"type": "page"}, "text": (
+    '<page url="https://app.notion.com/p/x">\n<properties>{"Nom":"Demande"}</properties>\n<content>\n'
+    '<h2 color="red_bg">\nDétails de l’action\n</h2>\n\n# À quoi ça sert\n\nRelier <b>deux notes</b> avec <code>note_relation</code>.'
+    '\n\n- <b>Pas de </b><b><code>source_id</code></b> : rien.\n<p />\n<image source="notion-file-block://a" />\n'
+    '<span color="gray">gris</span> <mention-user url="user://u"/>\n</content>\n</page>')})
+
+
+def test_the_page_body_becomes_plain_markdown_without_any_tag():
+    text = bau_details.description_of(FETCHED)
+    assert text.startswith("### Détails de l’action") and "# À quoi ça sert" in text
+    assert "**deux notes**" in text and "`note_relation`" in text and "**Pas de `source_id`**" in text
+    assert "*(image : voir la page Notion)*" in text and "gris" in text and "<" not in text
+    assert bau_details.description_of(json.dumps({"text": "<page><properties/></page>"})) == ""
+
+
+def fake_session(projects: Path, session: str, text: str, saved: bool = False, error: bool = False) -> None:
+    folder = projects / "projet"
+    folder.mkdir(parents=True, exist_ok=True)
+    if saved:
+        file = folder / session / "tool-results" / "mcp-claude_ai_Notion-notion-fetch-1.txt"
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text(text, encoding="utf-8")
+        text = f"Error: result (72,000 characters) exceeds maximum allowed tokens. Output has been saved to {file}.\nFormat: JSON"
+    lines = [{"message": {"content": [{"type": "tool_use", "id": "t1", "name": "mcp__claude_ai_Notion__notion-fetch", "input": {"id": "x"}}]}},
+             {"message": {"content": [{"type": "tool_result", "tool_use_id": "t1", "is_error": error, "content": [{"type": "text", "text": text}]}]}}]
+    (folder / f"{session}.jsonl").write_text("".join(json.dumps(l) + "\n" for l in lines), encoding="utf-8")
+
+
+@pytest.mark.parametrize("saved", [False, True])
+def test_the_fetched_page_is_found_in_the_session_inline_or_saved_to_a_file(tmp_path, monkeypatch, saved):
+    monkeypatch.setattr(bau_details, "_saved_text", lambda path: path.read_text(encoding="utf-8"))
+    fake_session(tmp_path, "s1", FETCHED, saved=saved)
+    assert "<content>" in bau_details.fetched_in_session("s1", tmp_path)
+    fake_session(tmp_path, "s2", "Notion : accès refusé", error=True)
+    assert bau_details.fetched_in_session("s2", tmp_path) is None and bau_details.fetched_in_session("absente", tmp_path) is None
+
+
+def reader(tmp_path, monkeypatch, fetched: str | None = FETCHED) -> bau_details.DescriptionReader:
+    """Lecteur sans vrai Claude Code : la lecture « répond » aussitôt ce que Notion aurait renvoyé."""
+    r = bau_details.DescriptionReader(folder=tmp_path / "descriptions", projects=tmp_path)
+    monkeypatch.setattr(r, "problem", lambda: "")
+    calls = []
+
+    def read(x):
+        calls.append(x.ref)
+        r._save(x, texte=bau_details.description_of(fetched)) if fetched else r._save(x, erreur="page non lue")
+    monkeypatch.setattr(r, "_read", read)
+    r.calls = calls
+    return r
+
+
+def wait(r, ref):
+    while r.reading(ref):
+        pass
+
+
+def test_a_description_is_read_once_then_again_when_the_request_changes_in_notion(tmp_path, monkeypatch):
+    r = reader(tmp_path, monkeypatch)
+    x = bau.Demande(ref="ABCD1234", title="t", notion_url="https://app.notion.com/p/x", modified="2027-03-02 10:00:00Z")
+    assert r.ensure(x) and (wait(r, x.ref) or True)
+    assert "**deux notes**" in r.text(x) and r.is_fresh(x)
+    assert not r.ensure(x) and r.calls == ["ABCD1234"]  # à jour : pas relue
+    x.modified = "2027-03-05 08:00:00Z"
+    assert not r.is_fresh(x) and r.text(x)  # modifiée dans Notion : l'ancien texte reste affiché pendant la relecture
+    assert r.ensure(x) and (wait(r, x.ref) or True) and r.is_fresh(x) and r.calls == ["ABCD1234"] * 2
+
+
+def test_a_failed_read_keeps_the_previous_text_and_is_not_retried_in_a_loop(tmp_path, monkeypatch):
+    r = reader(tmp_path, monkeypatch)
+    x = bau.Demande(ref="ABCD1234", title="t", notion_url="https://app.notion.com/p/x", modified="a")
+    r.ensure(x); wait(r, x.ref)
+    monkeypatch.setattr(r, "_read", lambda y: r._save(y, erreur="délai dépassé"))
+    x.modified = "b"
+    r.ensure(x); wait(r, x.ref)
+    assert r.saved(x.ref)["erreur"] == "délai dépassé" and "deux notes" in r.text(x) and r.is_fresh(x)
+    assert not r.ensure(x) and r.ensure(x, again=True)  # « Réessayer » relance
+
+
+def test_the_panel_shows_the_description_and_the_agent_brief_starts_from_it(board, monkeypatch, tmp_path):
+    r = reader(tmp_path, monkeypatch)
+    monkeypatch.setattr(main, "descriptions", r)
+    x = board.demandes[0]
+    panel = client.get(f"/bau/demande/{x.ref}", headers={"HX-Request": "true"}).text
+    assert f'hx-get="/bau/demande/{x.ref}/description"' in panel
+    client.get(f"/bau/demande/{x.ref}/description"); wait(r, x.ref)
+    shown = client.get(f"/bau/demande/{x.ref}/description").text
+    assert "<strong>deux notes</strong>" in shown and "every 3s" not in shown and "Relire dans Notion" in shown
+    form = client.get(f"/bau/demande/{x.ref}/brief").text
+    assert "**deux notes**" in form and TO_FILL not in form
+    started = client.post(f"/bau/demande/{x.ref}/agent", data={"description": ""})
+    assert "lancé sur demande" in started.text and "**deux notes**" in main.claude.runs[0].prompt
+
+
+def test_while_the_page_is_read_the_block_asks_again_and_says_so(board, monkeypatch, tmp_path):
+    r = reader(tmp_path, monkeypatch)
+    monkeypatch.setattr(r, "ensure", lambda x, again=False: True)
+    monkeypatch.setattr(r, "reading", lambda ref: True)
+    monkeypatch.setattr(main, "descriptions", r)
+    shown = client.get(f"/bau/demande/{board.demandes[0].ref}/description").text
+    assert "every 3s" in shown and "Jarvis lit la page Notion" in shown
+
+
+def test_a_page_without_description_says_so_and_the_brief_still_asks_for_one(board, monkeypatch, tmp_path):
+    r = reader(tmp_path, monkeypatch, fetched=json.dumps({"text": "<page><content>\n</content></page>"}))
+    monkeypatch.setattr(main, "descriptions", r)
+    x = board.demandes[1]
+    client.get(f"/bau/demande/{x.ref}/description"); wait(r, x.ref)
+    assert "n'a pas de description" in client.get(f"/bau/demande/{x.ref}/description").text
+    assert TO_FILL in client.get(f"/bau/demande/{x.ref}/brief").text

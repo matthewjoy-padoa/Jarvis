@@ -34,6 +34,7 @@ from deploy_hub.sources.dag_board import board
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_source import DagSource
 from deploy_hub.sources.dag_watch import DagWatcher
+from deploy_hub.sources.bau_details import DescriptionReader
 from deploy_hub.sources.client_directory import ClientDirectory, form_of, name_key
 from deploy_hub.sources.sync_routine import SyncRoutine
 from deploy_hub.sources import connections, flow_digger, notion_api, running_code
@@ -58,6 +59,7 @@ claude = ClaudeRunner.from_env(settings.orchestrator_dir, notifications, data_di
 # Synchro Notion sans jeton : le bouton « Rafraîchir depuis Notion » fait suivre sync/routine.md à Claude Code (claude -p).
 sync_routine = SyncRoutine(notifications)
 client_directory = ClientDirectory()
+descriptions = DescriptionReader()  # description d'une demande BAU (corps de sa page Notion), lue à son ouverture
 pulls = PullRequests(settings.orchestrator_dir)  # PR ouvertes de l'orchestrator (gh), gardées cinq minutes
 # Suivi des runs lancés (air.py d'Arthur) ; les suivis en cours au démarrage reprennent si Airflow est configuré.
 dag_watch = DagWatcher(data_dir() / "airflow", notifications, airflow.air_env())
@@ -1498,12 +1500,24 @@ async def bau_links_save(request: Request):
     return RedirectResponse(vers, status_code=303)
 
 
+@app.get("/bau/demande/{ref}/description", response_class=HTMLResponse)
+def bau_description(request: Request, ref: str, relire: bool = False):
+    """Description de la demande (corps de sa page Notion) : celle gardée si elle est à jour, sinon Jarvis la fait lire
+    et la page redemande toutes les 3 secondes jusqu'à ce qu'elle arrive. relire : relit même si elle est à jour."""
+    x = _demande(ref)
+    descriptions.ensure(x, again=relire)
+    return templates.TemplateResponse(request, "_demande_description.html", {
+        "x": x, "saved": descriptions.saved(x.ref), "fresh": descriptions.is_fresh(x), "reading": descriptions.reading(x.ref),
+        "problem": descriptions.problem()})
+
+
 @app.get("/bau/demande/{ref}/brief", response_class=HTMLResponse)
 def bau_agent_brief(request: Request, ref: str):
-    """Formulaire de l'agent sur une demande, brief pré-rempli : chargé à l'ouverture du bloc, comme pour un retour."""
+    """Formulaire de l'agent sur une demande, brief pré-rempli (avec sa description si Jarvis l'a lue) : chargé à
+    l'ouverture du bloc, comme pour un retour."""
     x = _demande(ref)
     branch = claude.demande_branch(x)
-    return _agent_form(request, demande_prompt(x, branch=branch), branch, f"agent-bau-{x.ref}", f"/bau/demande/{x.ref}/agent",
+    return _agent_form(request, demande_prompt(x, descriptions.text(x), branch=branch), branch, f"agent-bau-{x.ref}", f"/bau/demande/{x.ref}/agent",
                        f"la demande {x.ref}", "cette demande")
 
 
@@ -1512,6 +1526,7 @@ def launch_agent_on_demande(request: Request, ref: str, description: str = Form(
     x = _demande(ref)
     if not x.is_open:
         return _result(request, ActionResult(False, f"Demande {x.ref} déjà close ({x.status})", simulated=False))
+    description = description.strip() or descriptions.text(x)
     if TO_FILL in (prompt.strip() or demande_prompt(x, description)):
         return _result(request, ActionResult(False, f"Le brief contient encore « {TO_FILL} » : colle le détail de la demande avant de lancer.", simulated=False))
     return _result(request, claude.launch_demande(x, description, prompt))

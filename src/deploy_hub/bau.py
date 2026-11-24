@@ -7,8 +7,8 @@ exemple « BAU équipe intégration - TECHNIQUE »). Les demandes suivent le pas
 - cache-demandes.json : les demandes, que la page « BAU » lit telles quelles ;
 - etat-synchro.json : page et colonnes du cache, jour de la dernière lecture complète.
 
-Lecture seule : rien n'est écrit dans Notion. Le corps des pages (le détail d'une demande) n'est pas lu : la synchro ne
-connaît que les propriétés de la base.
+Lecture seule : rien n'est écrit dans Notion. Le corps des pages (la description d'une demande) n'est pas lu par la
+synchro, qui ne connaît que les colonnes de la base : il est lu à part, à l'ouverture d'une demande (sources/bau_details.py).
 """
 
 import hashlib
@@ -71,6 +71,7 @@ class Demande:
     clients: list[str] = field(default_factory=list)  # « Client lié à l'action » : noms de domaine Padoa
     resources: list[str] = field(default_factory=list)  # « Resources » : noms orchestrator
     notion_url: str = ""
+    modified: str = ""  # « Dernière modif » telle que Notion la donne : une description lue avant est à relire
 
     @property
     def group(self) -> str:
@@ -396,6 +397,7 @@ def _demande(row: dict, users: dict[str, str]) -> Demande:
         clients=_list(row.get("clients")),
         resources=_list(row.get("ressources")),
         notion_url=notion_link(row["url"]),
+        modified=str(row.get("modifie") or ""),
     )
 
 
