@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Jarvis{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=4">
+  {# Jarvis installé comme application (Chrome : « Installer la page en tant qu'application ») : ses notifications portent alors
+     son logo à la place de celui de Chrome. Les icônes PNG reprennent le dessin de favicon.svg. #}
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="apple-touch-icon" href="/static/jarvis-192.png">
   <meta name="theme-color" content="#001235">
   <script>
     // Thème retenu dans le navigateur ("" ou rien : Auto, suit le Mac). À partir du 1er décembre 2026 (heure du navigateur), Noël
