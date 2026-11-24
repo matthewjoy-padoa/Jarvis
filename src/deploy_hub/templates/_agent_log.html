@@ -31,7 +31,7 @@
   <form class="toolbar" hx-post="/agents/{{ run.id }}/relancer" hx-target="#relaunch-out-{{ run.id }}" hx-disabled-elt="find button"
         hx-confirm="Relancer l'agent #{{ run.id }} avec le même brief, sur la branche {{ run.branch }} ?">
     <button type="submit">Relancer l'agent</button>
-    <span class="muted">Même brief, même branche : il reprend le worktree là où celui-ci s'est arrêté.</span>
+    <span class="muted">Même brief, même branche : l'agent repart sur cette fiche et reprend le worktree là où il s'est arrêté.</span>
     <div id="relaunch-out-{{ run.id }}"></div>
   </form>
   {% elif relaunch %}<p class="muted">Relancé dans <a href="/agents/{{ relaunch.id }}">l'agent #{{ relaunch.id }}</a>.</p>{% endif %}
@@ -64,7 +64,7 @@
       {% endfor %}
       <label for="reponse-{{ run.id }}">Autre précision (facultatif)</label>
       <textarea id="reponse-{{ run.id }}" name="reponse" rows="2"></textarea>
-      <p class="muted">Un nouvel agent repart sur la branche <code>{{ run.branch }}</code>. S'il retrouve le même worktree, il reprend la session de celui-ci et garde ce qu'il a déjà lu ; sinon il repart du brief, avec ce compte rendu et ta réponse.</p>
+      <p class="muted">L'agent repart sur cette fiche et la branche <code>{{ run.branch }}</code>. S'il retrouve son worktree, il reprend sa session et garde ce qu'il a déjà lu ; sinon il repart du brief, avec ce compte rendu et ta réponse.</p>
       <button type="submit">Répondre et relancer</button>
       <div id="reply-out-{{ run.id }}"></div>
     </form>
@@ -73,6 +73,20 @@
   {% elif run.summary %}<section class="panel"><h2>Compte rendu</h2><div class="md">{{ run.report | md }}</div>
     {% if follow_up %}<p class="muted">Réponse envoyée : suite dans <a href="/agents/{{ follow_up.id }}">l'agent #{{ follow_up.id }}</a>.</p>{% endif %}
   </section>{% endif %}
+  {% if run.passages %}
+  <details class="panel agent-passages"><summary>{{ run.passages | length + 1 }} passages sur cette fiche</summary>
+    <ol>
+      {% for p in run.passages %}
+      <li><span class="badge g-{{ p.status | agent_group }}">{{ p.status }}</span>
+        <span class="muted">{{ p.started_at.strftime("%d/%m %H:%M") }}{% if p.ended_at %} · {{ (p.ended_at - p.started_at) | duree }}{% endif %}</span>
+        · puis {{ "ta réponse" if p.next == "réponse" else "relancé" }}
+        {% if p.summary %}<details><summary>Compte rendu de ce passage</summary><div class="md">{{ p.summary | agent_report | md }}</div></details>{% endif %}
+        {% if p.answer %}<details><summary>Ta réponse</summary><div class="md">{{ p.answer | md }}</div></details>{% endif %}</li>
+      {% endfor %}
+      <li><span class="badge g-{{ run.group }}">{{ run.status }}</span> <span class="muted">passage en cours ou dernier</span></li>
+    </ol>
+  </details>
+  {% endif %}
   {% if review %}
   <section class="panel review" id="relecture">
     <h2>Relecture guidée</h2>

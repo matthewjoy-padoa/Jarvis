@@ -28,8 +28,8 @@ from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
 from deploy_hub.rendu import md, md_inline
-from deploy_hub.sources.claude_runner import (TO_FILL, WAITING, ClaudeRunner, agent_questions, answer_text, chosen_answer,
-                                              duration_text, read_log, retour_prompt, tokens_text, usage)
+from deploy_hub.sources.claude_runner import (AGENT_STATUSES, TO_FILL, WAITING, ClaudeRunner, agent_questions, answer_text, chosen_answer,
+                                              duration_text, read_log, report_of, retour_prompt, tokens_text, usage)
 from deploy_hub.sources.dag_board import board
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_source import DagSource
@@ -262,6 +262,8 @@ def settings_links(text) -> Markup:
 
 templates.env.filters["reglages"] = settings_links
 templates.env.filters["duree"] = duration_text
+templates.env.filters["agent_group"] = lambda status: status_group(status, AGENT_STATUSES)  # passages d'un agent
+templates.env.filters["agent_report"] = report_of  # compte rendu sans le bloc de questions en JSON
 templates.env.filters["tokens"] = tokens_text
 
 
@@ -861,32 +863,32 @@ def agent_journal(request: Request, run_id: int):
     return templates.TemplateResponse(request, "_agent_log.html", _agent_context(run))
 
 
-def _open_new_agent(request: Request, result: ActionResult, new_agent) -> HTMLResponse:
-    """Refus affiché sous le bouton ; sinon la page du nouvel agent s'ouvre."""
+def _open_agent(request: Request, result: ActionResult) -> HTMLResponse:
+    """Refus affiché sous le bouton ; sinon la page de l'agent qui repart s'ouvre (la même fiche, ou une nouvelle pour un ancien agent)."""
     if not result.ok:
         return _result(request, result)
-    return HTMLResponse("", headers={"HX-Redirect": f"/agents/{new_agent().id}"})
+    return HTMLResponse("", headers={"HX-Redirect": f"/agents/{result.run_id}"})
 
 
 @app.post("/agents/{run_id}/repondre")
 async def agent_reply(request: Request, run_id: int):
     """« Répondre et relancer » : par question, l'option cochée (choix_1…) et une réponse libre (reponse_1…), plus une précision
     libre (reponse), assemblées
-    question par question ; elles partent à un nouvel agent sur la même branche, ouvert dès son lancement."""
+    question par question ; l'agent repart avec elles, sur la même fiche et la même branche."""
     run = _run_or_404(run_id)
     form = await request.form()
     _, questions = agent_questions(run.summary)
     answers = [chosen_answer(q, str(form.get(f"choix_{i}", "")), str(form.get(f"reponse_{i}", ""))) for i, q in enumerate(questions, 1)]
     answer = answer_text(questions, answers, str(form.get("reponse", "")))
     result = await asyncio.to_thread(claude.reply, run_id, answer)  # git (vérifs, worktree) : hors de la boucle
-    return _open_new_agent(request, result, lambda: claude.follow_up(run_id))
+    return _open_agent(request, result)
 
 
 @app.post("/agents/{run_id}/relancer")
 def agent_relaunch(request: Request, run_id: int):
-    """Relance d'un agent fini en erreur, quelle qu'elle soit : même branche, même brief."""
+    """Relance d'un agent fini en erreur, quelle qu'elle soit : même fiche, même branche, même brief."""
     _run_or_404(run_id)
-    return _open_new_agent(request, claude.relaunch(run_id), lambda: claude.relaunched(run_id))
+    return _open_agent(request, claude.relaunch(run_id))
 
 
 @app.post("/agents/{run_id}/arreter")
