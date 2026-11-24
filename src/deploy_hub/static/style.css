@@ -1785,11 +1785,42 @@ details.filter.multi { position: relative; font-size: 13px; }
 }
 
 /* Page Agents : glisser-déposer (place dans la colonne, zone « Archiver ») */
-.flow-bot[draggable="true"] { cursor: grab; }
-.flow-bot.is-dragging { opacity: .45; }
+.flow-bot[data-fly] { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.flow-bot[data-fly] .bot { -webkit-user-drag: none; }
+.flow-bot.is-dragging .bot { opacity: .18; }  /* sa place, vide, pendant qu'il vole */
+.flow-bot.is-dragging .bot-wrap::after { display: none; }
+.is-dragging-agent, .is-dragging-agent * { cursor: grabbing !important; }
+/* L'armure en vol : copie de l'agent au-dessus de la page, dans ses couleurs, réacteurs allumés, halo qui pulse, bras écartés */
+/* Pas de filter ni de will-change sur l'armure en vol : avec eux, la photo (image SVG) peut ne plus être peinte pendant le
+   vol ; l'ombre est un dégradé posé sous ses pieds. */
+.bot-flyer { position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none; transform-origin: 50% 63%; }
+.bot-flyer::after { content: ""; position: absolute; left: 18%; right: 18%; bottom: -16px; height: 8px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, .22), transparent); }
+.bot-flyer .bot { display: block; overflow: visible; }
+.bot-flyer.is-ko .im-face { filter: grayscale(1) contrast(.9); }
+.bot-flyer .im-jets { animation: bot-flame .09s ease-in-out infinite alternate; transform-origin: 50% 0; }
+.bot-flyer .im-halo { animation: bot-pulse .8s ease-in-out infinite; }
+.bot-flyer .im-arm-l { transform: rotate(24deg); } .bot-flyer .im-arm-r { transform: rotate(-24deg); }
+.bot-flyer .im-leg-a { transform: rotate(6deg); } .bot-flyer .im-leg-b { transform: rotate(-6deg); }
+.bot-puff { position: fixed; z-index: 59; width: 9px; height: 9px; margin: -4px 0 0 -4px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, #fff4d6 0%, #ffb35c 45%, rgba(160, 160, 160, .5) 100%); }
 .flow-archive { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 10px 0 18px; padding: 12px 16px;
   border: 1.5px dashed var(--border); border-radius: var(--radius); color: var(--muted); transition: border-color .15s, background .15s; }
 .flow-archive.is-over { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
+/* Pendant un glisser : la zone s'éveille (bordure qui défile), grossit sous l'agent, se referme sur lui */
+.flow-archive svg { transition: transform .25s cubic-bezier(.3, 1.5, .5, 1); }
+.is-dragging-agent .flow-archive { color: var(--text); border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  animation: archive-ready 1.4s ease-in-out infinite; }
+.is-dragging-agent .flow-archive svg { transform: translateY(-2px) rotate(-8deg); }
+.flow-archive.is-over { scale: 1.02; animation: none; transition: scale .18s cubic-bezier(.3, 1.5, .5, 1), background .15s, border-color .15s; }
+.flow-archive.is-over svg { transform: translateY(-4px) rotate(-18deg) scale(1.25); }
+.flow-archive.is-swallowing { animation: archive-swallow .45s ease-in .2s; }
+@keyframes archive-ready { 50% { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent); } }
+@keyframes archive-swallow { 40% { scale: 1.04; } 70% { scale: .98; } }
+@media (prefers-reduced-motion: reduce) {
+  .is-dragging-agent .flow-archive, .flow-archive.is-swallowing { animation: none; }
+  .flow-archive svg, .flow-bot.is-dragging { transition: none; }
+}
 
 /* Agents : nom et épingle */
 .agent-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }

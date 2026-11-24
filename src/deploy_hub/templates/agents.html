@@ -39,7 +39,7 @@
 </nav>
 <div id="pane-agents" data-tab-pane>
 <p class="muted">Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.
-  Glisse un agent dans sa colonne pour changer sa place, ou sur « Archiver » pour le ranger. <a href="/agents/archives">Archivés ({{ archived_count }})</a></p>
+  Attrape un agent : il s'envole. Pose-le ailleurs dans sa colonne pour changer sa place, ou sur « Archiver » pour le ranger. <a href="/agents/archives">Archivés ({{ archived_count }})</a></p>
 {% if runs %}
 {% set lanes = [
   ("in_progress", "En cours", "L'agent travaille dans son worktree · ? : attend ta réponse", runs | selectattr("group", "in", ["in_progress", "todo"]) | list),
@@ -54,7 +54,7 @@
     <div class="flow-nodes">
       {% for r in found[:24] %}
       {% set waiting = r.group == "todo" %}
-      <a class="flow-node flow-bot{{ ' is-sim' if r.simulated }}{{ ' is-waiting' if waiting }}" href="/agents/{{ r.id }}" data-agent="{{ r.id }}" draggable="true" style="--i: {{ loop.index0 }}">
+      <a class="flow-node flow-bot{{ ' is-sim' if r.simulated }}{{ ' is-waiting' if waiting }}" href="/agents/{{ r.id }}" data-agent="{{ r.id }}" data-fly style="--i: {{ loop.index0 }}">
         <span class="bot-wrap">{{ bot("waiting" if waiting else key, heads | au_hasard(r.id)) }}{% if r.pinned %}<span class="bot-pin" title="Épinglé">{{ ic.icon("pin") }}</span>{% endif %}</span><span class="bot-id">#{{ r.id }}</span>
         <span class="flow-tip" role="tooltip"><strong>{{ r.name }}</strong>
           <span>{{ r.client }} · {{ r.status }}{{ " (simulé)" if r.simulated }}</span>
@@ -70,40 +70,161 @@
 </section>
 <div class="flow-archive" data-archive-zone aria-live="polite"><span>{{ ic.icon("archive") }} Archiver : dépose ici un agent fini</span><small class="muted" data-archive-out></small></div>
 <script>
-  // Glisser-déposer : dans sa colonne, l'agent change de place (ordre gardé) ; sur la zone « Archiver », il est rangé.
+  // Déplacer un agent : il s'envole comme une armure d'Iron Man, dans ses propres couleurs (réacteurs allumés, penché dans le sens du vol, traînée de
+  // fumée) et suit la souris ou le doigt. Lâché dans sa colonne, il atterrit à la place choisie (ordre gardé) ; lâché sur
+  // « Archiver », il plonge dedans ; refusé ou lâché ailleurs, il rentre à sa place. Un simple clic ouvre toujours l'agent.
   (() => {
-    let dragged = null;
     const zone = document.querySelector("[data-archive-zone]"), out = zone.querySelector("[data-archive-out]");
+    const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const ease = "cubic-bezier(.2, .8, .2, 1)";
     const post = (url, body) => fetch(url, {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded"}, body});
-    document.querySelectorAll(".flow-bot[data-agent]").forEach((el) => {
-      el.addEventListener("dragstart", (e) => { dragged = el; e.dataTransfer.setData("text/plain", el.dataset.agent); e.dataTransfer.effectAllowed = "move"; el.classList.add("is-dragging"); });
-      el.addEventListener("dragend", () => { el.classList.remove("is-dragging"); zone.classList.remove("is-over"); dragged = null; });
-    });
-    document.querySelectorAll(".flow-nodes").forEach((lane) => {
-      lane.addEventListener("dragover", (e) => {
-        if (!dragged || dragged.parentElement !== lane) return;  // une colonne suit l'état de l'agent : pas de passage de l'une à l'autre
-        e.preventDefault();
-        const target = e.target.closest(".flow-bot");
-        if (target && target !== dragged) {
-          const box = target.getBoundingClientRect();
-          lane.insertBefore(dragged, e.clientX > box.left + box.width / 2 ? target.nextSibling : target);
+    const JETS = '<g class="im-jets"><path class="im-fire" d="M17 44.5h5.4l-2.7 8zM25.6 44.5h5.4l-2.7 8z"/><path class="im-spark" d="M18.5 44.5h2.4l-1.2 4.4zM27.1 44.5h2.4l-1.2 4.4z"/></g>';
+    const HALO = '<circle class="im-halo" cx="24" cy="27.4" r="3.7"/>';
+    let drag = null;
+
+    const flip = (lane, move) => {  // les voisins glissent de leur ancienne place à la nouvelle
+      const kids = [...lane.querySelectorAll(".flow-bot[data-agent]")];
+      const before = new Map(kids.map((k) => [k, k.getBoundingClientRect()]));
+      move();
+      kids.forEach((k) => {
+        if (k === drag.el || calm) return;
+        const a = before.get(k), b = k.getBoundingClientRect();
+        if (a.left !== b.left || a.top !== b.top) k.animate([{translate: `${a.left - b.left}px ${a.top - b.top}px`}, {translate: "0 0"}], {duration: 220, easing: ease});
+      });
+    };
+    const takeOff = (d) => {  // l'armure qui vole : une copie de l'agent, réacteurs allumés, posée au-dessus de la page
+      const flyer = document.createElement("div");
+      flyer.className = "bot-flyer";
+      const svg = d.el.querySelector(".bot").cloneNode(true);  // copie DOM : la photo garde son image déjà chargée
+      flyer.append(svg);
+      svg.insertAdjacentHTML("afterbegin", JETS);
+      if (!svg.querySelector(".im-halo")) svg.querySelector(".im-core").insertAdjacentHTML("beforebegin", HALO);
+      const own = getComputedStyle(d.el.querySelector(".bot"));  // il garde son armure : couleurs de sa colonne ou de son état
+      for (const v of ["--suit-a", "--suit-b", "--suit-glow"]) flyer.style.setProperty(v, own.getPropertyValue(v));
+      flyer.classList.toggle("is-ko", !!d.el.closest(".flow-ko"));  // l'armure en échec garde sa photo grise
+      document.body.append(flyer);
+      document.body.classList.add("is-dragging-agent");
+      d.el.classList.add("is-dragging");
+      d.flyer = flyer;
+      d.x = d.tx = d.startX; d.y = d.ty = d.startY;
+      d.tilt = 0;
+      d.lastPuff = 0;
+      const box = d.el.querySelector(".bot").getBoundingClientRect();
+      d.dx = d.startX - box.left; d.dy = d.startY - box.top;  // l'agent reste « tenu » là où on l'a attrapé
+      const tick = (t) => {
+        if (!d.flyer || d.landing) return;
+        const k = calm ? 1 : .22;  // un léger retard : il rattrape la souris comme s'il volait
+        const vx = (d.tx - d.x) * k;
+        d.x += vx; d.y += (d.ty - d.y) * k;
+        d.tilt += (Math.max(-28, Math.min(28, vx * 2.2)) - d.tilt) * .2;  // penché dans le sens du vol
+        const bob = calm ? 0 : Math.sin(t / 140) * 2.5;
+        flyer.style.transform = `translate(${d.x - d.dx}px, ${d.y - d.dy + bob}px) rotate(${calm ? 0 : d.tilt}deg) scale(1.25)`;
+        if (!calm && t - d.lastPuff > 45) {  // fumée des réacteurs
+          d.lastPuff = t;
+          const puff = document.createElement("span");
+          puff.className = "bot-puff";
+          puff.style.left = `${d.x - d.dx + 30}px`; puff.style.top = `${d.y - d.dy + 62}px`;
+          document.body.append(puff);
+          puff.animate([{opacity: .55, scale: ".6"}, {opacity: 0, scale: "2.2", translate: `${-vx * 2}px 14px`}], {duration: 650, easing: "ease-out"}).finished.then(() => puff.remove());
         }
-      });
-      lane.addEventListener("drop", (e) => {
-        if (!dragged || dragged.parentElement !== lane) return;
-        e.preventDefault();
-        post("/agents/ordre", "ids=" + [...lane.querySelectorAll(".flow-bot[data-agent]")].map((n) => n.dataset.agent).join(","));
-      });
-    });
-    zone.addEventListener("dragover", (e) => { if (dragged) { e.preventDefault(); zone.classList.add("is-over"); } });
-    zone.addEventListener("dragleave", () => zone.classList.remove("is-over"));
-    zone.addEventListener("drop", async (e) => {
-      e.preventDefault();
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    };
+    const under = (d, x, y) => {  // ce qui est sous la souris, l'armure mise à part
+      d.flyer.style.visibility = "hidden";
+      const hit = document.elementFromPoint(x, y);
+      d.flyer.style.visibility = "";
+      return hit;
+    };
+    const landOn = async (d, target, {spin = false, vanish = false} = {}) => {  // vol jusqu'à la cible, puis atterrissage
+      d.landing = true;
+      const a = d.flyer.getBoundingClientRect(), b = target.getBoundingClientRect();
+      const from = d.flyer.style.transform;
+      const to = `translate(${b.left + (b.width - a.width / 1.25) / 2}px, ${b.top + (b.height - a.height / 1.25) / 2}px) rotate(${spin ? 380 : 0}deg) scale(${vanish ? .1 : 1})`;
+      if (!calm) await d.flyer.animate([{transform: from, opacity: 1}, {transform: to, opacity: vanish ? 0 : 1}],
+                                       {duration: vanish ? 480 : 380, easing: vanish ? "cubic-bezier(.5, 0, .75, 0)" : ease, fill: "forwards"}).finished;
+    };
+    const finish = (d) => {
+      if (d.done) return;
+      d.done = true;
+      d.flyer?.getAnimations().forEach((a) => a.cancel());
+      d.flyer?.remove();
+      d.el.classList.remove("is-dragging");
+      document.body.classList.remove("is-dragging-agent");
       zone.classList.remove("is-over");
-      const id = e.dataTransfer.getData("text/plain");
-      if (!id) return;
-      const r = await post(`/agents/${id}/archiver`, "");
-      if (r.ok) location.reload(); else out.textContent = await r.text();
+      if (drag === d) drag = null;
+    };
+    const goHome = async (d) => {  // rentre se poser à sa place (nouvelle ou ancienne) ; quoi qu'il arrive, le vol se termine
+      try {
+        if (d.flyer) await landOn(d, d.el.querySelector(".bot"));
+      } catch { /* animation interrompue */ } finally {
+        const landed = !!d.flyer;
+        finish(d);
+        if (landed && !calm) d.el.querySelector(".bot").animate([{scale: "1.15 .85"}, {scale: ".95 1.06"}, {scale: "1"}], {duration: 360, easing: "cubic-bezier(.3, 1.5, .5, 1)"});
+      }
+    };
+    const move = (d, e) => {
+      if (!d.moved) {
+        if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 6) return;  // en dessous : un clic
+        d.moved = true;
+        takeOff(d);
+      }
+      d.tx = e.clientX; d.ty = e.clientY;
+      const hit = under(d, e.clientX, e.clientY);
+      zone.classList.toggle("is-over", !!hit?.closest("[data-archive-zone]"));
+      const target = hit?.closest(".flow-bot[data-agent]");
+      if (target && target !== d.el && target.parentElement === d.lane) {  // une colonne suit l'état : on ne change pas de colonne
+        const box = target.getBoundingClientRect();
+        const ref = e.clientX > box.left + box.width / 2 ? target.nextSibling : target;
+        if (ref !== d.el && ref !== d.el.nextSibling) flip(d.lane, () => d.lane.insertBefore(d.el, ref));
+      }
+    };
+    const drop = async (d, e) => {
+      d.landing = true;
+      const el = d.el;
+      const hit = under(d, e.clientX, e.clientY);
+      if (hit?.closest("[data-archive-zone]")) {
+        const r = await post(`/agents/${el.dataset.agent}/archiver`, "").catch(() => null);
+        if (r && r.ok) {
+          zone.classList.add("is-swallowing");
+          try { await landOn(d, zone.querySelector("svg") || zone, {spin: true, vanish: true}); } catch { /* interrompue */ }
+          return location.reload();
+        }
+        out.textContent = r ? await r.text() : "Jarvis injoignable : l'agent n'a pas été archivé.";
+        if (!calm) zone.animate([{translate: "0"}, {translate: "-8px"}, {translate: "7px"}, {translate: "-5px"}, {translate: "3px"}, {translate: "0"}], {duration: 420});
+      } else if (el.parentElement === d.lane) {
+        post("/agents/ordre", "ids=" + [...d.lane.querySelectorAll(".flow-bot[data-agent]")].map((n) => n.dataset.agent).join(",")).catch(() => {
+          out.textContent = "Jarvis injoignable : la nouvelle place n'est pas enregistrée.";
+        });
+      }
+      await goHome(d);
+    };
+
+    // Les mouvements se suivent sur toute la fenêtre, pas sur l'agent : quand il change de place dans sa colonne, il sort
+    // un instant de la page et le navigateur lâchait le pointeur ; l'armure restait figée et plus rien ne bougeait.
+    addEventListener("pointermove", (e) => { if (drag && !drag.landing && e.pointerId === drag.pointerId) move(drag, e); });
+    addEventListener("pointerup", (e) => {
+      const d = drag;
+      if (!d || d.landing || e.pointerId !== d.pointerId) return;
+      if (!d.moved) { finish(d); return; }  // un clic : le lien ouvre l'agent
+      d.el.dataset.justFlew = "1";  // le clic qui suit ce lâcher n'ouvre pas l'agent
+      setTimeout(() => delete d.el.dataset.justFlew, 0);
+      drop(d, e);
+    });
+    const abort = () => { if (drag && !drag.landing) { drag.landing = true; goHome(drag); } };  // il rentre chez lui
+    addEventListener("pointercancel", (e) => { if (drag && e.pointerId === drag.pointerId) abort(); });
+    addEventListener("blur", abort);
+    addEventListener("keydown", (e) => { if (e.key === "Escape") abort(); });
+
+    document.querySelectorAll(".flow-bot[data-fly]").forEach((el) => {
+      el.addEventListener("dragstart", (e) => e.preventDefault());  // pas de glisser natif : c'est l'armure qui vole
+      el.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0) return;
+        if (drag) finish(drag);  // un vol encore en train d'atterrir : il se pose tout de suite, le nouveau part
+        drag = {el, lane: el.parentElement, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, moved: false};
+      });
+      el.addEventListener("click", (e) => { if (el.dataset.justFlew) e.preventDefault(); });
     });
   })();
 

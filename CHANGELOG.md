@@ -11,6 +11,10 @@ Pour une PR qui monte le numéro :
 
 La version affichée en bas de chaque page change donc avec chaque fonctionnalité ; après une simple correction, le bandeau « Jarvis est à relancer » compare les commits. Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
+## [0.7.2] · 2026-11-24
+
+- Page Agents : attraper un agent le fait s'envoler comme une armure d'Iron Man. Il garde son armure et ses couleurs, réacteurs allumés et halo qui pulse, suit la souris (ou le doigt) avec un léger retard, se penche dans le sens du vol et laisse une traînée de fumée. Lâché ailleurs dans sa colonne, il atterrit à la nouvelle place (ses voisins glissent pour lui faire place, ordre gardé) ; lâché sur « Archiver », qui s'éveille pendant le vol, il plonge dedans en vrille ; refusé (agent en cours ou en attente) ou lâché ailleurs, il rentre se poser chez lui et la zone secoue la tête. Échap (ou quitter la fenêtre) le renvoie chez lui ; un nouveau vol peut partir pendant qu'un autre atterrit. Un simple clic ouvre toujours l'agent ; rien ne bouge si le système demande moins d'animations.
+
 ## [0.7.1] · 2026-11-24
 
 - Agents : on peut renommer un agent (son sujet « retour 1B7052 » reste en dessous et sert toujours de lien au retour) et l'épingler. Un agent épinglé passe en tête de sa colonne, porte une épingle sur le schéma et n'est jamais archivé par le rangement automatique. Nom et épingle se règlent depuis la page de l'agent, aussi pour un agent archivé.
