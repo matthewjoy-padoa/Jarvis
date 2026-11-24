@@ -454,7 +454,7 @@ def prepare(root: Path = PROJECT_ROOT, only: str | None = None) -> dict:
         wanted = [slug.strip() for slug in only.split(",")]  # un client (sa fiche) ou plusieurs (synchro automatique)
         configs = [c for c in configs if c["slug"] in wanted]
         if bau.KEY in wanted and not with_bau:
-            raise SyncError(bau.problem() or f"{bau.SETTING} est vide : aucune page BAU à synchroniser")
+            raise SyncError(bau.problem())
         with_bau = with_bau and bau.KEY in wanted
         if not configs and not with_bau:
             raise SyncError(f"{only} : client inconnu ou archivé, rien à synchroniser")

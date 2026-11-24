@@ -83,8 +83,8 @@ def passage(root: Path, fingerprint: str, answers: dict[str, list[dict]] | None 
 
 # ------------------------------------------------------------------------------------------------------------ réglage
 def test_the_setting_takes_a_link_or_an_id_and_says_when_it_is_neither(monkeypatch):
-    monkeypatch.delenv(bau.SETTING, raising=False)
-    assert not bau.enabled() and bau.problem() == "" and bau.page_id() == ""
+    monkeypatch.delenv(bau.SETTING, raising=False)  # vide : la page de toute l'équipe intégration
+    assert bau.enabled() and bau.problem() == "" and bau.page_id() == "5314976cdfac824da508018262a6fc9c"
     monkeypatch.setenv(bau.SETTING, LINK)
     assert bau.enabled() and bau.page_id() == PAGE
     monkeypatch.setenv(bau.SETTING, "pas un lien")
@@ -185,12 +185,10 @@ def test_requests_ride_along_with_clients_but_not_with_one_client(root):
     assert state["clients"] == ["demo"] and state["bau"] is False
 
 
-def test_asking_for_requests_without_a_page_says_so(root, monkeypatch):
-    monkeypatch.delenv(bau.SETTING)
+def test_asking_for_requests_with_an_unreadable_page_says_so(root, monkeypatch):
+    monkeypatch.setenv(bau.SETTING, "pas un lien")
     with pytest.raises(sn.SyncError, match=bau.SETTING):
         sn.prepare(root, bau.KEY)
-    with pytest.raises(sn.SyncError, match="Aucun client suivi"):
-        sn.prepare(root, "")
 
 
 # --------------------------------------------------------------------------------------------------------------- page
@@ -220,17 +218,18 @@ def board(monkeypatch):
     users.write_text(before, encoding="utf-8") if before is not None else users.unlink()
 
 
-def test_without_a_page_the_menu_hides_bau_and_the_page_says_how_to_set_it(monkeypatch):
+def test_without_a_setting_the_menu_shows_bau_and_follows_the_team_page(monkeypatch):
     monkeypatch.delenv(bau.SETTING, raising=False)
-    assert 'href="/bau"' not in client.get("/").text
+    assert 'href="/bau"' in client.get("/").text
     page = client.get("/bau")
-    assert page.status_code == 200 and "Aucune page BAU suivie" in page.text and f"/reglages#reglage-{bau.SETTING}" in page.text
+    assert page.status_code == 200 and "Page BAU à corriger" not in page.text
 
 
 def test_a_wrong_setting_keeps_the_menu_entry_and_says_what_to_fix(monkeypatch):
     monkeypatch.setenv(bau.SETTING, "pas un lien")
     assert 'href="/bau"' in client.get("/").text
-    assert "Page BAU à corriger" in client.get("/bau").text
+    page = client.get("/bau").text
+    assert "Page BAU à corriger" in page and f"/reglages#reglage-{bau.SETTING}" in page
 
 
 def test_a_set_page_waits_for_its_first_sync(monkeypatch):

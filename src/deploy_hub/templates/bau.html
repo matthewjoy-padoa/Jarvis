@@ -32,9 +32,9 @@
 
 {% if not board.configured %}
 <section class="panel empty-state">
-  <h2>{{ "Page BAU à corriger" if board.problem else "Aucune page BAU suivie" }}</h2>
-  {% if board.problem %}<p class="result ko">{{ board.problem | reglages }}</p>{% endif %}
-  <p>Jarvis peut suivre les demandes d'une page projet ou BAU de la base Notion « Equipes OPS - Projets et BAU », par exemple « BAU équipe intégration - TECHNIQUE » : colle le lien de la page dans {{ setting | reglages }}, puis reviens ici et lance « Rafraîchir depuis Notion ».</p>
+  <h2>Page BAU à corriger</h2>
+  <p class="result ko">{{ board.problem | reglages }}</p>
+  <p>Colle dans {{ setting | reglages }} le lien d'une page projet ou BAU de la base Notion « Equipes OPS - Projets et BAU », ou vide-le pour suivre « BAU équipe intégration - TECHNIQUE », puis reviens ici et lance « Rafraîchir depuis Notion ».</p>
   <a class="btn-primary" href="/reglages#reglage-{{ setting }}">Ouvrir les réglages</a>
 </section>
 {% elif not board.synced %}

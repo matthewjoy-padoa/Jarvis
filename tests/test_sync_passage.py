@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 import deploy_hub.sync_notion as sn
+from deploy_hub import bau
 from deploy_hub.sources.sync_routine import SyncRoutine, routine_text
 
 FIXTURES = Path(__file__).parent / "fixtures" / "notion" / "demo"
@@ -24,6 +25,7 @@ def root(tmp_path: Path, monkeypatch) -> Path:
     monkeypatch.setattr(sn, "CLAUDE_PROJECTS", tmp_path / "projects")
     monkeypatch.setenv(sn.SESSION_ENV, SESSION)
     monkeypatch.delenv(sn.CLIENT_ENV, raising=False)
+    monkeypatch.setattr(bau, "enabled", lambda: False)  # passages des clients seuls ; ceux de la BAU : test_bau.py
     return tmp_path
 
 

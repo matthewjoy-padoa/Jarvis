@@ -29,6 +29,9 @@ from deploy_hub.sync_notion import SyncError
 KEY = "_bau"  # clé des demandes dans un passage et dossier data/notion/_bau : jamais un identifiant de client (pas de « _ »)
 LABEL = "BAU"  # nom des demandes dans les comptes rendus et les messages de synchro
 SETTING = "JARVIS_NOTION_BAU"
+# Page « BAU équipe intégration - TECHNIQUE », la même pour toute l'équipe : suivie sans réglage ; JARVIS_NOTION_BAU en
+# suit une autre.
+DEFAULT_PAGE = "https://app.notion.com/p/padoa/BAU-quipe-int-gration-TECHNIQUE-5314976cdfac824da508018262a6fc9c"
 SQUADS_SETTING = "JARVIS_BAU_SQUADS"
 # Vues de squad de la page « BAU équipe intégration - TECHNIQUE » : Jarvis les lit telles quelles (mode view), avec leurs
 # filtres (personnes de la squad, demandes à faire ou en cours). Une par ligne ou séparées par « ; » : « nom | lien de la vue ».
@@ -93,7 +96,7 @@ class Demande:
 @dataclass
 class Board:
     """Ce que la page « BAU » affiche : les demandes du cache, ou la raison pour laquelle il n'y en a pas."""
-    configured: bool = False  # JARVIS_NOTION_BAU renseigné et lisible
+    configured: bool = False  # page suivie lisible (False : JARVIS_NOTION_BAU illisible)
     squads: dict[str, list[str]] = field(default_factory=dict)  # vue de squad → références de ses demandes (comme dans Notion)
     problem: str = ""  # réglage illisible
     notion_url: str = ""  # la page BAU dans Notion
@@ -124,13 +127,13 @@ class Board:
 
 # ------------------------------------------------------------------------------------------------------------ réglage
 def page_id() -> str:
-    """Id de la page projet ou BAU suivie ; "" si le réglage est vide. ConfigError s'il n'est ni un id ni une adresse Notion."""
-    value = os.getenv(SETTING, "").strip()
-    return page_id_of(value) if value else ""
+    """Id de la page projet ou BAU suivie : celle du réglage, sinon la page BAU de l'équipe intégration. ConfigError si le
+    réglage n'est ni un id ni une adresse Notion."""
+    return page_id_of(os.getenv(SETTING, "").strip() or DEFAULT_PAGE)
 
 
 def problem() -> str:
-    """Pourquoi le réglage est inutilisable ; "" s'il est vide ou correct."""
+    """Pourquoi le réglage est inutilisable ; "" s'il est vide (page par défaut) ou correct."""
     try:
         page_id()
     except ConfigError:
