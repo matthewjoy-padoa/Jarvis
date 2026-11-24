@@ -11,9 +11,17 @@ Pour une PR qui monte le numéro :
 
 La version affichée en bas de chaque page change donc avec chaque fonctionnalité ; après une simple correction, le bandeau « Jarvis est à relancer » compare les commits. Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
-## [0.7.3] · 2026-11-24
+## [0.8.1] · 2026-11-24
 
 - Agents : toute la carte d'un agent l'ouvre. Ligne du tableau de la page Agents et des archives, ligne d'un agent sur la page d'un retour : un clic n'importe où (hors autre lien ou bouton) ouvre l'agent, Cmd/Ctrl-clic dans un nouvel onglet. Sur le schéma, la bulle de détail ne disparaît plus quand la souris la rejoint et s'ouvre au clic.
+## [0.8.0] · 2026-11-24
+
+- Page « BAU » : Jarvis suit aussi les demandes d'une page projet ou BAU de Notion (base « Equipes OPS - Actions internes »), pour l'équipe qui les traite. Le lien de la page se colle dans Réglages (`JARVIS_NOTION_BAU`) ; les demandes s'affichent en liste ou en kanban, par priorité puis échéance, avec filtres (statut, priorité, responsable, référent inté) et panneau de détail, et l'accueil dit combien sont ouvertes et en retard. Elles suivent la synchro existante (routine Claude Code, lecture seule) : relues avec les clients par « Tout rafraîchir », seules par le bouton de la page. Aucun client n'est nécessaire pour s'en servir.
+- Demande BAU : sa description (corps de la page Notion) est affichée dans le panneau et reprise dans le brief de l'agent. La synchro charge d'abord les demandes ; les descriptions se lisent ensuite en fond (lots de 15 enchaînés), puis seulement celles des demandes modifiées ; une demande pas encore à jour la fait lire à son ouverture.
+- Page BAU : bouton « Synchro auto », comme sur la fiche d'un client : les demandes se relisent toutes seules, seulement ce qui a changé.
+- Page BAU : liens de l'équipe (Drive, pages Notion, autres adresses) à ajouter soi-même, affichés sous le titre et dans les raccourcis à droite, comme ceux d'un client.
+- Page BAU : une vue par squad (« Squad SPSTA », « Squad Plateform »), lue telle quelle dans les vues « Action squad » de Notion à chaque synchro.
+- Demandes BAU traitées comme des retours de recette : « Lancer un agent » sur une demande ouverte (brief pré-rempli, à compléter du détail de la demande, que Jarvis ne lit pas dans Notion), suivi dans Agents et dans le panneau de la demande, épingle et rappels.
 
 ## [0.7.2] · 2026-11-24
 

@@ -1,0 +1,14 @@
+{# Description d'une demande BAU (corps de sa page Notion, sources/bau_details.py). Attend : x, saved ({texte, erreur,
+   lu}), fresh (lue depuis la dernière modification), reading (lecture en cours), problem (Claude Code absent).
+   Tant qu'une lecture tourne, le bloc se redemande toutes les 3 secondes ; l'ancien texte reste affiché pendant ce temps. #}
+{% set waiting = reading or (not fresh and not problem) %}
+<section class="ticket-section demande-description"{% if waiting %} hx-get="/bau/demande/{{ x.ref }}/description" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  <h3>Description {% if saved.lu and saved.texte is defined %}<span class="muted">· lue {{ saved.lu | quand_iso }}</span>{% endif %}</h3>
+  {% if saved.texte %}<div class="md">{{ saved.texte | md }}</div>
+  {% elif saved.texte is defined and not waiting %}<p class="muted">La page Notion de cette demande n'a pas de description.</p>{% endif %}
+  {% if waiting %}<p class="muted" role="status">{{ "Mise à jour depuis Notion…" if saved.texte else "Jarvis lit la page Notion de la demande (une dizaine de secondes)…" }}</p>
+  {% elif problem and not saved.texte %}<p class="result ko">{{ problem | reglages }}</p>
+  {% elif saved.erreur %}<p class="result ko">Lecture de la page Notion en échec ({{ saved.erreur }}).
+    <button type="button" class="secondary" hx-get="/bau/demande/{{ x.ref }}/description?relire=true" hx-target="closest section" hx-swap="outerHTML">Réessayer</button></p>
+  {% elif saved.texte is defined %}<p class="muted small-note"><button type="button" class="secondary" hx-get="/bau/demande/{{ x.ref }}/description?relire=true" hx-target="closest section" hx-swap="outerHTML">Relire dans Notion</button>{% if x.notion_url %} · <a href="{{ x.notion_url }}" target="_blank" rel="noopener">Ouvrir dans Notion ↗</a>{% endif %}</p>{% endif %}
+</section>

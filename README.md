@@ -4,6 +4,7 @@ Tableau de bord des déploiements clients de l'équipe Integration : ce qui est 
 
 - **Accueil** : retards, échéances, injections KO, prochains jalons, « Quoi de neuf » depuis ta dernière visite.
 - **Une fiche par client** : synthèse et jalons, injections par ressource (une liste : l'état de chaque ressource, ce qui bloque en haut, la stack choisie une fois et un bouton « Lancer » par ligne, pour chaque ressource et chaque groupe de ressources ; ouvrir une ligne montre ses cartes et ses derniers DAG lancés, qui mènent à leur suivi), actions par équipe, retours de recette (avec brief pour un agent Claude), règles de reprise, CED.
+- **BAU** : les demandes d'une page projet ou BAU de Notion, pour l'équipe qui les traite (voir [Demandes BAU](#demandes-bau)).
 - **Notifications** : agent terminé, changements urgents, échéances, avancement qui se dégrade, rappels arrivés à échéance. Une fois « Activer les notifications du Mac » cliqué (**Réglages → Notifications du Mac**), elles arrivent sur le Mac même onglet fermé (Web Push, [`sources/web_push.py`](src/deploy_hub/sources/web_push.py)) : le navigateur doit rester lancé ; le contenu part chiffré de bout en bout vers le service de push du navigateur ; clé et abonnements dans `data/push/`.
 - **Pour moi seulement** : brief du matin à copier, tickets épinglés, notes, rappels (voir [Perso](#perso)).
 
@@ -52,6 +53,18 @@ Deux façons de lire Notion, au choix :
 4. **Bouton dans Jarvis** (facultatif) : avec Claude Code en ligne de commande installé et connecté, « Rafraîchir depuis Notion » (fiche) et « Tout rafraîchir » (Clients) lancent la routine sans jeton ; l'état s'affiche sous le bouton et la page se recharge à la fin. Sans jeton ni `claude`, il est grisé et son infobulle dit pourquoi.
 
 La consigne vit dans le dépôt : un `git pull` met à jour la tâche planifiée, la commande et le bouton. Détails (déroulé d'un passage, outils permis, journal) : [`docs/routine-synchro.md`](docs/routine-synchro.md).
+
+## Demandes BAU
+
+Pour l'équipe qui traite des demandes plutôt qu'un déploiement : la page **BAU** affiche les actions de la base Notion « Equipes OPS - Actions internes » liées à une page projet ou BAU, par exemple « BAU équipe intégration - TECHNIQUE ».
+- **Mise en place** : dans **Réglages → Notion**, colle le lien de la page dans `JARVIS_NOTION_BAU` (••• → Copier le lien, celui de la page elle-même, pas d'une vue). « BAU » apparaît dans la barre du haut ; « Rafraîchir depuis Notion » charge les demandes (une minute environ la première fois). Aucun client n'est nécessaire.
+- **Liens de l'équipe** : l'équipe n'a pas de client pour porter ses liens ; « + Ajouter des liens » (page BAU, ou le « + » des raccourcis à droite) enregistre ses dossiers Google Drive, ses pages Notion et tout autre lien (outils, canaux Slack, dépôts…). Ils s'affichent sous le titre de la page BAU et dans les raccourcis à droite, sur les pages BAU et partout quand aucun client n'est suivi. Gardés dans `config/bau.yaml`, sur ta machine ; jamais lus par Jarvis, seulement ouverts.
+- **Une vue par squad, comme dans Notion** : « Toute l'équipe », « Squad SPSTA », « Squad Plateform ». Chaque squad montre exactement les demandes de sa vue « Action squad » dans Notion (ses membres, demandes à faire ou en cours), relue à chaque synchro : si la vue change dans Notion, Jarvis suit. Le choix est gardé d'une visite à l'autre. Autres vues : `JARVIS_BAU_SQUADS` (« nom | lien de la vue », séparées par « ; »).
+- **Ce qu'on y voit** : les demandes en liste ou en kanban (une colonne par statut Notion), ouvertes ou toutes, les plus prioritaires d'abord (P0, P1, P2), puis les échéances les plus proches. Filtres : statut, priorité, responsable, référent inté ; la recherche trouve aussi un client lié ou une ressource ; tout est gardé d'une visite à l'autre. Une demande s'ouvre en panneau : responsables, référents, clients liés (avec le lien vers leur fiche s'ils sont suivis dans Jarvis), ressources, échéance, lien Notion. L'accueil résume où en est l'équipe (demandes ouvertes, en retard).
+- **Comme un retour de recette** : « Lancer un agent » sur une demande ouverte (liste ou panneau) prépare un brief pour Claude Code, sur une branche `bau-<client>-<premiers mots de l'intitulé>` ; l'agent se suit dans **Agents** (journal, questions, PR) et apparaît dans le panneau de sa demande. Le brief reprend la description de la demande ; une carte sans description laisse « À COMPLÉTER », et l'agent ne part pas tant que tu ne l'as pas remplacé. Une demande s'épingle (page BAU et accueil) et se rappelle comme un ticket.
+- **Synchro auto** : bouton « Synchro auto » de la page BAU, comme sur la fiche d'un client (non par défaut) : Jarvis relit les demandes tout seul, toutes les heures (`JARVIS_SYNC_EVERY_MIN`), et ne relit que ce qui a changé. Mesuré sur la VM le 2026-11-24 : premier passage 58 s (531 demandes lues entières et les 2 vues de squad).
+- **Synchro** : par la routine Claude Code seulement (connecteur Notion, lecture seule), même avec un `NOTION_TOKEN` : le bouton de la page BAU ne relit que les demandes ; « Tout rafraîchir », `/jarvis-sync` et la tâche planifiée les relisent avec les clients. Une requête d'empreinte, puis seulement les demandes modifiées ; tout est relu quand des demandes ont disparu de la page, et tous les 7 jours.
+- **Description d'une demande** : le corps de sa page Notion, que la synchro ne voit pas (elle ne lit que les colonnes). La synchro charge d'abord les demandes ; les descriptions se lisent ensuite en fond, par lots de 15 enchaînés, les demandes ouvertes les plus récemment modifiées d'abord, jusqu'à ce que toutes soient à jour ; ensuite, seules les demandes modifiées sont relues. Mesuré sur la VM le 2026-11-24 : 12 à 15 s par lot, les 249 demandes ouvertes en 4 minutes environ. La page BAU dit où en est la lecture (« Descriptions : 120 / 249 »), et une demande qu'on ouvre avant fait lire la sienne tout de suite (une dizaine de secondes). Elle s'affiche dans le panneau ; elle est gardée sur ta machine (`data/notion/_bau/descriptions/`) et relue quand la demande change dans Notion, ou sur « Relire dans Notion ». Les images ne sont pas reprises : la description renvoie à la page. Rien n'est écrit dans Notion ; les demandes restent sur ta machine (`data/notion/_bau/`).
 
 ## Lancer des DAGs
 
@@ -118,6 +131,8 @@ Tous facultatifs. La page **Réglages** (accessible seulement en local, par exem
 | `JARVIS_SYNC_EVERY_MIN` | Intervalle de la synchro Notion automatique, en minutes (vide : 60 ; 0 : jamais). Elle ne concerne que les clients dont le bouton « Synchro auto » de la fiche est activé |
 | `JARVIS_NOTION_WORKSPACE` | Espace de travail Notion des liens complets que l'annuaire pré-remplit (`https://app.notion.com/p/<espace>/<Titre>-<id>`, vide : `padoa`) |
 | `JARVIS_NOTION_DASHBOARDS` | Page Notion qui liste les dashboards des clients, lue chaque jour pour l'annuaire de « Ajouter un client » (vide : « Liste des dashboards pour le déploiement des nouveaux clients ») |
+| `JARVIS_BAU_SQUADS` | Vues Notion des squads de la page BAU, « nom | lien de la vue » séparées par « ; » (vide : SPSTA et Plateform) |
+| `JARVIS_NOTION_BAU` | Lien (ou id) de la page projet ou BAU dont Jarvis suit les demandes, page **BAU** (vide : pas de page BAU) |
 | `AIRFLOW_BASE_URL`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD` | Lancement réel des DAGs |
 | `JARVIS_DAG_MAX_CLEARS`, `JARVIS_DAG_INTERVAL_S` | Suivi des runs : relances automatiques au plus (0 : aucune), secondes entre deux vérifications |
 | `ORCHESTRATOR_DIR` | Clone local de l'orchestrator : DAGs proposés, agents Claude, PR (vide : `~/integration-orchestrator`) |
@@ -140,6 +155,7 @@ Routes dans `src/deploy_hub/main.py`, pages dans `templates/` et `static/`, sync
 
 ## Limites connues
 
+- Demandes BAU : la description n'est pas affichée dans la liste ni cherchable, et ne se lit qu'avec Claude Code en ligne de commande ; pas de synchro par jeton Notion ; elles ne sont pas dans la recherche ⌘K, la commande `>agent` ni « Quoi de neuf ».
 - Après un changement du clone orchestrator, la liste des DAGs est à jour au plus une minute plus tard (ou tout de suite avec « Régénérer ») ; une page Injections déjà ouverte ne se recharge pas seule.
 - Les runs lancés par `/air` n'apparaissent pas dans **Agents → DAG** (leurs rapports sont dans `data/airflow/`).
 - Un changement fait seulement sur une carte Bible n'est vu qu'à la synchro complète suivante (7 jours au plus).

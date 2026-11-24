@@ -243,7 +243,7 @@
   {% for r in runs %}
     <tr data-agent="{{ r.id }}" data-ticket-card title="Ouvrir l'agent #{{ r.id }}">
       <td><a href="/agents/{{ r.id }}" data-row-link>#{{ r.id }}</a></td><td class="muted">{{ r.started_at.strftime("%d/%m %H:%M") }}</td>
-      <td><a href="/deploiements/{{ r.slug }}/recette">{{ r.client }}</a></td>
+      <td><a href="{{ '/bau' if r.slug == '_bau' else '/deploiements/' ~ r.slug ~ '/recette' }}">{{ r.client }}</a></td>
       <td>{% if r.pinned %}{{ ic.icon("pin", "Épinglé", "ic-pin") }} {% endif %}<a href="/agents/{{ r.id }}">{{ r.name }}</a>{% if r.title %} <span class="muted">· {{ r.subject }}</span>{% endif %}</td>
       <td><code>{{ r.branch }}</code></td>
       <td><span class="badge g-{{ r.group }}">{{ r.status }}</span>{% if r.simulated %} {{ ic.icon("flask", "Simulation", "ic-muted") }}{% endif %}</td>

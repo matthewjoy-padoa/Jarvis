@@ -1,0 +1,53 @@
+{# Détail d'une demande BAU (bau.Demande). Attend : x, fiche_of (client lié → fiche suivie dans Jarvis), today, runs (ses agents),
+   et d, kind, ref pour l'épingle et les rappels (bau.SPACE, « demande », x.ref). #}
+{% import "_icons.html" as ic %}
+<article class="ticket" data-group="{{ x.group }}">
+  <header class="ticket-head">
+    <p class="ticket-kicker muted"><span>Demande BAU</span> · <code>{{ x.ref }}</code> · <a href="/bau">BAU</a></p>
+    <h2 class="ticket-title">{{ x.title }}</h2>
+    <div class="ticket-badges">
+      <span class="badge g-{{ x.group }}">{{ x.status }}</span>
+      {% if x.priority %}<span class="badge" title="Priorité">{{ x.priority }}</span>{% endif %}
+    </div>
+    <div class="ticket-actions">
+      {% if x.is_open %}<button type="button" class="ticket-agent-btn" onclick="const a = this.closest('.ticket').querySelector('details.agent'); a.open = true; a.scrollIntoView({behavior: 'smooth', block: 'start'})">{{ ic.icon("bot") }} Lancer un agent</button>{% endif %}
+      {% include "_pin_button.html" %}
+      {% if x.notion_url %}<a class="btn-link" href="{{ x.notion_url }}" target="_blank" rel="noopener">Ouvrir dans Notion ↗</a>{% endif %}
+      <a class="btn-link" href="/bau/demande/{{ x.ref }}" target="_blank" rel="noopener" title="Ouvrir cette demande dans un nouvel onglet">Nouvel onglet ↗</a>
+    </div>
+    {% include "_ticket_remind.html" %}
+  </header>
+
+  <section class="ticket-section">
+    <h3>Informations</h3>
+    <dl class="meta-list">
+      <dt>Responsable(s)</dt><dd>{% if x.owners %}{{ ic.icon("user") }} {{ x.owners | join(", ") }}{% else %}<span class="muted">personne</span>{% endif %}</dd>
+      <dt>Référent(s) inté</dt><dd>{% if x.referents %}{{ x.referents | join(", ") }}{% else %}<span class="muted">personne</span>{% endif %}</dd>
+      <dt>Client(s) lié(s)</dt><dd>{% for c in x.clients %}{% if fiche_of.get(c) %}<a href="/deploiements/{{ fiche_of[c] }}">{{ c }}</a>{% else %}{{ c }}{% endif %}{{ ", " if not loop.last }}{% else %}<span class="muted">aucun</span>{% endfor %}</dd>
+      <dt>Ressources</dt><dd>{% for r in x.resources %}<code>{{ r }}</code> {% else %}<span class="muted">aucune</span>{% endfor %}</dd>
+      <dt>Échéance</dt><dd>{% if x.due %}<span class="{{ 'late' if x.is_late(today) }}">{{ x.due.strftime("%d/%m/%Y") }}</span>
+        <span class="muted">· {% set days = (x.due - today).days %}{{ "aujourd'hui" if days == 0 else ("dans %d j" % days if days > 0 else "il y a %d j" % -days) }}</span>{% else %}—{% endif %}</dd>
+      <dt>Créée le</dt><dd>{{ x.created.strftime("%d/%m/%Y") if x.created else "—" }}</dd>
+    </dl>
+  </section>
+
+  <section class="ticket-section" hx-get="/bau/demande/{{ x.ref }}/description" hx-trigger="load" hx-swap="outerHTML">
+    <h3>Description</h3>
+    <p class="muted">Jarvis lit la page Notion de la demande…</p>
+  </section>
+
+  <section class="ticket-section">
+    <h3>Agents</h3>
+    {% for run in runs %}
+    <p class="ticket-run"><a href="/agents/{{ run.id }}">Agent #{{ run.id }}</a> <span class="badge g-{{ run.group }}">{{ run.status }}</span>
+      <span class="muted">{{ run.started_at.strftime("%d/%m %H:%M") }} · <code>{{ run.branch }}</code></span>
+      {% if run.pr_url %}<a href="{{ run.pr_url }}" target="_blank" rel="noopener">PR ↗</a>{% endif %}</p>
+    {% else %}<p class="muted">Aucun agent lancé sur cette demande.</p>{% endfor %}
+    {% if x.is_open %}
+    <details class="agent" hx-get="/bau/demande/{{ x.ref }}/brief" hx-target="find .agent-body" hx-trigger="toggle once">
+      <summary>{{ ic.icon("bot") }} Lancer un agent</summary>
+      <div class="agent-body"><p class="muted">Jarvis prépare le brief…</p></div>
+    </details>
+    {% endif %}
+  </section>
+</article>

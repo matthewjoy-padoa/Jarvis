@@ -213,11 +213,13 @@ def users_path(root: Path = PROJECT_ROOT) -> Path:
 
 
 def unknown_users(root: Path = PROJECT_ROOT) -> list[str]:
-    """Responsables présents dans les caches de recette mais absents de l'annuaire : à faire traduire par la synchro."""
+    """Responsables présents dans les caches de recette (et responsables et référents des demandes BAU) mais absents de
+    l'annuaire : à faire traduire par la synchro."""
+    from deploy_hub import bau
     known = _load_json(users_path(root), {})
     seen = {u for cache in (data_dir(root) / "notion").glob("*/cache-recette.json")
             for row in _load_json(cache, {}).values() for u in user_ids(row.get("responsables"))}
-    return sorted(seen - set(known))
+    return sorted((seen | bau.cached_user_ids(root)) - set(known))
 
 
 def add_users(names: dict[str, str], root: Path = PROJECT_ROOT) -> None:
@@ -440,16 +442,24 @@ def _followed(root: Path, slugs: list[str] | None = None) -> list[str]:
 def prepare(root: Path = PROJECT_ROOT, only: str | None = None) -> dict:
     """Ouvre un passage : écrit les requêtes de chaque client et l'empreinte (une seule requête, une ligne par client).
     only (ou JARVIS_SYNC_CLIENT) : ce client seulement, ou ceux-là (slugs séparés par des virgules). Refuse si une autre synchro lancée par Jarvis tourne : deux
-    passages écriraient les mêmes fichiers (vu le 2026-11-18)."""
+    passages écriraient les mêmes fichiers (vu le 2026-11-18).
+    Les demandes BAU (réglage JARVIS_NOTION_BAU, voir bau.py) sont du passage quand tout est synchronisé, ou quand
+    « only » les nomme (bau.KEY) : elles ont leur propre requête d'empreinte, donnée avec celle des clients."""
     if (other := running_elsewhere(root)):
         raise SyncError(f"Une autre synchro tourne déjà (lancée à {other.get('started', '?')}) : attends sa fin, puis relance")
-    from deploy_hub import client_config
+    from deploy_hub import bau, client_config
     configs = [asdict(c) for c in client_config.active_configs(root)]  # un client archivé n'est plus synchronisé
+    with_bau = bau.enabled()
     if (only := os.environ.get(CLIENT_ENV, "") if only is None else only):
         wanted = [slug.strip() for slug in only.split(",")]  # un client (sa fiche) ou plusieurs (synchro automatique)
         configs = [c for c in configs if c["slug"] in wanted]
-        if not configs:
+        if bau.KEY in wanted and not with_bau:
+            raise SyncError(bau.problem() or f"{bau.SETTING} est vide : aucune page BAU à synchroniser")
+        with_bau = with_bau and bau.KEY in wanted
+        if not configs and not with_bau:
             raise SyncError(f"{only} : client inconnu ou archivé, rien à synchroniser")
+    elif not configs and not with_bau:
+        raise SyncError("Aucun client suivi : ajoute un client avant de synchroniser")
     for config in configs:
         queries.write(config["slug"], config, root)
     folder = data_dir(root) / "notion"
@@ -459,9 +469,9 @@ def prepare(root: Path = PROJECT_ROOT, only: str | None = None) -> dict:
         old.unlink()
     # Une requête d'empreinte par paquet de clients : chacune doit tenir dans ce qu'une commande peut rendre au modèle
     # (BATCH_CHARS). Les réponses vont dans empreintes.json, empreintes-2.json… que _rows lit comme les pages d'un résultat.
-    packs: list[list[dict]] = [[]]
+    packs: list[list[dict]] = []
     for config in configs:
-        if packs[-1] and len(queries.empreintes(packs[-1] + [config])) > BATCH_CHARS // 2:
+        if not packs or len(queries.empreintes(packs[-1] + [config])) > BATCH_CHARS // 2:
             packs.append([])
         packs[-1].append(config)
     asked = []
@@ -469,8 +479,10 @@ def prepare(root: Path = PROJECT_ROOT, only: str | None = None) -> dict:
         name = EMPREINTES if n == 1 else f"{EMPREINTES}-{n}"
         (folder / f"{name}.sql").write_text(queries.empreintes(pack), encoding="utf-8")
         asked.append(_query(folder / f"{name}.sql", folder / f"{name}.json", []))
+    if with_bau:
+        asked.append(bau.empreinte(root))
     write_json(_passage(root), {"debut": datetime.now(timezone.utc).isoformat(timespec="seconds"), "etape": "empreinte",
-                                "clients": [c["slug"] for c in configs], "demandes": 0,
+                                "clients": [c["slug"] for c in configs], "bau": with_bau, "demandes": 0,
                                 "attendues": [_expected(None, query) for query in asked]})
     return asked[0]
 
@@ -559,6 +571,20 @@ def _sql_key(sql: str, params) -> tuple:
     return " ".join(str(sql).split()), tuple(str(p) for p in params)
 
 
+VIEW_PREFIX = "vue:"  # « requete » d'une vue Notion lue telle quelle (mode view) : son adresse, ainsi préfixée
+
+
+def view_key(url: str) -> tuple:
+    """Ce qui identifie la lecture d'une vue Notion (mode view) dans le transcript : son adresse."""
+    return _sql_key(VIEW_PREFIX + url.strip(), [])
+
+
+def expected_view(client: str, url: str, out: Path) -> dict:
+    """Vue Notion à lire telle quelle (ses filtres et son tri, ceux de Notion) : une seule page de 100 lignes."""
+    return {"client": client, "nom": out.stem, "page": 1, "requete": VIEW_PREFIX + url, "params": [], "sources": [],
+            "sql": "", "sortie": str(out), "vue": url}
+
+
 def _expected(client: str | None, query: dict, page: int = 1) -> dict:
     """Requête attendue par « suite » : son texte exact, et où ranger sa réponse. Les pages suivantes reprennent la requête
     avec « LIMIT 100 OFFSET n » et vont dans <nom>-2.json, <nom>-3.json… (voir _rows)."""
@@ -626,7 +652,8 @@ def notion_answers(since: datetime, session: str = "") -> dict[tuple, str]:
                 if part.get("type") == "tool_use" and str(part.get("name", "")).endswith(NOTION_QUERY):
                     data = part.get("input") or {}
                     data = data.get("data") if isinstance(data.get("data"), dict) else data
-                    asked[part.get("id")] = _sql_key(data.get("query", ""), data.get("params"))
+                    asked[part.get("id")] = (view_key(data["view_url"]) if data.get("mode") == "view" and data.get("view_url")
+                                             else _sql_key(data.get("query", ""), data.get("params")))
                 elif part.get("type") == "tool_result" and part.get("tool_use_id") in asked:
                     if (text := _answer(part.get("content"))) is not None:
                         answers[asked[part["tool_use_id"]]] = text
@@ -634,6 +661,8 @@ def notion_answers(since: datetime, session: str = "") -> dict[tuple, str]:
 
 
 def _shown(q: dict, lost: bool = False) -> dict:
+    if q.get("vue"):
+        return {"vue": q["vue"], **({"sortie": q["sortie"]} if lost else {})}
     return {"requete": q["requete"], "sources": q["sources"], **({"params": q["params"]} if q["params"] else {}),
             **({"sortie": q["sortie"]} if lost else {})}
 
@@ -700,6 +729,8 @@ def _next_pages(state: dict) -> list[dict]:
             last[key] = q
     more = []
     for q in last.values():
+        if q.get("vue"):  # une vue se lit en une page : pas de suite par OFFSET
+            continue
         rows = _notion_rows(Path(q["sortie"]).read_text(encoding="utf-8"), Path(q["sortie"]).name)
         if len(rows) >= PAGE_SIZE and q["page"] < MAX_PAGES:
             first = next(x for x in state["attendues"] if (x["client"], x["nom"], x["page"]) == (q["client"], q["nom"], 1))
@@ -766,7 +797,12 @@ def advance(root: Path = PROJECT_ROOT) -> dict:
         state["attendues"] += _next_pages(state)
         batch = _hand(state)
     if not batch and state["etape"] == "empreinte":
-        state.update(etape="requetes", attendues=_planned(plan_all(root, slugs), root))
+        if state["clients"]:
+            planned = _planned(plan_all(root, slugs), root)
+        else:  # passage des seules demandes BAU : pas d'empreinte des clients, et aucune erreur de plan d'avant à garder
+            planned = []
+            write_json(data_dir(root) / "notion" / PLAN_ERRORS, {})
+        state.update(etape="requetes", attendues=planned + _bau_planned(state, root))
         batch = _hand(state)
     if batch:
         write_json(path, state)
@@ -774,10 +810,43 @@ def advance(root: Path = PROJECT_ROOT) -> dict:
     plan_errors = _load_json(data_dir(root) / "notion" / PLAN_ERRORS, {})  # écrites par plan_all
     merged = merge_all(root, slugs)
     errors = {**plan_errors, **{slug: f"fusion : {r['erreur']}" for slug, r in merged.items() if "erreur" in r}}
+    bau_line = _bau_merged(state, root, errors)
     write_json(data_dir(root) / "notion" / PLAN_ERRORS, errors)  # Jarvis les affiche, quel que soit le compte rendu du modèle
     state.update(etape="fini", attendues=[])
     write_json(path, state)
-    return {"termine": True, "compte_rendu": _report(slugs, plan_errors, merged), "utilisateurs": unknown_users(root)}
+    return {"termine": True, "compte_rendu": _report(slugs, plan_errors, merged) + bau_line, "utilisateurs": unknown_users(root)}
+
+
+BAU_ERRORS = (SyncError, ConfigError, OSError, KeyError, ValueError)  # un échec des demandes BAU n'arrête pas les clients
+
+
+def _bau_planned(state: dict, root: Path) -> list[dict]:
+    """Requêtes des demandes BAU d'après leur empreinte, si elles sont du passage. Un plan en échec est gardé pour le
+    compte rendu (state["bau_erreur"]) : les clients, eux, continuent."""
+    if not state.get("bau"):
+        return []
+    from deploy_hub import bau
+    try:
+        return bau.planned(root)
+    except BAU_ERRORS as e:
+        state["bau_erreur"] = f"plan : {e}"
+        return []
+
+
+def _bau_merged(state: dict, root: Path, errors: dict) -> list[str]:
+    """Fusionne les demandes BAU du passage ; renvoie leur ligne de compte rendu ([] si elles n'en sont pas). Un échec
+    est aussi noté dans errors (plan-erreurs.json), que Jarvis affiche sous le bouton."""
+    if not state.get("bau"):
+        return []
+    from deploy_hub import bau
+    error = state.get("bau_erreur")
+    if not error:
+        try:
+            return [bau.report(bau.merge(root))]
+        except BAU_ERRORS as e:
+            error = f"fusion : {e}"
+    errors[bau.LABEL] = error
+    return [f"ÉCHEC {bau.LABEL} : {error}"]
 
 
 PLAN_ERRORS = "plan-erreurs.json"  # data/notion/plan-erreurs.json : erreurs par client du dernier « plan »

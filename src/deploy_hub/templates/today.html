@@ -10,7 +10,8 @@
   <div>
     <h1>{{ "Bonsoir" if hour >= 18 or hour < 5 else "Bonjour" }}. <span class="muted">{{ days[today.weekday()] | capitalize }} {{ today.day }} {{ months[today.month - 1] }}</span></h1>
     <p class="jarvis-line">
-      {% if not deployments %}Aucun client suivi pour l'instant.
+      {% if not deployments and bau_board.synced %}Aucun client suivi : l'équipe a <a class="count-link" href="/bau"><strong>{{ bau_board.open | length }}</strong> demande(s) BAU ouverte(s)</a>.
+      {% elif not deployments %}Aucun client suivi pour l'instant.
       {% elif late or ko or due_today %}Jarvis a relevé
         {%- if late %} <a class="count-link" href="{{ links.retard.href }}"{% if links.retard.ticket %} data-ticket{% endif %}><strong>{{ late | length }}</strong> élément(s) en retard</a>{% endif %}
         {%- if due_today %}{{ "," if late }} <a class="count-link" href="{{ links.aujourdhui.href }}"{% if links.aujourdhui.ticket %} data-ticket{% endif %}><strong>{{ due_today | length }}</strong> échéance(s) aujourd'hui</a>{% endif %}
@@ -20,7 +21,7 @@
   </div>
   <div class="head-side"><a class="btn-primary" href="/brief" title="Le résumé du jour en texte, à copier pour Slack ou le daily">{{ ic.icon("sun") }} Brief du matin</a></div>
 </div>
-{% if not deployments %}
+{% if not deployments and not bau_board.synced %}
 <section class="panel empty-state">
   <h2>Ajoute ton premier client</h2>
   <p>Il suffit de son nom et du lien de sa fiche dans la base Notion « Clients en déploiement ». Les clients déjà ajoutés et pas encore synchronisés sont dans <a href="/clients">Clients</a>.</p>
@@ -28,6 +29,16 @@
 </section>
 {% endif %}
 {{ charts.stats([("En retard", late | length, "ko", links.retard), ("À échéance aujourd'hui", due_today | length, "todo", links.aujourdhui), ("Dans les 7 jours", due_week | length, "", links.semaine), ("Injections KO", ko | length, "ko", links.ko)]) }}
+
+{# Demandes BAU (page BAU réglée et synchronisée) : où en est l'équipe, d'un coup d'œil ; chaque segment ouvre la page BAU. #}
+{% if bau_board.synced and bau_board.demandes %}
+{% set bau_open = bau_board.open %}
+{% set bau_late = bau_open | selectattr("due") | selectattr("due", "lt", today) | list %}
+<section class="panel glance">
+  <h2 class="glance-title"><a href="/bau">BAU</a><span class="badge">{{ bau_open | length }} demande(s) ouverte(s)</span>{% if bau_late %}<span class="badge g-ko">{{ bau_late | length }} en retard</span>{% endif %}</h2>
+  <div class="glance-wide">{{ charts.segbar("", bau_board.groups, "demandes", slim=true, filter_key="groupe", href="/bau", hrefs={"done": "/bau?tous=true"}) }}</div>
+</section>
+{% endif %}
 
 {# Mes tickets épinglés : tout en haut, juste sous les compteurs. #}
 {% include "_pins.html" %}
