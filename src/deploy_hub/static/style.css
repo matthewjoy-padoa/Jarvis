@@ -1790,13 +1790,14 @@ details.filter.multi { position: relative; font-size: 13px; }
 .flow-bot.is-dragging .bot { opacity: .18; }  /* sa place, vide, pendant qu'il vole */
 .flow-bot.is-dragging .bot-wrap::after { display: none; }
 .is-dragging-agent, .is-dragging-agent * { cursor: grabbing !important; }
-/* L'armure en vol : copie de l'agent au-dessus de la page, réacteurs allumés, halo qui pulse, bras écartés */
+/* L'armure en vol : copie de l'agent au-dessus de la page, dans ses couleurs, réacteurs allumés, halo qui pulse, bras écartés */
 /* Pas de filter ni de will-change sur l'armure en vol : avec eux, la photo (image SVG) peut ne plus être peinte pendant le
    vol ; l'ombre est un dégradé posé sous ses pieds. */
 .bot-flyer { position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none; transform-origin: 50% 63%; }
 .bot-flyer::after { content: ""; position: absolute; left: 18%; right: 18%; bottom: -16px; height: 8px; border-radius: 50%;
   background: radial-gradient(closest-side, rgba(0, 0, 0, .22), transparent); }
 .bot-flyer .bot { display: block; overflow: visible; }
+.bot-flyer.is-ko .im-face { filter: grayscale(1) contrast(.9); }
 .bot-flyer .im-jets { animation: bot-flame .09s ease-in-out infinite alternate; transform-origin: 50% 0; }
 .bot-flyer .im-halo { animation: bot-pulse .8s ease-in-out infinite; }
 .bot-flyer .im-arm-l { transform: rotate(24deg); } .bot-flyer .im-arm-r { transform: rotate(-24deg); }

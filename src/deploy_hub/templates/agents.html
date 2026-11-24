@@ -70,7 +70,7 @@
 </section>
 <div class="flow-archive" data-archive-zone aria-live="polite"><span>{{ ic.icon("archive") }} Archiver : dépose ici un agent fini</span><small class="muted" data-archive-out></small></div>
 <script>
-  // Déplacer un agent : il s'envole comme une armure d'Iron Man (réacteurs allumés, penché dans le sens du vol, traînée de
+  // Déplacer un agent : il s'envole comme une armure d'Iron Man, dans ses propres couleurs (réacteurs allumés, penché dans le sens du vol, traînée de
   // fumée) et suit la souris ou le doigt. Lâché dans sa colonne, il atterrit à la place choisie (ordre gardé) ; lâché sur
   // « Archiver », il plonge dedans ; refusé ou lâché ailleurs, il rentre à sa place. Un simple clic ouvre toujours l'agent.
   (() => {
@@ -80,8 +80,6 @@
     const post = (url, body) => fetch(url, {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded"}, body});
     const JETS = '<g class="im-jets"><path class="im-fire" d="M17 44.5h5.4l-2.7 8zM25.6 44.5h5.4l-2.7 8z"/><path class="im-spark" d="M18.5 44.5h2.4l-1.2 4.4zM27.1 44.5h2.4l-1.2 4.4z"/></g>';
     const HALO = '<circle class="im-halo" cx="24" cy="27.4" r="3.7"/>';
-    const flying = document.querySelector(".flow-lane.flow-in_progress");  // l'armure rouge et or des agents en vol
-    const suit = flying ? getComputedStyle(flying) : null;
     let drag = null;
 
     const flip = (lane, move) => {  // les voisins glissent de leur ancienne place à la nouvelle
@@ -101,7 +99,9 @@
       flyer.append(svg);
       svg.insertAdjacentHTML("afterbegin", JETS);
       if (!svg.querySelector(".im-halo")) svg.querySelector(".im-core").insertAdjacentHTML("beforebegin", HALO);
-      if (suit) for (const v of ["--suit-a", "--suit-b", "--suit-glow"]) flyer.style.setProperty(v, suit.getPropertyValue(v));
+      const own = getComputedStyle(d.el.querySelector(".bot"));  // il garde son armure : couleurs de sa colonne ou de son état
+      for (const v of ["--suit-a", "--suit-b", "--suit-glow"]) flyer.style.setProperty(v, own.getPropertyValue(v));
+      flyer.classList.toggle("is-ko", !!d.el.closest(".flow-ko"));  // l'armure en échec garde sa photo grise
       document.body.append(flyer);
       document.body.classList.add("is-dragging-agent");
       d.el.classList.add("is-dragging");
