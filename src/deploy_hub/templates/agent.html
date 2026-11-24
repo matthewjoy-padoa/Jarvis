@@ -2,9 +2,18 @@
 {% block title %}Agent #{{ run.id }} · Jarvis{% endblock %}
 {% block content %}
 <p class="muted"><a href="/agents">← Agents</a></p>
-<div class="page-head">
-  <h1>Agent #{{ run.id }} · {{ run.client }}</h1>
+{% import "_icons.html" as ic %}
+<div class="page-head agent-head">
+  <h1>{% if run.pinned %}{{ ic.icon("pin", "Épinglé", "ic-pin") }} {% endif %}{{ run.name }} <span class="muted">· agent #{{ run.id }} · {{ run.client }}</span></h1>
+  <form method="post" action="/agents/{{ run.id }}/epingler"><button type="submit" class="secondary">{{ ic.icon("pin") }} {{ "Désépingler" if run.pinned else "Épingler" }}</button></form>
 </div>
+<details class="agent-rename"><summary>Renommer</summary>
+  <form method="post" action="/agents/{{ run.id }}/renommer" class="toolbar">
+    <label class="sr-only" for="titre-{{ run.id }}">Nom de l'agent</label>
+    <input id="titre-{{ run.id }}" name="titre" value="{{ run.title }}" maxlength="120" placeholder="{{ run.subject }}">
+    <button type="submit">Enregistrer</button><span class="muted">Vide : le sujet, « {{ run.subject }} ».</span>
+  </form>
+</details>
 <dl class="meta-list">
   <dt>Sujet</dt><dd><a href="/deploiements/{{ run.slug }}/recette">{{ run.subject }}</a></dd>
   <dt>Branche</dt><dd><code>{{ run.branch }}</code></dd>

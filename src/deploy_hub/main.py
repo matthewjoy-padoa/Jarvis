@@ -827,7 +827,7 @@ def agents(request: Request):
     """Historique des lancements : agents, et une carte par run de DAG (suivis, enchaînements, lancements sans suivi)."""
     for run in claude.runs:
         claude.refresh_context(run)  # agents en cours : où en est leur contexte
-    runs = [r for _, r in sorted(enumerate(claude.runs), key=lambda p: (p[1].rank is None, p[1].rank or 0, p[0]))]  # ordre choisi, puis récents
+    runs = [r for _, r in sorted(enumerate(claude.runs), key=lambda p: (not p[1].pinned, p[1].rank is None, p[1].rank or 0, p[0]))]  # épinglés, ordre choisi, récents
     archived = claude.archived()
     return _render(request, "agents.html", "/agents", runs=runs, archived_count=len(archived),
                    cards=board(dag_watch, dag_chains.chains, airflow.runs), usage=usage(claude.runs + archived))
@@ -918,6 +918,23 @@ def agent_archive(request: Request, run_id: int):
     if not result.ok:
         return HTMLResponse(result.message, status_code=409)
     return HTMLResponse(result.message, headers={"HX-Redirect": "/agents"})
+
+
+@app.post("/agents/{run_id}/renommer")
+def agent_rename(request: Request, run_id: int, titre: str = Form("")):
+    """Nom de l'agent, modifié depuis sa page ; vide : il reprend son sujet."""
+    _run_or_404(run_id)
+    claude.rename(run_id, titre)
+    return RedirectResponse(f"/agents/{run_id}", status_code=303)
+
+
+@app.post("/agents/{run_id}/epingler")
+def agent_pin(request: Request, run_id: int):
+    """Épingle ou désépingle depuis la page de l'agent (retour sur la page d'où vient le clic)."""
+    _run_or_404(run_id)
+    claude.toggle_pin(run_id)
+    back = request.headers.get("referer") or f"/agents/{run_id}"
+    return RedirectResponse(back if back.startswith(str(request.base_url)) or back.startswith("/") else f"/agents/{run_id}", status_code=303)
 
 
 @app.post("/agents/{run_id}/ressortir")
