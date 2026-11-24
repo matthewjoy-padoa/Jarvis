@@ -57,8 +57,8 @@ FIELDS = (
           "Id de la page Notion qui liste les dashboards des clients (annuaire de « Ajouter un client »). Vide : « Liste des dashboards "
           "pour le déploiement des nouveaux clients »", section=NOTION),
     Field("JARVIS_NOTION_BAU", "Page des demandes BAU", "text",
-          "Lien (ou id) d'une page projet ou BAU de la base Notion « Equipes OPS - Projets et BAU », par exemple « BAU équipe "
-          "intégration - TECHNIQUE » : ses actions deviennent la page « BAU » de Jarvis. Vide : pas de page BAU", section=NOTION),
+          "Lien (ou id) d'une page projet ou BAU de la base Notion « Equipes OPS - Projets et BAU » : ses actions deviennent la "
+          "page « BAU » de Jarvis. Vide : « BAU équipe intégration - TECHNIQUE », la page de toute l'équipe", section=NOTION),
     Field("JARVIS_BAU_SQUADS", "Vues de squad (BAU)", "text",
           "Vues Notion lues telles quelles pour le sélecteur de squad de la page BAU, « nom | lien de la vue » séparées par « ; ». "
           "Vide : SPSTA et Plateform, les vues « Action squad » de la page BAU de l'équipe intégration", section=NOTION),

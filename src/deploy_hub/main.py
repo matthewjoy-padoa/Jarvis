@@ -346,14 +346,7 @@ PAGES = [
     ("/agents", "Agents"),
     ("/bau", "BAU"),
 ]
-NAV_PAGES = [p for p in PAGES if p[0] != "/clients"]
-
-
-def _nav_pages() -> list[tuple[str, str]]:
-    """Barre du haut. « BAU » n'y est que si une page BAU est réglée (JARVIS_NOTION_BAU), même mal réglée : la page dit
-    alors quoi corriger. Relu à chaque page : le réglage s'applique sans relancer Jarvis."""
-    shown = bau.enabled() or bool(bau.problem())
-    return [p for p in NAV_PAGES if p[0] != "/bau" or shown]
+NAV_PAGES = [p for p in PAGES if p[0] != "/clients"]  # « BAU » toujours : la page de l'équipe intégration est suivie par défaut
 
 
 CLIENT_COOKIE = "jarvis_client"  # client en cours : celui de la dernière fiche ouverte
@@ -452,7 +445,7 @@ def _render(request: Request, template: str, active: str, **context) -> HTMLResp
         request,
         template,
         {
-            "pages": _nav_pages(),
+            "pages": NAV_PAGES,
             "current": _current(request),
             # Dock de l'équipe BAU (ses liens) : sur ses pages, et partout quand aucun client n'est suivi (sinon : celui du client).
             "bau_dock": bau.load_links() if bau.enabled() and (active == "/bau" or _current(request) is None) else None,
