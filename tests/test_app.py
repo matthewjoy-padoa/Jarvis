@@ -687,3 +687,21 @@ def test_agents_are_archived_from_their_page_or_by_drag_and_drop_and_can_be_reor
     second.status = "terminé"
     back = client.post(f"/agents/{first.id}/ressortir")
     assert back.headers["HX-Redirect"] == f"/agents/{first.id}" and claude.get(first.id)
+
+
+def test_an_agent_is_renamed_and_pinned_from_its_page_and_pinned_ones_lead_the_schema():
+    claude.runs.clear()
+    for _ in range(2):
+        client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief"})
+    first, second = sorted(claude.runs, key=lambda r: r.id)
+    for run in (first, second):
+        run.status = "terminé"
+    page = client.get(f"/agents/{first.id}").text
+    assert f'action="/agents/{first.id}/renommer"' in page and "Épingler" in page
+    r = client.post(f"/agents/{first.id}/renommer", data={"titre": "Champ de vision"}, follow_redirects=False)
+    assert r.status_code == 303 and first.title == "Champ de vision"
+    client.post(f"/agents/{first.id}/epingler", follow_redirects=False)
+    assert first.pinned and "Désépingler" in client.get(f"/agents/{first.id}").text
+    listing = client.get("/agents").text
+    assert "Champ de vision" in listing and 'class="bot-pin"' in listing
+    assert listing.index(f'data-agent="{first.id}" draggable') < listing.index(f'data-agent="{second.id}" draggable')  # épinglé d'abord

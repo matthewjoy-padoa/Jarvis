@@ -68,6 +68,12 @@ class AgentRun:
     archived_at: datetime | None = None  # rangé dans les archives (agents-archive.json) : hors de la page Agents
     rank: int | None = None  # place choisie à la main dans sa colonne du schéma (glisser-déposer) ; None : la plus récente d'abord
     log_removed: bool = False  # journal effacé par le rangement automatique : la fiche garde compte rendu, coût et PR
+    title: str = ""  # nom donné à la main ; vide : le sujet (« retour 1B7052 »), qui reste la clé du retour
+    pinned: bool = False  # épinglé : en tête de sa colonne, jamais archivé par le rangement automatique
+
+    @property
+    def name(self) -> str:
+        return self.title or self.subject
 
     @property
     def report(self) -> str:
@@ -155,6 +161,7 @@ COUNTED = ("cost_usd", "num_turns") + tuple(name for name, _, _ in TOKEN_KINDS) 
 REPLY, RELAUNCH = "réponse", "relance"  # ce qui ouvre un nouveau passage
 ARCHIVE_DAYS, LOG_DAYS = 30, 90  # rangement automatique : archivage des agents finis, puis effacement de leur journal
 TIDY_EVERY = timedelta(days=1)
+TITLE_MAX = 120
 WAITING, ANSWERED = "question en attente", "répondu"
 AGENT_STATUSES = {"préparation": IN_PROGRESS, "en cours": IN_PROGRESS, "terminé": DONE, WAITING: TODO, ANSWERED: DONE,
                   "échec": KO, "arrêté": KO, "délai dépassé": KO, "interrompu": KO}
@@ -607,6 +614,27 @@ class ClaudeRunner:
             self._save()
         return ActionResult(True, f"Agent #{run_id} ressorti des archives.", False, str(run_id))
 
+    def _edit(self, run_id: int, change) -> AgentRun | None:
+        """Change une fiche, suivie ou archivée, et l'enregistre là où elle est."""
+        with self._lock:
+            if (run := self.get(run_id)):
+                change(run)
+                self._save()
+                return run
+            archive = self.archived()
+            if (run := next((r for r in archive if r.id == run_id), None)):
+                change(run)
+                self._save_archive(archive)
+            return run
+
+    def rename(self, run_id: int, title: str) -> AgentRun | None:
+        """Nom choisi pour l'agent ; vide : il reprend son sujet."""
+        title = " ".join((title or "").split())[:TITLE_MAX]
+        return self._edit(run_id, lambda run: setattr(run, "title", title))
+
+    def toggle_pin(self, run_id: int) -> AgentRun | None:
+        return self._edit(run_id, lambda run: setattr(run, "pinned", not run.pinned))
+
     def reorder(self, ids: list[int]) -> None:
         """Ordre choisi dans une colonne du schéma : chaque agent cité prend sa place."""
         with self._lock:
@@ -631,7 +659,8 @@ class ClaudeRunner:
         if not force and self._tidied and now - self._tidied < TIDY_EVERY:
             return
         self._tidied = now
-        for run in [r for r in self.runs if self.archivable(r) and r.ended_at and now - r.ended_at > timedelta(days=self.archive_days)]:
+        for run in [r for r in self.runs if self.archivable(r) and not r.pinned and r.ended_at
+                    and now - r.ended_at > timedelta(days=self.archive_days)]:  # un agent épinglé reste
             self.archive(run.id, now)
         with self._lock:
             archive = self.archived()

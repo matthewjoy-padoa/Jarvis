@@ -55,8 +55,8 @@
       {% for r in found[:24] %}
       {% set waiting = r.group == "todo" %}
       <a class="flow-node flow-bot{{ ' is-sim' if r.simulated }}{{ ' is-waiting' if waiting }}" href="/agents/{{ r.id }}" data-agent="{{ r.id }}" draggable="true" style="--i: {{ loop.index0 }}">
-        <span class="bot-wrap">{{ bot("waiting" if waiting else key, heads | au_hasard(r.id)) }}</span><span class="bot-id">#{{ r.id }}</span>
-        <span class="flow-tip" role="tooltip"><strong>{{ r.subject }}</strong>
+        <span class="bot-wrap">{{ bot("waiting" if waiting else key, heads | au_hasard(r.id)) }}{% if r.pinned %}<span class="bot-pin" title="Épinglé">{{ ic.icon("pin") }}</span>{% endif %}</span><span class="bot-id">#{{ r.id }}</span>
+        <span class="flow-tip" role="tooltip"><strong>{{ r.name }}</strong>
           <span>{{ r.client }} · {{ r.status }}{{ " (simulé)" if r.simulated }}</span>
           <span>Lancé le {{ r.started_at.strftime("%d/%m à %H:%M") }}{% if not r.simulated %} · {{ r.duration | duree }}{% endif %}</span>
           {% if r.tokens is not none %}<span>{{ r.tokens | tokens }} tokens{% if r.context_pct is not none %} · contexte {{ r.context_pct }} %{% endif %}</span>
@@ -123,7 +123,7 @@
     <tr data-agent="{{ r.id }}">
       <td><a href="/agents/{{ r.id }}">#{{ r.id }}</a></td><td class="muted">{{ r.started_at.strftime("%d/%m %H:%M") }}</td>
       <td><a href="/deploiements/{{ r.slug }}/recette">{{ r.client }}</a></td>
-      <td><a href="/agents/{{ r.id }}">{{ r.subject }}</a></td>
+      <td>{% if r.pinned %}{{ ic.icon("pin", "Épinglé", "ic-pin") }} {% endif %}<a href="/agents/{{ r.id }}">{{ r.name }}</a>{% if r.title %} <span class="muted">· {{ r.subject }}</span>{% endif %}</td>
       <td><code>{{ r.branch }}</code></td>
       <td><span class="badge g-{{ r.group }}">{{ r.status }}</span>{% if r.simulated %} {{ ic.icon("flask", "Simulation", "ic-muted") }}{% endif %}</td>
       <td data-sort="{{ r.duration.total_seconds() | int }}">{% if not r.simulated %}{{ r.duration | duree }}{% endif %}</td>

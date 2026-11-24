@@ -558,3 +558,17 @@ def test_a_worktree_with_uncommitted_work_is_kept_when_archiving(repo, fake_clau
     worktree = Path(runner.get(1).worktree)
     result = runner.archive(1)  # argv.json, non suivi, est encore là
     assert result.ok and "Worktree gardé" in result.message and worktree.is_dir()
+
+
+def test_an_agent_can_be_renamed_and_pinned_and_a_pinned_agent_is_never_tidied_away(tmp_path):
+    runner = ClaudeRunner(tmp_path, tmp_path / "agents", archive_days=30)
+    old = datetime(2026, 9, 1, 9)
+    runner.runs.append(AgentRun(1, "acme", "Acme", "retour R-1", "fix-1", "x", old, "terminé", ended_at=old))
+    runner.runs.append(AgentRun(2, "acme", "Acme", "retour R-2", "fix-2", "x", old, "terminé", ended_at=old))
+    assert runner.rename(1, "  Champ   de vision\n manquant ").title == "Champ de vision manquant" and runner.get(1).name == "Champ de vision manquant"
+    assert runner.rename(1, "x" * 300).title == "x" * 120 and runner.rename(1, "  ").name == "retour R-1"  # vide : le sujet
+    assert runner.toggle_pin(1).pinned and runner.rename(99, "?") is None
+    runner.tidy(datetime(2026, 11, 24, 9))
+    assert [r.id for r in runner.runs] == [1]  # épinglé : reste ; l'autre, fini depuis plus de 30 jours, est archivé
+    assert runner.rename(2, "Archivé renommé").title == "Archivé renommé" and runner.archived()[0].name == "Archivé renommé"
+    assert ClaudeRunner(tmp_path, tmp_path / "agents").get(1).pinned  # gardé au redémarrage

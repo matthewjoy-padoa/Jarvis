@@ -12,7 +12,7 @@
   {% for r in runs %}
     <tr>
       <td><a href="/agents/{{ r.id }}">#{{ r.id }}</a></td><td class="muted">{{ r.started_at.strftime("%d/%m/%Y") }}</td>
-      <td>{{ r.client }}</td><td><a href="/agents/{{ r.id }}">{{ r.subject }}</a></td>
+      <td>{{ r.client }}</td><td><a href="/agents/{{ r.id }}">{{ r.name }}</a></td>
       <td><span class="badge g-{{ r.group }}">{{ r.status }}</span></td>
       <td class="muted">{{ r.archived_at.strftime("%d/%m/%Y") if r.archived_at }}</td>
       <td>{% if r.pr_url %}<a href="{{ r.pr_url }}" target="_blank" rel="noopener">PR ↗</a>{% endif %}</td>
