@@ -43,7 +43,10 @@
       if (!card || e.target.closest(INTERACTIVE) || String(window.getSelection())) return;
       a = card.querySelector("a[data-ticket], a[data-row-link]");
       if (!a) return;
-      if (!a.hasAttribute("data-ticket")) { a.click(); return; }  // lien externe : le navigateur applique sa cible
+      if (!a.hasAttribute("data-ticket")) {  // lien simple (agent, PR GitHub) : le navigateur applique sa cible
+        if (e.metaKey || e.ctrlKey) window.open(a.href, "_blank", "noopener"); else a.click();
+        return;
+      }
       if (e.metaKey || e.ctrlKey) { window.open(a.href, "_blank", "noopener"); return; }
     }
     if (e.metaKey || e.ctrlKey || e.shiftKey || !window.htmx) return;

@@ -241,8 +241,8 @@
   <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>Sujet</th><th>Branche</th><th data-filter>État</th><th>Durée</th><th>Tokens</th><th>PR</th></tr></thead>
   <tbody>
   {% for r in runs %}
-    <tr data-agent="{{ r.id }}">
-      <td><a href="/agents/{{ r.id }}">#{{ r.id }}</a></td><td class="muted">{{ r.started_at.strftime("%d/%m %H:%M") }}</td>
+    <tr data-agent="{{ r.id }}" data-ticket-card title="Ouvrir l'agent #{{ r.id }}">
+      <td><a href="/agents/{{ r.id }}" data-row-link>#{{ r.id }}</a></td><td class="muted">{{ r.started_at.strftime("%d/%m %H:%M") }}</td>
       <td><a href="/deploiements/{{ r.slug }}/recette">{{ r.client }}</a></td>
       <td>{% if r.pinned %}{{ ic.icon("pin", "Épinglé", "ic-pin") }} {% endif %}<a href="/agents/{{ r.id }}">{{ r.name }}</a>{% if r.title %} <span class="muted">· {{ r.subject }}</span>{% endif %}</td>
       <td><code>{{ r.branch }}</code></td>

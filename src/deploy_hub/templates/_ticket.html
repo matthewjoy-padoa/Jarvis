@@ -56,7 +56,7 @@
   <section class="ticket-section">
     <h3>Agents</h3>
     {% for run in runs %}
-    <p class="ticket-run"><a href="/agents/{{ run.id }}">Agent #{{ run.id }}</a> <span class="badge g-{{ run.group }}">{{ run.status }}</span>
+    <p class="ticket-run" data-ticket-card title="Ouvrir l'agent #{{ run.id }}"><a href="/agents/{{ run.id }}" data-row-link>Agent #{{ run.id }}</a> <span class="badge g-{{ run.group }}">{{ run.status }}</span>
       <span class="muted">{{ run.started_at.strftime("%d/%m %H:%M") }} · <code>{{ run.branch }}</code></span>
       {% if run.pr_url %}<a href="{{ run.pr_url }}" target="_blank" rel="noopener">PR ↗</a>{% endif %}</p>
     {% else %}<p class="muted">Aucun agent lancé sur ce retour.</p>{% endfor %}

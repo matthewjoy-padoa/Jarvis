@@ -548,7 +548,7 @@ def test_agents_page_shows_tokens_chart(monkeypatch):
     assert page.count('<svg class="ring') <= 1 and "ring-cell" not in page  # au plus un anneau : le bilan
     assert "Tokens et durée" in page and "Cache relu" in page and "4,6 M" in page  # 2 agents finis : 3 421 000 + 1 221 000
     assert 'href="#dags" data-pane="pane-dags"' in page and page.index('id="pane-dags"') < page.index("Aucun DAG lancé depuis Jarvis")  # onglet DAG
-    assert 'class="flow-lane flow-in_progress"' in page and page.count('<a class="flow-node') == 3 and '<tr data-agent="2">' in page
+    assert 'class="flow-lane flow-in_progress"' in page and page.count('<a class="flow-node') == 3 and '<tr data-agent="2" data-ticket-card' in page
 
 
 
@@ -717,3 +717,17 @@ def test_dragging_an_agent_is_animated_and_calm_when_motion_is_reduced():
     assert 'matchMedia("(prefers-reduced-motion: reduce)")' in page
     css = (__import__("pathlib").Path(__file__).parents[1] / "src" / "deploy_hub" / "static" / "style.css").read_text()
     assert "@keyframes archive-ready" in css and "@keyframes archive-swallow" in css
+
+
+def test_the_whole_agent_card_opens_the_agent():
+    claude.runs.clear()
+    client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief"})
+    run = claude.runs[0]
+    run.status = "terminé"
+    page = client.get("/agents").text
+    assert f'<tr data-agent="{run.id}" data-ticket-card' in page and f'<a href="/agents/{run.id}" data-row-link>' in page
+    assert f'class="ticket-run" data-ticket-card' in client.get("/deploiements/client-demo/ticket/retour/R-03").text
+    claude.archive(run.id)
+    assert f'<a href="/agents/{run.id}" data-row-link>' in client.get("/agents/archives").text
+    css = (__import__("pathlib").Path(__file__).parents[1] / "src" / "deploy_hub" / "static" / "style.css").read_text()
+    assert ".flow-tip::before" in css  # la bulle du schéma reste ouverte quand la souris la rejoint
