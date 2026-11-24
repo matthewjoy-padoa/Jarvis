@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from deploy_hub.sources.claude_runner import (ANSWERED, INSTRUCTION, RESUME_INSTRUCTION, WAITING, ClaudeRunner, agent_branch,
+from deploy_hub.sources.claude_runner import (INSTRUCTION, RESUME_INSTRUCTION, WAITING, ClaudeRunner, agent_branch,
                                                agent_questions, answer_text, chosen_answer, find_pr, final_status, read_log,
                                                report_of, split_questions)
 from deploy_hub.sources.notifications import NotificationStore
@@ -286,14 +286,20 @@ def test_the_answer_resumes_the_same_session_in_the_same_worktree(repo, fake_cla
     runner.launch_retour(D, R, prompt="Brief relu")
     _wait(runner, 1)
     monkeypatch.setenv("FAKE_MODE", "ok")
+    worktree = runner.get(1).worktree
     result = runner.reply(1, "  Au niveau client.  ")
-    assert result.ok and "Agent #2 lancé" in result.message
-    _wait(runner, 2)
-    first, second = runner.get(1), runner.get(2)
-    assert first.status == ANSWERED and runner.follow_up(1) is second
-    assert second.reply_to == 1 and second.resume == "sess-fix-acme-r-7" and second.branch == first.branch
-    assert second.status == "terminé" and second.pr_url.endswith("/pull/4242") and second.worktree == first.worktree
-    seen = json.loads((Path(second.worktree) / "argv.json").read_text())
+    assert result.ok and "Agent #1 reprend avec ta réponse" in result.message and result.run_id == "1"
+    _wait(runner, 1)
+    run = runner.get(1)
+    assert len(runner.runs) == 1 and runner.follow_up(1) is None  # pas de nouvel agent : la même fiche a repris
+    assert run.resume == "sess-fix-acme-r-7" and run.status == "terminé" and run.pr_url.endswith("/pull/4242") and run.worktree == worktree
+    assert [p["status"] for p in run.passages] == [WAITING] and run.passages[0]["answer"] == "Au niveau client."
+    assert ("réponse", "Au niveau client.") in runner.log(run)  # repère de reprise dans le journal, qui garde le premier passage
+    assert run.duration >= run.passages[0]["ended_at"] - run.passages[0]["started_at"]
+    assert run.num_turns == 5 and run.cost_usd == 0.42 and run.passages[0]["num_turns"] == 2  # totaux de la fiche, détail par passage
+    reloaded = ClaudeRunner(repo, tmp_path / "agents").get(1)  # relu après redémarrage : passages et dates intacts
+    assert reloaded.passages[0]["started_at"] == run.passages[0]["started_at"] and reloaded.duration == run.duration
+    seen = json.loads((Path(run.worktree) / "argv.json").read_text())
     assert seen["argv"][:2] == ["-p", RESUME_INSTRUCTION] and seen["argv"][seen["argv"].index("--resume") + 1] == "sess-fix-acme-r-7"
     assert seen["brief"] == "Au niveau client."  # la session a déjà le brief : seule la réponse part
 
@@ -307,8 +313,8 @@ def test_without_the_same_worktree_the_answer_restarts_from_the_brief(repo, fake
     _git(repo, "worktree", "remove", "--force", runner.get(1).worktree)  # worktree disparu : la session n'est plus reprenable
     monkeypatch.setenv("FAKE_MODE", "ok")
     assert runner.reply(1, "Au niveau client.").ok
-    _wait(runner, 2)
-    second = runner.get(2)
+    _wait(runner, 1)
+    second = runner.get(1)
     seen = json.loads((Path(second.worktree) / "argv.json").read_text())
     assert second.resume == "" and "--resume" not in seen["argv"] and seen["argv"][:2] == ["-p", INSTRUCTION]
     assert seen["brief"].startswith("Brief relu") and "client ou logiciel ?" in seen["brief"] and "<reponse>\nAu niveau client." in seen["brief"]
@@ -345,13 +351,16 @@ def test_when_the_resumed_agent_fails_the_answer_can_be_sent_again_from_the_brie
     _wait(runner, 1)
     monkeypatch.setenv("FAKE_MODE", "fail")  # ex. session introuvable : --resume échoue
     assert runner.reply(1, "Au niveau client.").ok
-    _wait(runner, 2)
-    assert runner.get(2).status == "échec" and runner.get(1).status == WAITING
+    _wait(runner, 1)
+    run = runner.get(1)
+    assert run.status == "échec" and not runner.reply(1, "encore").ok  # en erreur : on relance, on ne répond plus
     monkeypatch.setenv("FAKE_MODE", "ok")
-    assert runner.reply(1, "Au niveau client.").ok
-    _wait(runner, 3)
-    third = runner.get(3)
-    assert third.resume == "" and runner.follow_up(1) is third and third.status == "terminé" and runner.get(1).status == ANSWERED
+    assert runner.relaunch(1).ok
+    _wait(runner, 1)
+    seen = json.loads((Path(run.worktree) / "argv.json").read_text())
+    assert run.status == "terminé" and run.resume == "" and len(runner.runs) == 1
+    assert [p["status"] for p in run.passages] == [WAITING, "échec"]
+    assert seen["brief"].startswith("Brief relu") and "<reponse>\nAu niveau client." in seen["brief"]  # la réponse repart avec le brief
 
 
 def test_any_agent_ended_in_error_can_be_relaunched_with_the_same_brief(repo, fake_claude, tmp_path, monkeypatch):
@@ -360,15 +369,15 @@ def test_any_agent_ended_in_error_can_be_relaunched_with_the_same_brief(repo, fa
     runner.launch_retour(D, R, prompt="Brief relu")
     _wait(runner, 1)
     monkeypatch.setenv("FAKE_MODE", "ok")
+    worktree = runner.get(1).worktree
     result = runner.relaunch(1)
-    assert result.ok and "Agent #2 lancé" in result.message
-    _wait(runner, 2)
-    first, second = runner.get(1), runner.get(2)
-    assert runner.relaunched(1) is second and second.relaunch_of == 1 and second.branch == first.branch
-    assert second.worktree == first.worktree and second.status == "terminé" and second.resume == ""
-    seen = json.loads((Path(second.worktree) / "argv.json").read_text())
+    assert result.ok and "Agent #1 relancé" in result.message
+    _wait(runner, 1)
+    run = runner.get(1)
+    assert len(runner.runs) == 1 and run.worktree == worktree and run.status == "terminé" and run.resume == ""
+    seen = json.loads((Path(run.worktree) / "argv.json").read_text())
     assert seen["brief"] == "Brief relu" and "--resume" not in seen["argv"]
-    assert not runner.relaunch(2).ok and not runner.relaunch(99).ok  # terminé, puis inconnu
+    assert not runner.relaunch(1).ok and not runner.relaunch(99).ok  # terminé, puis inconnu
 
 
 @pytest.mark.parametrize("status", ["arrêté", "délai dépassé", "interrompu"])
@@ -378,7 +387,7 @@ def test_every_error_status_is_relaunchable(tmp_path, status):
     runner._start = lambda run: None
     runner.runs.append(__import__("deploy_hub.sources.claude_runner", fromlist=["AgentRun"]).AgentRun(
         1, "acme", "Acme", "retour R-1", "fix-acme-r-1", "Brief", datetime(2026, 11, 18, 9), status))
-    assert runner.relaunch(1).ok and runner.get(2).prompt == "Brief"
+    assert runner.relaunch(1).ok and len(runner.runs) == 1 and runner.get(1).prompt == "Brief" and runner.get(1).passages[0]["status"] == status
 
 
 def test_each_question_is_listed_with_its_details():

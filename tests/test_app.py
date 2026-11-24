@@ -434,7 +434,7 @@ def test_agent_page_shows_status_brief_and_log():
 
 
 def test_an_agent_with_questions_can_be_answered_from_its_page():
-    from deploy_hub.sources.claude_runner import ANSWERED, WAITING
+    from deploy_hub.sources.claude_runner import WAITING
     claude.runs.clear()
     client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief initial"})
     run = claude.runs[0]
@@ -451,14 +451,15 @@ def test_an_agent_with_questions_can_be_answered_from_its_page():
     assert schema.index("flow-lane flow-in_progress") < schema.index("flow-bot is-waiting") < schema.index("flow-lane flow-done")
     empty = client.post(f"/agents/{run.id}/repondre", data={"reponse": " "})
     assert "Écris ta réponse" in empty.text and "HX-Redirect" not in empty.headers
+    count = len(claude.runs)
     answered = client.post(f"/agents/{run.id}/repondre", data={"reponse_1": "Au niveau client.", "reponse_2": "", "reponse": "Merci"})
-    follow_up = claude.runs[0]
-    assert answered.headers["HX-Redirect"] == f"/agents/{follow_up.id}" and follow_up.reply_to == run.id
-    assert "<reponse>\nQuestion 1 : Client ou logiciel ?\n- client : apst2607 seul\nRéponse : Au niveau client." in follow_up.prompt
-    assert "Question 2 : Faut-il un test de non-régression ?\nRéponse : (pas de réponse)" in follow_up.prompt
-    assert "Précision : Merci" in follow_up.prompt
-    assert run.status == ANSWERED and f'href="/agents/{follow_up.id}"' in client.get(f"/agents/{run.id}").text
-    assert f'href="/agents/{run.id}"' in client.get(f"/agents/{follow_up.id}").text  # « Reprend l'agent #… »
+    assert answered.headers["HX-Redirect"] == f"/agents/{run.id}" and len(claude.runs) == count  # la même fiche repart
+    assert "<reponse>\nQuestion 1 : Client ou logiciel ?\n- client : apst2607 seul\nRéponse : Au niveau client." in run.stdin
+    assert "Question 2 : Faut-il un test de non-régression ?\nRéponse : (pas de réponse)" in run.stdin
+    assert "Précision : Merci" in run.stdin and run.prompt == "Brief initial"  # le brief reste celui de la fiche
+    assert run.status != WAITING and run.passages[-1]["status"] == WAITING and run.passages[-1]["next"] == "réponse"
+    page = client.get(f"/agents/{run.id}").text
+    assert "2 passages sur cette fiche" in page and "puis ta réponse" in page
 
 
 def test_each_agent_draws_a_head_and_keeps_it():
@@ -582,11 +583,12 @@ def test_an_agent_in_error_has_a_relaunch_button():
     assert 'hx-post="/agents/%d/relancer"' % run.id not in client.get(f"/agents/{run.id}").text  # terminé : pas de bouton
     run.status = "échec"
     assert 'hx-post="/agents/%d/relancer"' % run.id in client.get(f"/agents/{run.id}").text
+    count = len(claude.runs)
     r = client.post(f"/agents/{run.id}/relancer")
-    again = claude.runs[0]
-    assert r.headers["HX-Redirect"] == f"/agents/{again.id}" and again.relaunch_of == run.id and again.prompt == "Brief initial"
+    assert r.headers["HX-Redirect"] == f"/agents/{run.id}" and len(claude.runs) == count  # la même fiche repart
+    assert run.prompt == "Brief initial" and not run.stdin and run.passages[-1]["status"] == "échec"
     page = client.get(f"/agents/{run.id}").text
-    assert 'hx-post="/agents/%d/relancer"' % run.id not in page and f'href="/agents/{again.id}"' in page
+    assert 'hx-post="/agents/%d/relancer"' % run.id not in page and "puis relancé" in page
 
 
 def test_the_agent_form_says_before_the_click_why_no_agent_would_start(monkeypatch):
@@ -647,9 +649,8 @@ def test_structured_questions_offer_their_options_with_the_recommendation_checke
     assert 'name="choix_1" value="1" checked' in page and 'name="choix_1" value="2">' in page and "recommandé" in page
     assert "4 clients à revérifier" in page and "la copie a une autre raison d'être" in page and "<code>a.sql:40</code>" in page
     answered = client.post(f"/agents/{run.id}/repondre", data={"choix_1": "1", "reponse_1": ""})  # un clic : la recommandation
-    follow_up = claude.runs[0]
-    assert answered.headers["HX-Redirect"] == f"/agents/{follow_up.id}"
-    assert "Question 1 : Corriger côté client ou logiciel ?\nCopie client en `a.sql:40`.\nRéponse : option « client »" in follow_up.prompt
+    assert answered.headers["HX-Redirect"] == f"/agents/{run.id}"
+    assert "Question 1 : Corriger côté client ou logiciel ?\nCopie client en `a.sql:40`.\nRéponse : option « client »" in run.stdin
 
 
 def test_retour_statuses_put_the_ball_where_it_is():

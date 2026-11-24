@@ -58,6 +58,13 @@ class AgentRun:
     reply_to: int | None = None  # agent dont celui-ci reprend le travail après une réponse à ses questions
     resume: str = ""  # session reprise (--resume) ; vide : nouvelle session
     relaunch_of: int | None = None  # agent en erreur que celui-ci relance avec le même brief
+    # Une réponse aux questions ou une relance reprend la même fiche : chaque reprise range ici le passage qu'elle clôt
+    # (début, fin, état, compte rendu, coût et tokens de ce passage, ce qui l'a suivi). Les champs de la fiche gardent les
+    # totaux (coût, tours, tokens) et le dernier passage (état, compte rendu, contexte).
+    passages: list[dict] = field(default_factory=list)
+    passage_started_at: datetime | None = None  # début du passage en cours (None : le premier, started_at)
+    stdin: str = ""  # ce que reçoit le passage en cours (réponse, ou brief complété) ; vide : le brief (prompt)
+    log_offset: int = 0  # taille du journal au début du passage en cours : son résultat se lit après
 
     @property
     def report(self) -> str:
@@ -82,7 +89,9 @@ class AgentRun:
 
     @property
     def duration(self) -> timedelta:
-        return (self.ended_at or datetime.now()) - self.started_at
+        """Temps de travail : passages précédents et passage en cours, sans l'attente d'une réponse entre deux."""
+        done = sum((p["ended_at"] - p["started_at"] for p in self.passages if p.get("ended_at")), timedelta())
+        return done + (self.ended_at or datetime.now()) - (self.passage_started_at or self.started_at)
 
     @property
     def group(self) -> str:
@@ -139,6 +148,8 @@ def read_tokens(run: "AgentRun", result: dict) -> None:
         setattr(run, name, value if isinstance(value, int) and not isinstance(value, bool) else None)
 
 
+COUNTED = ("cost_usd", "num_turns") + tuple(name for name, _, _ in TOKEN_KINDS)  # additionnés d'un passage à l'autre
+REPLY, RELAUNCH = "réponse", "relance"  # ce qui ouvre un nouveau passage
 WAITING, ANSWERED = "question en attente", "répondu"
 AGENT_STATUSES = {"préparation": IN_PROGRESS, "en cours": IN_PROGRESS, "terminé": DONE, WAITING: TODO, ANSWERED: DONE,
                   "échec": KO, "arrêté": KO, "délai dépassé": KO, "interrompu": KO}
@@ -517,8 +528,11 @@ class ClaudeRunner:
             return []
         runs = []
         for item in items:
-            for key in ("started_at", "ended_at"):  # écrites en ISO par _save
+            for key in ("started_at", "ended_at", "passage_started_at"):  # écrites en ISO par _save
                 item[key] = datetime.fromisoformat(item[key]) if item.get(key) else None
+            for passage in item.get("passages") or []:
+                for key in ("started_at", "ended_at"):
+                    passage[key] = datetime.fromisoformat(passage[key]) if passage.get(key) else None
             run = AgentRun(**{k: v for k, v in item.items() if k in AgentRun.__dataclass_fields__})
             if run.status == "terminé":  # agents finis avant l'état « question en attente »
                 run.status = final_status(run)
@@ -596,7 +610,7 @@ class ClaudeRunner:
             self.runs.insert(0, run)
         self._save()
         self._start(run)
-        return ActionResult(True, f"Agent #{run.id} lancé sur {subject}, branche {branch}. Suivi dans Agents.", False)
+        return ActionResult(True, f"Agent #{run.id} lancé sur {subject}, branche {branch}. Suivi dans Agents.", False, str(run.id))
 
     def _git(self, *args: str, check: bool = True) -> subprocess.CompletedProcess:
         return subprocess.run(["git", "-C", str(self.orchestrator_dir), *args], capture_output=True, text=True, timeout=300, check=check)
@@ -638,12 +652,12 @@ class ClaudeRunner:
         log = self.log_path(run)
         timed_out = False
         try:
-            with log.open("w", encoding="utf-8") as out:
+            with log.open("a" if run.passages else "w", encoding="utf-8") as out:
                 proc = subprocess.Popen(self.build_command(run.resume), cwd=run.worktree, stdin=subprocess.PIPE, stdout=out,
                                         stderr=subprocess.STDOUT, text=True, env=self._env())
                 self._procs[run.id] = proc
                 try:
-                    proc.stdin.write(run.prompt)
+                    proc.stdin.write(run.stdin or run.prompt)
                     proc.stdin.close()
                 except BrokenPipeError:  # claude est déjà sorti (non connecté, option refusée) : son message est au journal
                     pass
@@ -657,14 +671,19 @@ class ClaudeRunner:
             return self.finished(run, "échec")
         finally:
             self._procs.pop(run.id, None)
-        text = log.read_text(encoding="utf-8", errors="replace")  # lu une fois : résultat final et lien de la PR
+        whole = log.read_text(encoding="utf-8", errors="replace")  # lu une fois : résultat final et lien de la PR
+        text = whole.encode("utf-8")[run.log_offset:].decode("utf-8", errors="replace")  # ce passage seulement
         result = next((e for e in reversed(list(_events(text))) if e.get("type") == "result"), {})
         run.cost_usd = result.get("total_cost_usd")
         run.num_turns = result.get("num_turns")
         read_tokens(run, result)
+        for name in COUNTED:  # totaux de la fiche : ce passage plus les précédents
+            before = [p[name] for p in run.passages if p.get(name) is not None]
+            if before:
+                setattr(run, name, sum(before) + (getattr(run, name) or 0))
         read_context(run, text)
         run.summary = (result.get("result") or "").strip()
-        run.pr_url = find_pr(text)
+        run.pr_url = find_pr(whole)  # une PR ouverte à un passage précédent reste celle de la fiche
         run.session_id = result.get("session_id") or run.session_id
         if run.id in self._stopped:
             status = "arrêté"
@@ -708,7 +727,7 @@ class ClaudeRunner:
             report = "" if ok else run.report
             body = run.pr_url or f"{run.subject} · branche {run.branch}" + (f" · {report[:200]}" if report else "")
             title = f"Agent #{run.id} {status}{' (simulé)' if run.simulated else ''} · {run.client}"
-            self.notifications.add(f"agent:{run.id}:{run.started_at.isoformat()}", "agent", "info" if ok else "warning",
+            self.notifications.add(f"agent:{run.id}:{(run.passage_started_at or run.started_at).isoformat()}", "agent", "info" if ok else "warning",
                                    title, body, f"/agents/{run.id}", run.client)
 
     def launch(self, d: Deployment, resource: str) -> ActionResult:
@@ -747,40 +766,69 @@ class ClaudeRunner:
         return self._child(run_id, "relaunch_of")
 
     def relaunch(self, run_id: int) -> ActionResult:
-        """Relance d'un agent fini en erreur (échec, arrêté, délai dépassé, interrompu) : nouvel agent, même branche et même brief,
-        nouvelle session. Le worktree existant est repris, avec ce que l'agent y avait déjà fait."""
-        old = self.get(run_id)
-        if not old or old.group != KO:
+        """Relance d'un agent fini en erreur (échec, arrêté, délai dépassé, interrompu) : même fiche, même branche, même brief,
+        nouvelle session. Le worktree existant est repris, avec ce que l'agent y avait déjà fait ; si le passage en erreur
+        suivait une réponse, elle repart avec le brief."""
+        run = self.get(run_id)
+        if not run or run.group != KO:
             return ActionResult(False, f"L'agent #{run_id} n'est pas en erreur : rien à relancer.", False)
-        prompt = old.prompt if not old.resume else "\n\n".join([self._brief(old), _tag("reponse", old.prompt)])  # reprise : réponse seule
-        return self._launch(old.slug, old.client, old.subject, old.branch, prompt, old.category, relaunch_of=old.id)
+        if run.resume and run.reply_to:  # ancienne fiche, lancée pour reprendre la session d'un autre agent : nouvel agent
+            prompt = "\n\n".join([self._brief(run), _tag("reponse", run.prompt)])
+            return self._launch(run.slug, run.client, run.subject, run.branch, prompt, run.category, relaunch_of=run.id)
+        answer = run.passages[-1].get("answer", "") if run.passages and run.passages[-1].get("next") == REPLY else ""
+        stdin = "\n\n".join([run.prompt, _tag("reponse", answer)]) if answer else ""
+        return self._resume(run, RELAUNCH, "", stdin, resume="")
 
     def _brief(self, run: AgentRun) -> str:
-        """Brief d'origine : un agent qui a repris une session n'a reçu que la réponse, on remonte à celui qui l'a lancée."""
+        """Brief d'origine : un ancien agent qui reprenait une session n'avait reçu que la réponse, on remonte à celui qui l'a lancée."""
         while run.resume and run.reply_to and (parent := self.get(run.reply_to)):
             run = parent
         return run.prompt
 
     def reply(self, run_id: int, answer: str) -> ActionResult:
-        """Réponse aux questions d'un agent : nouvel agent sur la même branche. Si le worktree n'a pas bougé, il reprend la session
-        Claude (--resume) et garde ce qu'il avait lu ; sinon il repart du brief, avec le compte rendu et la réponse."""
-        old, answer = self.get(run_id), (answer or "").strip()
-        previous = old and self.follow_up(old.id)  # suite déjà tentée, donc en échec : on ne reprend plus sa session
-        if not old or not self.can_reply(old, previous):
+        """Réponse aux questions d'un agent : la même fiche repart, sur la même branche. Si le worktree n'a pas bougé, elle reprend
+        sa session Claude (--resume) et garde ce qu'elle avait lu ; sinon elle repart du brief, avec son compte rendu et la réponse."""
+        run, answer = self.get(run_id), (answer or "").strip()
+        previous = run and self.follow_up(run.id)  # ancienne suite (fiche à part), donc en échec : on ne reprend plus sa session
+        if not run or not self.can_reply(run, previous):
             return ActionResult(False, f"L'agent #{run_id} n'attend pas de réponse.", False)
         if not answer:
             return ActionResult(False, "Écris ta réponse avant de relancer l'agent.", False)
-        here = self.worktree_of(old.branch)  # celui que prepare_worktree reprendra
-        same_place = not previous and bool(old.session_id) and old.worktree == str(here) and (here / ".git").exists()
-        prompt = answer if same_place else "\n\n".join([
-            self._brief(old),
-            _tag("echange_precedent", f"Un agent (#{old.id}) a commencé ce travail et s'est arrêté sur des questions. Son compte rendu :\n{old.summary}"),
+        here = self.worktree_of(run.branch)  # celui que prepare_worktree reprendra
+        same_place = not previous and bool(run.session_id) and run.worktree == str(here) and (here / ".git").exists()
+        stdin = answer if same_place else "\n\n".join([
+            self._brief(run),
+            _tag("echange_precedent", f"Tu as commencé ce travail et tu t'es arrêté sur des questions. Ton compte rendu :\n{run.summary}"),
             _tag("reponse", answer),
             "Reprends la mission en tenant compte de cette réponse."])
-        result = self._launch(old.slug, old.client, old.subject, old.branch, prompt, old.category,
-                              reply_to=old.id, resume=old.session_id if same_place else "")
-        return result
+        return self._resume(run, REPLY, answer, stdin, resume=run.session_id if same_place else "")
 
+    def _resume(self, run: AgentRun, why: str, answer: str, stdin: str, resume: str) -> ActionResult:
+        """Nouveau passage sur la même fiche : le passage fini est rangé dans run.passages, la fiche repart."""
+        if (problem := self.problem()):
+            return ActionResult(False, problem, False)
+        with self._lock:
+            if run.running or any(r.running and r.branch == run.branch for r in self.runs):
+                return ActionResult(False, f"Un agent travaille déjà sur la branche {run.branch} : attends sa fin ou arrête-le (Agents).", False)
+            if sum(r.running for r in self.runs) >= self.max_running:
+                return ActionResult(False, f"Déjà {self.max_running} agent(s) en cours : attends qu'un se termine.", False)
+            before = {name: sum(p[name] for p in run.passages if p.get(name) is not None) for name in COUNTED}
+            run.passages.append({
+                "started_at": run.passage_started_at or run.started_at, "ended_at": run.ended_at, "status": run.status,
+                "summary": run.summary, "next": why, "answer": answer,
+                # les champs de la fiche sont des totaux : ce passage, c'est le total moins les passages d'avant
+                **{name: None if getattr(run, name) is None else getattr(run, name) - before[name] for name in COUNTED}})
+            log = self.log_path(run)
+            run.log_offset = log.stat().st_size if log.is_file() else 0
+            if log.is_file():  # repère dans le journal : la page de l'agent montre où reprend le travail
+                with log.open("a", encoding="utf-8") as out:
+                    out.write(json.dumps({"type": "jarvis", "kind": why, "text": answer}, ensure_ascii=False) + "\n")
+            run.stdin, run.resume, run.status = stdin, resume, "préparation"
+            run.passage_started_at, run.ended_at, run.summary = datetime.now(), None, ""
+        self._save()
+        self._start(run)
+        what = "reprend avec ta réponse" if why == REPLY else "relancé"
+        return ActionResult(True, f"Agent #{run.id} {what}, branche {run.branch}. Suivi sur sa page.", False, str(run.id))
 
 def message_of(event: dict) -> dict:
     """Message d'un événement du journal de claude -p : un objet en général, mais Claude Code écrit aussi des événements
@@ -840,4 +888,6 @@ def read_log(log: Path) -> list[tuple[str, str]]:
             lines.append(("fin", f"{e.get('subtype', '')} · {e.get('num_turns', '?')} tours"))
         elif kind == "raw":
             lines.append(("brut", e["text"][:400]))
+        elif kind == "jarvis":  # repère écrit par Jarvis entre deux passages de la même fiche
+            lines.append((e.get("kind") or REPLY, e.get("text") or "Relancé avec le même brief."))
     return lines
