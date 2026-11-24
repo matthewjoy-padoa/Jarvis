@@ -14,7 +14,8 @@ La version affichée en bas de chaque page change donc avec chaque fonctionnalit
 ## [0.6.0] · 2026-11-23
 
 - Page « BAU » : Jarvis suit aussi les demandes d'une page projet ou BAU de Notion (base « Equipes OPS - Actions internes »), pour l'équipe qui les traite. Le lien de la page se colle dans Réglages (`JARVIS_NOTION_BAU`) ; les demandes s'affichent en liste ou en kanban, par priorité puis échéance, avec filtres (statut, priorité, responsable, référent inté) et panneau de détail, et l'accueil dit combien sont ouvertes et en retard. Elles suivent la synchro existante (routine Claude Code, lecture seule) : relues avec les clients par « Tout rafraîchir », seules par le bouton de la page. Aucun client n'est nécessaire pour s'en servir.
-- Demande BAU : sa description (corps de la page Notion) est lue à son ouverture, affichée dans le panneau et reprise dans le brief de l'agent.
+- Demande BAU : sa description (corps de la page Notion) est affichée dans le panneau et reprise dans le brief de l'agent. Chaque synchro lit celles des demandes modifiées (15 au plus par passage) ; une demande pas encore à jour la fait lire à son ouverture.
+- Page BAU : bouton « Synchro auto », comme sur la fiche d'un client : les demandes se relisent toutes seules, seulement ce qui a changé.
 - Page BAU : liens de l'équipe (Drive, pages Notion, autres adresses) à ajouter soi-même, affichés sous le titre et dans les raccourcis à droite, comme ceux d'un client.
 - Page BAU : une vue par squad (« Squad SPSTA », « Squad Plateform »), lue telle quelle dans les vues « Action squad » de Notion à chaque synchro.
 - Demandes BAU traitées comme des retours de recette : « Lancer un agent » sur une demande ouverte (brief pré-rempli, à compléter du détail de la demande, que Jarvis ne lit pas dans Notion), suivi dans Agents et dans le panneau de la demande, épingle et rappels.
