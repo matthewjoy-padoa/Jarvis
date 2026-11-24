@@ -4,12 +4,12 @@ import json
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
 
-from deploy_hub.sources.claude_runner import (ANSWERED, INSTRUCTION, RESUME_INSTRUCTION, WAITING, ClaudeRunner, agent_branch,
+from deploy_hub.sources.claude_runner import (INSTRUCTION, RESUME_INSTRUCTION, WAITING, AgentRun, ClaudeRunner, agent_branch,
                                                agent_questions, answer_text, chosen_answer, find_pr, final_status, read_log,
                                                report_of, split_questions)
 from deploy_hub.sources.notifications import NotificationStore
@@ -286,14 +286,20 @@ def test_the_answer_resumes_the_same_session_in_the_same_worktree(repo, fake_cla
     runner.launch_retour(D, R, prompt="Brief relu")
     _wait(runner, 1)
     monkeypatch.setenv("FAKE_MODE", "ok")
+    worktree = runner.get(1).worktree
     result = runner.reply(1, "  Au niveau client.  ")
-    assert result.ok and "Agent #2 lancé" in result.message
-    _wait(runner, 2)
-    first, second = runner.get(1), runner.get(2)
-    assert first.status == ANSWERED and runner.follow_up(1) is second
-    assert second.reply_to == 1 and second.resume == "sess-fix-acme-r-7" and second.branch == first.branch
-    assert second.status == "terminé" and second.pr_url.endswith("/pull/4242") and second.worktree == first.worktree
-    seen = json.loads((Path(second.worktree) / "argv.json").read_text())
+    assert result.ok and "Agent #1 reprend avec ta réponse" in result.message and result.run_id == "1"
+    _wait(runner, 1)
+    run = runner.get(1)
+    assert len(runner.runs) == 1 and runner.follow_up(1) is None  # pas de nouvel agent : la même fiche a repris
+    assert run.resume == "sess-fix-acme-r-7" and run.status == "terminé" and run.pr_url.endswith("/pull/4242") and run.worktree == worktree
+    assert [p["status"] for p in run.passages] == [WAITING] and run.passages[0]["answer"] == "Au niveau client."
+    assert ("réponse", "Au niveau client.") in runner.log(run)  # repère de reprise dans le journal, qui garde le premier passage
+    assert run.duration >= run.passages[0]["ended_at"] - run.passages[0]["started_at"]
+    assert run.num_turns == 5 and run.cost_usd == 0.42 and run.passages[0]["num_turns"] == 2  # totaux de la fiche, détail par passage
+    reloaded = ClaudeRunner(repo, tmp_path / "agents").get(1)  # relu après redémarrage : passages et dates intacts
+    assert reloaded.passages[0]["started_at"] == run.passages[0]["started_at"] and reloaded.duration == run.duration
+    seen = json.loads((Path(run.worktree) / "argv.json").read_text())
     assert seen["argv"][:2] == ["-p", RESUME_INSTRUCTION] and seen["argv"][seen["argv"].index("--resume") + 1] == "sess-fix-acme-r-7"
     assert seen["brief"] == "Au niveau client."  # la session a déjà le brief : seule la réponse part
 
@@ -307,8 +313,8 @@ def test_without_the_same_worktree_the_answer_restarts_from_the_brief(repo, fake
     _git(repo, "worktree", "remove", "--force", runner.get(1).worktree)  # worktree disparu : la session n'est plus reprenable
     monkeypatch.setenv("FAKE_MODE", "ok")
     assert runner.reply(1, "Au niveau client.").ok
-    _wait(runner, 2)
-    second = runner.get(2)
+    _wait(runner, 1)
+    second = runner.get(1)
     seen = json.loads((Path(second.worktree) / "argv.json").read_text())
     assert second.resume == "" and "--resume" not in seen["argv"] and seen["argv"][:2] == ["-p", INSTRUCTION]
     assert seen["brief"].startswith("Brief relu") and "client ou logiciel ?" in seen["brief"] and "<reponse>\nAu niveau client." in seen["brief"]
@@ -345,13 +351,16 @@ def test_when_the_resumed_agent_fails_the_answer_can_be_sent_again_from_the_brie
     _wait(runner, 1)
     monkeypatch.setenv("FAKE_MODE", "fail")  # ex. session introuvable : --resume échoue
     assert runner.reply(1, "Au niveau client.").ok
-    _wait(runner, 2)
-    assert runner.get(2).status == "échec" and runner.get(1).status == WAITING
+    _wait(runner, 1)
+    run = runner.get(1)
+    assert run.status == "échec" and not runner.reply(1, "encore").ok  # en erreur : on relance, on ne répond plus
     monkeypatch.setenv("FAKE_MODE", "ok")
-    assert runner.reply(1, "Au niveau client.").ok
-    _wait(runner, 3)
-    third = runner.get(3)
-    assert third.resume == "" and runner.follow_up(1) is third and third.status == "terminé" and runner.get(1).status == ANSWERED
+    assert runner.relaunch(1).ok
+    _wait(runner, 1)
+    seen = json.loads((Path(run.worktree) / "argv.json").read_text())
+    assert run.status == "terminé" and run.resume == "" and len(runner.runs) == 1
+    assert [p["status"] for p in run.passages] == [WAITING, "échec"]
+    assert seen["brief"].startswith("Brief relu") and "<reponse>\nAu niveau client." in seen["brief"]  # la réponse repart avec le brief
 
 
 def test_any_agent_ended_in_error_can_be_relaunched_with_the_same_brief(repo, fake_claude, tmp_path, monkeypatch):
@@ -360,15 +369,15 @@ def test_any_agent_ended_in_error_can_be_relaunched_with_the_same_brief(repo, fa
     runner.launch_retour(D, R, prompt="Brief relu")
     _wait(runner, 1)
     monkeypatch.setenv("FAKE_MODE", "ok")
+    worktree = runner.get(1).worktree
     result = runner.relaunch(1)
-    assert result.ok and "Agent #2 lancé" in result.message
-    _wait(runner, 2)
-    first, second = runner.get(1), runner.get(2)
-    assert runner.relaunched(1) is second and second.relaunch_of == 1 and second.branch == first.branch
-    assert second.worktree == first.worktree and second.status == "terminé" and second.resume == ""
-    seen = json.loads((Path(second.worktree) / "argv.json").read_text())
+    assert result.ok and "Agent #1 relancé" in result.message
+    _wait(runner, 1)
+    run = runner.get(1)
+    assert len(runner.runs) == 1 and run.worktree == worktree and run.status == "terminé" and run.resume == ""
+    seen = json.loads((Path(run.worktree) / "argv.json").read_text())
     assert seen["brief"] == "Brief relu" and "--resume" not in seen["argv"]
-    assert not runner.relaunch(2).ok and not runner.relaunch(99).ok  # terminé, puis inconnu
+    assert not runner.relaunch(1).ok and not runner.relaunch(99).ok  # terminé, puis inconnu
 
 
 @pytest.mark.parametrize("status", ["arrêté", "délai dépassé", "interrompu"])
@@ -378,7 +387,7 @@ def test_every_error_status_is_relaunchable(tmp_path, status):
     runner._start = lambda run: None
     runner.runs.append(__import__("deploy_hub.sources.claude_runner", fromlist=["AgentRun"]).AgentRun(
         1, "acme", "Acme", "retour R-1", "fix-acme-r-1", "Brief", datetime(2026, 11, 18, 9), status))
-    assert runner.relaunch(1).ok and runner.get(2).prompt == "Brief"
+    assert runner.relaunch(1).ok and len(runner.runs) == 1 and runner.get(1).prompt == "Brief" and runner.get(1).passages[0]["status"] == status
 
 
 def test_each_question_is_listed_with_its_details():
@@ -488,3 +497,78 @@ def test_retour_branch_says_the_subject_without_numbers():
     assert retour_branch(d, r, [older]) == "fix-presoa-23aa58"  # reprise : la branche déjà lancée
     other = AgentRun(2, "presoa", "Presoa", "retour 11BB22", retour_branch(d, r), "x", datetime(2026, 11, 18, 9), "terminé")
     assert retour_branch(d, r, [other]) == "fix-presoa-ced-ged-factures-multi-version-du-salarie-et-23aa58"
+
+
+def test_a_finished_agent_is_archived_with_its_worktree_and_comes_back(repo, fake_claude, tmp_path):
+    runner = _runner(repo, fake_claude, tmp_path)
+    runner.launch_retour(D, R, prompt="Brief")
+    _wait(runner, 1)
+    worktree = Path(runner.get(1).worktree)
+    assert worktree.is_dir() and runner.archivable(runner.get(1))
+    (worktree / "argv.json").unlink()  # trace du faux Claude : un fichier non suivi, git garderait le worktree
+    result = runner.archive(1)
+    assert result.ok and runner.get(1) is None and [r.id for r in runner.archived()] == [1]
+    assert not worktree.exists() and "fix-acme-r-7" in _git(repo, "branch")  # worktree retiré, branche gardée
+    assert runner.find(1).archived_at and not runner.archive(1).ok  # lisible, pas deux fois
+    assert ClaudeRunner(repo, tmp_path / "agents").get(1) is None  # au redémarrage, il reste aux archives
+    assert runner.unarchive(1).ok and runner.get(1).archived_at is None and runner.archived() == []
+
+
+def test_an_agent_at_work_or_waiting_for_an_answer_is_not_archived(tmp_path):
+    runner = ClaudeRunner(tmp_path, tmp_path / "agents")
+    for n, status in ((1, "en cours"), (2, WAITING)):
+        runner.runs.append(AgentRun(n, "acme", "Acme", f"retour R-{n}", f"fix-{n}", "x", datetime(2026, 11, 1, 9), status))
+    assert not runner.archive(1).ok and not runner.archive(2).ok and len(runner.runs) == 2
+
+
+def test_tidying_archives_old_agents_then_erases_old_logs_once_a_day(tmp_path):
+    runner = ClaudeRunner(tmp_path, tmp_path / "agents", archive_days=30, log_days=90)
+    now = datetime(2026, 11, 24, 9)
+    for n, days in ((1, 100), (2, 40), (3, 2)):
+        ended = now - timedelta(days=days)
+        runner.runs.append(AgentRun(n, "acme", "Acme", f"retour R-{n}", f"fix-{n}", "x", ended, "terminé", ended_at=ended))
+        runner.log_path(runner.runs[-1]).parent.mkdir(parents=True, exist_ok=True)
+        runner.log_path(runner.runs[-1]).write_text("{}\n")
+    runner.runs.append(AgentRun(4, "acme", "Acme", "retour R-4", "fix-4", "x", now - timedelta(days=60), WAITING,
+                                ended_at=now - timedelta(days=60)))
+    runner.tidy(now)
+    assert [r.id for r in runner.runs] == [3, 4]  # récent, et celui qui attend ta réponse
+    archived = {r.id: r for r in runner.archived()}
+    assert set(archived) == {1, 2} and archived[1].log_removed and not archived[2].log_removed
+    assert not runner.log_path(archived[1]).exists() and runner.log_path(archived[2]).exists()
+    runner.runs[0].ended_at = now - timedelta(days=50)
+    runner.tidy(now + timedelta(hours=2))
+    assert len(runner.runs) == 2  # pas avant le lendemain
+    runner.tidy(now + timedelta(days=1, hours=1))
+    assert [r.id for r in runner.runs] == [4]
+
+
+def test_the_order_chosen_in_a_column_is_kept(tmp_path):
+    runner = ClaudeRunner(tmp_path, tmp_path / "agents")
+    for n in (1, 2, 3):
+        runner.runs.append(AgentRun(n, "acme", "Acme", f"retour R-{n}", f"fix-{n}", "x", datetime(2026, 11, 1, 9), "terminé"))
+    runner.reorder([3, 1, 99])
+    assert [(r.id, r.rank) for r in ClaudeRunner(tmp_path, tmp_path / "agents").runs] == [(1, 1), (2, None), (3, 0)]
+
+
+def test_a_worktree_with_uncommitted_work_is_kept_when_archiving(repo, fake_claude, tmp_path):
+    runner = _runner(repo, fake_claude, tmp_path)
+    runner.launch_retour(D, R, prompt="Brief")
+    _wait(runner, 1)
+    worktree = Path(runner.get(1).worktree)
+    result = runner.archive(1)  # argv.json, non suivi, est encore là
+    assert result.ok and "Worktree gardé" in result.message and worktree.is_dir()
+
+
+def test_an_agent_can_be_renamed_and_pinned_and_a_pinned_agent_is_never_tidied_away(tmp_path):
+    runner = ClaudeRunner(tmp_path, tmp_path / "agents", archive_days=30)
+    old = datetime(2026, 9, 1, 9)
+    runner.runs.append(AgentRun(1, "acme", "Acme", "retour R-1", "fix-1", "x", old, "terminé", ended_at=old))
+    runner.runs.append(AgentRun(2, "acme", "Acme", "retour R-2", "fix-2", "x", old, "terminé", ended_at=old))
+    assert runner.rename(1, "  Champ   de vision\n manquant ").title == "Champ de vision manquant" and runner.get(1).name == "Champ de vision manquant"
+    assert runner.rename(1, "x" * 300).title == "x" * 120 and runner.rename(1, "  ").name == "retour R-1"  # vide : le sujet
+    assert runner.toggle_pin(1).pinned and runner.rename(99, "?") is None
+    runner.tidy(datetime(2026, 11, 24, 9))
+    assert [r.id for r in runner.runs] == [1]  # épinglé : reste ; l'autre, fini depuis plus de 30 jours, est archivé
+    assert runner.rename(2, "Archivé renommé").title == "Archivé renommé" and runner.archived()[0].name == "Archivé renommé"
+    assert ClaudeRunner(tmp_path, tmp_path / "agents").get(1).pinned  # gardé au redémarrage

@@ -59,6 +59,22 @@ class AgentRun:
     reply_to: int | None = None  # agent dont celui-ci reprend le travail après une réponse à ses questions
     resume: str = ""  # session reprise (--resume) ; vide : nouvelle session
     relaunch_of: int | None = None  # agent en erreur que celui-ci relance avec le même brief
+    # Une réponse aux questions ou une relance reprend la même fiche : chaque reprise range ici le passage qu'elle clôt
+    # (début, fin, état, compte rendu, coût et tokens de ce passage, ce qui l'a suivi). Les champs de la fiche gardent les
+    # totaux (coût, tours, tokens) et le dernier passage (état, compte rendu, contexte).
+    passages: list[dict] = field(default_factory=list)
+    passage_started_at: datetime | None = None  # début du passage en cours (None : le premier, started_at)
+    stdin: str = ""  # ce que reçoit le passage en cours (réponse, ou brief complété) ; vide : le brief (prompt)
+    log_offset: int = 0  # taille du journal au début du passage en cours : son résultat se lit après
+    archived_at: datetime | None = None  # rangé dans les archives (agents-archive.json) : hors de la page Agents
+    rank: int | None = None  # place choisie à la main dans sa colonne du schéma (glisser-déposer) ; None : la plus récente d'abord
+    log_removed: bool = False  # journal effacé par le rangement automatique : la fiche garde compte rendu, coût et PR
+    title: str = ""  # nom donné à la main ; vide : le sujet (« retour 1B7052 »), qui reste la clé du retour
+    pinned: bool = False  # épinglé : en tête de sa colonne, jamais archivé par le rangement automatique
+
+    @property
+    def name(self) -> str:
+        return self.title or self.subject
 
     @property
     def report(self) -> str:
@@ -83,7 +99,9 @@ class AgentRun:
 
     @property
     def duration(self) -> timedelta:
-        return (self.ended_at or datetime.now()) - self.started_at
+        """Temps de travail : passages précédents et passage en cours, sans l'attente d'une réponse entre deux."""
+        done = sum((p["ended_at"] - p["started_at"] for p in self.passages if p.get("ended_at")), timedelta())
+        return done + (self.ended_at or datetime.now()) - (self.passage_started_at or self.started_at)
 
     @property
     def group(self) -> str:
@@ -140,6 +158,11 @@ def read_tokens(run: "AgentRun", result: dict) -> None:
         setattr(run, name, value if isinstance(value, int) and not isinstance(value, bool) else None)
 
 
+COUNTED = ("cost_usd", "num_turns") + tuple(name for name, _, _ in TOKEN_KINDS)  # additionnés d'un passage à l'autre
+REPLY, RELAUNCH = "réponse", "relance"  # ce qui ouvre un nouveau passage
+ARCHIVE_DAYS, LOG_DAYS = 30, 90  # rangement automatique : archivage des agents finis, puis effacement de leur journal
+TIDY_EVERY = timedelta(days=1)
+TITLE_MAX = 120
 WAITING, ANSWERED = "question en attente", "répondu"
 AGENT_STATUSES = {"préparation": IN_PROGRESS, "en cours": IN_PROGRESS, "terminé": DONE, WAITING: TODO, ANSWERED: DONE,
                   "échec": KO, "arrêté": KO, "délai dépassé": KO, "interrompu": KO}
@@ -524,11 +547,14 @@ class ClaudeRunner:
                  worktrees_dir: Path | None = None, claude_bin: str = "claude", add_dirs: tuple[Path, ...] = (),
                  allowed_tools: tuple[str, ...] = DEFAULT_TOOLS, permission_mode: str = "acceptEdits",
                  timeout_min: int = 90, max_running: int = 2, model: str = "", fallback_model: str = "", effort: str = "",
-                 max_turns: int = 0, max_budget_usd: int = 0):
+                 max_turns: int = 0, max_budget_usd: int = 0, archive_days: int = ARCHIVE_DAYS, log_days: int = LOG_DAYS):
         self.orchestrator_dir = orchestrator_dir
         self.notifications = notifications  # NotificationStore : « agent terminé »
         self.state_dir = state_dir
         self.state_file = state_dir / "agents.json"
+        self.archive_file = state_dir / "agents-archive.json"  # lu seulement à la demande (page des archives, bilan)
+        self.archive_days, self.log_days = archive_days, log_days
+        self._tidied: datetime | None = None
         self.worktrees_dir = worktrees_dir or orchestrator_dir / ".claude" / "worktrees" / "jarvis"  # ignoré par git
         self.claude_bin = claude_bin
         self.add_dirs = add_dirs
@@ -564,6 +590,8 @@ class ClaudeRunner:
             "effort": env("JARVIS_AGENT_EFFORT"),
             "max_turns": env("JARVIS_AGENT_MAX_TURNS") and int(env("JARVIS_AGENT_MAX_TURNS")),
             "max_budget_usd": env("JARVIS_AGENT_MAX_BUDGET_USD") and int(env("JARVIS_AGENT_MAX_BUDGET_USD")),
+            "archive_days": env("JARVIS_AGENT_ARCHIVE_DAYS") and int(env("JARVIS_AGENT_ARCHIVE_DAYS")),
+            "log_days": env("JARVIS_AGENT_LOG_DAYS") and int(env("JARVIS_AGENT_LOG_DAYS")),
         }
         return {k: v for k, v in kw.items() if v}
 
@@ -576,7 +604,8 @@ class ClaudeRunner:
         Une variable vidée reprend la valeur par défaut de __init__."""
         defaults = {k: v.default for k, v in inspect.signature(ClaudeRunner.__init__).parameters.items()}
         options = {**{k: defaults[k] for k in ("claude_bin", "add_dirs", "allowed_tools", "permission_mode", "timeout_min",
-                                               "max_running", "model", "fallback_model", "effort", "max_turns", "max_budget_usd")}, **self._env_options()}
+                                               "max_running", "model", "fallback_model", "effort", "max_turns", "max_budget_usd",
+                                               "archive_days", "log_days")}, **self._env_options()}
         with self._lock:
             self.worktrees_dir = options.get("worktrees_dir") or self.orchestrator_dir / ".claude" / "worktrees" / "jarvis"
             self.timeout = options.pop("timeout_min") * 60
@@ -585,8 +614,8 @@ class ClaudeRunner:
                 setattr(self, key, value)
 
     # --- historique -------------------------------------------------------------------------------------------
-    def _load(self) -> list[AgentRun]:
-        path = self.state_file
+    def _load(self, path: Path | None = None) -> list[AgentRun]:
+        path = path or self.state_file
         if not path.is_file():
             return []
         try:
@@ -596,8 +625,11 @@ class ClaudeRunner:
             return []
         runs = []
         for item in items:
-            for key in ("started_at", "ended_at"):  # écrites en ISO par _save
+            for key in ("started_at", "ended_at", "passage_started_at", "archived_at"):  # écrites en ISO par _save
                 item[key] = datetime.fromisoformat(item[key]) if item.get(key) else None
+            for passage in item.get("passages") or []:
+                for key in ("started_at", "ended_at"):
+                    passage[key] = datetime.fromisoformat(passage[key]) if passage.get(key) else None
             run = AgentRun(**{k: v for k, v in item.items() if k in AgentRun.__dataclass_fields__})
             if run.status == "terminé":  # agents finis avant l'état « question en attente »
                 run.status = final_status(run)
@@ -613,6 +645,113 @@ class ClaudeRunner:
 
     def get(self, run_id: int) -> AgentRun | None:
         return next((r for r in self.runs if r.id == run_id), None)
+
+    # --- archives et rangement --------------------------------------------------------------------------------
+    def archived(self) -> list[AgentRun]:
+        """Agents archivés, le plus récemment archivé d'abord : relus du fichier à chaque appel, jamais gardés en mémoire."""
+        with self._lock:
+            return self._load(self.archive_file)
+
+    def _save_archive(self, runs: list[AgentRun]) -> None:
+        write_json(self.archive_file, [asdict(r) for r in runs], default=datetime.isoformat)
+
+    def find(self, run_id: int) -> AgentRun | None:
+        """Agent suivi ou archivé (page d'un agent, lien ancien)."""
+        return self.get(run_id) or next((r for r in self.archived() if r.id == run_id), None)
+
+    @staticmethod
+    def archivable(run: AgentRun) -> bool:
+        """Un agent qui travaille ou attend ta réponse reste sous les yeux."""
+        return not run.archived_at and not run.running and run.status != WAITING
+
+    def archive(self, run_id: int, now: datetime | None = None) -> ActionResult:
+        """Range un agent fini dans les archives et retire son worktree s'il est propre (la branche, elle, reste)."""
+        with self._lock:
+            run = self.get(run_id)
+            if not run:
+                return ActionResult(False, f"Agent #{run_id} inconnu ou déjà archivé.", False)
+            if not self.archivable(run):
+                return ActionResult(False, f"L'agent #{run_id} travaille ou attend ta réponse : arrête-le ou réponds d'abord.", False)
+            run.archived_at, run.rank = now or datetime.now(), None
+            self.runs.remove(run)
+            self._save_archive([run, *self.archived()])
+            self._save()
+        kept = self._drop_worktree(run)
+        return ActionResult(True, f"Agent #{run_id} archivé." + (f" Worktree gardé : {kept}" if kept else ""), False, str(run_id))
+
+    def unarchive(self, run_id: int) -> ActionResult:
+        with self._lock:
+            archive = self.archived()
+            run = next((r for r in archive if r.id == run_id), None)
+            if not run:
+                return ActionResult(False, f"L'agent #{run_id} n'est pas dans les archives.", False)
+            archive.remove(run)
+            run.archived_at = None
+            self.runs.append(run)
+            self.runs.sort(key=lambda r: r.id, reverse=True)  # même ordre qu'au lancement : le plus récent d'abord
+            self._save_archive(archive)
+            self._save()
+        return ActionResult(True, f"Agent #{run_id} ressorti des archives.", False, str(run_id))
+
+    def _edit(self, run_id: int, change) -> AgentRun | None:
+        """Change une fiche, suivie ou archivée, et l'enregistre là où elle est."""
+        with self._lock:
+            if (run := self.get(run_id)):
+                change(run)
+                self._save()
+                return run
+            archive = self.archived()
+            if (run := next((r for r in archive if r.id == run_id), None)):
+                change(run)
+                self._save_archive(archive)
+            return run
+
+    def rename(self, run_id: int, title: str) -> AgentRun | None:
+        """Nom choisi pour l'agent ; vide : il reprend son sujet."""
+        title = " ".join((title or "").split())[:TITLE_MAX]
+        return self._edit(run_id, lambda run: setattr(run, "title", title))
+
+    def toggle_pin(self, run_id: int) -> AgentRun | None:
+        return self._edit(run_id, lambda run: setattr(run, "pinned", not run.pinned))
+
+    def reorder(self, ids: list[int]) -> None:
+        """Ordre choisi dans une colonne du schéma : chaque agent cité prend sa place."""
+        with self._lock:
+            for rank, run_id in enumerate(ids):
+                if (run := self.get(run_id)):
+                    run.rank = rank
+            self._save()
+
+    def _drop_worktree(self, run: AgentRun) -> str:
+        """Retire le worktree d'un agent archivé, sauf si un agent suivi travaille sur la même branche ou s'il reste des
+        modifications non commitées (git refuse sans --force : on garde). Renvoie la raison quand il est gardé."""
+        path = Path(run.worktree) if run.worktree else None
+        if not path or not path.is_dir() or any(r.branch == run.branch for r in self.runs):
+            return ""
+        done = self._git("worktree", "remove", str(path), check=False)
+        return "" if done.returncode == 0 else (done.stderr or done.stdout).strip()[:200]
+
+    def tidy(self, now: datetime | None = None, force: bool = False) -> None:
+        """Rangement, une fois par jour au plus : agents finis depuis plus de archive_days jours archivés (worktree retiré),
+        journaux de plus de log_days jours effacés (la fiche garde compte rendu, coût, tokens et PR)."""
+        now = now or datetime.now()
+        if not force and self._tidied and now - self._tidied < TIDY_EVERY:
+            return
+        self._tidied = now
+        for run in [r for r in self.runs if self.archivable(r) and not r.pinned and r.ended_at
+                    and now - r.ended_at > timedelta(days=self.archive_days)]:  # un agent épinglé reste
+            self.archive(run.id, now)
+        with self._lock:
+            archive = self.archived()
+            changed = False
+            for run in [*self.runs, *archive]:
+                if run.log_removed or run.running or not run.ended_at or now - run.ended_at <= timedelta(days=self.log_days):
+                    continue
+                self.log_path(run).unlink(missing_ok=True)
+                run.log_removed = changed = True
+            if changed:
+                self._save_archive(archive)
+                self._save()
 
     def log_path(self, run: AgentRun) -> Path:
         return self.state_dir / f"{run.id}.jsonl"
@@ -675,7 +814,7 @@ class ClaudeRunner:
             self.runs.insert(0, run)
         self._save()
         self._start(run)
-        return ActionResult(True, f"Agent #{run.id} lancé sur {subject}, branche {branch}. Suivi dans Agents.", False)
+        return ActionResult(True, f"Agent #{run.id} lancé sur {subject}, branche {branch}. Suivi dans Agents.", False, str(run.id))
 
     def _git(self, *args: str, check: bool = True) -> subprocess.CompletedProcess:
         return subprocess.run(["git", "-C", str(self.orchestrator_dir), *args], capture_output=True, text=True, timeout=300, check=check)
@@ -717,12 +856,12 @@ class ClaudeRunner:
         log = self.log_path(run)
         timed_out = False
         try:
-            with log.open("w", encoding="utf-8") as out:
+            with log.open("a" if run.passages else "w", encoding="utf-8") as out:
                 proc = subprocess.Popen(self.build_command(run.resume), cwd=run.worktree, stdin=subprocess.PIPE, stdout=out,
                                         stderr=subprocess.STDOUT, text=True, env=self._env())
                 self._procs[run.id] = proc
                 try:
-                    proc.stdin.write(run.prompt)
+                    proc.stdin.write(run.stdin or run.prompt)
                     proc.stdin.close()
                 except BrokenPipeError:  # claude est déjà sorti (non connecté, option refusée) : son message est au journal
                     pass
@@ -736,14 +875,19 @@ class ClaudeRunner:
             return self.finished(run, "échec")
         finally:
             self._procs.pop(run.id, None)
-        text = log.read_text(encoding="utf-8", errors="replace")  # lu une fois : résultat final et lien de la PR
+        whole = log.read_text(encoding="utf-8", errors="replace")  # lu une fois : résultat final et lien de la PR
+        text = whole.encode("utf-8")[run.log_offset:].decode("utf-8", errors="replace")  # ce passage seulement
         result = next((e for e in reversed(list(_events(text))) if e.get("type") == "result"), {})
         run.cost_usd = result.get("total_cost_usd")
         run.num_turns = result.get("num_turns")
         read_tokens(run, result)
+        for name in COUNTED:  # totaux de la fiche : ce passage plus les précédents
+            before = [p[name] for p in run.passages if p.get(name) is not None]
+            if before:
+                setattr(run, name, sum(before) + (getattr(run, name) or 0))
         read_context(run, text)
         run.summary = (result.get("result") or "").strip()
-        run.pr_url = find_pr(text)
+        run.pr_url = find_pr(whole)  # une PR ouverte à un passage précédent reste celle de la fiche
         run.session_id = result.get("session_id") or run.session_id
         if run.id in self._stopped:
             status = "arrêté"
@@ -787,7 +931,7 @@ class ClaudeRunner:
             report = "" if ok else run.report
             body = run.pr_url or f"{run.subject} · branche {run.branch}" + (f" · {report[:200]}" if report else "")
             title = f"Agent #{run.id} {status}{' (simulé)' if run.simulated else ''} · {run.client}"
-            self.notifications.add(f"agent:{run.id}:{run.started_at.isoformat()}", "agent", "info" if ok else "warning",
+            self.notifications.add(f"agent:{run.id}:{(run.passage_started_at or run.started_at).isoformat()}", "agent", "info" if ok else "warning",
                                    title, body, f"/agents/{run.id}", run.client)
 
     def launch(self, d: Deployment, resource: str) -> ActionResult:
@@ -836,40 +980,69 @@ class ClaudeRunner:
         return self._child(run_id, "relaunch_of")
 
     def relaunch(self, run_id: int) -> ActionResult:
-        """Relance d'un agent fini en erreur (échec, arrêté, délai dépassé, interrompu) : nouvel agent, même branche et même brief,
-        nouvelle session. Le worktree existant est repris, avec ce que l'agent y avait déjà fait."""
-        old = self.get(run_id)
-        if not old or old.group != KO:
+        """Relance d'un agent fini en erreur (échec, arrêté, délai dépassé, interrompu) : même fiche, même branche, même brief,
+        nouvelle session. Le worktree existant est repris, avec ce que l'agent y avait déjà fait ; si le passage en erreur
+        suivait une réponse, elle repart avec le brief."""
+        run = self.get(run_id)
+        if not run or run.group != KO:
             return ActionResult(False, f"L'agent #{run_id} n'est pas en erreur : rien à relancer.", False)
-        prompt = old.prompt if not old.resume else "\n\n".join([self._brief(old), _tag("reponse", old.prompt)])  # reprise : réponse seule
-        return self._launch(old.slug, old.client, old.subject, old.branch, prompt, old.category, relaunch_of=old.id)
+        if run.resume and run.reply_to:  # ancienne fiche, lancée pour reprendre la session d'un autre agent : nouvel agent
+            prompt = "\n\n".join([self._brief(run), _tag("reponse", run.prompt)])
+            return self._launch(run.slug, run.client, run.subject, run.branch, prompt, run.category, relaunch_of=run.id)
+        answer = run.passages[-1].get("answer", "") if run.passages and run.passages[-1].get("next") == REPLY else ""
+        stdin = "\n\n".join([run.prompt, _tag("reponse", answer)]) if answer else ""
+        return self._resume(run, RELAUNCH, "", stdin, resume="")
 
     def _brief(self, run: AgentRun) -> str:
-        """Brief d'origine : un agent qui a repris une session n'a reçu que la réponse, on remonte à celui qui l'a lancée."""
+        """Brief d'origine : un ancien agent qui reprenait une session n'avait reçu que la réponse, on remonte à celui qui l'a lancée."""
         while run.resume and run.reply_to and (parent := self.get(run.reply_to)):
             run = parent
         return run.prompt
 
     def reply(self, run_id: int, answer: str) -> ActionResult:
-        """Réponse aux questions d'un agent : nouvel agent sur la même branche. Si le worktree n'a pas bougé, il reprend la session
-        Claude (--resume) et garde ce qu'il avait lu ; sinon il repart du brief, avec le compte rendu et la réponse."""
-        old, answer = self.get(run_id), (answer or "").strip()
-        previous = old and self.follow_up(old.id)  # suite déjà tentée, donc en échec : on ne reprend plus sa session
-        if not old or not self.can_reply(old, previous):
+        """Réponse aux questions d'un agent : la même fiche repart, sur la même branche. Si le worktree n'a pas bougé, elle reprend
+        sa session Claude (--resume) et garde ce qu'elle avait lu ; sinon elle repart du brief, avec son compte rendu et la réponse."""
+        run, answer = self.get(run_id), (answer or "").strip()
+        previous = run and self.follow_up(run.id)  # ancienne suite (fiche à part), donc en échec : on ne reprend plus sa session
+        if not run or not self.can_reply(run, previous):
             return ActionResult(False, f"L'agent #{run_id} n'attend pas de réponse.", False)
         if not answer:
             return ActionResult(False, "Écris ta réponse avant de relancer l'agent.", False)
-        here = self.worktree_of(old.branch)  # celui que prepare_worktree reprendra
-        same_place = not previous and bool(old.session_id) and old.worktree == str(here) and (here / ".git").exists()
-        prompt = answer if same_place else "\n\n".join([
-            self._brief(old),
-            _tag("echange_precedent", f"Un agent (#{old.id}) a commencé ce travail et s'est arrêté sur des questions. Son compte rendu :\n{old.summary}"),
+        here = self.worktree_of(run.branch)  # celui que prepare_worktree reprendra
+        same_place = not previous and bool(run.session_id) and run.worktree == str(here) and (here / ".git").exists()
+        stdin = answer if same_place else "\n\n".join([
+            self._brief(run),
+            _tag("echange_precedent", f"Tu as commencé ce travail et tu t'es arrêté sur des questions. Ton compte rendu :\n{run.summary}"),
             _tag("reponse", answer),
             "Reprends la mission en tenant compte de cette réponse."])
-        result = self._launch(old.slug, old.client, old.subject, old.branch, prompt, old.category,
-                              reply_to=old.id, resume=old.session_id if same_place else "")
-        return result
+        return self._resume(run, REPLY, answer, stdin, resume=run.session_id if same_place else "")
 
+    def _resume(self, run: AgentRun, why: str, answer: str, stdin: str, resume: str) -> ActionResult:
+        """Nouveau passage sur la même fiche : le passage fini est rangé dans run.passages, la fiche repart."""
+        if (problem := self.problem()):
+            return ActionResult(False, problem, False)
+        with self._lock:
+            if run.running or any(r.running and r.branch == run.branch for r in self.runs):
+                return ActionResult(False, f"Un agent travaille déjà sur la branche {run.branch} : attends sa fin ou arrête-le (Agents).", False)
+            if sum(r.running for r in self.runs) >= self.max_running:
+                return ActionResult(False, f"Déjà {self.max_running} agent(s) en cours : attends qu'un se termine.", False)
+            before = {name: sum(p[name] for p in run.passages if p.get(name) is not None) for name in COUNTED}
+            run.passages.append({
+                "started_at": run.passage_started_at or run.started_at, "ended_at": run.ended_at, "status": run.status,
+                "summary": run.summary, "next": why, "answer": answer,
+                # les champs de la fiche sont des totaux : ce passage, c'est le total moins les passages d'avant
+                **{name: None if getattr(run, name) is None else getattr(run, name) - before[name] for name in COUNTED}})
+            log = self.log_path(run)
+            run.log_offset = log.stat().st_size if log.is_file() else 0
+            if log.is_file():  # repère dans le journal : la page de l'agent montre où reprend le travail
+                with log.open("a", encoding="utf-8") as out:
+                    out.write(json.dumps({"type": "jarvis", "kind": why, "text": answer}, ensure_ascii=False) + "\n")
+            run.stdin, run.resume, run.status = stdin, resume, "préparation"
+            run.passage_started_at, run.ended_at, run.summary = datetime.now(), None, ""
+        self._save()
+        self._start(run)
+        what = "reprend avec ta réponse" if why == REPLY else "relancé"
+        return ActionResult(True, f"Agent #{run.id} {what}, branche {run.branch}. Suivi sur sa page.", False, str(run.id))
 
 def message_of(event: dict) -> dict:
     """Message d'un événement du journal de claude -p : un objet en général, mais Claude Code écrit aussi des événements
@@ -929,4 +1102,6 @@ def read_log(log: Path) -> list[tuple[str, str]]:
             lines.append(("fin", f"{e.get('subtype', '')} · {e.get('num_turns', '?')} tours"))
         elif kind == "raw":
             lines.append(("brut", e["text"][:400]))
+        elif kind == "jarvis":  # repère écrit par Jarvis entre deux passages de la même fiche
+            lines.append((e.get("kind") or REPLY, e.get("text") or "Relancé avec le même brief."))
     return lines

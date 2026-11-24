@@ -11,7 +11,7 @@ Pour une PR qui monte le numéro :
 
 La version affichée en bas de chaque page change donc avec chaque fonctionnalité ; après une simple correction, le bandeau « Jarvis est à relancer » compare les commits. Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
-## [0.6.0] · 2026-11-23
+## [0.8.0] · 2026-11-24
 
 - Page « BAU » : Jarvis suit aussi les demandes d'une page projet ou BAU de Notion (base « Equipes OPS - Actions internes »), pour l'équipe qui les traite. Le lien de la page se colle dans Réglages (`JARVIS_NOTION_BAU`) ; les demandes s'affichent en liste ou en kanban, par priorité puis échéance, avec filtres (statut, priorité, responsable, référent inté) et panneau de détail, et l'accueil dit combien sont ouvertes et en retard. Elles suivent la synchro existante (routine Claude Code, lecture seule) : relues avec les clients par « Tout rafraîchir », seules par le bouton de la page. Aucun client n'est nécessaire pour s'en servir.
 - Demande BAU : sa description (corps de la page Notion) est affichée dans le panneau et reprise dans le brief de l'agent. La synchro charge d'abord les demandes ; les descriptions se lisent ensuite en fond (lots de 15 enchaînés), puis seulement celles des demandes modifiées ; une demande pas encore à jour la fait lire à son ouverture.
@@ -19,6 +19,23 @@ La version affichée en bas de chaque page change donc avec chaque fonctionnalit
 - Page BAU : liens de l'équipe (Drive, pages Notion, autres adresses) à ajouter soi-même, affichés sous le titre et dans les raccourcis à droite, comme ceux d'un client.
 - Page BAU : une vue par squad (« Squad SPSTA », « Squad Plateform »), lue telle quelle dans les vues « Action squad » de Notion à chaque synchro.
 - Demandes BAU traitées comme des retours de recette : « Lancer un agent » sur une demande ouverte (brief pré-rempli, à compléter du détail de la demande, que Jarvis ne lit pas dans Notion), suivi dans Agents et dans le panneau de la demande, épingle et rappels.
+
+## [0.7.2] · 2026-11-24
+
+- Page Agents : attraper un agent le fait s'envoler comme une armure d'Iron Man. Il garde son armure et ses couleurs, réacteurs allumés et halo qui pulse, suit la souris (ou le doigt) avec un léger retard, se penche dans le sens du vol et laisse une traînée de fumée. Lâché ailleurs dans sa colonne, il atterrit à la nouvelle place (ses voisins glissent pour lui faire place, ordre gardé) ; lâché sur « Archiver », qui s'éveille pendant le vol, il plonge dedans en vrille ; refusé (agent en cours ou en attente) ou lâché ailleurs, il rentre se poser chez lui et la zone secoue la tête. Échap (ou quitter la fenêtre) le renvoie chez lui ; un nouveau vol peut partir pendant qu'un autre atterrit. Un simple clic ouvre toujours l'agent ; rien ne bouge si le système demande moins d'animations.
+
+## [0.7.1] · 2026-11-24
+
+- Agents : on peut renommer un agent (son sujet « retour 1B7052 » reste en dessous et sert toujours de lien au retour) et l'épingler. Un agent épinglé passe en tête de sa colonne, porte une épingle sur le schéma et n'est jamais archivé par le rangement automatique. Nom et épingle se règlent depuis la page de l'agent, aussi pour un agent archivé.
+
+## [0.7.0] · 2026-11-24
+
+- Agents : le suivi ne grandit plus sans fin. Un rangement automatique, une fois par jour, archive les agents finis depuis plus de 30 jours (leur worktree est retiré s'il est propre, la branche reste) et efface après 90 jours le journal détaillé (la fiche garde compte rendu, coût, tokens et PR). Seuils dans Réglages (JARVIS_AGENT_ARCHIVE_DAYS, JARVIS_AGENT_LOG_DAYS). Un agent qui travaille ou attend ta réponse n'est jamais archivé.
+- Page Agents : glisser un agent dans sa colonne change sa place (ordre gardé) ; le déposer sur « Archiver » le range. Bouton « Archiver » sur la page d'un agent fini, page « Archivés » d'où l'on peut le ressortir ; le bilan des tokens compte aussi les archivés.
+
+## [0.6.0] · 2026-11-24
+
+- Agents : répondre aux questions d'un agent ou le relancer après une erreur fait repartir la même fiche, au lieu d'en créer une nouvelle qui laissait la première « en attente ». La fiche garde son numéro, son journal (un repère « réponse » ou « relance » marque chaque reprise), et additionne tours, coût et tokens ; sa durée compte le travail, pas l'attente de ta réponse. Les passages précédents (état, durée, compte rendu, ta réponse) se déplient sur la page de l'agent. Les anciennes fiches (une par réponse) restent lisibles telles quelles.
 
 ## [0.5.7] · 2026-11-23
 

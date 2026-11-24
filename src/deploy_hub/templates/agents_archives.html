@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Agents archivés · Jarvis{% endblock %}
+{% block content %}
+<p class="muted"><a href="/agents">← Agents</a></p>
+<h1>Agents archivés</h1>
+<p class="muted">Archivés à la main (bouton ou glisser-déposer) ou par le rangement automatique : un agent fini depuis plus de {{ archive_days }} jours
+  quitte la page Agents et son worktree est retiré (la branche reste). Après {{ log_days }} jours, son journal est effacé ; la fiche garde compte rendu,
+  coût, tokens et PR. Réglages : JARVIS_AGENT_ARCHIVE_DAYS et JARVIS_AGENT_LOG_DAYS.</p>
+<table data-filterable>
+  <thead><tr><th>#</th><th>Lancé le</th><th data-filter>Client</th><th>Sujet</th><th data-filter>État</th><th>Archivé le</th><th>PR</th><th data-nosort></th></tr></thead>
+  <tbody>
+  {% for r in runs %}
+    <tr>
+      <td><a href="/agents/{{ r.id }}">#{{ r.id }}</a></td><td class="muted">{{ r.started_at.strftime("%d/%m/%Y") }}</td>
+      <td>{{ r.client }}</td><td><a href="/agents/{{ r.id }}">{{ r.name }}</a></td>
+      <td><span class="badge g-{{ r.group }}">{{ r.status }}</span></td>
+      <td class="muted">{{ r.archived_at.strftime("%d/%m/%Y") if r.archived_at }}</td>
+      <td>{% if r.pr_url %}<a href="{{ r.pr_url }}" target="_blank" rel="noopener">PR ↗</a>{% endif %}</td>
+      <td><form hx-post="/agents/{{ r.id }}/ressortir" hx-target="#unarchive-{{ r.id }}"><button type="submit" class="secondary">Ressortir</button>
+        <span id="unarchive-{{ r.id }}"></span></form></td>
+    </tr>
+  {% else %}<tr><td colspan="8" class="muted">Aucun agent archivé.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

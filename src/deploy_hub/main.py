@@ -29,8 +29,9 @@ from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
 from deploy_hub.sources.airflow import CONFIRM_PROD, PADOA_ENVS, AirflowSource
 from deploy_hub.rendu import md, md_inline
-from deploy_hub.sources.claude_runner import (TO_FILL, WAITING, ClaudeRunner, agent_questions, answer_text, chosen_answer,
-                                              demande_prompt, duration_text, read_log, retour_prompt, tokens_text, usage)
+from deploy_hub.sources.claude_runner import (AGENT_STATUSES, TO_FILL, WAITING, ClaudeRunner, agent_questions, answer_text, chosen_answer,
+                                              demande_prompt, duration_text, read_log, report_of, retour_prompt, tokens_text,
+                                              usage)
 from deploy_hub.sources.dag_board import board
 from deploy_hub.sources.dag_chain import MAX_STEPS, ChainRunner
 from deploy_hub.sources.dag_source import DagSource
@@ -231,6 +232,7 @@ def _push_round() -> None:
     _guarded("Code à jour", _check_restart)
     _guarded("Synchro Notion automatique", _auto_sync)
     _guarded("Descriptions des demandes BAU", _bau_descriptions)
+    _guarded("Rangement des agents", claude.tidy)  # une fois par jour : archives, journaux anciens, worktrees
 
 
 def _bau_descriptions() -> None:
@@ -281,6 +283,8 @@ def settings_links(text) -> Markup:
 
 templates.env.filters["reglages"] = settings_links
 templates.env.filters["duree"] = duration_text
+templates.env.filters["agent_group"] = lambda status: status_group(status, AGENT_STATUSES)  # passages d'un agent
+templates.env.filters["agent_report"] = report_of  # compte rendu sans le bloc de questions en JSON
 templates.env.filters["tokens"] = tokens_text
 
 
@@ -857,12 +861,30 @@ def agents(request: Request):
     """Historique des lancements : agents, et une carte par run de DAG (suivis, enchaînements, lancements sans suivi)."""
     for run in claude.runs:
         claude.refresh_context(run)  # agents en cours : où en est leur contexte
-    return _render(request, "agents.html", "/agents", runs=claude.runs,
-                   cards=board(dag_watch, dag_chains.chains, airflow.runs), usage=usage(claude.runs))
+    runs = [r for _, r in sorted(enumerate(claude.runs), key=lambda p: (not p[1].pinned, p[1].rank is None, p[1].rank or 0, p[0]))]  # épinglés, ordre choisi, récents
+    archived = claude.archived()
+    return _render(request, "agents.html", "/agents", runs=runs, archived_count=len(archived),
+                   cards=board(dag_watch, dag_chains.chains, airflow.runs), usage=usage(claude.runs + archived))
+
+
+@app.get("/agents/archives", response_class=HTMLResponse)
+def agents_archives(request: Request):
+    """Agents archivés (à la main ou par le rangement automatique) : lisibles, et qu'on peut ressortir."""
+    return _render(request, "agents_archives.html", "/agents", runs=claude.archived(), archive_days=claude.archive_days,
+                   log_days=claude.log_days)
+
+
+@app.post("/agents/ordre")
+async def agents_order(request: Request):
+    """Ordre d'une colonne du schéma après un glisser-déposer : « ids » = numéros dans l'ordre voulu."""
+    form = await request.form()
+    ids = [int(x) for x in str(form.get("ids", "")).split(",") if x.strip().isdigit()]
+    claude.reorder(ids)
+    return Response(status_code=204)
 
 
 def _run_or_404(run_id: int):
-    run = claude.get(run_id)
+    run = claude.find(run_id)  # suivi ou archivé
     if not run:
         raise HTTPException(404, f"Agent #{run_id} inconnu")
     return run
@@ -878,7 +900,7 @@ def _agent_context(run) -> dict:
     intro, questions = agent_questions(run.summary) if waiting else ("", [])  # contexte écrit par l'agent, puis ses questions
     return {"relaunch": relaunch, "relaunchable": run.group == KO and (relaunch is None or relaunch.group == KO),  # relance en échec : on peut réessayer
             "run": run, "log": read_log(path), "review": None if run.running or run.simulated else agent_review.build(run, path),
-            "follow_up": follow_up, "waiting": waiting, "intro": intro, "questions": questions}
+            "follow_up": follow_up, "waiting": waiting, "intro": intro, "questions": questions, "archivable": claude.archivable(run)}
 
 
 @app.get("/agents/{run_id}", response_class=HTMLResponse)
@@ -894,32 +916,66 @@ def agent_journal(request: Request, run_id: int):
     return templates.TemplateResponse(request, "_agent_log.html", _agent_context(run))
 
 
-def _open_new_agent(request: Request, result: ActionResult, new_agent) -> HTMLResponse:
-    """Refus affiché sous le bouton ; sinon la page du nouvel agent s'ouvre."""
+def _open_agent(request: Request, result: ActionResult) -> HTMLResponse:
+    """Refus affiché sous le bouton ; sinon la page de l'agent qui repart s'ouvre (la même fiche, ou une nouvelle pour un ancien agent)."""
     if not result.ok:
         return _result(request, result)
-    return HTMLResponse("", headers={"HX-Redirect": f"/agents/{new_agent().id}"})
+    return HTMLResponse("", headers={"HX-Redirect": f"/agents/{result.run_id}"})
 
 
 @app.post("/agents/{run_id}/repondre")
 async def agent_reply(request: Request, run_id: int):
     """« Répondre et relancer » : par question, l'option cochée (choix_1…) et une réponse libre (reponse_1…), plus une précision
     libre (reponse), assemblées
-    question par question ; elles partent à un nouvel agent sur la même branche, ouvert dès son lancement."""
+    question par question ; l'agent repart avec elles, sur la même fiche et la même branche."""
     run = _run_or_404(run_id)
     form = await request.form()
     _, questions = agent_questions(run.summary)
     answers = [chosen_answer(q, str(form.get(f"choix_{i}", "")), str(form.get(f"reponse_{i}", ""))) for i, q in enumerate(questions, 1)]
     answer = answer_text(questions, answers, str(form.get("reponse", "")))
     result = await asyncio.to_thread(claude.reply, run_id, answer)  # git (vérifs, worktree) : hors de la boucle
-    return _open_new_agent(request, result, lambda: claude.follow_up(run_id))
+    return _open_agent(request, result)
 
 
 @app.post("/agents/{run_id}/relancer")
 def agent_relaunch(request: Request, run_id: int):
-    """Relance d'un agent fini en erreur, quelle qu'elle soit : même branche, même brief."""
+    """Relance d'un agent fini en erreur, quelle qu'elle soit : même fiche, même branche, même brief."""
     _run_or_404(run_id)
-    return _open_new_agent(request, claude.relaunch(run_id), lambda: claude.relaunched(run_id))
+    return _open_agent(request, claude.relaunch(run_id))
+
+
+@app.post("/agents/{run_id}/archiver")
+def agent_archive(request: Request, run_id: int):
+    """Bouton « Archiver » de la page d'un agent, ou agent déposé sur la zone d'archive du schéma : refus en 409, lisible."""
+    _run_or_404(run_id)
+    result = claude.archive(run_id)
+    if not result.ok:
+        return HTMLResponse(result.message, status_code=409)
+    return HTMLResponse(result.message, headers={"HX-Redirect": "/agents"})
+
+
+@app.post("/agents/{run_id}/renommer")
+def agent_rename(request: Request, run_id: int, titre: str = Form("")):
+    """Nom de l'agent, modifié depuis sa page ; vide : il reprend son sujet."""
+    _run_or_404(run_id)
+    claude.rename(run_id, titre)
+    return RedirectResponse(f"/agents/{run_id}", status_code=303)
+
+
+@app.post("/agents/{run_id}/epingler")
+def agent_pin(request: Request, run_id: int):
+    """Épingle ou désépingle depuis la page de l'agent (retour sur la page d'où vient le clic)."""
+    _run_or_404(run_id)
+    claude.toggle_pin(run_id)
+    back = request.headers.get("referer") or f"/agents/{run_id}"
+    return RedirectResponse(back if back.startswith(str(request.base_url)) or back.startswith("/") else f"/agents/{run_id}", status_code=303)
+
+
+@app.post("/agents/{run_id}/ressortir")
+def agent_unarchive(request: Request, run_id: int):
+    _run_or_404(run_id)
+    result = claude.unarchive(run_id)
+    return _result(request, result) if not result.ok else HTMLResponse("", headers={"HX-Redirect": f"/agents/{run_id}"})
 
 
 @app.post("/agents/{run_id}/arreter")
