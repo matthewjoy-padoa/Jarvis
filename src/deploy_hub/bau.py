@@ -165,6 +165,73 @@ def folder(root: Path = PROJECT_ROOT) -> Path:
     return data_dir(root) / "notion" / KEY
 
 
+# ------------------------------------------------------------------------------------------------------------ liens
+LINKS_FILE = "bau.yaml"  # <dossier de configuration>/bau.yaml (config/, hors git) : les liens de l'équipe
+
+
+@dataclass
+class Links:
+    """Liens de l'équipe BAU, qui n'a pas de client pour porter les siens : Google Drive, pages Notion, autres adresses.
+    Jarvis ne fait que les ouvrir dans le navigateur, il ne lit jamais leur contenu."""
+    drive: list[dict] = field(default_factory=list)  # [{label, url}] : drive.google.com ou docs.google.com
+    notion: list[dict] = field(default_factory=list)  # [{label, url}] : pages Notion de l'équipe
+    other: list[dict] = field(default_factory=list)  # [{label, url}] : toute autre adresse http(s)
+
+    @property
+    def all(self) -> list[dict]:
+        return self.drive + self.notion + self.other
+
+    @staticmethod
+    def text(links: list[dict]) -> str:
+        """Liens au format du formulaire : un par ligne, « libellé | adresse »."""
+        return "\n".join(f"{l['label']} | {l['url']}" for l in links)
+
+
+def links_path(root: Path = PROJECT_ROOT) -> Path:
+    from deploy_hub.config import clients_dir
+    return clients_dir(root).parent / LINKS_FILE
+
+
+def parse_other_links(text: str) -> list[dict]:
+    """Autres liens, un par ligne : « libellé | adresse » ou l'adresse seule ; seulement des adresses http(s)."""
+    from deploy_hub.client_config import _labelled_links
+    links = []
+    for line, label, url in _labelled_links(text):
+        if not url.startswith(("https://", "http://")):
+            raise ConfigError(f"Lien « {line} » : adresse https://… attendue")
+        links.append({"label": label or url.split("//", 1)[1].split("/", 1)[0], "url": url})
+    return links
+
+
+def links_from_form(form: dict) -> Links:
+    """Liens saisis dans la page « Liens de l'équipe » ; ConfigError si une adresse ne convient pas."""
+    from deploy_hub.client_config import parse_dashboards, parse_drive
+    return Links(drive=parse_drive(str(form.get("drive") or "")), notion=parse_dashboards(str(form.get("notion") or "")),
+                 other=parse_other_links(str(form.get("other") or "")))
+
+
+def load_links(root: Path = PROJECT_ROOT) -> Links:
+    """Liens enregistrés ; aucun si le fichier manque ou est illisible (retouché à la main) : la page reste utilisable."""
+    import yaml
+    try:
+        data = yaml.safe_load(links_path(root).read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return Links()
+    keep = lambda key: [{"label": str(l.get("label") or "Lien"), "url": str(l["url"])} for l in data.get(key) or []
+                        if isinstance(l, dict) and str(l.get("url") or "").startswith(("https://", "http://"))]
+    return Links(drive=keep("drive"), notion=keep("notion"), other=keep("autres"))
+
+
+def save_links(links: Links, root: Path = PROJECT_ROOT) -> Path:
+    import yaml
+    from deploy_hub.safe_write import write_text
+    path = links_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_text(path, "# Liens de l'équipe BAU (page BAU de Jarvis) : configuration locale, hors git, modifiable depuis l'app.\n"
+               + yaml.safe_dump({"drive": links.drive, "notion": links.notion, "autres": links.other}, allow_unicode=True, sort_keys=False))
+    return path
+
+
 # ------------------------------------------------------------------------------------------------------------ synchro
 def _template(name: str) -> str:
     return (TEMPLATES / f"{name}.sql").read_text(encoding="utf-8")

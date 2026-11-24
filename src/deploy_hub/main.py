@@ -431,6 +431,8 @@ def _render(request: Request, template: str, active: str, **context) -> HTMLResp
         {
             "pages": _nav_pages(),
             "current": _current(request),
+            # Dock de l'équipe BAU (ses liens) : sur ses pages, et partout quand aucun client n'est suivi (sinon : celui du client).
+            "bau_dock": bau.load_links() if bau.enabled() and (active == "/bau" or _current(request) is None) else None,
             "shell_token": shell.TOKEN if shell.enabled() else "",  # onglet « Shell » de la console (JARVIS_SHELL=1, VM)
             "cross_pages": CROSS_PAGES,
             "clients": _deployments(request),
@@ -1473,6 +1475,27 @@ def bau_demande(request: Request, ref: str):
     if request.headers.get("HX-Request"):
         return templates.TemplateResponse(request, "_demande.html", context)
     return _render(request, "demande.html", "/bau", **context)
+
+
+def _bau_links_page(request: Request, links: bau.Links, vers: str, error: str = "", form: dict | None = None) -> HTMLResponse:
+    return _render(request, "bau_links.html", "/bau", links=links, vers=vers, error=error, form=form or {})
+
+
+@app.get("/bau/liens", response_class=HTMLResponse)
+def bau_links(request: Request, vers: str = ""):
+    """Liens de l'équipe BAU (Drive, pages Notion, autres) : ce que porte la fiche d'un client, pour une équipe sans client."""
+    return _bau_links_page(request, bau.load_links(), _local_path(vers, "/bau"))
+
+
+@app.post("/bau/liens", response_class=HTMLResponse)
+async def bau_links_save(request: Request):
+    form = dict(await request.form())
+    vers = _local_path(str(form.get("vers") or ""), "/bau")
+    try:
+        bau.save_links(bau.links_from_form(form))
+    except client_config.ConfigError as e:
+        return _bau_links_page(request, bau.load_links(), vers, str(e), form)
+    return RedirectResponse(vers, status_code=303)
 
 
 @app.get("/bau/demande/{ref}/brief", response_class=HTMLResponse)

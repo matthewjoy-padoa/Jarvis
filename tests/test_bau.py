@@ -399,3 +399,42 @@ def test_the_page_offers_one_view_per_squad_and_remembers_it(board):
     assert "Ajouter une colonne au reporting" not in kept
     everyone = remembered.get("/bau?squad=").text
     assert "Ajouter une colonne au reporting" in everyone
+
+
+# ------------------------------------------------------------------------------------------------------- liens de l'équipe
+def test_the_team_saves_its_own_links_and_finds_them_on_its_page_and_in_the_dock(board, monkeypatch):
+    path = bau.links_path()
+    before = path.read_text(encoding="utf-8") if path.is_file() else None
+    try:
+        assert "+ Ajouter des liens" in client.get("/bau").text
+        form = {"drive": "Dossier équipe | https://drive.google.com/drive/folders/abc", "notion": "Process | https://app.notion.com/p/123",
+                "other": "https://padoa.slack.com/archives/C123\nAirflow | https://airflow.example.test", "vers": "/bau?vue=kanban"}
+        saved = client.post("/bau/liens", data=form, follow_redirects=False)
+        assert saved.status_code == 303 and saved.headers["location"] == "/bau?vue=kanban"
+        links = bau.load_links()
+        assert [l["label"] for l in links.all] == ["Dossier équipe", "Process", "padoa.slack.com", "Airflow"]
+        page = client.get("/bau").text
+        assert 'href="https://drive.google.com/drive/folders/abc"' in page and "Raccourcis de l'équipe BAU" in page  # rangée et dock
+        assert "Raccourcis de l'équipe BAU" not in client.get("/").text  # ailleurs, un client est suivi : son dock à lui
+        form_page = client.get("/bau/liens").text
+        assert "Airflow | https://airflow.example.test" in form_page
+        refused = client.post("/bau/liens", data={**form, "drive": "https://example.test/pas-drive"})
+        assert "drive.google.com" in refused.text and bau.load_links() == links  # rien d'écrit, la saisie reste dans le formulaire
+        assert "pas-drive" in refused.text
+        assert client.post("/bau/liens", data={"other": "ftp://x"}).status_code == 200 and bau.load_links() == links
+        assert client.post("/bau/liens", data={**form, "vers": "https://ailleurs.test"}, follow_redirects=False).headers["location"] == "/bau"
+    finally:
+        path.write_text(before, encoding="utf-8") if before is not None else path.unlink(missing_ok=True)
+
+
+def test_without_any_client_the_dock_is_the_teams(board, monkeypatch):
+    monkeypatch.setattr(main.fiches, "list_deployments", lambda: [])
+    assert "Raccourcis de l'équipe BAU" in client.get("/").text
+
+
+def test_a_hand_broken_links_file_shows_no_link_instead_of_an_error(tmp_path):
+    (tmp_path / "config" / "clients").mkdir(parents=True)
+    (tmp_path / "config" / bau.LINKS_FILE).write_text("drive: [pas: fermé", encoding="utf-8")
+    assert bau.load_links(tmp_path).all == []
+    (tmp_path / "config" / bau.LINKS_FILE).write_text("autres:\n  - {label: Ok, url: 'https://ok.test'}\n  - {label: Non, url: 'javascript:alert(1)'}\n", encoding="utf-8")
+    assert bau.load_links(tmp_path).all == [{"label": "Ok", "url": "https://ok.test"}]

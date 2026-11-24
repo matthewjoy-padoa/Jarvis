@@ -21,6 +21,11 @@
   <a class="btn-link" href="{{ board.notion_url }}" target="_blank" rel="noopener">Page Notion ↗</a>
   {% endif %}
 </div>
+{% if board.configured %}
+{# Liens de l'équipe : ce que porte la fiche d'un client (Drive, Notion, outils), ici pour une équipe sans client. #}
+<p class="stacks bau-links">{% for l in bau_dock.all if bau_dock %}<a href="{{ l.url }}" target="_blank" rel="noopener noreferrer">{{ l.label }} ↗</a>{% endfor %}
+  <a href="/bau/liens?vers={{ request.url.path | urlencode }}" class="muted">{{ "+ Ajouter ou modifier les liens" if bau_dock and bau_dock.all else "+ Ajouter des liens (Drive, Notion, outils de l'équipe)" }}</a></p>
+{% endif %}
 
 {% if not board.configured %}
 <section class="panel empty-state">
