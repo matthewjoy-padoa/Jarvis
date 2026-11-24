@@ -11,6 +11,7 @@ import time
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -172,16 +173,19 @@ def auto_sync_plan() -> tuple[list[str], datetime | None]:
     main compte, et un redémarrage de Jarvis ne remet rien à zéro. Jamais avant _auto_sync_next."""
     every = auto_sync_every()
     wanted = [c.slug for c in client_config.active_configs() if c.auto_sync] if every else []
+    if every and bau.enabled() and bau.auto_sync():  # demandes BAU en synchro auto (bouton de la page BAU)
+        wanted.append(bau.KEY)
     if not wanted:
         return [], None
     return wanted, max(sync_notion.next_check(every, wanted), _auto_sync_next)
 
 
-def auto_sync_note(d: Deployment) -> str:
+def auto_sync_note(d) -> str:
     """« prochaine vers 14:15 », à côté de la dernière synchro d'une fiche : l'heure prévue de la synchro automatique de
-    ce client. Vide s'il ne l'a pas demandée, si rien n'est prévu, ou pendant qu'une synchro tourne (règle d'affichage :
-    le bouton « Rafraîchir » porte alors l'avancement)."""
-    if not d.auto_sync or sync_routine.running or _refresh_lock.locked():
+    ce client (ou des demandes BAU : bau.SPACE et bau.auto_sync()). Vide s'il ne l'a pas demandée, si rien n'est prévu,
+    ou pendant qu'une synchro tourne (règle d'affichage : le bouton « Rafraîchir » porte alors l'avancement)."""
+    on = bau.auto_sync() if d.slug == bau.KEY else d.auto_sync
+    if not on or sync_routine.running or _refresh_lock.locked():
         return ""
     wanted, due = auto_sync_plan()
     if due is None or d.slug not in wanted:
@@ -200,9 +204,13 @@ def _auto_sync() -> None:
     wanted, due = auto_sync_plan()
     if due is None or due > datetime.now():
         return
-    if notion_api.load_token():
-        threading.Thread(target=_refresh, args=(wanted,), name="jarvis-sync-auto", daemon=True).start()
+    clients = [slug for slug in wanted if slug != bau.KEY]
+    if notion_api.load_token() and clients:  # les demandes BAU ne se lisent que par la routine (notion_api ne les connaît pas)
+        threading.Thread(target=_refresh, args=(clients,), name="jarvis-sync-auto", daemon=True).start()
         started, message = True, "lancée par l'API"
+        if bau.KEY in wanted:
+            r = sync_routine.start([bau.KEY], auto=True)
+            message += f" ; demandes BAU : {r.message}"
     else:
         r = sync_routine.start(wanted, auto=True)
         started, message = r.ok, r.message
@@ -1448,7 +1456,7 @@ def bau_page(request: Request):
     squad = board.squad(_views(request, "bau", "squad")["squad"])
     demandes = squad[1] if squad else board.demandes
     columns = kanban_columns([(None, x) for x in demandes], bau.STATUSES) if view["vue"] == "kanban" else []
-    return _render(request, "bau.html", "/bau", board=board, demandes=demandes, squad=squad[0] if squad else "",
+    return _render(request, "bau.html", "/bau", board=board, demandes=demandes, space=_bau_space(), squad=squad[0] if squad else "",
                    squads=[(bau.squad_slug(name), name) for name in board.squads], columns=columns,
                    fiche_of=_bau_fiches(request, board), bau_ready=sync_routine.problem() is None, setting=bau.SETTING,
                    pins=_bau_pins(), **view)
@@ -1530,6 +1538,18 @@ def launch_agent_on_demande(request: Request, ref: str, description: str = Form(
     if TO_FILL in (prompt.strip() or demande_prompt(x, description)):
         return _result(request, ActionResult(False, f"Le brief contient encore « {TO_FILL} » : colle le détail de la demande avant de lancer.", simulated=False))
     return _result(request, claude.launch_demande(x, description, prompt))
+
+
+@app.post("/bau/synchro-auto", response_class=HTMLResponse)
+def bau_auto_sync(request: Request, actif: str = Form("")):
+    """Bouton « Synchro auto » de la page BAU : Jarvis relit les demandes tout seul, ou non (non par défaut)."""
+    bau.set_auto_sync(actif == "1")
+    return templates.TemplateResponse(request, "_auto_sync.html", {"d": _bau_space()})
+
+
+def _bau_space():
+    """Ce que le bouton « Synchro auto » attend d'un client (_auto_sync.html), pour les demandes BAU."""
+    return SimpleNamespace(slug=bau.KEY, client="les demandes BAU", auto_sync=bau.auto_sync())
 
 
 @app.post("/bau/rafraichir", response_class=HTMLResponse)

@@ -11,7 +11,8 @@
 <div class="page-head">
   <div>
     <h1>BAU <span class="muted">· demandes de l'équipe</span></h1>
-    {% if board.configured %}<p class="muted last-sync">{% if board.checked_at %}Dernière synchro : {{ board.checked_at | quand }}{% else %}Jamais synchronisé{% endif %}</p>{% endif %}
+    {% if board.configured %}<p class="muted last-sync">{% if board.checked_at %}Dernière synchro : {{ board.checked_at | quand }}{% else %}Jamais synchronisé{% endif %}
+      {% with d = space %}{% include "_auto_sync.html" %}{% endwith %}</p>{% endif %}
   </div>
   {% if board.configured %}
   <div class="refresh">

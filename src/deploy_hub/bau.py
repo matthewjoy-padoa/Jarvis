@@ -211,26 +211,46 @@ def links_from_form(form: dict) -> Links:
                  other=parse_other_links(str(form.get("other") or "")))
 
 
-def load_links(root: Path = PROJECT_ROOT) -> Links:
-    """Liens enregistrés ; aucun si le fichier manque ou est illisible (retouché à la main) : la page reste utilisable."""
+def _settings(root: Path = PROJECT_ROOT) -> dict:
+    """Contenu de config/bau.yaml (liens, synchro automatique) ; {} s'il manque ou est illisible (retouché à la main)."""
     import yaml
     try:
         data = yaml.safe_load(links_path(root).read_text(encoding="utf-8")) or {}
     except (OSError, yaml.YAMLError):
-        return Links()
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _write_settings(data: dict, root: Path = PROJECT_ROOT) -> Path:
+    import yaml
+    from deploy_hub.safe_write import write_text
+    path = links_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_text(path, "# Équipe BAU (page BAU de Jarvis) : configuration locale, hors git, modifiable depuis l'app.\n"
+               + yaml.safe_dump(data, allow_unicode=True, sort_keys=False))
+    return path
+
+
+def auto_sync(root: Path = PROJECT_ROOT) -> bool:
+    """Jarvis relit les demandes tout seul (bouton « Synchro auto » de la page BAU) ; non par défaut, comme un client."""
+    return bool(_settings(root).get("synchro_auto"))
+
+
+def set_auto_sync(on: bool, root: Path = PROJECT_ROOT) -> None:
+    _write_settings({**_settings(root), "synchro_auto": on}, root)
+
+
+def load_links(root: Path = PROJECT_ROOT) -> Links:
+    """Liens enregistrés ; aucun si le fichier manque ou est illisible (retouché à la main) : la page reste utilisable."""
+    data = _settings(root)
     keep = lambda key: [{"label": str(l.get("label") or "Lien"), "url": str(l["url"])} for l in data.get(key) or []
                         if isinstance(l, dict) and str(l.get("url") or "").startswith(("https://", "http://"))]
     return Links(drive=keep("drive"), notion=keep("notion"), other=keep("autres"))
 
 
 def save_links(links: Links, root: Path = PROJECT_ROOT) -> Path:
-    import yaml
-    from deploy_hub.safe_write import write_text
-    path = links_path(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    write_text(path, "# Liens de l'équipe BAU (page BAU de Jarvis) : configuration locale, hors git, modifiable depuis l'app.\n"
-               + yaml.safe_dump({"drive": links.drive, "notion": links.notion, "autres": links.other}, allow_unicode=True, sort_keys=False))
-    return path
+    """Enregistre les liens ; le reste du fichier (synchro automatique) est gardé."""
+    return _write_settings({**_settings(root), "drive": links.drive, "notion": links.notion, "autres": links.other}, root)
 
 
 # ------------------------------------------------------------------------------------------------------------ synchro

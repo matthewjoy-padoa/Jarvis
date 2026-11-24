@@ -1,6 +1,11 @@
 """Description d'une demande BAU : le corps de sa page Notion, que la synchro SQL ne voit pas (elle ne lit que les colonnes).
 
-À l'ouverture d'une demande, Jarvis fait lire sa page par Claude Code (`claude -p`, connecteur Notion, lecture seule,
+Deux façons de la lire, la même description gardée :
+- dans la synchro : après la fusion des demandes, le passage fait lire les pages des demandes ouvertes modifiées depuis
+  leur dernière lecture (stale), PAGES_PER_PASSAGE au plus, les plus récentes d'abord ; le reste au passage suivant ;
+- à l'ouverture d'une demande dont la description n'est pas à jour (DescriptionReader) :
+
+Jarvis fait lire sa page par Claude Code (`claude -p`, connecteur Notion, lecture seule,
 modèle rapide) : une page à la fois, seulement celle qu'on regarde. Claude ne fait qu'appeler notion-fetch ; Jarvis va
 chercher la réponse lui-même dans le transcript de la session (ou dans le fichier où Claude Code l'a rangée), en garde le
 contenu (la partie <content> de la page) dans data/notion/_bau/descriptions/<réf>.json, hors git, avec la date de dernière
@@ -30,6 +35,7 @@ PROMPT = """Lecture seule : ne modifie rien dans Notion, n'écris aucun fichier,
 """
 MODEL = "haiku"  # Claude ne fait qu'un appel d'outil : un modèle rapide suffit
 MAX_READERS = 2  # lectures en même temps au plus ; les suivantes partent quand une se termine (la page redemande)
+PAGES_PER_PASSAGE = 15  # pages lues au plus par passage de synchro : leurs réponses restent dans le contexte du modèle
 NOTION_FETCH = "notion-fetch"
 CONTENT = re.compile(r"<content>\s*(.*?)\s*</content>", re.S)
 
@@ -100,6 +106,53 @@ def fetched_in_session(session: str, projects: Path = CLAUDE_PROJECTS) -> str | 
     return found
 
 
+def descriptions_dir(root: Path = PROJECT_ROOT) -> Path:
+    return bau_folder(root) / "descriptions"
+
+
+def pages_dir(root: Path = PROJECT_ROOT) -> Path:
+    """Pages lues par un passage de synchro, en attendant d'être rangées (retirées ensuite)."""
+    return bau_folder(root) / "pages"
+
+
+def saved(ref: str, root: Path = PROJECT_ROOT, folder: Path | None = None) -> dict:
+    """{texte, modifie, lu} de la dernière lecture réussie, {erreur, …} d'un échec, ou {} si jamais lue."""
+    try:
+        data = json.loads(((folder or descriptions_dir(root)) / f"{ref}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def save(ref: str, modified: str, folder: Path, **result) -> None:
+    """Range une lecture : le texte (même vide), ou une erreur qui garde l'ancien texte ; avec la date de la demande lue."""
+    kept = {} if "texte" in result else {k: v for k, v in saved(ref, folder=folder).items() if k == "texte"}
+    write_json(folder / f"{ref}.json", {**kept, **result, "modifie": modified, "lu": datetime.now().isoformat(timespec="seconds")})
+
+
+def stale(root: Path = PROJECT_ROOT) -> list[Demande]:
+    """Demandes ouvertes dont la description n'a pas été lue depuis leur dernière modification : les plus récemment
+    modifiées d'abord, PAGES_PER_PASSAGE au plus (les suivantes au passage d'après, ou à leur ouverture)."""
+    from deploy_hub import bau
+    todo = [x for x in bau.load(root).open if x.notion_url and saved(x.ref, root).get("modifie") != x.modified]
+    return sorted(todo, key=lambda x: x.modified, reverse=True)[:PAGES_PER_PASSAGE]
+
+
+def store_pages(modified: dict[str, str], root: Path = PROJECT_ROOT) -> int:
+    """Range les pages lues par un passage (pages_dir/<réf>.json) en descriptions ; nombre rangé. Une page sans réponse
+    n'est pas notée : elle reste à relire. Les réponses brutes sont retirées."""
+    folder, read = pages_dir(root), 0
+    for ref, stamp in modified.items():
+        answer = folder / f"{ref}.json"
+        if answer.is_file():
+            save(ref, stamp, descriptions_dir(root), texte=description_of(answer.read_text(encoding="utf-8")))
+            read += 1
+    if folder.is_dir():
+        for answer in folder.glob("*.json"):
+            answer.unlink()
+    return read
+
+
 class DescriptionReader:
     """Descriptions lues (data/notion/_bau/descriptions/) et lectures en cours, une par demande, MAX_READERS au plus."""
 
@@ -114,19 +167,14 @@ class DescriptionReader:
 
     @property
     def folder(self) -> Path:
-        return self._folder or bau_folder() / "descriptions"
+        return self._folder or descriptions_dir()
 
     @property
     def claude_bin(self) -> str:
         return self._claude_bin or os.getenv("CLAUDE_BIN") or "claude"
 
     def saved(self, ref: str) -> dict:
-        """{texte, modifie, lu} de la dernière lecture réussie, {erreur, …} d'un échec, ou {} si jamais lue."""
-        try:
-            data = json.loads((self.folder / f"{ref}.json").read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return {}
-        return data if isinstance(data, dict) else {}
+        return saved(ref, folder=self.folder)
 
     def is_fresh(self, x: Demande) -> bool:
         """Lue depuis la dernière modification connue de la demande (même un échec : on ne relit pas en boucle)."""
@@ -182,5 +230,4 @@ class DescriptionReader:
         self._save(x, texte=description_of(fetched))
 
     def _save(self, x: Demande, **result) -> None:
-        kept = {} if "texte" in result else {k: v for k, v in self.saved(x.ref).items() if k == "texte"}  # un échec garde l'ancien texte
-        write_json(self.folder / f"{x.ref}.json", {**kept, **result, "modifie": x.modified, "lu": datetime.now().isoformat(timespec="seconds")})
+        save(x.ref, x.modified, self.folder, **result)
