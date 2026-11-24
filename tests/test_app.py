@@ -705,3 +705,14 @@ def test_an_agent_is_renamed_and_pinned_from_its_page_and_pinned_ones_lead_the_s
     listing = client.get("/agents").text
     assert "Champ de vision" in listing and 'class="bot-pin"' in listing
     assert listing.index(f'data-agent="{first.id}" draggable') < listing.index(f'data-agent="{second.id}" draggable')  # épinglé d'abord
+
+
+def test_dragging_an_agent_is_animated_and_calm_when_motion_is_reduced():
+    claude.runs.clear()
+    client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief"})
+    claude.runs[0].status = "terminé"
+    page = client.get("/agents").text
+    assert "const flip = " in page and "is-dragging-agent" in page and "is-swallowing" in page  # voisins, zone éveillée, archive
+    assert 'matchMedia("(prefers-reduced-motion: reduce)")' in page
+    css = (__import__("pathlib").Path(__file__).parents[1] / "src" / "deploy_hub" / "static" / "style.css").read_text()
+    assert "@keyframes archive-ready" in css and "@keyframes archive-swallow" in css

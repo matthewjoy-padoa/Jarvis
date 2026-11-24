@@ -71,27 +71,53 @@
 <div class="flow-archive" data-archive-zone aria-live="polite"><span>{{ ic.icon("archive") }} Archiver : dépose ici un agent fini</span><small class="muted" data-archive-out></small></div>
 <script>
   // Glisser-déposer : dans sa colonne, l'agent change de place (ordre gardé) ; sur la zone « Archiver », il est rangé.
+  // Animations : l'agent soulevé, les voisins qui glissent pour lui faire place, un rebond quand il se pose, la zone
+  // qui s'ouvre pendant le glisser, l'agent avalé par l'archive ou la zone qui secoue la tête si elle refuse.
   (() => {
     let dragged = null;
     const zone = document.querySelector("[data-archive-zone]"), out = zone.querySelector("[data-archive-out]");
+    const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const animate = (el, frames, options) => calm ? null : el.animate(frames, {easing: "cubic-bezier(.2, .8, .2, 1)", ...options});
     const post = (url, body) => fetch(url, {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded"}, body});
+    const flip = (lane, move) => {  // les voisins partent de leur ancienne place et glissent jusqu'à la nouvelle
+      const kids = [...lane.querySelectorAll(".flow-bot[data-agent]")];
+      const before = new Map(kids.map((k) => [k, k.getBoundingClientRect()]));
+      move();
+      kids.forEach((k) => {
+        if (k === dragged) return;
+        const a = before.get(k), b = k.getBoundingClientRect();
+        if (a.left !== b.left || a.top !== b.top) animate(k, [{translate: `${a.left - b.left}px ${a.top - b.top}px`}, {translate: "0 0"}], {duration: 220});
+      });
+    };
     document.querySelectorAll(".flow-bot[data-agent]").forEach((el) => {
-      el.addEventListener("dragstart", (e) => { dragged = el; e.dataTransfer.setData("text/plain", el.dataset.agent); e.dataTransfer.effectAllowed = "move"; el.classList.add("is-dragging"); });
-      el.addEventListener("dragend", () => { el.classList.remove("is-dragging"); zone.classList.remove("is-over"); dragged = null; });
+      el.addEventListener("dragstart", (e) => {
+        dragged = el;
+        e.dataTransfer.setData("text/plain", el.dataset.agent);
+        e.dataTransfer.effectAllowed = "move";
+        requestAnimationFrame(() => el.classList.add("is-dragging"));  // après la capture de l'image qui suit la souris
+        document.body.classList.add("is-dragging-agent");
+      });
+      el.addEventListener("dragend", () => {
+        el.classList.remove("is-dragging");
+        document.body.classList.remove("is-dragging-agent");
+        zone.classList.remove("is-over");
+        dragged = null;
+      });
     });
     document.querySelectorAll(".flow-nodes").forEach((lane) => {
       lane.addEventListener("dragover", (e) => {
         if (!dragged || dragged.parentElement !== lane) return;  // une colonne suit l'état de l'agent : pas de passage de l'une à l'autre
         e.preventDefault();
         const target = e.target.closest(".flow-bot");
-        if (target && target !== dragged) {
-          const box = target.getBoundingClientRect();
-          lane.insertBefore(dragged, e.clientX > box.left + box.width / 2 ? target.nextSibling : target);
-        }
+        if (!target || target === dragged) return;
+        const box = target.getBoundingClientRect();
+        const ref = e.clientX > box.left + box.width / 2 ? target.nextSibling : target;
+        if (ref !== dragged && ref !== dragged.nextSibling) flip(lane, () => lane.insertBefore(dragged, ref));
       });
       lane.addEventListener("drop", (e) => {
         if (!dragged || dragged.parentElement !== lane) return;
         e.preventDefault();
+        animate(dragged, [{scale: "1.18"}, {scale: ".94"}, {scale: "1"}], {duration: 320, easing: "cubic-bezier(.3, 1.5, .5, 1)"});  // il se pose
         post("/agents/ordre", "ids=" + [...lane.querySelectorAll(".flow-bot[data-agent]")].map((n) => n.dataset.agent).join(","));
       });
     });
@@ -100,10 +126,23 @@
     zone.addEventListener("drop", async (e) => {
       e.preventDefault();
       zone.classList.remove("is-over");
-      const id = e.dataTransfer.getData("text/plain");
+      const id = e.dataTransfer.getData("text/plain"), el = dragged || document.querySelector(`.flow-bot[data-agent="${id}"]`);
       if (!id) return;
-      const r = await post(`/agents/${id}/archiver`, "");
-      if (r.ok) location.reload(); else out.textContent = await r.text();
+      const r = await post(`/agents/${id}/archiver`, "").catch(() => null);
+      if (!r || !r.ok) {
+        out.textContent = r ? await r.text() : "Jarvis injoignable : l'agent n'a pas été archivé.";
+        animate(zone, [{translate: "0"}, {translate: "-8px"}, {translate: "7px"}, {translate: "-5px"}, {translate: "3px"}, {translate: "0"}], {duration: 420});
+        return;
+      }
+      out.textContent = "";
+      if (el) {  // l'agent file vers la zone et y disparaît, la zone se referme dessus
+        const a = el.getBoundingClientRect(), b = zone.getBoundingClientRect();
+        const dx = b.left + b.width / 2 - (a.left + a.width / 2), dy = b.top + b.height / 2 - (a.top + a.height / 2);
+        zone.classList.add("is-swallowing");
+        await animate(el, [{transform: "none", opacity: 1}, {transform: `translate(${dx}px, ${dy}px) scale(.15) rotate(25deg)`, opacity: 0}],
+                      {duration: 420, easing: "cubic-bezier(.5, 0, .75, 0)", fill: "forwards"})?.finished;
+      }
+      location.reload();
     });
   })();
 
