@@ -73,7 +73,11 @@ def fetched_in_session(session: str, projects: Path = CLAUDE_PROJECTS) -> str | 
     quand elle est grosse) ; None si l'outil n'a pas répondu, ou en erreur."""
     asked, found = set(), None
     for path in projects.glob(f"*/{session}.jsonl"):
-        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        for line in lines:
             try:
                 content = json.loads(line)["message"]["content"]
             except (ValueError, KeyError, TypeError):
@@ -169,7 +173,10 @@ class DescriptionReader:
             return self._save(x, erreur="délai dépassé")
         except OSError as e:
             return self._save(x, erreur=f"Claude Code n'a pas pu être lancé ({type(e).__name__})")
-        fetched = fetched_in_session(session, self.projects)
+        try:
+            fetched = fetched_in_session(session, self.projects)
+        except Exception as e:  # noqa: BLE001 : toujours noter l'échec, sinon la page relancerait une lecture à chaque sondage
+            return self._save(x, erreur=f"réponse illisible ({type(e).__name__})")
         if fetched is None:
             return self._save(x, erreur="page non lue" + (f" : {out.strip()[-160:]}" if "ÉCHEC" in (out or "") else ""))
         self._save(x, texte=description_of(fetched))
