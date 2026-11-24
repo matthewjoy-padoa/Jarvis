@@ -25,6 +25,8 @@ Ouvre http://localhost:8765, puis **Clients → Ajouter un client**, et choisis 
 
 Le client apparaît alors comme « pas encore synchronisé » : lance une première synchro (section suivante) pour charger ses données.
 
+**Mises à jour** : pas besoin de `git pull` pour savoir qu'une nouvelle version existe. Toutes les dix minutes, Jarvis regarde sur GitHub (`git fetch`) si sa branche a du code qu'il n'a pas : bandeau « Nouvelle version de Jarvis disponible » en haut de chaque page, et notification. Son bouton **Mettre à jour et redémarrer** met le dossier à jour (avance rapide seulement, jamais de fusion), synchronise les dépendances (`uv sync`) puis redémarre Jarvis tout seul, dans le même terminal (ou le même service), et la page se recharge sur la nouvelle version. C'est refusé tant qu'un agent Claude, une synchro Notion ou la lecture de l'annuaire tourne, puisque le redémarrage les couperait. Après un `git pull` fait à la main, le même bandeau dit « Jarvis est à relancer », avec un bouton **Redémarrer**.
+
 ## Synchroniser avec Notion
 
 Synchro incrémentale : une requête d'empreinte pour tous les clients, puis seulement ce qui a changé. **Clients synchronisés : ceux configurés dans ton Jarvis** (`config/clients/`, ou `JARVIS_CONFIG_DIR`) ; un client ajouté est pris au passage suivant, un client archivé ou retiré ne l'est plus. **Archiver** un client (sa carte de la page Clients, ou Configurer) quand on ne travaille plus dessus : il sort du menu, de l'accueil, des notifications et de la synchro ; sa fiche reste consultable dans « Archivés », en bas de la page Clients, et « Désarchiver » le remet dans le suivi (clé `archived` de son yaml).

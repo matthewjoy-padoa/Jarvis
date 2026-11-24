@@ -81,7 +81,7 @@ button.secondary { background: transparent; color: var(--accent); }
 .result.ok { color: var(--ok); } .result.ko { color: var(--danger); }
 .plain { list-style: none; padding: 0; } .plain li { padding: 4px 0; }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-.dot.ok { background: var(--ok); } .dot.off { background: var(--muted); }
+.dot.ok { background: var(--ok); } .dot.off { background: var(--muted); } .dot.warn { background: var(--warn); }
 @media (max-width: 700px) { table { display: block; overflow-x: auto; } }
 .topbar { flex-wrap: wrap; }
 .nav { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
@@ -1724,6 +1724,12 @@ details.filter.multi { position: relative; font-size: 13px; }
 .archived-card .card-head strong { color: var(--muted); }
 .restart-note { margin: 0 0 16px; padding: 10px 16px; border-color: var(--danger); }  /* « Jarvis est à relancer » : en tête de toutes les pages */
 .restart-note p { margin: 0; }
+.restart-note.is-news { border-color: var(--accent); }  /* nouvelle version publiée : une nouvelle, pas une panne */
+.update-form { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 8px; }
+.update-form .update-out { flex-basis: 100%; }
+.update-form .update-out:empty { display: none; }
+.update-form .btn-busy, .update-form.htmx-request .btn-idle { display: none; }
+.update-form.htmx-request .btn-busy { display: inline; }
 .archived-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 8px 0 12px; border-style: dashed; }
 .archived-note p { margin: 0; flex: 1 1 320px; }
 

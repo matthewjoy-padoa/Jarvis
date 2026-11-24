@@ -42,6 +42,8 @@ def _agents_finish_at_once(monkeypatch):
     from deploy_hub import main
     monkeypatch.setattr(main.claude, "problem", lambda: None)
     monkeypatch.setattr(main.claude, "_start", lambda run: main.claude.finished(run, "terminé"))
+    # Jamais de « git fetch » du dossier de Jarvis quand un test fait tourner la boucle de fond : rien de publié.
+    monkeypatch.setattr(main.running_code, "published", main.running_code.Published)
 
 
 @dataclass

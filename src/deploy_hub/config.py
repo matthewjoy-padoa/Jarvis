@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+# Environnement reçu au lancement, avant le .env (load_env_file) : Jarvis redémarré depuis l'app (running_code.restart)
+# repart avec, comme relancé de son terminal ; le .env y est relu, et les variables fixées hors .env y gardent la main.
+START_ENVIRON = dict(os.environ)
 
 
 @dataclass(frozen=True)
