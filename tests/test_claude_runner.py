@@ -4,12 +4,12 @@ import json
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
 
-from deploy_hub.sources.claude_runner import (INSTRUCTION, RESUME_INSTRUCTION, WAITING, ClaudeRunner, agent_branch,
+from deploy_hub.sources.claude_runner import (INSTRUCTION, RESUME_INSTRUCTION, WAITING, AgentRun, ClaudeRunner, agent_branch,
                                                agent_questions, answer_text, chosen_answer, find_pr, final_status, read_log,
                                                report_of, split_questions)
 from deploy_hub.sources.notifications import NotificationStore
@@ -497,3 +497,64 @@ def test_retour_branch_says_the_subject_without_numbers():
     assert retour_branch(d, r, [older]) == "fix-presoa-23aa58"  # reprise : la branche déjà lancée
     other = AgentRun(2, "presoa", "Presoa", "retour 11BB22", retour_branch(d, r), "x", datetime(2026, 11, 18, 9), "terminé")
     assert retour_branch(d, r, [other]) == "fix-presoa-ced-ged-factures-multi-version-du-salarie-et-23aa58"
+
+
+def test_a_finished_agent_is_archived_with_its_worktree_and_comes_back(repo, fake_claude, tmp_path):
+    runner = _runner(repo, fake_claude, tmp_path)
+    runner.launch_retour(D, R, prompt="Brief")
+    _wait(runner, 1)
+    worktree = Path(runner.get(1).worktree)
+    assert worktree.is_dir() and runner.archivable(runner.get(1))
+    (worktree / "argv.json").unlink()  # trace du faux Claude : un fichier non suivi, git garderait le worktree
+    result = runner.archive(1)
+    assert result.ok and runner.get(1) is None and [r.id for r in runner.archived()] == [1]
+    assert not worktree.exists() and "fix-acme-r-7" in _git(repo, "branch")  # worktree retiré, branche gardée
+    assert runner.find(1).archived_at and not runner.archive(1).ok  # lisible, pas deux fois
+    assert ClaudeRunner(repo, tmp_path / "agents").get(1) is None  # au redémarrage, il reste aux archives
+    assert runner.unarchive(1).ok and runner.get(1).archived_at is None and runner.archived() == []
+
+
+def test_an_agent_at_work_or_waiting_for_an_answer_is_not_archived(tmp_path):
+    runner = ClaudeRunner(tmp_path, tmp_path / "agents")
+    for n, status in ((1, "en cours"), (2, WAITING)):
+        runner.runs.append(AgentRun(n, "acme", "Acme", f"retour R-{n}", f"fix-{n}", "x", datetime(2026, 11, 1, 9), status))
+    assert not runner.archive(1).ok and not runner.archive(2).ok and len(runner.runs) == 2
+
+
+def test_tidying_archives_old_agents_then_erases_old_logs_once_a_day(tmp_path):
+    runner = ClaudeRunner(tmp_path, tmp_path / "agents", archive_days=30, log_days=90)
+    now = datetime(2026, 11, 24, 9)
+    for n, days in ((1, 100), (2, 40), (3, 2)):
+        ended = now - timedelta(days=days)
+        runner.runs.append(AgentRun(n, "acme", "Acme", f"retour R-{n}", f"fix-{n}", "x", ended, "terminé", ended_at=ended))
+        runner.log_path(runner.runs[-1]).parent.mkdir(parents=True, exist_ok=True)
+        runner.log_path(runner.runs[-1]).write_text("{}\n")
+    runner.runs.append(AgentRun(4, "acme", "Acme", "retour R-4", "fix-4", "x", now - timedelta(days=60), WAITING,
+                                ended_at=now - timedelta(days=60)))
+    runner.tidy(now)
+    assert [r.id for r in runner.runs] == [3, 4]  # récent, et celui qui attend ta réponse
+    archived = {r.id: r for r in runner.archived()}
+    assert set(archived) == {1, 2} and archived[1].log_removed and not archived[2].log_removed
+    assert not runner.log_path(archived[1]).exists() and runner.log_path(archived[2]).exists()
+    runner.runs[0].ended_at = now - timedelta(days=50)
+    runner.tidy(now + timedelta(hours=2))
+    assert len(runner.runs) == 2  # pas avant le lendemain
+    runner.tidy(now + timedelta(days=1, hours=1))
+    assert [r.id for r in runner.runs] == [4]
+
+
+def test_the_order_chosen_in_a_column_is_kept(tmp_path):
+    runner = ClaudeRunner(tmp_path, tmp_path / "agents")
+    for n in (1, 2, 3):
+        runner.runs.append(AgentRun(n, "acme", "Acme", f"retour R-{n}", f"fix-{n}", "x", datetime(2026, 11, 1, 9), "terminé"))
+    runner.reorder([3, 1, 99])
+    assert [(r.id, r.rank) for r in ClaudeRunner(tmp_path, tmp_path / "agents").runs] == [(1, 1), (2, None), (3, 0)]
+
+
+def test_a_worktree_with_uncommitted_work_is_kept_when_archiving(repo, fake_claude, tmp_path):
+    runner = _runner(repo, fake_claude, tmp_path)
+    runner.launch_retour(D, R, prompt="Brief")
+    _wait(runner, 1)
+    worktree = Path(runner.get(1).worktree)
+    result = runner.archive(1)  # argv.json, non suivi, est encore là
+    assert result.ok and "Worktree gardé" in result.message and worktree.is_dir()

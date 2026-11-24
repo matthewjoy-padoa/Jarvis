@@ -84,6 +84,12 @@ FIELDS = (
           group=LIMITS),
     Field("JARVIS_AGENT_MAX_TURNS", "Tours au plus", "int", "L'agent s'arrête après ce nombre d'allers-retours avec ses outils. Vide : pas de limite",
           section=CLAUDE, group=LIMITS),
+    Field("JARVIS_AGENT_ARCHIVE_DAYS", "Archiver les agents finis après (jours)", "int",
+          "Rangement automatique, une fois par jour : la fiche quitte la page Agents pour les archives et son worktree est retiré "
+          "(la branche reste). Vide : 30", section=CLAUDE, group=LIMITS),
+    Field("JARVIS_AGENT_LOG_DAYS", "Effacer le journal d'un agent après (jours)", "int",
+          "La fiche garde son compte rendu, son coût, ses tokens et sa PR ; seul le détail des outils appelés disparaît. Vide : 90",
+          section=CLAUDE, group=LIMITS),
     Field("JARVIS_AGENT_MAX_BUDGET_USD", "Dépense maximale par agent ($)", "int", "L'agent s'arrête une fois ce montant atteint. Vide : pas de limite",
           section=CLAUDE, group=LIMITS),
     Field("JARVIS_AGENT_PERMISSION_MODE", "Mode de permission", "choice",

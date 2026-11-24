@@ -38,7 +38,8 @@
   <a href="#dags" data-pane="pane-dags">DAG <span class="count" title="Runs de DAG en cours">{{ cards | selectattr("running") | list | length }}</span></a>
 </nav>
 <div id="pane-agents" data-tab-pane>
-<p class="muted">Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.</p>
+<p class="muted">Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.
+  Glisse un agent dans sa colonne pour changer sa place, ou sur « Archiver » pour le ranger. <a href="/agents/archives">Archivés ({{ archived_count }})</a></p>
 {% if runs %}
 {% set lanes = [
   ("in_progress", "En cours", "L'agent travaille dans son worktree · ? : attend ta réponse", runs | selectattr("group", "in", ["in_progress", "todo"]) | list),
@@ -53,7 +54,7 @@
     <div class="flow-nodes">
       {% for r in found[:24] %}
       {% set waiting = r.group == "todo" %}
-      <a class="flow-node flow-bot{{ ' is-sim' if r.simulated }}{{ ' is-waiting' if waiting }}" href="/agents/{{ r.id }}" data-agent="{{ r.id }}" style="--i: {{ loop.index0 }}">
+      <a class="flow-node flow-bot{{ ' is-sim' if r.simulated }}{{ ' is-waiting' if waiting }}" href="/agents/{{ r.id }}" data-agent="{{ r.id }}" draggable="true" style="--i: {{ loop.index0 }}">
         <span class="bot-wrap">{{ bot("waiting" if waiting else key, heads | au_hasard(r.id)) }}</span><span class="bot-id">#{{ r.id }}</span>
         <span class="flow-tip" role="tooltip"><strong>{{ r.subject }}</strong>
           <span>{{ r.client }} · {{ r.status }}{{ " (simulé)" if r.simulated }}</span>
@@ -67,7 +68,45 @@
   </div>
   {% endfor %}
 </section>
+<div class="flow-archive" data-archive-zone aria-live="polite"><span>{{ ic.icon("archive") }} Archiver : dépose ici un agent fini</span><small class="muted" data-archive-out></small></div>
 <script>
+  // Glisser-déposer : dans sa colonne, l'agent change de place (ordre gardé) ; sur la zone « Archiver », il est rangé.
+  (() => {
+    let dragged = null;
+    const zone = document.querySelector("[data-archive-zone]"), out = zone.querySelector("[data-archive-out]");
+    const post = (url, body) => fetch(url, {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded"}, body});
+    document.querySelectorAll(".flow-bot[data-agent]").forEach((el) => {
+      el.addEventListener("dragstart", (e) => { dragged = el; e.dataTransfer.setData("text/plain", el.dataset.agent); e.dataTransfer.effectAllowed = "move"; el.classList.add("is-dragging"); });
+      el.addEventListener("dragend", () => { el.classList.remove("is-dragging"); zone.classList.remove("is-over"); dragged = null; });
+    });
+    document.querySelectorAll(".flow-nodes").forEach((lane) => {
+      lane.addEventListener("dragover", (e) => {
+        if (!dragged || dragged.parentElement !== lane) return;  // une colonne suit l'état de l'agent : pas de passage de l'une à l'autre
+        e.preventDefault();
+        const target = e.target.closest(".flow-bot");
+        if (target && target !== dragged) {
+          const box = target.getBoundingClientRect();
+          lane.insertBefore(dragged, e.clientX > box.left + box.width / 2 ? target.nextSibling : target);
+        }
+      });
+      lane.addEventListener("drop", (e) => {
+        if (!dragged || dragged.parentElement !== lane) return;
+        e.preventDefault();
+        post("/agents/ordre", "ids=" + [...lane.querySelectorAll(".flow-bot[data-agent]")].map((n) => n.dataset.agent).join(","));
+      });
+    });
+    zone.addEventListener("dragover", (e) => { if (dragged) { e.preventDefault(); zone.classList.add("is-over"); } });
+    zone.addEventListener("dragleave", () => zone.classList.remove("is-over"));
+    zone.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      zone.classList.remove("is-over");
+      const id = e.dataTransfer.getData("text/plain");
+      if (!id) return;
+      const r = await post(`/agents/${id}/archiver`, "");
+      if (r.ok) location.reload(); else out.textContent = await r.text();
+    });
+  })();
+
   document.querySelectorAll("[data-agent]").forEach((el) => {
     const mark = (on) => document.querySelectorAll(`[data-agent="${el.dataset.agent}"]`).forEach((other) => other.classList.toggle("is-hot", on));
     el.addEventListener("mouseenter", () => mark(true));

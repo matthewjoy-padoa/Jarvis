@@ -220,6 +220,7 @@ def _push_round() -> None:
     _guarded("Connexion de Claude Code", _check_claude_login)
     _guarded("Code à jour", _check_restart)
     _guarded("Synchro Notion automatique", _auto_sync)
+    _guarded("Rangement des agents", claude.tidy)  # une fois par jour : archives, journaux anciens, worktrees
 
 
 async def _push_loop() -> None:
@@ -826,12 +827,30 @@ def agents(request: Request):
     """Historique des lancements : agents, et une carte par run de DAG (suivis, enchaînements, lancements sans suivi)."""
     for run in claude.runs:
         claude.refresh_context(run)  # agents en cours : où en est leur contexte
-    return _render(request, "agents.html", "/agents", runs=claude.runs,
-                   cards=board(dag_watch, dag_chains.chains, airflow.runs), usage=usage(claude.runs))
+    runs = [r for _, r in sorted(enumerate(claude.runs), key=lambda p: (p[1].rank is None, p[1].rank or 0, p[0]))]  # ordre choisi, puis récents
+    archived = claude.archived()
+    return _render(request, "agents.html", "/agents", runs=runs, archived_count=len(archived),
+                   cards=board(dag_watch, dag_chains.chains, airflow.runs), usage=usage(claude.runs + archived))
+
+
+@app.get("/agents/archives", response_class=HTMLResponse)
+def agents_archives(request: Request):
+    """Agents archivés (à la main ou par le rangement automatique) : lisibles, et qu'on peut ressortir."""
+    return _render(request, "agents_archives.html", "/agents", runs=claude.archived(), archive_days=claude.archive_days,
+                   log_days=claude.log_days)
+
+
+@app.post("/agents/ordre")
+async def agents_order(request: Request):
+    """Ordre d'une colonne du schéma après un glisser-déposer : « ids » = numéros dans l'ordre voulu."""
+    form = await request.form()
+    ids = [int(x) for x in str(form.get("ids", "")).split(",") if x.strip().isdigit()]
+    claude.reorder(ids)
+    return Response(status_code=204)
 
 
 def _run_or_404(run_id: int):
-    run = claude.get(run_id)
+    run = claude.find(run_id)  # suivi ou archivé
     if not run:
         raise HTTPException(404, f"Agent #{run_id} inconnu")
     return run
@@ -847,7 +866,7 @@ def _agent_context(run) -> dict:
     intro, questions = agent_questions(run.summary) if waiting else ("", [])  # contexte écrit par l'agent, puis ses questions
     return {"relaunch": relaunch, "relaunchable": run.group == KO and (relaunch is None or relaunch.group == KO),  # relance en échec : on peut réessayer
             "run": run, "log": read_log(path), "review": None if run.running or run.simulated else agent_review.build(run, path),
-            "follow_up": follow_up, "waiting": waiting, "intro": intro, "questions": questions}
+            "follow_up": follow_up, "waiting": waiting, "intro": intro, "questions": questions, "archivable": claude.archivable(run)}
 
 
 @app.get("/agents/{run_id}", response_class=HTMLResponse)
@@ -889,6 +908,23 @@ def agent_relaunch(request: Request, run_id: int):
     """Relance d'un agent fini en erreur, quelle qu'elle soit : même fiche, même branche, même brief."""
     _run_or_404(run_id)
     return _open_agent(request, claude.relaunch(run_id))
+
+
+@app.post("/agents/{run_id}/archiver")
+def agent_archive(request: Request, run_id: int):
+    """Bouton « Archiver » de la page d'un agent, ou agent déposé sur la zone d'archive du schéma : refus en 409, lisible."""
+    _run_or_404(run_id)
+    result = claude.archive(run_id)
+    if not result.ok:
+        return HTMLResponse(result.message, status_code=409)
+    return HTMLResponse(result.message, headers={"HX-Redirect": "/agents"})
+
+
+@app.post("/agents/{run_id}/ressortir")
+def agent_unarchive(request: Request, run_id: int):
+    _run_or_404(run_id)
+    result = claude.unarchive(run_id)
+    return _result(request, result) if not result.ok else HTMLResponse("", headers={"HX-Redirect": f"/agents/{run_id}"})
 
 
 @app.post("/agents/{run_id}/arreter")

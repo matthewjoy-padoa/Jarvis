@@ -65,6 +65,9 @@ class AgentRun:
     passage_started_at: datetime | None = None  # début du passage en cours (None : le premier, started_at)
     stdin: str = ""  # ce que reçoit le passage en cours (réponse, ou brief complété) ; vide : le brief (prompt)
     log_offset: int = 0  # taille du journal au début du passage en cours : son résultat se lit après
+    archived_at: datetime | None = None  # rangé dans les archives (agents-archive.json) : hors de la page Agents
+    rank: int | None = None  # place choisie à la main dans sa colonne du schéma (glisser-déposer) ; None : la plus récente d'abord
+    log_removed: bool = False  # journal effacé par le rangement automatique : la fiche garde compte rendu, coût et PR
 
     @property
     def report(self) -> str:
@@ -150,6 +153,8 @@ def read_tokens(run: "AgentRun", result: dict) -> None:
 
 COUNTED = ("cost_usd", "num_turns") + tuple(name for name, _, _ in TOKEN_KINDS)  # additionnés d'un passage à l'autre
 REPLY, RELAUNCH = "réponse", "relance"  # ce qui ouvre un nouveau passage
+ARCHIVE_DAYS, LOG_DAYS = 30, 90  # rangement automatique : archivage des agents finis, puis effacement de leur journal
+TIDY_EVERY = timedelta(days=1)
 WAITING, ANSWERED = "question en attente", "répondu"
 AGENT_STATUSES = {"préparation": IN_PROGRESS, "en cours": IN_PROGRESS, "terminé": DONE, WAITING: TODO, ANSWERED: DONE,
                   "échec": KO, "arrêté": KO, "délai dépassé": KO, "interrompu": KO}
@@ -456,11 +461,14 @@ class ClaudeRunner:
                  worktrees_dir: Path | None = None, claude_bin: str = "claude", add_dirs: tuple[Path, ...] = (),
                  allowed_tools: tuple[str, ...] = DEFAULT_TOOLS, permission_mode: str = "acceptEdits",
                  timeout_min: int = 90, max_running: int = 2, model: str = "", fallback_model: str = "", effort: str = "",
-                 max_turns: int = 0, max_budget_usd: int = 0):
+                 max_turns: int = 0, max_budget_usd: int = 0, archive_days: int = ARCHIVE_DAYS, log_days: int = LOG_DAYS):
         self.orchestrator_dir = orchestrator_dir
         self.notifications = notifications  # NotificationStore : « agent terminé »
         self.state_dir = state_dir
         self.state_file = state_dir / "agents.json"
+        self.archive_file = state_dir / "agents-archive.json"  # lu seulement à la demande (page des archives, bilan)
+        self.archive_days, self.log_days = archive_days, log_days
+        self._tidied: datetime | None = None
         self.worktrees_dir = worktrees_dir or orchestrator_dir / ".claude" / "worktrees" / "jarvis"  # ignoré par git
         self.claude_bin = claude_bin
         self.add_dirs = add_dirs
@@ -496,6 +504,8 @@ class ClaudeRunner:
             "effort": env("JARVIS_AGENT_EFFORT"),
             "max_turns": env("JARVIS_AGENT_MAX_TURNS") and int(env("JARVIS_AGENT_MAX_TURNS")),
             "max_budget_usd": env("JARVIS_AGENT_MAX_BUDGET_USD") and int(env("JARVIS_AGENT_MAX_BUDGET_USD")),
+            "archive_days": env("JARVIS_AGENT_ARCHIVE_DAYS") and int(env("JARVIS_AGENT_ARCHIVE_DAYS")),
+            "log_days": env("JARVIS_AGENT_LOG_DAYS") and int(env("JARVIS_AGENT_LOG_DAYS")),
         }
         return {k: v for k, v in kw.items() if v}
 
@@ -508,7 +518,8 @@ class ClaudeRunner:
         Une variable vidée reprend la valeur par défaut de __init__."""
         defaults = {k: v.default for k, v in inspect.signature(ClaudeRunner.__init__).parameters.items()}
         options = {**{k: defaults[k] for k in ("claude_bin", "add_dirs", "allowed_tools", "permission_mode", "timeout_min",
-                                               "max_running", "model", "fallback_model", "effort", "max_turns", "max_budget_usd")}, **self._env_options()}
+                                               "max_running", "model", "fallback_model", "effort", "max_turns", "max_budget_usd",
+                                               "archive_days", "log_days")}, **self._env_options()}
         with self._lock:
             self.worktrees_dir = options.get("worktrees_dir") or self.orchestrator_dir / ".claude" / "worktrees" / "jarvis"
             self.timeout = options.pop("timeout_min") * 60
@@ -517,8 +528,8 @@ class ClaudeRunner:
                 setattr(self, key, value)
 
     # --- historique -------------------------------------------------------------------------------------------
-    def _load(self) -> list[AgentRun]:
-        path = self.state_file
+    def _load(self, path: Path | None = None) -> list[AgentRun]:
+        path = path or self.state_file
         if not path.is_file():
             return []
         try:
@@ -528,7 +539,7 @@ class ClaudeRunner:
             return []
         runs = []
         for item in items:
-            for key in ("started_at", "ended_at", "passage_started_at"):  # écrites en ISO par _save
+            for key in ("started_at", "ended_at", "passage_started_at", "archived_at"):  # écrites en ISO par _save
                 item[key] = datetime.fromisoformat(item[key]) if item.get(key) else None
             for passage in item.get("passages") or []:
                 for key in ("started_at", "ended_at"):
@@ -548,6 +559,91 @@ class ClaudeRunner:
 
     def get(self, run_id: int) -> AgentRun | None:
         return next((r for r in self.runs if r.id == run_id), None)
+
+    # --- archives et rangement --------------------------------------------------------------------------------
+    def archived(self) -> list[AgentRun]:
+        """Agents archivés, le plus récemment archivé d'abord : relus du fichier à chaque appel, jamais gardés en mémoire."""
+        with self._lock:
+            return self._load(self.archive_file)
+
+    def _save_archive(self, runs: list[AgentRun]) -> None:
+        write_json(self.archive_file, [asdict(r) for r in runs], default=datetime.isoformat)
+
+    def find(self, run_id: int) -> AgentRun | None:
+        """Agent suivi ou archivé (page d'un agent, lien ancien)."""
+        return self.get(run_id) or next((r for r in self.archived() if r.id == run_id), None)
+
+    @staticmethod
+    def archivable(run: AgentRun) -> bool:
+        """Un agent qui travaille ou attend ta réponse reste sous les yeux."""
+        return not run.archived_at and not run.running and run.status != WAITING
+
+    def archive(self, run_id: int, now: datetime | None = None) -> ActionResult:
+        """Range un agent fini dans les archives et retire son worktree s'il est propre (la branche, elle, reste)."""
+        with self._lock:
+            run = self.get(run_id)
+            if not run:
+                return ActionResult(False, f"Agent #{run_id} inconnu ou déjà archivé.", False)
+            if not self.archivable(run):
+                return ActionResult(False, f"L'agent #{run_id} travaille ou attend ta réponse : arrête-le ou réponds d'abord.", False)
+            run.archived_at, run.rank = now or datetime.now(), None
+            self.runs.remove(run)
+            self._save_archive([run, *self.archived()])
+            self._save()
+        kept = self._drop_worktree(run)
+        return ActionResult(True, f"Agent #{run_id} archivé." + (f" Worktree gardé : {kept}" if kept else ""), False, str(run_id))
+
+    def unarchive(self, run_id: int) -> ActionResult:
+        with self._lock:
+            archive = self.archived()
+            run = next((r for r in archive if r.id == run_id), None)
+            if not run:
+                return ActionResult(False, f"L'agent #{run_id} n'est pas dans les archives.", False)
+            archive.remove(run)
+            run.archived_at = None
+            self.runs.append(run)
+            self.runs.sort(key=lambda r: r.id, reverse=True)  # même ordre qu'au lancement : le plus récent d'abord
+            self._save_archive(archive)
+            self._save()
+        return ActionResult(True, f"Agent #{run_id} ressorti des archives.", False, str(run_id))
+
+    def reorder(self, ids: list[int]) -> None:
+        """Ordre choisi dans une colonne du schéma : chaque agent cité prend sa place."""
+        with self._lock:
+            for rank, run_id in enumerate(ids):
+                if (run := self.get(run_id)):
+                    run.rank = rank
+            self._save()
+
+    def _drop_worktree(self, run: AgentRun) -> str:
+        """Retire le worktree d'un agent archivé, sauf si un agent suivi travaille sur la même branche ou s'il reste des
+        modifications non commitées (git refuse sans --force : on garde). Renvoie la raison quand il est gardé."""
+        path = Path(run.worktree) if run.worktree else None
+        if not path or not path.is_dir() or any(r.branch == run.branch for r in self.runs):
+            return ""
+        done = self._git("worktree", "remove", str(path), check=False)
+        return "" if done.returncode == 0 else (done.stderr or done.stdout).strip()[:200]
+
+    def tidy(self, now: datetime | None = None, force: bool = False) -> None:
+        """Rangement, une fois par jour au plus : agents finis depuis plus de archive_days jours archivés (worktree retiré),
+        journaux de plus de log_days jours effacés (la fiche garde compte rendu, coût, tokens et PR)."""
+        now = now or datetime.now()
+        if not force and self._tidied and now - self._tidied < TIDY_EVERY:
+            return
+        self._tidied = now
+        for run in [r for r in self.runs if self.archivable(r) and r.ended_at and now - r.ended_at > timedelta(days=self.archive_days)]:
+            self.archive(run.id, now)
+        with self._lock:
+            archive = self.archived()
+            changed = False
+            for run in [*self.runs, *archive]:
+                if run.log_removed or run.running or not run.ended_at or now - run.ended_at <= timedelta(days=self.log_days):
+                    continue
+                self.log_path(run).unlink(missing_ok=True)
+                run.log_removed = changed = True
+            if changed:
+                self._save_archive(archive)
+                self._save()
 
     def log_path(self, run: AgentRun) -> Path:
         return self.state_dir / f"{run.id}.jsonl"

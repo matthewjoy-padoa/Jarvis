@@ -662,3 +662,28 @@ def test_retour_statuses_put_the_ball_where_it_is():
     assert [group(s) for s in ("INTE - Ancien retour - OK", "OPS - Vérifié en SNAP", "terminé")] == [DONE] * 3
     assert group("Autre") == group("Action identifiée") == OTHER
     assert OTHER not in group_counts([TODO, DONE]) and group_counts([OTHER])[OTHER] == 1
+
+
+def test_agents_are_archived_from_their_page_or_by_drag_and_drop_and_can_be_reordered():
+    claude.runs.clear()
+    for _ in range(2):
+        client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief"})
+    first, second = sorted(claude.runs, key=lambda r: r.id)
+    for run in (first, second):
+        run.status = "terminé"
+    page = client.get("/agents").text
+    assert "data-archive-zone" in page and 'draggable="true"' in page and 'href="/agents/archives">Archivés (' in page
+    assert f'hx-post="/agents/{first.id}/archiver"' in client.get(f"/agents/{first.id}").text
+    assert client.post("/agents/ordre", data={"ids": f"{first.id},{second.id}"}).status_code == 204
+    page = client.get("/agents").text
+    assert page.index(f'data-agent="{first.id}" draggable') < page.index(f'data-agent="{second.id}" draggable')  # ordre choisi
+    done = client.post(f"/agents/{first.id}/archiver")
+    assert done.status_code == 200 and done.headers["HX-Redirect"] == "/agents" and claude.get(first.id) is None
+    assert f'href="/agents/{first.id}"' in client.get("/agents/archives").text
+    assert "Ressortir des archives" in client.get(f"/agents/{first.id}").text  # la fiche reste lisible
+    second.status = "en cours"
+    refused = client.post(f"/agents/{second.id}/archiver")
+    assert refused.status_code == 409 and "travaille ou attend" in refused.text
+    second.status = "terminé"
+    back = client.post(f"/agents/{first.id}/ressortir")
+    assert back.headers["HX-Redirect"] == f"/agents/{first.id}" and claude.get(first.id)
