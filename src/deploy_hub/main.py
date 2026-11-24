@@ -234,8 +234,9 @@ def _push_round() -> None:
 
 
 def _bau_descriptions() -> None:
-    """Descriptions des demandes BAU lues en fond, un lot par minute, une fois la synchro terminée (elle charge d'abord
-    les demandes) : jusqu'à ce que toutes les demandes ouvertes soient à jour, puis seulement celles qui changent."""
+    """Descriptions des demandes BAU lues en fond (lots enchaînés), une fois la synchro terminée (elle charge d'abord les
+    demandes) : jusqu'à ce que toutes les demandes ouvertes soient à jour, puis seulement celles qui changent. Regardé
+    chaque minute."""
     if bau.enabled() and not sync_routine.running and (board := bau.load()).synced:
         descriptions.catch_up(board.demandes)
 

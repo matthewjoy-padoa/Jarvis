@@ -568,8 +568,7 @@ def test_descriptions_are_read_in_the_background_batch_after_batch_the_most_rece
     r = reader(tmp_path, monkeypatch)
     demandes = [demande(n) for n in range(1, 6)] + [demande(6, status="Terminé")]
     assert r.progress(demandes) == {"lues": 0, "total": 5, "en_cours": False}
-    while r.catch_up(demandes):  # ce que Jarvis fait chaque minute
-        wait(r)
+    assert r.catch_up(demandes) and (wait(r) or True) and not r.catch_up(demandes)  # une seule fois : les lots s'enchaînent
     assert r.calls == [[f"{5:08X}", f"{4:08X}"], [f"{3:08X}", f"{2:08X}"], [f"{1:08X}"]]  # lots de 2, les plus récentes d'abord
     assert r.progress(demandes)["lues"] == 5 and not r.saved(f"{6:08X}")  # une demande terminée n'est pas lue
     demandes[2].modified = "2027-03-09 12:00:00Z"  # modifiée dans Notion : seule elle est relue

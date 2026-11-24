@@ -1,9 +1,9 @@
 """Description d'une demande BAU : le corps de sa page Notion, que la synchro SQL ne voit pas (elle ne lit que les colonnes).
 
 La synchro charge d'abord les demandes (et finit) ; les descriptions se lisent ensuite en fond, sans rien bloquer :
-- catch_up, appelé chaque minute par Jarvis : un lot de BATCH_SIZE pages à relire (demandes ouvertes jamais lues, ou
-  modifiées dans Notion depuis leur lecture ; les plus récentes d'abord), puis le lot suivant à la minute d'après,
-  jusqu'à ce que tout soit à jour ; ensuite, seules les demandes modifiées sont relues ;
+- catch_up, appelé chaque minute par Jarvis : les pages à relire (demandes ouvertes jamais lues, ou modifiées dans Notion
+  depuis leur lecture ; les plus récentes d'abord), par lots de BATCH_SIZE enchaînés jusqu'à ce que tout soit à jour
+  (mesuré sur la VM : 12 à 15 s par lot de 15) ; ensuite, seules les demandes modifiées sont relues ;
 - ensure, à l'ouverture d'une demande dont la description n'est pas encore à jour : sa page seule, tout de suite.
 
 Les deux font lire les pages par Claude Code (`claude -p`, connecteur Notion, lecture seule, modèle rapide) : Claude ne
@@ -186,23 +186,30 @@ class DescriptionReader:
 
     # --- lecture de fond, par lots ----------------------------------------------------------------------------------
     def catch_up(self, demandes: list[Demande]) -> bool:
-        """Lance un lot de BATCH_SIZE pages à relire, s'il y en a et qu'aucun lot ne tourne ; True s'il est parti.
-        Appelé chaque minute : les lots s'enchaînent jusqu'à ce que tout soit à jour. Après un lot sans aucune réponse,
-        pas de nouvel essai avant RETRY_AFTER."""
+        """Lance en fond la lecture des pages à relire, s'il y en a et qu'aucune lecture de fond ne tourne ; True si elle est
+        partie. Lots de BATCH_SIZE enchaînés ; après un lot sans aucune réponse, arrêt, et pas de nouvel essai avant RETRY_AFTER."""
         if self.batch_running or self.problem():
             return False
         if self._batch_failed and datetime.now() - self._batch_failed < RETRY_AFTER:
             return False
         with self._lock:
-            todo = [x for x in self.stale(demandes) if not self.reading(x.ref)][:BATCH_SIZE]
+            todo = [x for x in self.stale(demandes) if not self.reading(x.ref)]
             if not todo:
                 return False
-            self._batch_refs = {x.ref for x in todo}
-            self._batch = threading.Thread(target=self._read_batch, args=(todo,), name="jarvis-bau-descriptions", daemon=True)
+            self._batch_refs = {x.ref for x in todo[:BATCH_SIZE]}
+            self._batch = threading.Thread(target=self._read_batches, args=(todo,), name="jarvis-bau-descriptions", daemon=True)
             self._batch.start()
         return True
 
-    def _read_batch(self, todo: list[Demande]) -> None:
+    def _read_batches(self, todo: list[Demande]) -> None:
+        for start in range(0, len(todo), BATCH_SIZE):
+            batch = [x for x in todo[start:start + BATCH_SIZE] if not self.is_fresh(x)]  # lue entre-temps à son ouverture : sautée
+            self._batch_refs = {x.ref for x in batch}
+            if batch and not self._read_batch(batch):
+                return
+
+    def _read_batch(self, todo: list[Demande]) -> bool:
+        """Un lot ; False s'il n'a eu aucune réponse (Claude déconnecté, Notion injoignable…) : la lecture de fond s'arrête."""
         pages, error = self._fetch(todo)
         for x in todo:
             if (text := pages.get(_page_id(x.notion_url))) is not None:
@@ -210,6 +217,7 @@ class DescriptionReader:
             elif pages:  # le lot a marché, pas cette page : notée, elle sera relue si la demande change (ou sur « Réessayer »)
                 self._save(x, erreur="page non lue")
         self._batch_failed = None if pages else datetime.now()
+        return bool(pages)
 
     # --- une page, à l'ouverture d'une demande -----------------------------------------------------------------------
     def ensure(self, x: Demande, again: bool = False) -> bool:
