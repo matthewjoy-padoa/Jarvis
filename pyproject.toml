@@ -1,6 +1,6 @@
 [project]
 name = "deploy-hub"
-version = "0.8.0"
+version = "0.8.1"
 description = "Tableau de bord de déploiement client : injections, tâches, recettes, deadlines et actions"
 requires-python = ">=3.12"
 dependencies = [

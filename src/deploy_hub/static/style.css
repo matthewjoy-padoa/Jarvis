@@ -751,6 +751,8 @@ a[data-ticket]:hover { color: var(--accent); }
 a.row-link { color: inherit; }
 a.row-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 tr[data-ticket-card]:hover td { background: color-mix(in srgb, var(--accent-soft) 35%, transparent); }
+.ticket-run[data-ticket-card] { margin-inline: -8px; padding: 4px 8px; border-radius: 8px; }
+.ticket-run[data-ticket-card]:hover { background: color-mix(in srgb, var(--accent-soft) 35%, transparent); }
 
 /* « Lancer un agent » : bouton plein bien visible (liste des retours et fenêtre de détail) ; ouvert, il passe en secondaire */
 .retour details.agent > summary, .ticket details.agent > summary {
@@ -1474,6 +1476,11 @@ a.tl-mark:hover, a.tl-mark:focus-visible { transform: scale(1.3); }
   font-size: 12.5px; line-height: 1.45; text-align: left; color: var(--text); background: var(--surface); border: 1px solid var(--border); box-shadow: 0 8px 24px rgb(0 0 0 / .18); }
 .flow-tip > * { display: block; } .flow-tip > span { color: var(--muted); }
 .flow-node:hover .flow-tip, .flow-node:focus-visible .flow-tip { display: block; }
+/* La bulle fait partie du lien de l'agent : un pont invisible couvre l'écart de 8 px, la souris y passe sans la faire
+   disparaître, et un clic n'importe où dessus ouvre l'agent. */
+.flow-tip::before { content: ""; position: absolute; left: 0; right: 0; top: -10px; height: 10px; }
+.flow-node .flow-tip { cursor: pointer; }
+.flow-node .flow-tip:hover { border-color: var(--accent); }
 .flow-lane:nth-child(n+3) .flow-tip { left: auto; right: 0; }
 tr.is-hot > td { background: color-mix(in srgb, var(--accent) 9%, transparent); }
 .flow-times { margin: 10px 0; color: var(--muted); } .flow-times strong { color: var(--text); }
