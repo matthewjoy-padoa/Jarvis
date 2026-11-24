@@ -21,7 +21,7 @@ from markupsafe import Markup, escape
 from deploy_hub import client_config
 from deploy_hub.config import PROCESS_KEYS, PROJECT_ROOT, clients_dir, data_dir, ensure_private_dirs, forget_secrets, load_settings, secret_problem
 from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, KO, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
-                               kanban_columns, notion_link, status_group)
+                               group_counts, kanban_columns, notion_link, status_group)
 from deploy_hub import bau, brief, console, env_file, onepassword, shell, sync_notion
 from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
@@ -286,6 +286,7 @@ templates.env.filters["md"] = md
 templates.env.filters["md_inline"] = md_inline
 templates.env.globals["status_group"] = lambda s: status_group(s, INJECTION_STATUSES)
 templates.env.globals["kanban_columns"] = kanban_columns
+templates.env.filters["group_counts"] = group_counts  # [groupe, …] → {groupe: nombre} (barre de répartition)
 templates.env.globals["auto_sync_every"] = auto_sync_every  # bouton « Synchro auto » d'une fiche
 templates.env.globals["auto_sync_note"] = auto_sync_note
 templates.env.tests["drive"] = client_config.is_drive  # {% if l.url is drive %} : logo Google Drive dans le dock
@@ -1439,9 +1440,14 @@ def bau_page(request: Request):
     """Demandes de la page BAU suivie (base Notion « Equipes OPS - Actions internes »), en liste ou en kanban."""
     board = bau.load()
     view = _list_view(request, "bau")
-    columns = kanban_columns([(None, x) for x in board.demandes], bau.STATUSES) if view["vue"] == "kanban" else []
-    return _render(request, "bau.html", "/bau", board=board, columns=columns, fiche_of=_bau_fiches(request, board),
-                   bau_ready=sync_routine.problem() is None, setting=bau.SETTING, pins=_bau_pins(), **view)
+    # Squad choisie (vue Notion de la squad, lue par la synchro) ; gardée comme Liste / Kanban, à part : « ?squad= » = toute l'équipe.
+    squad = board.squad(_views(request, "bau", "squad")["squad"])
+    demandes = squad[1] if squad else board.demandes
+    columns = kanban_columns([(None, x) for x in demandes], bau.STATUSES) if view["vue"] == "kanban" else []
+    return _render(request, "bau.html", "/bau", board=board, demandes=demandes, squad=squad[0] if squad else "",
+                   squads=[(bau.squad_slug(name), name) for name in board.squads], columns=columns,
+                   fiche_of=_bau_fiches(request, board), bau_ready=sync_routine.problem() is None, setting=bau.SETTING,
+                   pins=_bau_pins(), **view)
 
 
 def _demande(ref: str) -> bau.Demande:

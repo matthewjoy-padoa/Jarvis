@@ -2,7 +2,8 @@
 {% block title %}BAU · Jarvis{% endblock %}
 {% import "_icons.html" as ic %}
 {% block content %}
-{# Demandes de l'équipe BAU (bau.py). Attend : board, columns (vue kanban), fiche_of, bau_ready, setting, vue, show_all. #}
+{# Demandes de l'équipe BAU (bau.py). Attend : board, demandes (toutes, ou celles de la squad choisie), squad (son nom),
+   squads [(identifiant, nom)], columns (vue kanban), fiche_of, bau_ready, setting, vue, show_all. #}
 {% import "_charts.html" as charts with context %}
 {% import "_kanban.html" as kb %}
 {% set base = request.url.path %}
@@ -37,10 +38,14 @@
 <p class="muted">Aucune demande liée à cette page dans Notion : vérifie le lien dans {{ setting | reglages }} (celui de la page projet ou BAU elle-même, pas d'une vue).</p>
 {% else %}
 <section class="chart-row">
-  {{ charts.segbar("Statut des demandes", board.groups, "demandes", slim=true, filter_key="groupe", hrefs={} if show_all else {"done": base ~ "?tous=true"}) }}
+  {{ charts.segbar("Statut des demandes" ~ (" · squad " ~ squad if squad), demandes | map(attribute="group") | list | group_counts, "demandes", slim=true, filter_key="groupe", hrefs={} if show_all else {"done": base ~ "?tous=true"}) }}
 </section>
 {% include "_pins.html" %}
+{% if squad and not demandes %}<p class="muted">Aucune demande à faire ou en cours dans la vue de la squad {{ squad }} (Notion).</p>{% endif %}
 <div class="view-bar">
+{% if squads %}<div class="segmented" role="group" aria-label="Squad">
+  <a href="{{ base }}?squad=" class="{{ 'active' if not squad }}" data-view="bau.squad:">Toute l'équipe</a>{% for key, name in squads %}<a href="{{ base }}?squad={{ key }}" class="{{ 'active' if name == squad }}" data-view="bau.squad:{{ key }}">Squad {{ name }}</a>{% endfor %}
+</div>{% endif %}
 <div class="segmented" role="group" aria-label="Présentation">
   <a href="{{ base }}{{ '?tous=true' if show_all }}" class="{{ 'active' if not kanban }}" data-view="bau.vue:liste">Liste</a><a href="{{ base }}?vue=kanban{{ '&tous=true' if show_all }}" class="{{ 'active' if kanban }}" data-view="bau.vue:kanban">Kanban</a>
 </div>
@@ -68,7 +73,7 @@ data-group="{{ x.group }}" data-statut="{{ x.status }}" data-priorite="{{ x.prio
 {% else %}
 <div data-filterable data-fold-filters data-items=".retour" data-filters="Statut:statut,{{ filters }}" data-sorts="Priorité:priorite,Échéance:echeance,Création:cree,Statut:statut" data-out-label="terminée(s)">
 {# Toutes les demandes sont envoyées : en vue « Ouvertes », les terminées sont masquées (data-out) et la recherche propose de les afficher. #}
-{% for x in board.demandes %}
+{% for x in demandes %}
 <article id="{{ x.ref }}" data-ticket-card class="retour {{ 'done' if not x.is_open }}"{% if not show_all and not x.is_open %} hidden data-out{% endif %} {{ attrs(x) }}>
   <div class="retour-main">
     <header>

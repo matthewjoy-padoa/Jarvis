@@ -1,7 +1,7 @@
 """Demandes BAU : réglage, requêtes, plan et fusion dans le passage de synchro, page « BAU » et ticket d'une demande."""
 import json
 import shutil
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -10,7 +10,6 @@ from fastapi.testclient import TestClient
 import deploy_hub.sync_notion as sn
 from deploy_hub import bau, main
 from deploy_hub.config import data_dir
-from datetime import datetime
 
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources.claude_runner import TO_FILL, AgentRun, demande_branch
@@ -41,18 +40,40 @@ def root(tmp_path: Path, monkeypatch) -> Path:
     monkeypatch.setenv(sn.SESSION_ENV, SESSION)
     monkeypatch.delenv(sn.CLIENT_ENV, raising=False)
     monkeypatch.setenv(bau.SETTING, LINK)
+    monkeypatch.setenv(bau.SQUADS_SETTING, SQUADS)
     return tmp_path
 
 
-def passage(root: Path, fingerprint: str, answers: dict[str, list[dict]] | None = None, only: str = "") -> dict:
+SQUADS = "Alpha | view://aaaa; Beta | view://bbbb"
+
+
+def view_answer(url: str, rows: list[dict]) -> None:
+    """Ce que Claude Code écrit dans son transcript quand le modèle lit une vue Notion (mode view)."""
+    folder = sn.CLAUDE_PROJECTS / "projet"
+    folder.mkdir(parents=True, exist_ok=True)
+    stamp = (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat().replace("+00:00", "Z")
+    call = f"toolu_vue_{abs(hash((url, stamp, json.dumps(rows))))}"
+    lines = [{"type": "assistant", "timestamp": stamp, "message": {"content": [
+                {"type": "tool_use", "id": call, "name": "mcp__claude_ai_Notion__notion-query-data-sources",
+                 "input": {"data": {"mode": "view", "view_url": url, "page_size": 100}}}]}},
+             {"type": "user", "timestamp": stamp, "message": {"content": [{"type": "tool_result", "tool_use_id": call, "content": results(rows)}]}}]
+    with (folder / f"{SESSION}.jsonl").open("a", encoding="utf-8") as f:
+        f.write("".join(json.dumps(line) + "\n" for line in lines))
+
+
+def passage(root: Path, fingerprint: str, answers: dict[str, list[dict]] | None = None, only: str = "",
+            views: dict[str, list[dict]] | None = None) -> dict:
     """Un passage des seules demandes : empreinte, puis les requêtes du plan, auxquelles Notion répond « answers »
-    ({nom du modèle de requête: lignes})."""
+    ({nom du modèle de requête: lignes}), et les vues de squad, qui répondent « views » ({lien de la vue: lignes})."""
     asked = sn.first_queries(root, only)
     answer(asked["requetes"][0]["requete"], results([{"cle": bau.KEY, "demandes": fingerprint}]))
     out = sn.advance(root)
     known = {p.read_text(encoding="utf-8").rstrip(): p.stem for p in (bau.folder(root) / "requetes").glob("*.sql")}
     while not out.get("termine"):
         for q in out["requetes"]:
+            if "vue" in q:
+                view_answer(q["vue"], (views or {}).get(q["vue"], []))
+                continue
             name = known[q["requete"].split("\nLIMIT ")[0]]
             rows = (answers or {}).get(name, []) if "OFFSET" not in q["requete"] else []
             answer(q["requete"], results(rows), q.get("params", ()))
@@ -130,7 +151,8 @@ def test_a_full_read_asks_every_page_at_once(root):
     asked = sn.first_queries(root, "")
     answer(asked["requetes"][0]["requete"], results([{"cle": bau.KEY, "demandes": "250|2027-03-02 10:00:00Z"}]))
     queries = sn.advance(root)["requetes"]
-    assert len(queries) == 3 and ["OFFSET" in q["requete"] for q in queries] == [False, True, True]
+    assert ["OFFSET" in q["requete"] for q in queries if "requete" in q] == [False, True, True]
+    assert [q["vue"] for q in queries if "vue" in q] == ["view://aaaa", "view://bbbb"]  # les vues de squad, à chaque passage
 
 
 def test_an_unexpected_column_stops_the_merge_and_is_reported(root):
@@ -149,9 +171,11 @@ def test_requests_ride_along_with_clients_but_not_with_one_client(root):
     answer(asked["requetes"][0]["requete"], results([FINGERPRINT]))
     answer(asked["requetes"][1]["requete"], results([{"cle": bau.KEY, "demandes": "1|2027-03-02 10:00:00Z"}]))
     out = sn.advance(root)
-    mine = [q for q in out["requetes"] if "Projet ou équipe liée" in q["requete"]]
-    assert len(mine) == 1 and len(out["requetes"]) == 5  # client, règles, actions, recette, demandes
+    mine = [q for q in out["requetes"] if "vue" in q or "Projet ou équipe liée" in q["requete"]]
+    assert len(mine) == 3 and len(out["requetes"]) == 7  # client, règles, actions, recette ; demandes et deux vues de squad
     answer(mine[0]["requete"], results([row(1)]))
+    for q in mine[1:]:
+        view_answer(q["vue"], [])
     run(root, {"requetes": [q for q in out["requetes"] if q not in mine]})
     done = sn.advance(root)
     assert [line.split(" : ")[0] for line in done["compte_rendu"]] == ["demo", "BAU"]
@@ -339,3 +363,39 @@ def test_a_request_can_be_pinned_and_reminded_like_a_ticket(board, monkeypatch, 
     notes = main._reminder_notes([], reminder.due)  # arrivé à échéance : notification, sans aucun client suivi
     assert [n["link"] for n in notes] == [f"/bau/demande/{x.ref}"] and notes[0]["client"] == "BAU"
     assert client.post(f"/perso/epingle/{bau.KEY}/demande/INCONNUE").status_code == 404
+
+
+def test_squad_views_are_read_as_notion_shows_them_and_select_their_requests(root):
+    rows = [row(1), row(2), row(3)]
+    view = lambda *ns: [{"url": f"https://app.notion.com/p/{n:032x}", "Nom": f"Demande {n}"} for n in ns]
+    passage(root, "3|2027-03-02 10:00:00Z", {"bau": rows}, views={"view://aaaa": view(1, 3), "view://bbbb": view(2)})
+    board = bau.load(root)
+    assert board.squads == {"Alpha": [f"{1:08X}", f"{3:08X}"], "Beta": [f"{2:08X}"]}
+    assert [x.title for x in board.squad("alpha")[1]] == ["Demande 1", "Demande 3"] and board.squad("gamma") is None
+    assert not list(bau.folder(root).glob("squad-*.json"))  # réponses rangées : retirées
+    # la vue change sans que les demandes changent (filtre modifié dans Notion) : relue quand même
+    passage(root, "3|2027-03-02 10:00:00Z", views={"view://aaaa": view(2), "view://bbbb": []})
+    assert bau.load(root).squads == {"Alpha": [f"{2:08X}"], "Beta": []}
+
+
+def test_the_squads_setting_takes_names_and_view_links(monkeypatch):
+    monkeypatch.delenv(bau.SQUADS_SETTING, raising=False)
+    assert [name for name, _ in bau.squad_views()] == ["SPSTA", "Plateform"]  # les vues de la page BAU de l'équipe
+    monkeypatch.setenv(bau.SQUADS_SETTING, "Data | https://app.notion.com/p/x?v=1\nview://sans-nom")
+    assert bau.squad_views() == [("Data", "https://app.notion.com/p/x?v=1"), ("view://sans-nom", "view://sans-nom")]
+
+
+def test_the_page_offers_one_view_per_squad_and_remembers_it(board):
+    squads = {"SPSTA": [board.demandes[0].ref], "Plateform": []}
+    (bau.folder() / bau.SQUADS).write_text(json.dumps(squads), encoding="utf-8")
+    page = client.get("/bau").text
+    assert "Toute l'équipe" in page and 'href="/bau?squad=spsta"' in page and "Squad Plateform" in page
+    spsta = client.get("/bau?squad=spsta").text
+    assert "Corriger le mapping des contrats" in spsta and "Ajouter une colonne au reporting" not in spsta
+    assert "squad SPSTA" in spsta and 'class="active" data-view="bau.squad:spsta"' in spsta
+    assert "Aucune demande à faire ou en cours" in client.get("/bau?squad=plateform").text
+    remembered = TestClient(main.app, cookies={"jarvis_vues": "bau.squad:spsta"})  # choix gardé (filters.js écrit le cookie)
+    kept = remembered.get("/bau").text
+    assert "Ajouter une colonne au reporting" not in kept
+    everyone = remembered.get("/bau?squad=").text
+    assert "Ajouter une colonne au reporting" in everyone

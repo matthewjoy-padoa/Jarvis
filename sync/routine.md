@@ -15,7 +15,7 @@ RÈGLES
 ÉTAPES
 1. uv run python -m deploy_hub.sync_notion preparer
    → {"requetes": [...], "ensuite": "<commande>"}.
-2. Exécute TOUTES les requêtes de "requetes" dans le même message (plusieurs appels d'outil à la fois) : outil Notion `notion-query-data-sources`, mode sql, `query` = "requete" à l'identique, `data_source_urls` = "sources", `params` = "params" s'il est donné. Tu ne fais RIEN des réponses, quelles qu'elles soient : rendues en ligne, rangées dans un fichier (« Output has been saved to … » : c'est normal, Python ira les y lire, ne lance aucune commande pour ça), en erreur ou en délai dépassé (ne réessaie pas à la main, l'étape 3 redemandera la requête). Dès que tous les appels ont répondu, passe à l'étape 3.
+2. Exécute TOUTES les requêtes de "requetes" dans le même message (plusieurs appels d'outil à la fois) : outil Notion `notion-query-data-sources`, mode sql, `query` = "requete" à l'identique, `data_source_urls` = "sources", `params` = "params" s'il est donné. Une entrée qui porte "vue" au lieu de "requete" : même outil, mode view, `view_url` = "vue" à l'identique, `page_size` = 100. Tu ne fais RIEN des réponses, quelles qu'elles soient : rendues en ligne, rangées dans un fichier (« Output has been saved to … » : c'est normal, Python ira les y lire, ne lance aucune commande pour ça), en erreur ou en délai dépassé (ne réessaie pas à la main, l'étape 3 redemandera la requête). Dès que tous les appels ont répondu, passe à l'étape 3.
 3. uv run python -m deploy_hub.sync_notion suite
    → soit de nouvelles "requetes" : retourne à l'étape 2 ;
    → soit {"termine": true, "compte_rendu": [...], "utilisateurs": [...]} : va à l'étape 4.

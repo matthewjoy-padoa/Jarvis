@@ -571,6 +571,20 @@ def _sql_key(sql: str, params) -> tuple:
     return " ".join(str(sql).split()), tuple(str(p) for p in params)
 
 
+VIEW_PREFIX = "vue:"  # « requete » d'une vue Notion lue telle quelle (mode view) : son adresse, ainsi préfixée
+
+
+def view_key(url: str) -> tuple:
+    """Ce qui identifie la lecture d'une vue Notion (mode view) dans le transcript : son adresse."""
+    return _sql_key(VIEW_PREFIX + url.strip(), [])
+
+
+def expected_view(client: str, url: str, out: Path) -> dict:
+    """Vue Notion à lire telle quelle (ses filtres et son tri, ceux de Notion) : une seule page de 100 lignes."""
+    return {"client": client, "nom": out.stem, "page": 1, "requete": VIEW_PREFIX + url, "params": [], "sources": [],
+            "sql": "", "sortie": str(out), "vue": url}
+
+
 def _expected(client: str | None, query: dict, page: int = 1) -> dict:
     """Requête attendue par « suite » : son texte exact, et où ranger sa réponse. Les pages suivantes reprennent la requête
     avec « LIMIT 100 OFFSET n » et vont dans <nom>-2.json, <nom>-3.json… (voir _rows)."""
@@ -638,7 +652,8 @@ def notion_answers(since: datetime, session: str = "") -> dict[tuple, str]:
                 if part.get("type") == "tool_use" and str(part.get("name", "")).endswith(NOTION_QUERY):
                     data = part.get("input") or {}
                     data = data.get("data") if isinstance(data.get("data"), dict) else data
-                    asked[part.get("id")] = _sql_key(data.get("query", ""), data.get("params"))
+                    asked[part.get("id")] = (view_key(data["view_url"]) if data.get("mode") == "view" and data.get("view_url")
+                                             else _sql_key(data.get("query", ""), data.get("params")))
                 elif part.get("type") == "tool_result" and part.get("tool_use_id") in asked:
                     if (text := _answer(part.get("content"))) is not None:
                         answers[asked[part["tool_use_id"]]] = text
@@ -646,6 +661,8 @@ def notion_answers(since: datetime, session: str = "") -> dict[tuple, str]:
 
 
 def _shown(q: dict, lost: bool = False) -> dict:
+    if q.get("vue"):
+        return {"vue": q["vue"], **({"sortie": q["sortie"]} if lost else {})}
     return {"requete": q["requete"], "sources": q["sources"], **({"params": q["params"]} if q["params"] else {}),
             **({"sortie": q["sortie"]} if lost else {})}
 
@@ -712,6 +729,8 @@ def _next_pages(state: dict) -> list[dict]:
             last[key] = q
     more = []
     for q in last.values():
+        if q.get("vue"):  # une vue se lit en une page : pas de suite par OFFSET
+            continue
         rows = _notion_rows(Path(q["sortie"]).read_text(encoding="utf-8"), Path(q["sortie"]).name)
         if len(rows) >= PAGE_SIZE and q["page"] < MAX_PAGES:
             first = next(x for x in state["attendues"] if (x["client"], x["nom"], x["page"]) == (q["client"], q["nom"], 1))

@@ -29,6 +29,11 @@ from deploy_hub.sync_notion import SyncError
 KEY = "_bau"  # clé des demandes dans un passage et dossier data/notion/_bau : jamais un identifiant de client (pas de « _ »)
 LABEL = "BAU"  # nom des demandes dans les comptes rendus et les messages de synchro
 SETTING = "JARVIS_NOTION_BAU"
+SQUADS_SETTING = "JARVIS_BAU_SQUADS"
+# Vues de squad de la page « BAU équipe intégration - TECHNIQUE » : Jarvis les lit telles quelles (mode view), avec leurs
+# filtres (personnes de la squad, demandes à faire ou en cours). Une par ligne ou séparées par « ; » : « nom | lien de la vue ».
+DEFAULT_SQUADS = "SPSTA | view://1684976c-dfac-830a-9523-088056550d68; Plateform | view://8454976c-dfac-83f5-b601-080ae7576566"
+SQUADS = "squads.json"  # data/notion/_bau/squads.json : {nom de la squad: [références des demandes de sa vue]}
 # Ce qui tient lieu de client aux demandes là où Jarvis en attend un (épingles, rappels, agents) : slug et nom seulement.
 SPACE = SimpleNamespace(slug=KEY, client=LABEL)
 TEMPLATE_NAMES = ("bau", "bau-delta", "bau-empreinte")
@@ -88,6 +93,7 @@ class Demande:
 class Board:
     """Ce que la page « BAU » affiche : les demandes du cache, ou la raison pour laquelle il n'y en a pas."""
     configured: bool = False  # JARVIS_NOTION_BAU renseigné et lisible
+    squads: dict[str, list[str]] = field(default_factory=dict)  # vue de squad → références de ses demandes (comme dans Notion)
     problem: str = ""  # réglage illisible
     notion_url: str = ""  # la page BAU dans Notion
     synced: bool = False  # au moins une synchro faite pour cette page
@@ -102,6 +108,14 @@ class Board:
     def groups(self) -> dict[str, int]:
         """Nombre de demandes par groupe de statut (à faire, en cours, terminé), pour la barre de répartition."""
         return group_counts([d.group for d in self.demandes])
+
+    def squad(self, slug: str) -> tuple[str, list[Demande]] | None:
+        """(nom, demandes) de la squad dont l'identifiant (squad_slug) est donné ; None si elle n'existe pas."""
+        for name, refs in self.squads.items():
+            if squad_slug(name) == slug:
+                wanted = set(refs)
+                return name, [d for d in self.demandes if d.ref in wanted]
+        return None
 
     def get(self, ref: str) -> Demande | None:
         return next((d for d in self.demandes if d.ref == ref.upper()), None)
@@ -128,6 +142,23 @@ def enabled() -> bool:
         return bool(page_id())
     except ConfigError:
         return False
+
+
+def squad_views() -> list[tuple[str, str]]:
+    """(nom, lien de la vue) des squads : réglage JARVIS_BAU_SQUADS, sinon les vues de la page BAU de l'équipe intégration.
+    Une ligne sans « | » prend son lien pour nom."""
+    value = os.getenv(SQUADS_SETTING, "").strip() or DEFAULT_SQUADS
+    out = []
+    for part in value.replace("\n", ";").split(";"):
+        name, _, url = (p.strip() for p in part.rpartition("|")) if "|" in part else ("", "", part.strip())
+        if url:
+            out.append((name or url, url))
+    return out
+
+
+def squad_slug(name: str) -> str:
+    from deploy_hub.client_config import slugify
+    return slugify(name) or "squad"
 
 
 def folder(root: Path = PROJECT_ROOT) -> Path:
@@ -159,6 +190,8 @@ def empreinte(root: Path = PROJECT_ROOT) -> dict:
     queries_dir = write_queries(root)
     raw = folder(root)
     sn._clean(raw, ("empreinte", "plan") + RESULTS)
+    for answer in raw.glob("squad-*.json"):
+        answer.unlink()
     return sn._query(queries_dir / "bau-empreinte.sql", raw / "empreinte.json", [])
 
 
@@ -207,7 +240,8 @@ def planned(root: Path = PROJECT_ROOT) -> list[dict]:
         query = sn._query(raw / "requetes" / f"{template}.sql", raw / f"{name}.json", params)
         pages = min(count // sn.PAGE_SIZE + 1, sn.MAX_PAGES) if name == "demandes" else 1
         out += [sn._expected(KEY, query, page) for page in range(1, pages + 1)]
-    return out
+    # Vues de squad : relues à chaque passage (une page chacune) ; leurs filtres changent sans dater les demandes.
+    return out + [sn.expected_view(KEY, url, raw / f"squad-{n}.json") for n, (_, url) in enumerate(squad_views(), start=1)]
 
 
 def _checked(rows: list[dict]) -> list[dict]:
@@ -249,6 +283,14 @@ def merge(root: Path = PROJECT_ROOT) -> dict:
                              "complet_le": date.today().isoformat() if how == "complet" else state.get("complet_le"),
                              # autant de demandes que dans Notion, sinon tout est relu au passage suivant
                              "complet_requis": len(after) != count})
+    squads = {}
+    for n, (name, _) in enumerate(squad_views(), start=1):
+        answer = raw / f"squad-{n}.json"
+        if answer.is_file():  # une page de 100 lignes au plus : une vue de squad n'a que les demandes ouvertes de ses membres
+            squads[name] = [sn._page_id(r.get("url", ""))[-8:].upper() for r in sn._notion_rows(answer.read_text(encoding="utf-8"), answer.name)]
+    write_json(raw / SQUADS, squads)
+    for answer in raw.glob("squad-*.json"):
+        answer.unlink()
     sn._clean(raw, RESULTS + ("plan", "empreinte"))
     sn.mark_checked([KEY], root)
     before = cache if state.get("page") == page_id() else None  # cache d'une autre page : premier passage pour celle-ci
@@ -302,7 +344,7 @@ def load(root: Path = PROJECT_ROOT) -> Board:
     if (why := problem()) or not (pid := page_id()):
         return Board(problem=why)
     raw, users_file, checks = folder(root), sn.users_path(root), data_dir(root) / "notion" / sn.VERIFICATIONS
-    stamps = (pid, _stamp(raw / CACHE), _stamp(raw / STATE), _stamp(users_file), _stamp(checks))
+    stamps = (pid, _stamp(raw / CACHE), _stamp(raw / STATE), _stamp(raw / SQUADS), _stamp(users_file), _stamp(checks))
     if (kept := _boards.get(root)) and kept[0] == stamps:
         return kept[1]
     board = Board(configured=True, notion_url=f"https://app.notion.com/p/{pid}")
@@ -310,6 +352,7 @@ def load(root: Path = PROJECT_ROOT) -> Board:
     if cache is not None and sn._load_json(raw / STATE, {}).get("page") == pid:
         users = sn._load_json(users_file, {})
         board.synced = True
+        board.squads = sn._load_json(raw / SQUADS, {})
         board.demandes = sorted((_demande(row, users) for row in cache.values()),
                                 key=lambda d: (d.priority_rank, d.due or date.max, -(d.created or date.min).toordinal(), d.title))
         try:
