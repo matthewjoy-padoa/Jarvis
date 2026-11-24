@@ -97,8 +97,8 @@
     const takeOff = (d) => {  // l'armure qui vole : une copie de l'agent, réacteurs allumés, posée au-dessus de la page
       const flyer = document.createElement("div");
       flyer.className = "bot-flyer";
-      flyer.innerHTML = d.el.querySelector(".bot").outerHTML;
-      const svg = flyer.querySelector("svg");
+      const svg = d.el.querySelector(".bot").cloneNode(true);  // copie DOM : la photo garde son image déjà chargée
+      flyer.append(svg);
       svg.insertAdjacentHTML("afterbegin", JETS);
       if (!svg.querySelector(".im-halo")) svg.querySelector(".im-core").insertAdjacentHTML("beforebegin", HALO);
       if (suit) for (const v of ["--suit-a", "--suit-b", "--suit-glow"]) flyer.style.setProperty(v, suit.getPropertyValue(v));
