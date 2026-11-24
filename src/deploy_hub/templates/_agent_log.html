@@ -27,6 +27,14 @@
   {% if run.running and not run.simulated %}
   <form method="post" action="/agents/{{ run.id }}/arreter" onsubmit="return confirm('Arrêter l\'agent #{{ run.id }} ?')"><button type="submit" class="secondary">Arrêter l'agent</button></form>
   {% endif %}
+  {% if run.archived_at %}
+  <form class="toolbar" hx-post="/agents/{{ run.id }}/ressortir" hx-target="#archive-out-{{ run.id }}">
+    <span class="badge">Archivé le {{ run.archived_at.strftime("%d/%m/%Y") }}</span> <button type="submit" class="secondary">Ressortir des archives</button>
+    <span id="archive-out-{{ run.id }}"></span></form>
+  {% elif archivable %}
+  <form class="toolbar" hx-post="/agents/{{ run.id }}/archiver" hx-target="#archive-out-{{ run.id }}" hx-confirm="Archiver l'agent #{{ run.id }} ? Il quitte la page Agents ; son worktree est retiré s'il est propre (la branche reste).">
+    <button type="submit" class="secondary">Archiver</button> <span class="muted" id="archive-out-{{ run.id }}"></span></form>
+  {% endif %}
   {% if relaunchable %}
   <form class="toolbar" hx-post="/agents/{{ run.id }}/relancer" hx-target="#relaunch-out-{{ run.id }}" hx-disabled-elt="find button"
         hx-confirm="Relancer l'agent #{{ run.id }} avec le même brief, sur la branche {{ run.branch }} ?">
@@ -120,6 +128,6 @@
     <ol class="agent-log">
       {% for kind, text in log %}<li class="log-{{ kind }}"><span class="log-kind">{{ kind }}</span><pre>{{ text }}</pre></li>{% endfor %}
     </ol>
-    {% else %}<p class="muted">{{ "Rien pour l'instant : l'agent prépare son worktree." if run.running else "Pas de journal (agent simulé ou arrêté avant de démarrer)." }}</p>{% endif %}
+    {% else %}<p class="muted">{{ "Rien pour l'instant : l'agent prépare son worktree." if run.running else ("Journal effacé par le rangement automatique : restent le compte rendu, le coût et la PR." if run.log_removed else "Pas de journal (agent simulé ou arrêté avant de démarrer).") }}</p>{% endif %}
   </section>
 </div>

@@ -11,6 +11,11 @@ Pour une PR qui monte le numéro :
 
 La version affichée en bas de chaque page change donc avec chaque fonctionnalité ; après une simple correction, le bandeau « Jarvis est à relancer » compare les commits. Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
+## [0.7.0] · 2026-11-24
+
+- Agents : le suivi ne grandit plus sans fin. Un rangement automatique, une fois par jour, archive les agents finis depuis plus de 30 jours (leur worktree est retiré s'il est propre, la branche reste) et efface après 90 jours le journal détaillé (la fiche garde compte rendu, coût, tokens et PR). Seuils dans Réglages (JARVIS_AGENT_ARCHIVE_DAYS, JARVIS_AGENT_LOG_DAYS). Un agent qui travaille ou attend ta réponse n'est jamais archivé.
+- Page Agents : glisser un agent dans sa colonne change sa place (ordre gardé) ; le déposer sur « Archiver » le range. Bouton « Archiver » sur la page d'un agent fini, page « Archivés » d'où l'on peut le ressortir ; le bilan des tokens compte aussi les archivés.
+
 ## [0.6.0] · 2026-11-24
 
 - Agents : répondre aux questions d'un agent ou le relancer après une erreur fait repartir la même fiche, au lieu d'en créer une nouvelle qui laissait la première « en attente ». La fiche garde son numéro, son journal (un repère « réponse » ou « relance » marque chaque reprise), et additionne tours, coût et tokens ; sa durée compte le travail, pas l'attente de ta réponse. Les passages précédents (état, durée, compte rendu, ta réponse) se déplient sur la page de l'agent. Les anciennes fiches (une par réponse) restent lisibles telles quelles.
