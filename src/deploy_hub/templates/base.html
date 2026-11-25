@@ -1,5 +1,5 @@
 <!doctype html>
-{% set plain = sober(request) %}{# affichage sobre (cookie) : lu une fois ici, repris par les pages (agents.html, reglages.html) #}
+{# `plain` : affichage sobre choisi dans ce navigateur (fourni à tous les gabarits par main.py). #}
 <html lang="fr"{% if plain %} data-style="sobre"{% endif %}>
 <head>
   <meta charset="utf-8">
@@ -31,7 +31,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=181">
+  <link rel="stylesheet" href="/static/style.css?v=182">
+  {% if plain %}<link rel="stylesheet" href="/static/sobre.css?v=1">{% endif %}
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=11" defer></script>
   <script src="/static/dag.js?v=3" defer></script>
@@ -47,18 +48,21 @@
 <body{% if current %} data-current-client="{{ current.client }}"{% endif %}>
   {% import "_icons.html" as ic %}
   {% set cross = cross_pages | map(attribute=0) | list %}
+  {% set here = (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode %}{# page en cours, pour y revenir #}
+  {% set icons = {
+    "/": '<path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1h-5v-6h-5v6h-5a1 1 0 0 1-1-1z"/>',
+    "/clients": '<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
+    "/deadlines": '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+    "/agents": '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9.5 13h.01M14.5 13h.01M9.5 16.5h5"/>',
+    "fiche": '<rect x="4" y="3.5" width="16" height="17" rx="2.5"/><circle cx="12" cy="9.5" r="2.5"/><path d="M8 16.5c.8-1.8 2.2-2.7 4-2.7s3.2.9 4 2.7"/>',
+    "/bau": '<path d="M4 6.5h16l-1.5 12a1 1 0 0 1-1 .9h-11a1 1 0 0 1-1-.9z"/><path d="M4 12.5h4.5l1 2h5l1-2H20"/>',
+  } %}
+  {% if plain %}{% include "_side_sobre.html" %}{% else %}
   <header class="topbar">
     <div class="bar-left">
     <a href="/" class="brand" aria-label="Jarvis, accueil" title="Just A Rather Very Intelligent System">
       {{ ic.jarvis_mark() }}
       <span class="brand-name">Jarvis</span><span class="brand-dot" aria-hidden="true"></span></a>
-    {% set icons = {
-      "/": '<path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1h-5v-6h-5v6h-5a1 1 0 0 1-1-1z"/>',
-      "/clients": '<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
-      "/deadlines": '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
-      "/agents": '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9.5 13h.01M14.5 13h.01M9.5 16.5h5"/>',
-      "/bau": '<path d="M4 6.5h16l-1.5 12a1 1 0 0 1-1 .9h-11a1 1 0 0 1-1-.9z"/><path d="M4 12.5h4.5l1 2h5l1-2H20"/>',
-    } %}
     {# Le client en cours : on travaille sur un client à la fois ; les autres sont dans le menu, pas à côté. #}
     {% if current %}
     <details class="client-switch" data-client-switch>
@@ -66,20 +70,7 @@
                title="Client en cours : {{ current.client }} · {{ current.progress }} % intégré{% if current.go_live %} · déploiement le {{ current.go_live.strftime('%d/%m/%Y') }}{% endif %}">
         <span class="dot" aria-hidden="true"></span>{{ ic.client_emoji(current) }}<span class="client-name">{{ current.client }}</span>{{ ic.countdown(current) }}
         <svg class="switch-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></summary>
-      <div class="client-menu" role="menu">
-        <a role="menuitem" href="/deploiements/{{ current.slug }}">Ouvrir la fiche de {{ current.client }}</a>
-        {% if clients | rejectattr("slug", "equalto", current.slug) | list %}{# sur une fiche archivée, tous les clients suivis sont « les autres » #}
-        <p class="client-menu-label">Changer de client</p>
-        {% for d in clients if d.slug != current.slug %}
-        <div class="client-menu-row">
-        <a role="menuitem" class="client-menu-item" href="/client/{{ d.slug }}?vers={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode }}" title="Passer à {{ d.client }} sur cette page">
-          <span class="health h-{{ d.health_level }}" aria-hidden="true"></span>{{ ic.client_emoji(d) }}{{ d.client }}{{ ic.countdown(d) }}</a>
-        <a role="menuitem" class="client-menu-fiche" href="/client/{{ d.slug }}?vers=/deploiements/{{ d.slug }}" title="Ouvrir la fiche de {{ d.client }}" aria-label="Fiche de {{ d.client }}">Fiche</a>
-        </div>
-        {% endfor %}
-        {% endif %}
-        <a role="menuitem" class="client-menu-all" href="/clients">Tous les clients et réglages</a>
-      </div>
+      {% include "_client_menu.html" %}
     </details>
     {% else %}{# Aucun client : le sélecteur (et son lien vers Clients) n'existe pas ; on garde un chemin pour en ajouter un. #}
     <a class="client-chip client-add" href="/clients/nouveau" title="Ajouter un client à suivre">+ Ajouter un client</a>
@@ -91,7 +82,7 @@
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">{{ icons.get(path, '') | safe }}</svg><span>{{ label }}</span></a>
         {% if path == "/" and current %}{# La fiche du client en cours, à un clic de partout #}
         <a href="/deploiements/{{ current.slug }}" class="nav-item nav-fiche {{ 'active' if active == '/deploiements/' ~ current.slug }}" title="Fiche de {{ current.client }}">
-          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3.5" width="16" height="17" rx="2.5"/><circle cx="12" cy="9.5" r="2.5"/><path d="M8 16.5c.8-1.8 2.2-2.7 4-2.7s3.2.9 4 2.7"/></svg><span>Fiche</span></a>
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">{{ icons.fiche | safe }}</svg><span>Fiche</span></a>
         {% endif %}
         {% endfor %}
       </div>
@@ -114,6 +105,7 @@
     <a href="/reglages" class="settings-link bar-icon {{ 'active' if active == '/reglages' }}" aria-label="Réglages" title="Réglages : Airflow, Notion, 1Password">{{ ic.icon("gear") }}</a>
     </div>
   </header>
+  {% endif %}
   <script>
     // Thème : Auto (suit le Mac) → Nuit → Clair → Noël nuit → Noël clair → Auto. Tout choix est retenu dans le navigateur, Auto compris
     // ("") : Noël, imposé une fois le 1er décembre (script du <head>), ne revient pas une fois qu'on a choisi autre chose.
@@ -225,14 +217,16 @@
   <script>
     // Hauteur réelle du menu (elle change avec la largeur) : les onglets d'un client se collent juste dessous.
     (function () {
+      // Affichage sobre : pas de barre en haut (menu en colonne), les onglets se collent tout en haut de la page.
       const bar = document.querySelector(".topbar"), tabs = document.querySelector(".tabs");
-      const setHeight = () => document.documentElement.style.setProperty("--topbar-h", bar.offsetHeight + "px");
+      const height = () => bar ? bar.offsetHeight : 0;
+      const setHeight = () => document.documentElement.style.setProperty("--topbar-h", height() + "px");
       setHeight();
-      if ("ResizeObserver" in window) new ResizeObserver(setHeight).observe(bar);
+      if (bar && "ResizeObserver" in window) new ResizeObserver(setHeight).observe(bar);
       if (tabs) {
         // Ombre légère sous les onglets seulement quand ils sont collés (page défilée jusqu'à eux).
         const stuck = () => tabs.classList.toggle("is-stuck",
-          window.scrollY > 0 && tabs.getBoundingClientRect().top <= bar.offsetHeight + 0.5);
+          window.scrollY > 0 && tabs.getBoundingClientRect().top <= height() + 0.5);
         window.addEventListener("scroll", stuck, { passive: true });
         stuck();
       }
@@ -263,6 +257,7 @@
       </div>
     </div>
   </div>
+  {% if not plain %}{# en sobre : « Notes » et « Console » sont dans la colonne de gauche (_side_sobre.html) #}
   {# Console (>dag, >agent…) : bouton flottant en bas à droite, comme un bouton de discussion ; la touche « > » fait pareil. #}
   <button type="button" class="console-fab" data-console-open aria-label="Console Jarvis" title="Console Jarvis : tape des commandes comme dans un terminal (touche >)">
     {{ ic.icon("terminal") }}<span class="console-fab-label">Console</span><kbd>&gt;</kbd></button>
@@ -271,6 +266,7 @@
   <button type="button" class="console-fab notes-fab" data-notes-open aria-label="Mes notes" aria-expanded="false" aria-controls="notes"
           title="Mes notes : bloc-notes perso, jamais envoyé dans Notion (touche n)">
     {{ ic.icon("note") }}<span class="console-fab-label">Notes</span><kbd>n</kbd></button>
+  {% endif %}
   {# data-save-scope : un seul état d'enregistrement (data-save-status) pour toutes les notes et to-do lists du panneau (notes.js). #}
   <section class="notes" id="notes" hidden aria-label="Mes notes" data-save-scope>
     <div class="notes-bar">{{ ic.icon("note") }}<strong>Mes notes</strong><span class="muted">pour moi seulement</span>
@@ -310,25 +306,13 @@
       <button type="submit" name="affichage" value="{{ 'jarvis' if plain else 'sobre' }}" class="link-button" title="Pour ce navigateur ; aussi dans Réglages">{{ "Affichage animé" if plain else "Affichage sobre" }}</button></form>{% if jarvis_version %} · <a href="https://github.com/matthewjoy-padoa/Jarvis/blob/main/CHANGELOG.md" title="Historique des versions{% if jarvis_commit %} · commit {{ jarvis_commit }}{% endif %}">v{{ jarvis_version }}</a>{% endif %}</footer>
   {# Raccourcis du client en cours : dock de boutons ronds au bord droit, nom du lien en bulle au survol.
      Liens ouverts dans le navigateur : Jarvis ne lit jamais leur contenu. #}
-  {% if current or bau_dock is not none %}
-  {% set here = (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode %}
-  {% macro dock_icon(kind) -%}
-  {%- if kind == "drive" %}{# logos (Google Drive, Notion) : pleins (fill), sans le trait des autres icônes #}
-  <svg class="dock-logo" viewBox="0 0 87.3 78" aria-hidden="true"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>
-  {%- elif kind == "notion" %}{# logo Notion, plein, couleur du texte (lisible en clair comme en sombre) #}
-  <svg class="dock-logo" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279v-6.44l-1.215-.139c-.093-.514.28-.887.747-.933zM1.936 1.035l13.31-.98c1.634-.14 2.055-.047 3.082.7l4.249 2.986c.7.513.934.653.934 1.213v16.378c0 1.026-.373 1.634-1.68 1.726l-15.458.934c-.98.047-1.448-.093-1.962-.747l-3.129-4.06c-.56-.747-.793-1.306-.793-1.96V2.667c0-.839.374-1.54 1.447-1.632z"/></svg>
-  {%- else %}
-  <svg viewBox="0 0 24 24" aria-hidden="true">{% if kind == "stack" %}<rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M3.5 9h17M6.5 7h.01M8.5 7h.01"/>
-  {%- elif kind == "link" %}<path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/>
-  {%- else %}<path d="M12 6v12M6 12h12"/>{% endif %}</svg>
-  {%- endif %}
-  {%- endmacro %}
+  {% if not plain and (current or bau_dock is not none) %}{# en sobre : liens dans la colonne de gauche #}
   {% if bau_dock is not none %}
   {# Raccourcis de l'équipe BAU : ses liens (config/bau.yaml), sur ses pages et quand aucun client n'est suivi. #}
   <div class="dock-wrap">
   <nav class="dock" aria-label="Raccourcis de l'équipe BAU">
-    {% for l in bau_dock.all %}<a class="dock-btn" href="{{ l.url }}" target="_blank" rel="noopener noreferrer" data-tip="{{ l.label }} ↗" aria-label="{{ l.label }} (nouvel onglet)">{{ dock_icon("drive" if l.url is drive else ("notion" if l.url is notion else "link")) }}</a>{% endfor %}
-    <a class="dock-btn dock-add" href="/bau/liens?vers={{ here }}" data-tip="Ajouter ou modifier les liens de l'équipe" aria-label="Ajouter ou modifier les liens de l'équipe BAU">{{ dock_icon("add") }}</a>
+    {% for l in bau_dock.all %}<a class="dock-btn" href="{{ l.url }}" target="_blank" rel="noopener noreferrer" data-tip="{{ l.label }} ↗" aria-label="{{ l.label }} (nouvel onglet)">{{ ic.dock_icon(ic.link_kind(l.url)) }}</a>{% endfor %}
+    <a class="dock-btn dock-add" href="/bau/liens?vers={{ here }}" data-tip="Ajouter ou modifier les liens de l'équipe" aria-label="Ajouter ou modifier les liens de l'équipe BAU">{{ ic.dock_icon("add") }}</a>
   </nav>
   </div>
   {% else %}
@@ -343,13 +327,13 @@
   </div>
   <nav class="dock" aria-label="Raccourcis de {{ current.client }}">
     {% for l in current.drive %}
-    <a class="dock-btn" href="{{ l.url }}" target="_blank" rel="noopener noreferrer" data-tip="Drive · {{ l.label }} ↗" aria-label="Drive : {{ l.label }} (nouvel onglet)">{{ dock_icon("drive") }}</a>
+    <a class="dock-btn" href="{{ l.url }}" target="_blank" rel="noopener noreferrer" data-tip="Drive · {{ l.label }} ↗" aria-label="Drive : {{ l.label }} (nouvel onglet)">{{ ic.dock_icon("drive") }}</a>
     {% endfor %}
-    {% if current.notion_url %}<a class="dock-btn" href="{{ current.notion_url }}" target="_blank" rel="noopener" data-tip="Notion · Dashboard ↗" aria-label="Dashboard Notion (nouvel onglet)">{{ dock_icon("notion") }}</a>{% endif %}
-    {% for l in current.dashboards %}<a class="dock-btn" href="{{ l.url }}" target="_blank" rel="noopener" data-tip="Notion · {{ l.label }} ↗" aria-label="Dashboard Notion {{ l.label }} (nouvel onglet)">{{ dock_icon("notion") }}</a>{% endfor %}
-    {% for st in current.stacks %}<a class="dock-btn" href="{{ st.url }}" target="_blank" rel="noopener" data-tip="{{ (st.env ~ ' · ') if st.env }}{{ st.label }} ↗" aria-label="Stack {{ st.label }} (nouvel onglet)">{{ dock_icon("stack") }}</a>{% endfor %}
-    {% for l in current.links %}<a class="dock-btn" href="{{ l.url }}" target="_blank" rel="noopener" data-tip="{{ l.label }} ↗" aria-label="{{ l.label }} (nouvel onglet)">{{ dock_icon("drive" if l.url is drive else ("notion" if l.url is notion else "link")) }}</a>{% endfor %}
-    <a class="dock-btn dock-add" href="/clients/{{ current.slug }}/liens?vers={{ here }}" data-tip="{{ 'Ajouter un lien Drive' if not current.drive else 'Ajouter ou modifier les liens' }}" aria-label="Ajouter ou modifier les liens de {{ current.client }}">{{ dock_icon("add") }}</a>
+    {% if current.notion_url %}<a class="dock-btn" href="{{ current.notion_url }}" target="_blank" rel="noopener" data-tip="Notion · Dashboard ↗" aria-label="Dashboard Notion (nouvel onglet)">{{ ic.dock_icon("notion") }}</a>{% endif %}
+    {% for l in current.dashboards %}<a class="dock-btn" href="{{ l.url }}" target="_blank" rel="noopener" data-tip="Notion · {{ l.label }} ↗" aria-label="Dashboard Notion {{ l.label }} (nouvel onglet)">{{ ic.dock_icon("notion") }}</a>{% endfor %}
+    {% for st in current.stacks %}<a class="dock-btn" href="{{ st.url }}" target="_blank" rel="noopener" data-tip="{{ (st.env ~ ' · ') if st.env }}{{ st.label }} ↗" aria-label="Stack {{ st.label }} (nouvel onglet)">{{ ic.dock_icon("stack") }}</a>{% endfor %}
+    {% for l in current.links %}<a class="dock-btn" href="{{ l.url }}" target="_blank" rel="noopener" data-tip="{{ l.label }} ↗" aria-label="{{ l.label }} (nouvel onglet)">{{ ic.dock_icon(ic.link_kind(l.url)) }}</a>{% endfor %}
+    <a class="dock-btn dock-add" href="/clients/{{ current.slug }}/liens?vers={{ here }}" data-tip="{{ 'Ajouter un lien Drive' if not current.drive else 'Ajouter ou modifier les liens' }}" aria-label="Ajouter ou modifier les liens de {{ current.client }}">{{ ic.dock_icon("add") }}</a>
   </nav>
   </div>
   {% endif %}

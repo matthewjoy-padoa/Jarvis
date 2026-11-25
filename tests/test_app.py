@@ -733,16 +733,20 @@ def test_the_whole_agent_card_opens_the_agent():
     assert ".flow-tip::before" in css  # la bulle du schéma reste ouverte quand la souris la rejoint
 
 
-def test_sober_display_is_chosen_per_browser_and_strips_the_decor():
-    """Affichage sobre : choisi dans Réglages ou en pied de page, gardé dans un cookie ; le serveur marque alors <html>, n'offre
-    plus Noël au bouton de thème et ne l'impose pas en décembre. Sans le cookie, rien ne change."""
+SOBER = {"jarvis_affichage": "sobre"}  # cookie posé par POST /affichage
+
+
+def test_sober_display_is_chosen_per_browser_and_has_no_christmas():
+    """Affichage sobre : choisi dans Réglages ou en pied de page, gardé dans un cookie ; le serveur marque alors <html>, charge
+    sobre.css, n'offre plus Noël au bouton de thème et ne l'impose pas en décembre. Sans le cookie, rien ne change."""
     browser = TestClient(app)
     plain = browser.get("/")
     assert "<html lang=\"fr\">" in plain.text and 'value="sobre"' in plain.text and "Affichage sobre" in plain.text
+    assert "sobre.css" not in plain.text and '<header class="topbar">' in plain.text
     chosen = browser.post("/affichage", data={"affichage": "sobre", "vers": "/agents"}, follow_redirects=False)
     assert chosen.status_code == 303 and chosen.headers["location"] == "/agents"
     html = browser.get("/").text
-    assert '<html lang="fr" data-style="sobre">' in html and "Affichage animé" in html
+    assert '<html lang="fr" data-style="sobre">' in html and "Affichage animé" in html and "/static/sobre.css?v=" in html
     assert "Just A Rather Very Intelligent System</em>" not in html and "outil de l'équipe Integration" in html
     head = html.split("</head>")[0]
     assert '!sober && new Date() >= new Date("2026-12-01T00:00")' in head  # Noël jamais imposé en sobre
@@ -753,8 +757,7 @@ def test_sober_display_is_chosen_per_browser_and_strips_the_decor():
     back = browser.post("/affichage", data={"affichage": "jarvis"}, follow_redirects=False)
     assert back.headers["location"] == "/reglages#affichage"
     assert "<html lang=\"fr\">" in browser.get("/").text
-    css = client.get("/static/style.css").text
-    assert ':root[data-style="sobre"] .brand-mark *' in css and ':root[data-style="sobre"] { --radius: 8px; }' in css
+    assert ':root[data-style="sobre"] {' in client.get("/static/sobre.css").text
 
 
 def test_display_choice_only_returns_to_a_page_of_jarvis():
@@ -763,19 +766,44 @@ def test_display_choice_only_returns_to_a_page_of_jarvis():
         assert r.headers["location"] == "/reglages#affichage"
 
 
-def test_sober_agents_page_has_plain_nodes_and_no_suits():
-    """En sobre, la page Agents garde ses quatre colonnes mais montre une pastille par agent : ni armure, ni photo, ni
-    glisser-déposer (l'agent s'archive depuis sa page). L'affichage animé garde ses armures."""
+def test_sober_display_has_its_menu_in_a_side_column():
+    """En sobre, la barre du haut, le dock et les boutons flottants laissent la place à une colonne : client en cours, recherche,
+    pages, liens du client écrits en toutes lettres, outils (Flow Digger, Notes, Console), notifications, thème, réglages."""
+    html = TestClient(app, cookies=SOBER).get("/deploiements/client-demo/synthese").text
+    side = html[html.index('<aside class="side"'):html.index("</aside>")]
+    for missing in ('<header class="topbar">', 'class="dock-wrap"', "console-fab", 'class="brand-mark"'):
+        assert missing not in html, missing
+    assert "data-client-switch" in side and "data-palette-open" in side and 'id="theme-toggle"' in side and 'id="notif-panel"' in side
+    for label in ("Accueil", "Fiche du client", "Deadlines", "Agents", "BAU", "Clients", "Flow Digger", "Notes", "Console", "Réglages"):
+        assert f"<span>{label}</span>" in side, label
+    assert 'class="side-item active" title="Fiche de Client Démo"' in side  # la page en cours est marquée
+    assert "data-notes-open" in side and "data-console-open" in side and 'action="/outils/flow-digger"' in side
+    assert "Liens de Client Démo" in side and 'href="/clients/client-demo/liens?vers=' in side
+    assert 'id="notes"' in html and 'id="term"' in html and 'id="palette"' in html  # les fenêtres, elles, sont toujours là
+
+
+def test_sober_home_is_a_dashboard_without_greeting():
+    sober = TestClient(app, cookies=SOBER).get("/").text
+    assert "<h1>Tableau de bord " in sober and "Brief du jour" in sober
+    for chatty in ("Bonjour.", "Bonsoir.", "Par quoi commence-t-on", "Jarvis a relevé", "Brief du matin"):
+        assert chatty not in sober, chatty
+    animated = TestClient(app).get("/").text
+    assert ("Bonjour." in animated or "Bonsoir." in animated) and "Brief du matin" in animated and "Tableau de bord" not in animated
+
+
+def test_sober_agents_page_is_counters_and_a_table_without_suits():
+    """En sobre, la page Agents donne les étapes en compteurs puis le tableau : ni schéma, ni armure, ni photo, ni
+    glisser-déposer (l'agent s'archive depuis sa page). L'affichage animé garde son schéma et ses armures."""
     claude.runs.clear()
     client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief"})
     run = claude.runs[0]
     run.status = "terminé"
-    sober = TestClient(app, cookies={"jarvis_affichage": "sobre"})
+    sober = TestClient(app, cookies=SOBER)
     page = sober.get("/agents").text
-    assert f'class="flow-node flow-plain" href="/agents/{run.id}" data-agent="{run.id}"' in page
-    for decor in ('class="bot"', "agent-face", "data-fly", "data-archive-zone", "il s'envole", "takeOff"):
+    assert "<strong>1</strong><span>Terminés, sans PR</span>" in page and "<span>En attente de ta réponse</span>" in page
+    assert f'<tr data-agent="{run.id}"' in page and 'href="/agents/archives">Archivés (' in page
+    for decor in ('class="bot"', "agent-face", "data-fly", "data-archive-zone", "il s'envole", "takeOff", "agent-flow"):
         assert decor not in page, decor
-    assert 'href="/agents/archives">Archivés (' in page and 'class="panel agent-flow"' in page
     assert f'hx-post="/agents/{run.id}/archiver"' in sober.get(f"/agents/{run.id}").text
     animated = TestClient(app).get("/agents").text
-    assert 'class="bot"' in animated and "data-archive-zone" in animated and "flow-plain" not in animated
+    assert 'class="bot"' in animated and "data-archive-zone" in animated and 'class="panel agent-flow"' in animated

@@ -1,0 +1,16 @@
+{# Menu du sélecteur de client (barre du haut, ou colonne de gauche en affichage sobre). #}
+{% import "_icons.html" as ic %}
+      <div class="client-menu" role="menu">
+        <a role="menuitem" href="/deploiements/{{ current.slug }}">Ouvrir la fiche de {{ current.client }}</a>
+        {% if clients | rejectattr("slug", "equalto", current.slug) | list %}{# sur une fiche archivée, tous les clients suivis sont « les autres » #}
+        <p class="client-menu-label">Changer de client</p>
+        {% for d in clients if d.slug != current.slug %}
+        <div class="client-menu-row">
+        <a role="menuitem" class="client-menu-item" href="/client/{{ d.slug }}?vers={{ here }}" title="Passer à {{ d.client }} sur cette page">
+          <span class="health h-{{ d.health_level }}" aria-hidden="true"></span>{{ ic.client_emoji(d) }}{{ d.client }}{{ ic.countdown(d) }}</a>
+        <a role="menuitem" class="client-menu-fiche" href="/client/{{ d.slug }}?vers=/deploiements/{{ d.slug }}" title="Ouvrir la fiche de {{ d.client }}" aria-label="Fiche de {{ d.client }}">Fiche</a>
+        </div>
+        {% endfor %}
+        {% endif %}
+        <a role="menuitem" class="client-menu-all" href="/clients">Tous les clients et réglages</a>
+      </div>

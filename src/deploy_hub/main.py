@@ -321,7 +321,10 @@ async def _push_loop() -> None:
 
 app = FastAPI(title="Jarvis", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
-templates = Jinja2Templates(directory=HERE / "templates")
+# `plain` : affichage sobre choisi dans ce navigateur (cookie STYLE_COOKIE), connu de tous les gabarits, fragments htmx compris.
+# Un gabarit relu sur le disque avant la relance, par un processus qui ne le fournit pas encore, le voit faux : affichage animé.
+templates = Jinja2Templates(directory=HERE / "templates",
+                            context_processors=[lambda request: {"plain": request.cookies.get(STYLE_COOKIE) == "sobre"}])
 def when_text(moment: datetime | None) -> str:
     """« aujourd'hui à 14:04 », « hier à 16:00 », « le 12/11 à 09:03 » (« le 12/11/2025 à … » une autre année)."""
     if not moment:
@@ -415,10 +418,10 @@ NAV_PAGES = [p for p in PAGES if p[0] != "/clients"]  # « BAU » toujours : la 
 
 
 CLIENT_COOKIE = "jarvis_client"  # client en cours : celui de la dernière fiche ouverte
-# Affichage sobre, choisi dans Réglages ou en pied de page : sans armures, logo fixe, ni Noël ni effets (style.css, base.html).
-# Gardé dans un cookie, pas dans le navigateur seul : le serveur rend la page sobre dès le premier affichage.
+# Affichage sobre, choisi dans Réglages ou en pied de page : menu en colonne, couleurs neutres, ni armures, ni Noël, ni effets
+# (_side_sobre.html, sobre.css, branches `plain` des gabarits).
+# Gardé dans un cookie, pas dans le navigateur seul : le serveur rend la page sobre dès le premier affichage (`plain`, plus haut).
 STYLE_COOKIE = "jarvis_affichage"
-templates.env.globals["sober"] = lambda request: request.cookies.get(STYLE_COOKIE) == "sobre"
 # Vues tous clients, proposées sur la page Clients (et toujours joignables par leur URL).
 CROSS_PAGES = [
     ("/injections", "Injections"),

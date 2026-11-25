@@ -8,18 +8,19 @@
 {% set hour = now.hour %}
 <div class="page-head">
   <div>
-    <h1>{{ "Bonsoir" if hour >= 18 or hour < 5 else "Bonjour" }}. <span class="muted">{{ days[today.weekday()] | capitalize }} {{ today.day }} {{ months[today.month - 1] }}</span></h1>
+    {# `plain` (base.html) : affichage sobre, titre et phrases factuels, sans salutation #}
+    <h1>{% if plain %}Tableau de bord{% else %}{{ "Bonsoir" if hour >= 18 or hour < 5 else "Bonjour" }}.{% endif %} <span class="muted">{{ days[today.weekday()] | capitalize }} {{ today.day }} {{ months[today.month - 1] }}</span></h1>
     <p class="jarvis-line">
       {% if not deployments and bau_board.synced %}Aucun client suivi : l'équipe a <a class="count-link" href="/bau"><strong>{{ bau_board.open | length }}</strong> demande(s) BAU ouverte(s)</a>.
       {% elif not deployments %}Aucun client suivi pour l'instant.
-      {% elif late or ko or due_today %}Jarvis a relevé
+      {% elif late or ko or due_today %}{{ "À traiter :" if plain else "Jarvis a relevé" }}
         {%- if late %} <a class="count-link" href="{{ links.retard.href }}"{% if links.retard.ticket %} data-ticket{% endif %}><strong>{{ late | length }}</strong> élément(s) en retard</a>{% endif %}
         {%- if due_today %}{{ "," if late }} <a class="count-link" href="{{ links.aujourdhui.href }}"{% if links.aujourdhui.ticket %} data-ticket{% endif %}><strong>{{ due_today | length }}</strong> échéance(s) aujourd'hui</a>{% endif %}
-        {%- if ko %}{{ " et" if late or due_today }} <a class="count-link" href="{{ links.ko.href }}"{% if links.ko.ticket %} data-ticket{% endif %}><strong>{{ ko | length }}</strong> injection(s) KO</a>{% endif %}. Par quoi commence-t-on ?
-      {% else %}Tous les systèmes sont au vert. Rien d'urgent aujourd'hui.{% endif %}
+        {%- if ko %}{{ " et" if late or due_today }} <a class="count-link" href="{{ links.ko.href }}"{% if links.ko.ticket %} data-ticket{% endif %}><strong>{{ ko | length }}</strong> injection(s) KO</a>{% endif %}.{% if not plain %} Par quoi commence-t-on ?{% endif %}
+      {% else %}{{ "Rien en retard, aucune échéance aujourd'hui, aucune injection KO." if plain else "Tous les systèmes sont au vert. Rien d'urgent aujourd'hui." }}{% endif %}
     </p>
   </div>
-  <div class="head-side"><a class="btn-primary" href="/brief" title="Le résumé du jour en texte, à copier pour Slack ou le daily">{{ ic.icon("sun") }} Brief du matin</a></div>
+  <div class="head-side"><a class="{{ 'btn-link' if plain else 'btn-primary' }}" href="/brief" title="Le résumé du jour en texte, à copier pour Slack ou le daily">{% if plain %}Brief du jour{% else %}{{ ic.icon("sun") }} Brief du matin{% endif %}</a></div>
 </div>
 {% if not deployments and not bau_board.synced %}
 <section class="panel empty-state">
@@ -76,7 +77,7 @@
     </ul>
     <a class="todo-all muted" href="/deadlines?periode={{ periode }}">{{ title }} : voir dans Deadlines →</a>
     </div>
-    {% else %}<p class="muted">Rien en retard ni à échéance cette semaine. Jarvis reste en veille.</p>{% endfor %}
+    {% else %}<p class="muted">Rien en retard ni à échéance cette semaine.{% if not plain %} Jarvis reste en veille.{% endif %}</p>{% endfor %}
     <script>
       // Onglets de « À traiter » : affichent la liste de leur période, masquent les autres.
       document.querySelectorAll("[data-todo-tab]").forEach((tab) => tab.addEventListener("click", () => {
@@ -119,7 +120,7 @@
       <button type="button" class="secondary" id="mark-seen" title="Les changements actuels ne seront plus affichés comme nouveaux">Tout marquer comme vu</button>
     </div>
   </div>
-  <div id="whats-new-body" hx-get="/quoi-de-neuf" hx-trigger="load-changes from:body" hx-swap="innerHTML"><p class="muted">Jarvis consulte le journal…</p></div>
+  <div id="whats-new-body" hx-get="/quoi-de-neuf" hx-trigger="load-changes from:body" hx-swap="innerHTML"><p class="muted">{{ "Chargement…" if plain else "Jarvis consulte le journal…" }}</p></div>
 </section>
 
 <script>

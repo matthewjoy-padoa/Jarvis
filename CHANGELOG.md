@@ -13,7 +13,7 @@ La version affichée en bas de chaque page change donc avec chaque fonctionnalit
 
 ## [0.8.3] · 2026-11-25
 
-- Affichage sobre, pour qui préfère un outil plus neutre : à choisir dans Réglages → Affichage ou par le lien en pied de page, pour ce navigateur seulement. Logo fixe, nom sans dégradé, pas de thème Noël (ni au bouton de thème, ni imposé en décembre), coins moins ronds, boutons et cartes immobiles au survol, plus de pulsation décorative (les animations utiles restent : attente, avancement d'une synchro). Page Agents : une pastille par agent (numéro et nom) dans les quatre colonnes, sans armure ni glisser-déposer ; un agent s'archive depuis sa page. Les informations, les couleurs de statut et les thèmes Auto, Nuit et Clair sont les mêmes ; l'affichage animé reste celui par défaut.
+- Affichage sobre, pour qui préfère un outil de travail plus neutre : à choisir dans Réglages → Affichage ou par le lien en pied de page, pour ce navigateur seulement ; l'affichage animé reste celui par défaut. Le site est recomposé : menu en colonne à gauche (client en cours, recherche, pages, liens du client et outils écrits en toutes lettres, notifications, thème, réglages) à la place de la barre du haut, du dock et des boutons flottants ; gris neutres et un seul bleu, en clair comme en nuit ; angles peu arrondis, traits fins, pas d'ombre, rien qui bouge ; onglets soulignés, compteurs en bande, tableaux plus denses. Accueil en « Tableau de bord », sans salutation. Page Agents en compteurs et tableau, sans schéma ni armures (un agent s'archive depuis sa page). Pas de thème Noël, ni au bouton de thème, ni imposé en décembre. Les informations et les fonctions sont les mêmes.
 
 ## [0.8.2] · 2026-11-24
 

@@ -1,0 +1,65 @@
+{# Affichage sobre : le menu de Jarvis en colonne à gauche (en bandeau sous 900 px), à la place de la barre du haut, du dock
+   et des boutons flottants. Mêmes liens et mêmes commandes, avec leur nom écrit. Style : static/sobre.css. #}
+{% import "_icons.html" as ic %}
+<aside class="side" aria-label="Menu de Jarvis">
+  <a href="/" class="side-brand" aria-label="Jarvis, accueil"><span class="side-logo" aria-hidden="true">J</span><span class="side-brand-name">Jarvis</span><span class="side-brand-team">Integration</span></a>
+  <div class="side-block side-client">
+    <p class="side-label">Client en cours</p>
+    {% if current %}
+    <details class="client-switch" data-client-switch>
+      <summary class="side-select" title="{{ current.client }} · {{ current.health_label }} · {{ current.progress }} % intégré{% if current.go_live %} · déploiement le {{ current.go_live.strftime('%d/%m/%Y') }}{% endif %}">
+        <span class="health h-{{ current.health_level }}" aria-hidden="true"></span><span class="client-name">{{ current.client }}</span>{{ ic.countdown(current) }}
+        <svg class="switch-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></summary>
+      {% include "_client_menu.html" %}
+    </details>
+    {% else %}<a class="side-select client-add" href="/clients/nouveau" title="Ajouter un client à suivre">+ Ajouter un client</a>{% endif %}
+  </div>
+  <button type="button" class="side-search" data-palette-open aria-label="Rechercher dans Jarvis" title="Rechercher un client, un retour, une action">{{ ic.icon("search") }}<span>Rechercher</span><kbd data-palette-key>⌘K</kbd></button>
+  <nav class="side-nav" aria-label="Navigation">
+    {% for path, label in pages %}
+    <a href="{{ path }}" class="side-item{{ ' active' if path == active }}">
+      <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">{{ icons.get(path, '') | safe }}</svg><span>{{ label }}</span></a>
+    {% if path == "/" and current %}
+    <a href="/deploiements/{{ current.slug }}" class="side-item{{ ' active' if active == '/deploiements/' ~ current.slug }}" title="Fiche de {{ current.client }}">
+      <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">{{ icons.fiche | safe }}</svg><span>Fiche du client</span></a>
+    {% endif %}
+    {% endfor %}
+    <a href="/clients" class="side-item{{ ' active' if active == '/clients' or active in cross }}">
+      <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">{{ icons["/clients"] | safe }}</svg><span>Clients</span></a>
+  </nav>
+  {% macro link(url, label, kind) %}<a class="side-item side-link" href="{{ url }}" target="_blank" rel="noopener noreferrer" title="{{ label }} (nouvel onglet)">{{ ic.dock_icon(kind) }}<span>{{ label }}</span><span class="side-ext" aria-hidden="true">↗</span></a>{% endmacro %}
+  {% if bau_dock is not none %}
+  <div class="side-block side-links">
+    <p class="side-label">Liens de l'équipe <a href="/bau/liens?vers={{ here }}">Gérer</a></p>
+    {% for l in bau_dock.all %}{{ link(l.url, l.label, ic.link_kind(l.url)) }}{% endfor %}
+  </div>
+  {% elif current %}
+  <div class="side-block side-links">
+    <p class="side-label">Liens de {{ current.client }} <a href="/clients/{{ current.slug }}/liens?vers={{ here }}">Gérer</a></p>
+    {% for name, url in env_links(current) %}{{ link(url, "Padoa · " ~ name, "stack") }}{% endfor %}
+    {% for l in current.drive %}{{ link(l.url, "Drive · " ~ l.label, "drive") }}{% endfor %}
+    {% if current.notion_url %}{{ link(current.notion_url, "Notion · Dashboard", "notion") }}{% endif %}
+    {% for l in current.dashboards %}{{ link(l.url, "Notion · " ~ l.label, "notion") }}{% endfor %}
+    {% for st in current.stacks %}{{ link(st.url, ((st.env ~ " · ") if st.env else "") ~ st.label, "stack") }}{% endfor %}
+    {% for l in current.links %}{{ link(l.url, l.label, ic.link_kind(l.url)) }}{% endfor %}
+  </div>
+  {% endif %}
+  <div class="side-block side-tools">
+    <p class="side-label">Outils</p>
+    {# Flow Digger : lancé sur la VM au besoin, ouvert dans sa propre fenêtre (réutilisée). #}
+    <form method="post" action="/outils/flow-digger" target="flow-digger" data-own-window>
+      <button type="submit" class="side-item" title="Ouvrir Flow Digger dans une autre fenêtre (le démarre sur la VM s'il ne tourne pas)">{{ ic.icon("shovel") }}<span>Flow Digger</span><span class="side-ext" aria-hidden="true">↗</span></button>
+    </form>
+    <button type="button" class="side-item" data-notes-open aria-expanded="false" aria-controls="notes" title="Bloc-notes perso, jamais envoyé dans Notion (touche n)">{{ ic.icon("note") }}<span>Notes</span><kbd>n</kbd></button>
+    <button type="button" class="side-item" data-console-open title="Commandes de Jarvis, comme dans un terminal (touche >)">{{ ic.icon("terminal") }}<span>Console</span><kbd>&gt;</kbd></button>
+  </div>
+  <div class="side-block side-foot">
+    <div class="bell-wrap">
+      <button type="button" class="bell side-item" aria-label="Notifications" aria-haspopup="true" aria-expanded="false"
+              hx-get="/notifications/panneau" hx-target="#notif-panel" hx-trigger="click">{{ ic.icon("bell") }}<span>Notifications</span><span id="bell-count" hx-target="this" hx-get="/notifications/compte" hx-trigger="load, every 60s, notifs-changed from:body" hx-swap="innerHTML"></span></button>
+      <div id="notif-panel" class="notif-panel" hidden></div>
+    </div>
+    <button type="button" class="theme-toggle side-item" id="theme-toggle" title="Changer de thème" aria-label="Thème">Auto</button>
+    <a href="/reglages" class="side-item{{ ' active' if active == '/reglages' }}">{{ ic.icon("gear") }}<span>Réglages</span></a>
+  </div>
+</aside>

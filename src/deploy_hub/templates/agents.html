@@ -32,7 +32,6 @@
   {% if suit == "pr" %}<circle class="im-blast" cx="40.5" cy="16.4" r="3"/>{% endif %}
 </svg>
 {% endmacro %}
-{# Affichage sobre (`plain`, base.html) : pastilles au lieu des armures, sans glisser-déposer (un agent s'archive depuis sa page). #}
 <h1>Agents lancés</h1>
 <nav class="tabs" aria-label="Onglets" data-page-tabs>
   <a href="#agents" class="active" data-pane="pane-agents">Agents <span class="count" title="Agents en cours">{{ runs | selectattr("running") | list | length }}</span></a>
@@ -48,6 +47,14 @@
   ("pr", "PR ouverte", "À relire sur GitHub", runs | selectattr("pr_url") | list),
   ("ko", "Arrêtés ou en échec", "Échec, arrêt, délai dépassé", runs | selectattr("group", "equalto", "ko") | rejectattr("pr_url") | list),
 ] %}
+{% if plain %}
+{# Affichage sobre (`plain`, base.html) : les quatre étapes en compteurs, puis le tableau ; ni armures ni glisser-déposer
+   (un agent s'archive depuis sa page). #}
+{{ charts.stats([("En cours", lanes[0][3] | rejectattr("group", "equalto", "todo") | list | length, ""),
+                 ("En attente de ta réponse", lanes[0][3] | selectattr("group", "equalto", "todo") | list | length, "todo"),
+                 ("Terminés, sans PR", lanes[1][3] | length, ""), ("PR ouvertes, à relire", lanes[2][3] | length, ""),
+                 ("Arrêtés ou en échec", lanes[3][3] | length, "ko")]) }}
+{% else %}
 <section class="panel agent-flow" id="schema" aria-label="Où en sont les agents">
   {% for key, title, hint, found in lanes %}
   <div class="flow-lane flow-{{ key }}{{ ' is-empty' if not found }}">
@@ -55,12 +62,8 @@
     <div class="flow-nodes">
       {% for r in found[:24] %}
       {% set waiting = r.group == "todo" %}
-      <a class="flow-node {{ 'flow-plain' if plain else 'flow-bot' }}{{ ' is-sim' if r.simulated }}{{ ' is-waiting' if waiting }}" href="/agents/{{ r.id }}" data-agent="{{ r.id }}"{% if not plain %} data-fly style="--i: {{ loop.index0 }}"{% endif %}>
-        {% if plain %}
-        {% if r.pinned %}{{ ic.icon("pin", "Épinglé", "ic-pin") }}{% endif %}<span>#{{ r.id }}</span><span class="flow-name">{{ r.name }}</span>{% if waiting %}<span class="badge g-todo" role="img" aria-label="Attend ta réponse" title="Attend ta réponse">?</span>{% endif %}
-        {% else %}
+      <a class="flow-node flow-bot{{ ' is-sim' if r.simulated }}{{ ' is-waiting' if waiting }}" href="/agents/{{ r.id }}" data-agent="{{ r.id }}" data-fly style="--i: {{ loop.index0 }}">
         <span class="bot-wrap">{{ bot("waiting" if waiting else key, heads | au_hasard(r.id)) }}{% if r.pinned %}<span class="bot-pin" title="Épinglé">{{ ic.icon("pin") }}</span>{% endif %}</span><span class="bot-id">#{{ r.id }}</span>
-        {% endif %}
         <span class="flow-tip" role="tooltip"><strong>{{ r.name }}</strong>
           <span>{{ r.client }} · {{ r.status }}{{ " (simulé)" if r.simulated }}</span>
           <span>Lancé le {{ r.started_at.strftime("%d/%m à %H:%M") }}{% if not r.simulated %} · {{ r.duration | duree }}{% endif %}</span>
@@ -73,9 +76,8 @@
   </div>
   {% endfor %}
 </section>
-{% if not plain %}<div class="flow-archive" data-archive-zone aria-live="polite"><span>{{ ic.icon("archive") }} Archiver : dépose ici un agent fini</span><small class="muted" data-archive-out></small></div>{% endif %}
+<div class="flow-archive" data-archive-zone aria-live="polite"><span>{{ ic.icon("archive") }} Archiver : dépose ici un agent fini</span><small class="muted" data-archive-out></small></div>
 <script>
-{% if not plain %}
   // Déplacer un agent : il s'envole comme une armure d'Iron Man, dans ses propres couleurs (réacteurs allumés, penché dans le sens du vol, traînée de
   // fumée) et suit la souris ou le doigt. Lâché dans sa colonne, il atterrit à la place choisie (ordre gardé) ; lâché sur
   // « Archiver », il plonge dedans ; refusé ou lâché ailleurs, il rentre à sa place. Un simple clic ouvre toujours l'agent.
@@ -233,7 +235,6 @@
       el.addEventListener("click", (e) => { if (el.dataset.justFlew) e.preventDefault(); });
     });
   })();
-{% endif %}
 
   document.querySelectorAll("[data-agent]").forEach((el) => {
     const mark = (on) => document.querySelectorAll(`[data-agent="${el.dataset.agent}"]`).forEach((other) => other.classList.toggle("is-hot", on));
@@ -243,6 +244,7 @@
     el.addEventListener("focusout", () => mark(false));
   });
 </script>
+{% endif %}
 {% endif %}
 <table data-filterable>
   <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>Sujet</th><th>Branche</th><th data-filter>État</th><th>Durée</th><th>Tokens</th><th>PR</th></tr></thead>

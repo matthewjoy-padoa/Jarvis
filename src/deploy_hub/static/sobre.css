@@ -1,0 +1,170 @@
+/* Affichage sobre de Jarvis (2026-11-25) : chargée après style.css, seulement quand l'affichage sobre est choisi
+   (Réglages → Affichage, ou lien en pied de page ; cookie lu par le serveur, data-style="sobre" sur <html>).
+   Un outil de travail neutre : menu en colonne à gauche (_side_sobre.html), gris neutres et un seul bleu, traits fins,
+   angles peu arrondis, pas d'ombre, rien qui bouge. Les statuts gardent leurs quatre couleurs, en plus sourd.
+   Tout est imbriqué sous html:root[data-style="sobre"] : chaque règle passe devant celle de style.css qu'elle remplace,
+   thèmes compris (:root[data-theme="dark"]). Couleurs en light-dark() : le clair et la nuit suivent le thème (Auto, Nuit,
+   Clair) déjà posé par style.css (color-scheme). Demande un navigateur qui connaît l'imbrication CSS et light-dark().
+   Ce qui ne change pas ici : les animations utiles (attente, avancement d'une synchro, « Enregistré » qui s'efface) et les
+   barres d'avancement, qui gardent leurs bouts ronds. */
+html:root[data-style="sobre"] {
+  --bg: light-dark(#f4f5f7, #131519); --surface: light-dark(#ffffff, #1a1d23); --text: light-dark(#1a202c, #e2e5ea);
+  --muted: light-dark(#5c6675, #96a0ad); --border: light-dark(#dfe3e8, #2a2f38);
+  --accent: light-dark(#23468c, #8fb0ea); --accent-soft: light-dark(#e7edf7, #222c3f); --on-accent: light-dark(#ffffff, #10141b);
+  --cyan: light-dark(#2c6a8d, #86b8d4); --on-status: light-dark(#ffffff, #131519);
+  --st-todo: light-dark(#a06600, #d2a550); --st-progress: light-dark(#2b5cab, #8fb0ea);
+  --st-ko: light-dark(#b3261e, #e58b82); --st-done: light-dark(#1d7044, #77c093);
+  --pa-todo: light-dark(#faefd2, rgba(210, 165, 80, .18)); --pa-progress: light-dark(#e3ebf8, rgba(143, 176, 234, .18));
+  --pa-ko: light-dark(#fae3e0, rgba(229, 139, 130, .18)); --pa-done: light-dark(#dbefe2, rgba(119, 192, 147, .18));
+  --radius: 6px; --line: 1px; --shadow: none; --shadow-card: none;
+  --shadow-lift: 0 6px 16px -8px light-dark(rgba(16, 24, 40, .25), rgba(0, 0, 0, .7));
+  --ring: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
+  --side-w: 244px;
+
+  body { font-size: 13.5px; }
+  main { max-width: 1240px; padding: 26px 32px 24px; }
+  .footer { max-width: 1240px; padding: 8px 32px 24px; font-size: 12.5px; }
+  h1 { font-size: 21px; letter-spacing: -.01em; }
+  h2 { font-size: 15px; }
+  .page-head { margin-bottom: 10px; }
+  .page-head h1 .muted { font-size: 13.5px; font-weight: 400; }
+  .client-emoji:not(.client-icon) { display: none; }  /* le logo du client (image) reste, pas son emoji */
+
+  /* ---- Menu en colonne ------------------------------------------------------------------------------------------- */
+  .side { background: var(--surface); }
+  .side-brand { display: flex; align-items: center; gap: 9px; padding: 2px 8px 4px; color: var(--text); text-decoration: none; }
+  .side-logo { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; background: var(--accent); color: var(--on-accent);
+    font-weight: 700; font-size: 14px; }
+  .side-brand-name { font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; }
+  .side-brand-team { margin-left: auto; font-size: 11.5px; color: var(--muted); }
+  .side-block { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .side-block form { margin: 0; display: contents; }
+  .side-label { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 8px 4px; font-size: 11px; font-weight: 600;
+    letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+  .side-label a { font-weight: 500; letter-spacing: 0; text-transform: none; }
+  .side-nav { display: flex; flex-direction: column; gap: 1px; }
+  .side-item { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; min-height: 30px; padding: 4px 8px;
+    border: 0; border-radius: 6px; background: none; box-shadow: none; color: var(--text); font: inherit; font-weight: 500; text-align: left;
+    text-decoration: none; white-space: nowrap; cursor: pointer; transform: none; transition: none; }
+  .side-item > span:not(.side-ext, #bell-count) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .side-item .ic, .side-item .nav-icon, .side-item > svg { flex: none; width: 16px; height: 16px; margin: 0; color: var(--muted); }
+  .side-item > svg:not(.ic, .nav-icon, .dock-logo) { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .side-item:hover { background: var(--bg); color: var(--text); border: 0; text-decoration: none; }
+  .side-item:focus-visible { outline: none; box-shadow: var(--ring); }
+  .side-item.active { background: var(--accent-soft); font-weight: 600; }
+  .side-item.active .nav-icon, .side-item.active .ic { color: var(--accent); stroke: currentColor; }
+  .side-item kbd, .side-search kbd { flex: none; margin-left: auto; font-size: 11px; color: var(--muted); border-bottom-width: 1px; border-radius: 4px; background: none; }
+  .side-ext { flex: none; font-size: 11px; color: var(--muted); }
+  .side-link { font-weight: 400; }
+  .side-select { display: flex; align-items: center; gap: 8px; margin: 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--surface); color: var(--text); font-weight: 600; text-decoration: none; list-style: none; cursor: pointer; }
+  .side-select:hover { border-color: var(--muted); text-decoration: none; }
+  .side-select .client-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .side-select .switch-caret { flex: none; width: 16px; height: 16px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .side-select.client-add { border-style: dashed; color: var(--accent); font-weight: 500; }
+  .jx { padding: 1px 6px; border-radius: 4px; background: var(--bg); color: var(--muted); font-size: 11px; font-weight: 600; }
+  .jx.soon { background: var(--pa-ko); color: var(--text); }
+  /* Menu des clients : il se déplie dans la colonne, sous le client en cours */
+  .side .client-menu { position: static; min-width: 0; margin-top: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 6px; box-shadow: none; background: var(--surface); }
+  .client-menu a { padding: 6px 8px; border-radius: 4px; font-size: 13px; }
+  .client-menu a.client-menu-all { border-radius: 0 0 4px 4px; }
+  .side-search { display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; min-height: 32px; padding: 5px 8px 5px 10px;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--bg); box-shadow: none; color: var(--muted); font: inherit; cursor: text; transform: none; }
+  .side-search:hover { background: var(--bg); border-color: var(--muted); color: var(--text); }
+  .side-search .ic { width: 15px; height: 15px; margin: 0; }
+  .side-search span { flex: 1; text-align: left; }
+  .side .theme-toggle .theme-label::before { content: "Thème : "; }
+  #bell-count { flex: none; margin-left: auto; }
+  .bell-count { position: static; display: inline-block; min-width: 18px; height: 18px; border-radius: 4px; line-height: 18px; animation: none; }
+  .notif-panel { border-width: 1px; box-shadow: var(--shadow-lift); }
+
+  @media (min-width: 901px) {
+    body { padding-left: var(--side-w); }
+    .side { position: fixed; inset: 0 auto 0 0; z-index: 30; width: var(--side-w); display: flex; flex-direction: column; gap: 13px; padding: 14px 10px 10px;
+      border-right: 1px solid var(--border); overflow: hidden auto; scrollbar-width: thin; }
+    /* Notifications, thème et réglages : toujours visibles en bas, le reste de la colonne défile au-dessus */
+    .side-foot { position: sticky; bottom: -10px; margin: auto -10px -10px; padding: 8px 10px 10px; border-top: 1px solid var(--border); background: var(--surface);
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1px 4px; }
+    .side-foot .bell-wrap { grid-column: 1 / -1; }
+    .notif-panel { position: fixed; left: calc(var(--side-w) + 8px); right: auto; top: auto; bottom: 12px; z-index: 40; max-height: min(70vh, 640px); }
+    .term { left: calc(var(--side-w) + 16px); }
+  }
+  /* Écran étroit : le menu passe en bandeau, les pages en une rangée d'onglets, les liens du client restent sur sa fiche */
+  @media (max-width: 900px) {
+    main { padding: 18px 14px; }
+    .footer { padding: 8px 14px 20px; }
+    .side { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    .side-label, .side-links, .side-brand-team, .side-item kbd, .side-search kbd, .side-search span, .side-tools .side-item > span, .side-foot .side-item > span:not(#bell-count) { display: none; }
+    .side-brand { padding: 0; }
+    .side-client { flex: 1 1 150px; }
+    .side-search { width: auto; }
+    .side-tools, .side-foot { flex-direction: row; gap: 2px; }
+    .side-tools .side-item, .side-foot .side-item { width: 34px; justify-content: center; padding: 0; }
+    .side-nav { order: 9; flex: 1 0 100%; flex-direction: row; overflow-x: auto; scrollbar-width: none; }
+    .side-nav .side-item { width: auto; flex: none; }
+    .notif-panel { position: fixed; left: 12px; right: 12px; top: 56px; width: auto; }
+  }
+
+  /* ---- Boutons, champs, étiquettes -------------------------------------------------------------------------------- */
+  /* Forme seulement : les tailles propres à chaque bouton (ligne de tableau, filtre, croix) restent celles de style.css */
+  button, .btn-primary, .btn-link { border-radius: 6px; font-weight: 500; box-shadow: none; transition: none; }
+  .term-dot { border-radius: 50%; }
+  button:hover:not(:disabled), .btn-primary:hover, .btn-link:hover { transform: none; box-shadow: none; filter: none; }
+  button.secondary:hover:not(:disabled), .btn-link:hover { background: var(--bg); border-color: var(--muted); }
+  input:not([type=checkbox], [type=radio]), select, textarea { border-radius: 6px; }
+  .toolbar input[type=search], .toolbar select, .dag-form select, .agent-form textarea { border-width: 1px; border-radius: 6px; }
+  .badge { padding: 1px 7px; border-radius: 4px; font-size: 11.5px; font-weight: 500; }
+  .count { border-radius: 4px; }
+  code.res, code.req { border-radius: 4px; }
+  kbd { border-radius: 4px; }
+  /* Plus de pastilles ni de grands arrondis : 4 px pour une étiquette, 6 px pour un champ ou un encart */
+  .filters a, .stacks a, .team, .req, .wn-kind, .wn-pill, .pal-chip, button.pal-hint, .blocking-kind, .settings-nav a,
+  .deadline-client-pick { border-radius: 4px; }
+  .notif-icon, .field input, .field textarea, .kb-card, .kb-col, a.blocking-row, .settings-form select, .brief-text, .my-notes textarea, .notes-field textarea,
+  a.gauge-link, .multi > summary, .multi-list, .client-pick select, .refresh .refresh-out .result, .refresh .request-error, .wn-item, .pal-item, .pal-card { border-radius: 6px; }
+  .health { flex: none; width: 9px; height: 9px; box-shadow: none; }
+  .health.lg { width: 11px; height: 11px; vertical-align: 2px; }
+  .segmented { padding: 2px; border-radius: 6px; }
+  .segmented a, .segmented button { min-height: 0; padding: 3px 11px; border-radius: 4px; box-shadow: none; }
+  .segmented a.active, .segmented button.active { box-shadow: 0 0 0 1px var(--border); }
+  .retour details.agent > summary, .ticket details.agent > summary, .ticket-agent-btn { border-radius: 6px; background: var(--accent); box-shadow: none; transition: none; }
+  .retour details.agent > summary:hover, .ticket details.agent > summary:hover { transform: none; filter: none; box-shadow: none; }
+  .retour details.agent[open] > summary, .ticket details.agent[open] > summary { background: var(--surface); }
+  .retour details.agent[open], .ticket details.agent[open] { border-radius: 6px; }
+
+  /* ---- Onglets : soulignés, plus de pastilles ------------------------------------------------------------------- */
+  .tabs { gap: 22px; margin: 10px 0 16px; padding-top: 0; border-bottom: 1px solid var(--border); }
+  .tabs a { margin-bottom: -1px; padding: 9px 1px 8px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); font-weight: 500; }
+  .tabs a:hover { color: var(--text); }
+  .tabs a.active { background: none; color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+  .tabs.is-stuck { box-shadow: 0 0 0 100vmax var(--bg); clip-path: inset(0 -100vmax 0); border-bottom-color: var(--border); }
+  .tabs-view { margin-bottom: 4px; }
+  .tabs-view button, .auto-sync { min-height: 26px; }
+
+  /* ---- Cartes, tableaux, compteurs -------------------------------------------------------------------------------- */
+  .card, .kpi, .stat, .chart, .panel, .retour, .run-card, table { border-width: 1px; border-radius: var(--radius); box-shadow: none; }
+  .card-linked, a.kpi-link, .kb-card, .wn-item, a.stat-link, a.tl-mark { transition: none; }
+  .card-linked:hover, a.kpi-link:hover, .kb-card:hover, .wn-item:hover, a.stat-link:hover, a.tl-mark:hover { transform: none; box-shadow: none; border-color: var(--muted); }
+  .panel { padding: 4px 16px 10px; }
+  .panel h2 { font-size: 14px; }
+  th { padding: 7px 10px; background: var(--bg); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+  td { padding: 7px 10px; }
+  /* Compteurs : une seule bande à cases, le chiffre en couleur quand il alerte */
+  .stats { gap: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+  .stat { padding: 10px 16px; border: 0; border-right: 1px solid var(--border); border-radius: 0; background: none; }
+  .stat::before { display: none; }
+  .stat strong, .kpi strong { font-size: 21px; font-weight: 600; letter-spacing: 0; }
+  .stat-ko strong { color: var(--st-ko); }
+  .stat-todo strong { color: var(--st-todo); }
+  a.stat-link:hover { background: var(--bg); }
+  .segbar { height: 22px; border-radius: 4px; }
+  .seg:first-child { border-radius: 4px 0 0 4px; } .seg:last-child { border-radius: 0 4px 4px 0; } .seg:only-child { border-radius: 4px; }
+  .seg[data-filter-set]:hover { filter: none; opacity: .85; }
+  .seg-n { font-size: 12px; font-weight: 600; }
+
+  /* ---- Fenêtres : recherche, ticket, notes ------------------------------------------------------------------------ */
+  .palette-panel, .drawer.modal .drawer-panel, .notes, .tabs-pick { border-radius: 8px; box-shadow: var(--shadow-lift); animation: none; }
+  .drawer-panel, .drawer-backdrop, .palette-backdrop, .term { animation: none; }
+  .palette-backdrop { backdrop-filter: none; }
+  .notes { right: 24px; bottom: 24px; max-height: calc(100vh - 48px); }
+}
