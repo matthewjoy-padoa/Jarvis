@@ -32,6 +32,7 @@
   {% if suit == "pr" %}<circle class="im-blast" cx="40.5" cy="16.4" r="3"/>{% endif %}
 </svg>
 {% endmacro %}
+{# Affichage sobre (`plain`, base.html) : pastilles au lieu des armures, sans glisser-déposer (un agent s'archive depuis sa page). #}
 <h1>Agents lancés</h1>
 <nav class="tabs" aria-label="Onglets" data-page-tabs>
   <a href="#agents" class="active" data-pane="pane-agents">Agents <span class="count" title="Agents en cours">{{ runs | selectattr("running") | list | length }}</span></a>
@@ -39,7 +40,7 @@
 </nav>
 <div id="pane-agents" data-tab-pane>
 <p class="muted">Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.
-  Attrape un agent : il s'envole. Pose-le ailleurs dans sa colonne pour changer sa place, ou sur « Archiver » pour le ranger. <a href="/agents/archives">Archivés ({{ archived_count }})</a></p>
+  {% if not plain %}Attrape un agent : il s'envole. Pose-le ailleurs dans sa colonne pour changer sa place, ou sur « Archiver » pour le ranger. {% endif %}<a href="/agents/archives">Archivés ({{ archived_count }})</a></p>
 {% if runs %}
 {% set lanes = [
   ("in_progress", "En cours", "L'agent travaille dans son worktree · ? : attend ta réponse", runs | selectattr("group", "in", ["in_progress", "todo"]) | list),
@@ -54,8 +55,12 @@
     <div class="flow-nodes">
       {% for r in found[:24] %}
       {% set waiting = r.group == "todo" %}
-      <a class="flow-node flow-bot{{ ' is-sim' if r.simulated }}{{ ' is-waiting' if waiting }}" href="/agents/{{ r.id }}" data-agent="{{ r.id }}" data-fly style="--i: {{ loop.index0 }}">
+      <a class="flow-node {{ 'flow-plain' if plain else 'flow-bot' }}{{ ' is-sim' if r.simulated }}{{ ' is-waiting' if waiting }}" href="/agents/{{ r.id }}" data-agent="{{ r.id }}"{% if not plain %} data-fly style="--i: {{ loop.index0 }}"{% endif %}>
+        {% if plain %}
+        {% if r.pinned %}{{ ic.icon("pin", "Épinglé", "ic-pin") }}{% endif %}<span>#{{ r.id }}</span><span class="flow-name">{{ r.name }}</span>{% if waiting %}<span class="badge g-todo" role="img" aria-label="Attend ta réponse" title="Attend ta réponse">?</span>{% endif %}
+        {% else %}
         <span class="bot-wrap">{{ bot("waiting" if waiting else key, heads | au_hasard(r.id)) }}{% if r.pinned %}<span class="bot-pin" title="Épinglé">{{ ic.icon("pin") }}</span>{% endif %}</span><span class="bot-id">#{{ r.id }}</span>
+        {% endif %}
         <span class="flow-tip" role="tooltip"><strong>{{ r.name }}</strong>
           <span>{{ r.client }} · {{ r.status }}{{ " (simulé)" if r.simulated }}</span>
           <span>Lancé le {{ r.started_at.strftime("%d/%m à %H:%M") }}{% if not r.simulated %} · {{ r.duration | duree }}{% endif %}</span>
@@ -68,8 +73,9 @@
   </div>
   {% endfor %}
 </section>
-<div class="flow-archive" data-archive-zone aria-live="polite"><span>{{ ic.icon("archive") }} Archiver : dépose ici un agent fini</span><small class="muted" data-archive-out></small></div>
+{% if not plain %}<div class="flow-archive" data-archive-zone aria-live="polite"><span>{{ ic.icon("archive") }} Archiver : dépose ici un agent fini</span><small class="muted" data-archive-out></small></div>{% endif %}
 <script>
+{% if not plain %}
   // Déplacer un agent : il s'envole comme une armure d'Iron Man, dans ses propres couleurs (réacteurs allumés, penché dans le sens du vol, traînée de
   // fumée) et suit la souris ou le doigt. Lâché dans sa colonne, il atterrit à la place choisie (ordre gardé) ; lâché sur
   // « Archiver », il plonge dedans ; refusé ou lâché ailleurs, il rentre à sa place. Un simple clic ouvre toujours l'agent.
@@ -227,6 +233,7 @@
       el.addEventListener("click", (e) => { if (el.dataset.justFlew) e.preventDefault(); });
     });
   })();
+{% endif %}
 
   document.querySelectorAll("[data-agent]").forEach((el) => {
     const mark = (on) => document.querySelectorAll(`[data-agent="${el.dataset.agent}"]`).forEach((other) => other.classList.toggle("is-hot", on));

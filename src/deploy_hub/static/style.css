@@ -470,7 +470,7 @@ button .ic { margin-right: 2px; }
    popover (couche du dessus) : la barre d'onglets défile et rogne ce qui en dépasse. */
 .tabs-view { display: flex; flex: none; align-items: center; gap: 4px; margin: 0 0 6px auto; padding-left: 12px; }
 .tabs-view button, .auto-sync { min-height: 28px; padding: 3px 12px; font-size: 12.5px; white-space: nowrap; box-shadow: none; }
-.tabs-view .view-toggle[aria-pressed="true"], .auto-sync[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.tabs-view .view-toggle[aria-pressed="true"], .auto-sync[aria-pressed="true"], .style-choice button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
 .tabs-view .view-toggle[aria-pressed="true"]::before { content: "✓"; }
 .tabs-view .view-pick { padding: 3px 7px; anchor-name: --tabs-pick; }
 .tabs-view .view-pick .ic { margin: 0; }
@@ -1848,3 +1848,36 @@ details.filter.multi { position: relative; font-size: 13px; }
 .agent-rename input { min-width: min(420px, 100%); }
 .bot-pin { position: absolute; top: -4px; right: -2px; color: var(--accent); line-height: 0; }
 .bot-pin svg, .ic-pin { width: 14px; height: 14px; color: var(--accent); }
+
+/* ============================================================ Affichage sobre (2026-11-25)
+   Choisi dans Réglages ou en pied de page (cookie, data-style="sobre" sur <html>, rendu par le serveur) : pour qui préfère un
+   outil plus neutre. Logo fixe, nom de l'app sans dégradé, pas de Noël (base.html), pas d'armures sur la page Agents (agents.html),
+   coins moins ronds, boutons et cartes immobiles au survol, plus de pulsation décorative. Les animations utiles restent (attente,
+   avancement d'une synchro, ouverture d'un panneau). Les couleurs et les thèmes Auto, Nuit et Clair ne changent pas.
+   Un nouvel effet décoratif s'ajoute aux listes ci-dessous pour disparaître en sobre. */
+.footer-style { display: inline; margin: 0; }
+.footer-style .link-button { box-shadow: none; text-decoration: none; vertical-align: baseline; }
+.footer-style .link-button:hover { text-decoration: underline; transform: none; }
+:root[data-style="sobre"] { --radius: 8px; }
+:root[data-style="sobre"] .brand-mark, :root[data-style="sobre"] .brand-mark *, :root[data-style="sobre"] .brand-name,
+:root[data-style="sobre"] .bell-count.urgent, :root[data-style="sobre"] .flow-in_progress .flow-node::before { animation: none; }
+:root[data-style="sobre"] .brand-name { background: none; color: var(--text); font-weight: 700; }
+:root[data-style="sobre"] .brand-dot, :root[data-style="sobre"] .client-emoji:not(.client-icon) { display: none; }  /* le logo du client (image) reste, pas son emoji */
+:root[data-style="sobre"] .client-chip.strong { border: var(--line) solid var(--border); background: var(--surface); box-shadow: none; }
+:root[data-style="sobre"] :is(button, .btn-primary, .btn-link, .theme-toggle, .client-chip, .segmented, .segmented a) { border-radius: 6px; }
+:root[data-style="sobre"] :is(.retour, .ticket) details.agent > summary, :root[data-style="sobre"] .ticket-agent-btn {
+  border-radius: 6px; background: var(--accent); box-shadow: none; }
+:root[data-style="sobre"] :is(.retour, .ticket) details.agent[open] > summary { background: var(--surface); }
+:root[data-style="sobre"] .brand:hover .brand-mark,
+:root[data-style="sobre"] :is(button, .btn-primary, .btn-link, .theme-toggle, .client-chip.strong, .card-linked, a.kpi-link, .kb-card, .wn-item,
+  a.stat-link, .dock-btn, a.tl-mark, .flow-node, .retour details.agent > summary, .ticket details.agent > summary):is(:hover, :focus-visible) {
+  transform: none; filter: none; }
+/* Page Agents sobre : une pastille par agent (numéro et nom), sans armure ni glisser-déposer */
+:root[data-style="sobre"] .flow-nodes { min-height: 34px; align-items: flex-start; border-bottom: 0; padding-bottom: 0; }
+.flow-plain { max-width: 100%; min-width: 0; border-radius: 6px; font-weight: 500; }
+@media (max-width: 760px) { :root[data-style="sobre"] .agent-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }  /* un nom long se coupe, la colonne ne s'élargit pas */
+.flow-plain > span:first-of-type { font-weight: 600; }
+.flow-plain .flow-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--muted); }
+.flow-plain .badge { flex: none; font-size: 11px; }
+/* Réglages : choix de l'affichage */
+.style-choice { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }

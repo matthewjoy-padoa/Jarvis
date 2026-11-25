@@ -415,6 +415,10 @@ NAV_PAGES = [p for p in PAGES if p[0] != "/clients"]  # « BAU » toujours : la 
 
 
 CLIENT_COOKIE = "jarvis_client"  # client en cours : celui de la dernière fiche ouverte
+# Affichage sobre, choisi dans Réglages ou en pied de page : sans armures, logo fixe, ni Noël ni effets (style.css, base.html).
+# Gardé dans un cookie, pas dans le navigateur seul : le serveur rend la page sobre dès le premier affichage.
+STYLE_COOKIE = "jarvis_affichage"
+templates.env.globals["sober"] = lambda request: request.cookies.get(STYLE_COOKIE) == "sobre"
 # Vues tous clients, proposées sur la page Clients (et toujours joignables par leur URL).
 CROSS_PAGES = [
     ("/injections", "Injections"),
@@ -498,6 +502,16 @@ def _fiche_url(request: Request, slug: str) -> str:
 def _keep(response, cookie: str, value: str):
     """Préférence gardée un an dans ce navigateur (client en cours, vue des fiches)."""
     response.set_cookie(cookie, value, max_age=365 * 24 * 3600, samesite="lax")
+    return response
+
+
+@app.post("/affichage")
+def display_style(affichage: str = Form(""), vers: str = Form("")):
+    """Affichage sobre ou animé (« jarvis »), pour ce navigateur ; retour à la page d'où vient le choix."""
+    response = RedirectResponse(_local_path(vers, "/reglages#affichage"), status_code=303)
+    if affichage == "sobre":
+        return _keep(response, STYLE_COOKIE, "sobre")
+    response.delete_cookie(STYLE_COOKIE)
     return response
 
 

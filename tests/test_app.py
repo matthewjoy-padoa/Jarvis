@@ -731,3 +731,51 @@ def test_the_whole_agent_card_opens_the_agent():
     assert f'<a href="/agents/{run.id}" data-row-link>' in client.get("/agents/archives").text
     css = (__import__("pathlib").Path(__file__).parents[1] / "src" / "deploy_hub" / "static" / "style.css").read_text()
     assert ".flow-tip::before" in css  # la bulle du schéma reste ouverte quand la souris la rejoint
+
+
+def test_sober_display_is_chosen_per_browser_and_strips_the_decor():
+    """Affichage sobre : choisi dans Réglages ou en pied de page, gardé dans un cookie ; le serveur marque alors <html>, n'offre
+    plus Noël au bouton de thème et ne l'impose pas en décembre. Sans le cookie, rien ne change."""
+    browser = TestClient(app)
+    plain = browser.get("/")
+    assert "<html lang=\"fr\">" in plain.text and 'value="sobre"' in plain.text and "Affichage sobre" in plain.text
+    chosen = browser.post("/affichage", data={"affichage": "sobre", "vers": "/agents"}, follow_redirects=False)
+    assert chosen.status_code == 303 and chosen.headers["location"] == "/agents"
+    html = browser.get("/").text
+    assert '<html lang="fr" data-style="sobre">' in html and "Affichage animé" in html
+    assert "Just A Rather Very Intelligent System</em>" not in html and "outil de l'équipe Integration" in html
+    head = html.split("</head>")[0]
+    assert '!sober && new Date() >= new Date("2026-12-01T00:00")' in head  # Noël jamais imposé en sobre
+    assert '{ noel: "dark", "noel-clair": "light" }' in head  # un thème Noël retenu s'affiche en Nuit ou en Clair
+    assert 'root.dataset.style === "sobre" ? ["", "dark", "light"]' in html  # bouton de thème sans Noël
+    settings = browser.get("/reglages").text
+    assert 'id="affichage"' in settings and '<span class="badge">sobre</span>' in settings
+    back = browser.post("/affichage", data={"affichage": "jarvis"}, follow_redirects=False)
+    assert back.headers["location"] == "/reglages#affichage"
+    assert "<html lang=\"fr\">" in browser.get("/").text
+    css = client.get("/static/style.css").text
+    assert ':root[data-style="sobre"] .brand-mark *' in css and ':root[data-style="sobre"] { --radius: 8px; }' in css
+
+
+def test_display_choice_only_returns_to_a_page_of_jarvis():
+    for outside in ("https://example.com/", "//example.com/x"):
+        r = TestClient(app).post("/affichage", data={"affichage": "sobre", "vers": outside}, follow_redirects=False)
+        assert r.headers["location"] == "/reglages#affichage"
+
+
+def test_sober_agents_page_has_plain_nodes_and_no_suits():
+    """En sobre, la page Agents garde ses quatre colonnes mais montre une pastille par agent : ni armure, ni photo, ni
+    glisser-déposer (l'agent s'archive depuis sa page). L'affichage animé garde ses armures."""
+    claude.runs.clear()
+    client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief"})
+    run = claude.runs[0]
+    run.status = "terminé"
+    sober = TestClient(app, cookies={"jarvis_affichage": "sobre"})
+    page = sober.get("/agents").text
+    assert f'class="flow-node flow-plain" href="/agents/{run.id}" data-agent="{run.id}"' in page
+    for decor in ('class="bot"', "agent-face", "data-fly", "data-archive-zone", "il s'envole", "takeOff"):
+        assert decor not in page, decor
+    assert 'href="/agents/archives">Archivés (' in page and 'class="panel agent-flow"' in page
+    assert f'hx-post="/agents/{run.id}/archiver"' in sober.get(f"/agents/{run.id}").text
+    animated = TestClient(app).get("/agents").text
+    assert 'class="bot"' in animated and "data-archive-zone" in animated and "flow-plain" not in animated

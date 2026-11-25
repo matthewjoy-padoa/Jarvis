@@ -11,6 +11,10 @@ Pour une PR qui monte le numéro :
 
 La version affichée en bas de chaque page change donc avec chaque fonctionnalité ; après une simple correction, le bandeau « Jarvis est à relancer » compare les commits. Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
+## [0.8.3] · 2026-11-25
+
+- Affichage sobre, pour qui préfère un outil plus neutre : à choisir dans Réglages → Affichage ou par le lien en pied de page, pour ce navigateur seulement. Logo fixe, nom sans dégradé, pas de thème Noël (ni au bouton de thème, ni imposé en décembre), coins moins ronds, boutons et cartes immobiles au survol, plus de pulsation décorative (les animations utiles restent : attente, avancement d'une synchro). Page Agents : une pastille par agent (numéro et nom) dans les quatre colonnes, sans armure ni glisser-déposer ; un agent s'archive depuis sa page. Les informations, les couleurs de statut et les thèmes Auto, Nuit et Clair sont les mêmes ; l'affichage animé reste celui par défaut.
+
 ## [0.8.2] · 2026-11-24
 
 - Mises à jour depuis l'app, plus de `git pull` à la main : toutes les dix minutes, Jarvis regarde sur GitHub (`git fetch`) si une nouvelle version est publiée ; bandeau « Nouvelle version de Jarvis disponible » sur toutes les pages, et notification. Le bouton **Mettre à jour et redémarrer** fait lui-même le `git pull` (avance rapide), `uv sync`, puis relance Jarvis (même terminal, même service) ; la page se recharge sur la nouvelle version. Refusé tant qu'un agent, une synchro Notion ou la lecture de l'annuaire tourne.
