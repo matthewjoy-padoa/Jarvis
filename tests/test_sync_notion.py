@@ -294,3 +294,22 @@ def test_the_routine_keeps_the_emoji_of_the_direct_refresh(root):
     path.write_text("---\nclient: Demo\nemoji: 🦖\nicone: icone.png\n---\n", encoding="utf-8")
     sync("demo", root)
     assert (fiche(root).emoji, fiche(root).icone) == ("🦖", "icone.png")
+
+
+@pytest.mark.parametrize("label", ["Statut A ---> B", "avant\n---\naprès", "--- en tête"])
+def test_text_with_three_dashes_does_not_cut_the_fiche(tmp_path, label):
+    # Un titre ou un texte venu de Notion peut contenir « --- » : seule une ligne « --- » ferme le frontmatter.
+    path = tmp_path / "data" / "deploiements" / "acme.md"
+    module.write_fiche({"client": "Acme", "links": [{"label": label, "url": "https://example.com"}], "status": "terminé"}, path)
+    d = parse_deployment(path)
+    assert [(link.label, link.url) for link in d.links] == [(label, "https://example.com")]
+    assert d.status == "terminé"  # ce qui suit le texte est lu aussi
+    assert module._fiche_icon(path) == {"emoji": "", "icone": ""}
+
+
+def test_fiche_without_closing_line_is_still_refused(tmp_path):
+    from deploy_hub.sources.fiches import _split_frontmatter
+    with pytest.raises(ValueError):
+        _split_frontmatter("---\nclient: Acme\n")
+    assert _split_frontmatter("---\nclient: Acme\n---") == {"client": "Acme"}  # sans retour à la ligne final
+    assert _split_frontmatter("client: Acme\n") == {}

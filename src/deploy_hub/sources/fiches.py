@@ -1,6 +1,7 @@
 """Lecture des fiches de déploiement : un fichier markdown par client, données dans le frontmatter YAML."""
 
 import json
+import re
 from pathlib import Path
 
 import yaml
@@ -9,12 +10,17 @@ from deploy_hub.client_config import ConfigError, read_file
 from deploy_hub.sync_notion import ICON_FILE
 from deploy_hub.models import notion_link, Action, Deployment, Link, Regle, Remontee, ResourceInjection, RetourRecette, Stack
 
+FRONTMATTER_END = re.compile(r"^---[ \t\r]*$", re.M)
+
 
 def _split_frontmatter(text: str) -> dict:
     if not text.startswith("---"):
         return {}
-    _, front, _ = text.split("---", 2)
-    return yaml.safe_load(front) or {}
+    # Fin du frontmatter : une ligne « --- » seule, pas le premier « --- » venu (un titre Notion peut en contenir : « A ---> B »).
+    end = FRONTMATTER_END.search(text, 3)
+    if not end:
+        raise ValueError("frontmatter sans ligne « --- » de fin")
+    return yaml.safe_load(text[3:end.start()]) or {}
 
 
 def _config_path(clients_dir: Path | None, slug: str) -> Path | None:
