@@ -13,7 +13,8 @@ La version affichée en bas de chaque page change donc avec chaque fonctionnalit
 
 ## [0.8.2] · 2026-11-24
 
-- Nouvelle version sans `git pull` : toutes les dix minutes, Jarvis regarde sur GitHub (`git fetch`) si une nouvelle version est publiée ; bandeau « Nouvelle version de Jarvis disponible » sur toutes les pages, et notification. Bouton **Mettre à jour et redémarrer** : avance rapide du dossier, `uv sync`, puis Jarvis se relance lui-même (même terminal, même service) et la page se recharge sur la nouvelle version. Refusé tant qu'un agent, une synchro Notion ou la lecture de l'annuaire tourne. Après un `git pull` à la main, « Jarvis est à relancer » a son bouton **Redémarrer**.
+- Mises à jour depuis l'app, plus de `git pull` à la main : toutes les dix minutes, Jarvis regarde sur GitHub (`git fetch`) si une nouvelle version est publiée ; bandeau « Nouvelle version de Jarvis disponible » sur toutes les pages, et notification. Le bouton **Mettre à jour et redémarrer** fait lui-même le `git pull` (avance rapide), `uv sync`, puis relance Jarvis (même terminal, même service) ; la page se recharge sur la nouvelle version. Refusé tant qu'un agent, une synchro Notion ou la lecture de l'annuaire tourne.
+- Pour passer à cette version-ci, une dernière fois à la main : `git pull`, puis relancer le serveur (le Jarvis d'avant n'a pas encore le bouton). Les versions suivantes passent par le bouton.
 
 ## [0.8.1] · 2026-11-24
 
