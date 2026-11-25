@@ -53,7 +53,7 @@
 
 <section class="panel settings-part" id="affichage">
   <div class="panel-head"><h2>{{ ic.icon("gear") }} Affichage</h2><span class="badge">{{ "sobre" if plain else "animé" }}</span></div>
-  <p class="muted">Sobre : un outil plus neutre. Menu en colonne à gauche, avec les liens du client et les outils écrits en toutes lettres ; gris neutres et un seul bleu, angles droits, rien qui bouge ; accueil en tableau de bord ; page Agents en compteurs et tableau, sans armures ; pas de thème Noël. Les informations et les fonctions sont les mêmes. Le choix vaut pour ce navigateur ; rien n'est écrit dans <code>.env</code>.</p>
+  <p class="muted">Sobre : un outil plus neutre. Le même menu en haut ; gris neutres et un seul bleu, formes plus carrées, rien qui bouge ; accueil en tableau de bord ; page Agents en compteurs et tableau, sans armures ; pas de thème Noël. Les informations et les fonctions sont les mêmes. Le choix vaut pour ce navigateur ; rien n'est écrit dans <code>.env</code>.</p>
   <form method="post" action="/affichage" class="style-choice">
     <button type="submit" name="affichage" value="jarvis" class="secondary" aria-pressed="{{ 'false' if plain else 'true' }}">Animé</button>
     <button type="submit" name="affichage" value="sobre" class="secondary" aria-pressed="{{ 'true' if plain else 'false' }}">Sobre</button>

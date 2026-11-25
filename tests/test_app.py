@@ -766,20 +766,16 @@ def test_display_choice_only_returns_to_a_page_of_jarvis():
         assert r.headers["location"] == "/reglages#affichage"
 
 
-def test_sober_display_has_its_menu_in_a_side_column():
-    """En sobre, la barre du haut, le dock et les boutons flottants laissent la place à une colonne : client en cours, recherche,
-    pages, liens du client écrits en toutes lettres, outils (Flow Digger, Notes, Console), notifications, thème, réglages."""
-    html = TestClient(app, cookies=SOBER).get("/deploiements/client-demo/synthese").text
-    side = html[html.index('<aside class="side"'):html.index("</aside>")]
-    for missing in ('<header class="topbar">', 'class="dock-wrap"', "console-fab", 'class="brand-mark"'):
-        assert missing not in html, missing
-    assert "data-client-switch" in side and "data-palette-open" in side and 'id="theme-toggle"' in side and 'id="notif-panel"' in side
-    for label in ("Accueil", "Fiche du client", "Deadlines", "Agents", "BAU", "Clients", "Flow Digger", "Notes", "Console", "Réglages"):
-        assert f"<span>{label}</span>" in side, label
-    assert 'class="side-item active" title="Fiche de Client Démo"' in side  # la page en cours est marquée
-    assert "data-notes-open" in side and "data-console-open" in side and 'action="/outils/flow-digger"' in side
-    assert "Liens de Client Démo" in side and 'href="/clients/client-demo/liens?vers=' in side
-    assert 'id="notes"' in html and 'id="term"' in html and 'id="palette"' in html  # les fenêtres, elles, sont toujours là
+def test_sober_display_keeps_the_top_menu_dock_and_floating_buttons():
+    """En sobre, le squelette est celui de l'affichage animé, au caractère près : barre du haut, dock des liens du client,
+    boutons Notes et Console. Seule sobre.css en change l'aspect."""
+    def skeleton(cookies):
+        html = TestClient(app, cookies=cookies).get("/deploiements/client-demo/synthese").text
+        parts = (('<header class="topbar"', "</header>"), ('<div class="dock-wrap"', "</body>"), ("data-console-open", 'id="notes"'))
+        return [html[html.index(start):html.index(end, html.index(start))] for start, end in parts]
+    bar, dock, buttons = sober = skeleton(SOBER)
+    assert sober == skeleton({})
+    assert "data-client-switch" in bar and 'id="theme-toggle"' in bar and "/clients/client-demo/liens" in dock and "data-notes-open" in buttons
 
 
 def test_sober_home_is_a_dashboard_without_greeting():

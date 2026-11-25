@@ -418,8 +418,8 @@ NAV_PAGES = [p for p in PAGES if p[0] != "/clients"]  # « BAU » toujours : la 
 
 
 CLIENT_COOKIE = "jarvis_client"  # client en cours : celui de la dernière fiche ouverte
-# Affichage sobre, choisi dans Réglages ou en pied de page : menu en colonne, couleurs neutres, ni armures, ni Noël, ni effets
-# (_side_sobre.html, sobre.css, branches `plain` des gabarits).
+# Affichage sobre, choisi dans Réglages ou en pied de page : même squelette, couleurs neutres, formes plus carrées, ni armures,
+# ni Noël, ni effets (sobre.css, branches `plain` des gabarits).
 # Gardé dans un cookie, pas dans le navigateur seul : le serveur rend la page sobre dès le premier affichage (`plain`, plus haut).
 STYLE_COOKIE = "jarvis_affichage"
 # Vues tous clients, proposées sur la page Clients (et toujours joignables par leur URL).

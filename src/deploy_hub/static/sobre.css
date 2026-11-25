@@ -1,7 +1,8 @@
 /* Affichage sobre de Jarvis (2026-11-25) : chargée après style.css, seulement quand l'affichage sobre est choisi
    (Réglages → Affichage, ou lien en pied de page ; cookie lu par le serveur, data-style="sobre" sur <html>).
-   Un outil de travail neutre : menu en colonne à gauche (_side_sobre.html), gris neutres et un seul bleu, traits fins,
-   angles peu arrondis, pas d'ombre, rien qui bouge. Les statuts gardent leurs quatre couleurs, en plus sourd.
+   Un outil de travail neutre : même squelette que l'affichage animé (barre du haut, dock des liens, boutons Notes et
+   Console), mais gris neutres et un seul bleu, traits fins, angles peu arrondis, pas d'ombre, rien qui bouge. Les statuts
+   gardent leurs quatre couleurs, en plus sourd.
    Tout est imbriqué sous html:root[data-style="sobre"] : chaque règle passe devant celle de style.css qu'elle remplace,
    thèmes compris (:root[data-theme="dark"]). Couleurs en light-dark() : le clair et la nuit suivent le thème (Auto, Nuit,
    Clair) déjà posé par style.css (color-scheme). Demande un navigateur qui connaît l'imbrication CSS et light-dark().
@@ -19,91 +20,63 @@ html:root[data-style="sobre"] {
   --radius: 6px; --line: 1px; --shadow: none; --shadow-card: none;
   --shadow-lift: 0 6px 16px -8px light-dark(rgba(16, 24, 40, .25), rgba(0, 0, 0, .7));
   --ring: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
-  --side-w: 244px;
 
   body { font-size: 13.5px; }
-  main { max-width: 1240px; padding: 26px 32px 24px; }
-  .footer { max-width: 1240px; padding: 8px 32px 24px; font-size: 12.5px; }
+  .footer { font-size: 12.5px; }
   h1 { font-size: 21px; letter-spacing: -.01em; }
   h2 { font-size: 15px; }
   .page-head { margin-bottom: 10px; }
   .page-head h1 .muted { font-size: 13.5px; font-weight: 400; }
   .client-emoji:not(.client-icon) { display: none; }  /* le logo du client (image) reste, pas son emoji */
 
-  /* ---- Menu en colonne ------------------------------------------------------------------------------------------- */
-  .side { background: var(--surface); }
-  .side-brand { display: flex; align-items: center; gap: 9px; padding: 2px 8px 4px; color: var(--text); text-decoration: none; }
-  .side-logo { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; background: var(--accent); color: var(--on-accent);
-    font-weight: 700; font-size: 14px; }
-  .side-brand-name { font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; }
-  .side-brand-team { margin-left: auto; font-size: 11.5px; color: var(--muted); }
-  .side-block { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-  .side-block form { margin: 0; display: contents; }
-  .side-label { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 8px 4px; font-size: 11px; font-weight: 600;
-    letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
-  .side-label a { font-weight: 500; letter-spacing: 0; text-transform: none; }
-  .side-nav { display: flex; flex-direction: column; gap: 1px; }
-  .side-item { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; min-height: 30px; padding: 4px 8px;
-    border: 0; border-radius: 6px; background: none; box-shadow: none; color: var(--text); font: inherit; font-weight: 500; text-align: left;
-    text-decoration: none; white-space: nowrap; cursor: pointer; transform: none; transition: none; }
-  .side-item > span:not(.side-ext, #bell-count) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .side-item .ic, .side-item .nav-icon, .side-item > svg { flex: none; width: 16px; height: 16px; margin: 0; color: var(--muted); }
-  .side-item > svg:not(.ic, .nav-icon, .dock-logo) { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-  .side-item:hover { background: var(--bg); color: var(--text); border: 0; text-decoration: none; }
-  .side-item:focus-visible { outline: none; box-shadow: var(--ring); }
-  .side-item.active { background: var(--accent-soft); font-weight: 600; }
-  .side-item.active .nav-icon, .side-item.active .ic { color: var(--accent); stroke: currentColor; }
-  .side-item kbd, .side-search kbd { flex: none; margin-left: auto; font-size: 11px; color: var(--muted); border-bottom-width: 1px; border-radius: 4px; background: none; }
-  .side-ext { flex: none; font-size: 11px; color: var(--muted); }
-  .side-link { font-weight: 400; }
-  .side-select { display: flex; align-items: center; gap: 8px; margin: 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px;
-    background: var(--surface); color: var(--text); font-weight: 600; text-decoration: none; list-style: none; cursor: pointer; }
-  .side-select:hover { border-color: var(--muted); text-decoration: none; }
-  .side-select .client-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  .side-select .switch-caret { flex: none; width: 16px; height: 16px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .side-select.client-add { border-style: dashed; color: var(--accent); font-weight: 500; }
-  .jx { padding: 1px 6px; border-radius: 4px; background: var(--bg); color: var(--muted); font-size: 11px; font-weight: 600; }
-  .jx.soon { background: var(--pa-ko); color: var(--text); }
-  /* Menu des clients : il se déplie dans la colonne, sous le client en cours */
-  .side .client-menu { position: static; min-width: 0; margin-top: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 6px; box-shadow: none; background: var(--surface); }
-  .client-menu a { padding: 6px 8px; border-radius: 4px; font-size: 13px; }
+  /* ---- Barre du haut : celle de l'affichage animé, en plus carré (arrondis : listes de la section suivante) ------- */
+  .topbar { border-bottom-width: 1px; }
+  /* Logo fixe, nom en texte plein, pas de point « en ligne » qui bat */
+  .brand-mark { transform: none; transition: none; }
+  .brand-mark .ring-outer, .brand-mark .ring-inner, .brand-mark .core, .brand-name, .client-menu, .bell-count { animation: none; }
+  .brand-name { background: none; color: var(--text); font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+  .brand-dot { display: none; }
+  .client-chip { border-width: 1px; border-color: var(--border); background: var(--surface); box-shadow: none; font-weight: 600; transform: none; transition: none; }
+  .client-chip:hover { border-color: var(--muted); }
+  .nav-item { transition: none; }
   .client-menu a.client-menu-all { border-radius: 0 0 4px 4px; }
-  .side-search { display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; min-height: 32px; padding: 5px 8px 5px 10px;
-    border: 1px solid var(--border); border-radius: 6px; background: var(--bg); box-shadow: none; color: var(--muted); font: inherit; cursor: text; transform: none; }
-  .side-search:hover { background: var(--bg); border-color: var(--muted); color: var(--text); }
-  .side-search .ic { width: 15px; height: 15px; margin: 0; }
-  .side-search span { flex: 1; text-align: left; }
-  .side .theme-toggle .theme-label::before { content: "Thème : "; }
-  #bell-count { flex: none; margin-left: auto; }
-  .bell-count { position: static; display: inline-block; min-width: 18px; height: 18px; border-radius: 4px; line-height: 18px; animation: none; }
   .notif-panel { border-width: 1px; box-shadow: var(--shadow-lift); }
 
-  @media (min-width: 901px) {
-    body { padding-left: var(--side-w); }
-    .side { position: fixed; inset: 0 auto 0 0; z-index: 30; width: var(--side-w); display: flex; flex-direction: column; gap: 13px; padding: 14px 10px 10px;
-      border-right: 1px solid var(--border); overflow: hidden auto; scrollbar-width: thin; }
-    /* Notifications, thème et réglages : toujours visibles en bas, le reste de la colonne défile au-dessus */
-    .side-foot { position: sticky; bottom: -10px; margin: auto -10px -10px; padding: 8px 10px 10px; border-top: 1px solid var(--border); background: var(--surface);
-      display: grid; grid-template-columns: 1fr 1fr; gap: 1px 4px; }
-    .side-foot .bell-wrap { grid-column: 1 / -1; }
-    .notif-panel { position: fixed; left: calc(var(--side-w) + 8px); right: auto; top: auto; bottom: 12px; z-index: 40; max-height: min(70vh, 640px); }
-    .term { left: calc(var(--side-w) + 16px); }
+  /* ---- Dock des liens du client : boutons carrés, fixes ---------------------------------------------------------- */
+  .dock, .dock-envs { padding: 6px; border-radius: 8px; background: var(--surface); backdrop-filter: none; }
+  .dock-btn { width: 36px; height: 36px; transform: none; transition: none; }
+  .dock-btn:hover, .dock-btn:focus-visible { border-color: var(--muted); color: var(--text); }
+  .dock-btn::after { transition: none; }
+  /* Environnements Padoa : une liste à gauche du bouton, plus d'éventail. Elle garde elle-même le survol entre le bouton et
+     ses lignes (marge intérieure, souris captée une fois ouverte) : la zone de survol de l'éventail (style.css) ne sert plus. */
+  .dock-envs::before { content: none; }
+  .dock-pop { right: 100%; width: auto; height: auto; padding-right: 12px; transform: translateY(-50%); display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
+  .dock-envs:hover .dock-pop, .dock-envs:focus-within .dock-pop { pointer-events: auto; }
+  .dock-pop > * { position: static; transform: none; transition: none; font-weight: 500; }
+  .dock-pop > a:hover, .dock-pop > a:focus-visible { background: var(--bg); border-color: var(--muted); color: var(--text); }
+
+  /* ---- Boutons Notes et Console : carrés, rien ne s'allonge au survol --------------------------------------------- */
+  /* Notes se pose au-dessus de Console, le bloc-notes au-dessus de Notes : tout se déduit de ces trois mesures.
+     Le survol n'est repris que pour l'ombre, que la règle générale des boutons (plus bas) retire au survol. */
+  --fab-h: 36px; --fab-bottom: 24px; --fab-gap: 8px;
+  button.console-fab { bottom: var(--fab-bottom); gap: 8px; height: var(--fab-h); min-width: 0; padding: 0 12px; transform: none; }
+  button.console-fab, button.console-fab:hover:not(:disabled) { box-shadow: var(--shadow-lift); }
+  button.console-fab .ic { width: 16px; height: 16px; }
+  .console-fab-label, button.console-fab kbd { max-width: none; opacity: 1; transition: none; }
+  .console-fab-label { font-family: inherit; font-size: 13px; font-weight: 500; }
+  button.console-fab kbd { padding: 1px 6px; }
+  button.notes-fab { bottom: calc(var(--fab-bottom) + var(--fab-h) + var(--fab-gap)); background: var(--surface); color: var(--text); }
+  button.notes-fab, button.notes-fab:hover:not(:disabled) { box-shadow: 0 0 0 1px var(--border), var(--shadow-lift); }
+  button.notes-fab kbd { border-color: var(--border); background: var(--bg); color: var(--muted); }
+  &.notes-open button.notes-fab { background: var(--accent); color: var(--on-accent); }
+  &.notes-open button.notes-fab kbd { border-color: transparent; background: none; color: inherit; }
+  .notes { --notes-bottom: calc(var(--fab-bottom) + 2 * (var(--fab-h) + var(--fab-gap))); bottom: var(--notes-bottom); max-height: calc(100vh - var(--notes-bottom) - 32px); }
+  /* Libellé écrit seulement quand il tient à droite du contenu (main : 1100 px, plus deux marges d'environ 150 px) */
+  @media (max-width: 1400px) {
+    .console-fab-label, button.console-fab kbd { display: none; }
+    button.console-fab { width: var(--fab-h); padding: 0; justify-content: center; }
   }
-  /* Écran étroit : le menu passe en bandeau, les pages en une rangée d'onglets, les liens du client restent sur sa fiche */
-  @media (max-width: 900px) {
-    main { padding: 18px 14px; }
-    .footer { padding: 8px 14px 20px; }
-    .side { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
-    .side-label, .side-links, .side-brand-team, .side-item kbd, .side-search kbd, .side-search span, .side-tools .side-item > span, .side-foot .side-item > span:not(#bell-count) { display: none; }
-    .side-brand { padding: 0; }
-    .side-client { flex: 1 1 150px; }
-    .side-search { width: auto; }
-    .side-tools, .side-foot { flex-direction: row; gap: 2px; }
-    .side-tools .side-item, .side-foot .side-item { width: 34px; justify-content: center; padding: 0; }
-    .side-nav { order: 9; flex: 1 0 100%; flex-direction: row; overflow-x: auto; scrollbar-width: none; }
-    .side-nav .side-item { width: auto; flex: none; }
-    .notif-panel { position: fixed; left: 12px; right: 12px; top: 56px; width: auto; }
-  }
+  @media (max-width: 640px) { --fab-bottom: 16px; }
 
   /* ---- Boutons, champs, étiquettes -------------------------------------------------------------------------------- */
   /* Forme seulement : les tailles propres à chaque bouton (ligne de tableau, filtre, croix) restent celles de style.css */
@@ -118,15 +91,16 @@ html:root[data-style="sobre"] {
   code.res, code.req { border-radius: 4px; }
   kbd { border-radius: 4px; }
   /* Plus de pastilles ni de grands arrondis : 4 px pour une étiquette, 6 px pour un champ ou un encart */
-  .filters a, .stacks a, .team, .req, .wn-kind, .wn-pill, .pal-chip, button.pal-hint, .blocking-kind, .settings-nav a,
-  .deadline-client-pick { border-radius: 4px; }
+  .filters a, .stacks a, .team, .req, .wn-kind, .wn-pill, .pal-chip, button.pal-hint, .blocking-kind, .settings-nav a, .gauge-gap,
+  .deadline-client-pick, .jx, .nav-item, .client-menu a, .bell-count, .dock-btn::after { border-radius: 4px; }
   .notif-icon, .field input, .field textarea, .kb-card, .kb-col, a.blocking-row, .settings-form select, .brief-text, .my-notes textarea, .notes-field textarea,
-  a.gauge-link, .multi > summary, .multi-list, .client-pick select, .refresh .refresh-out .result, .refresh .request-error, .wn-item, .pal-item, .pal-card { border-radius: 6px; }
+  a.gauge-link, .multi > summary, .multi-list, .client-pick select, .refresh .refresh-out .result, .refresh .request-error, .wn-item, .pal-item, .pal-card,
+  .client-chip, .nav-group, .bar-icon, .client-menu, .dock-btn, .dock-pop > * { border-radius: 6px; }
   .health { flex: none; width: 9px; height: 9px; box-shadow: none; }
   .health.lg { width: 11px; height: 11px; vertical-align: 2px; }
   .segmented { padding: 2px; border-radius: 6px; }
   .segmented a, .segmented button { min-height: 0; padding: 3px 11px; border-radius: 4px; box-shadow: none; }
-  .segmented a.active, .segmented button.active { box-shadow: 0 0 0 1px var(--border); }
+  .segmented a.active, .segmented button.active, .nav-item.active { box-shadow: 0 0 0 1px var(--border); }
   .retour details.agent > summary, .ticket details.agent > summary, .ticket-agent-btn { border-radius: 6px; background: var(--accent); box-shadow: none; transition: none; }
   .retour details.agent > summary:hover, .ticket details.agent > summary:hover { transform: none; filter: none; box-shadow: none; }
   .retour details.agent[open] > summary, .ticket details.agent[open] > summary { background: var(--surface); }
@@ -166,5 +140,4 @@ html:root[data-style="sobre"] {
   .palette-panel, .drawer.modal .drawer-panel, .notes, .tabs-pick { border-radius: 8px; box-shadow: var(--shadow-lift); animation: none; }
   .drawer-panel, .drawer-backdrop, .palette-backdrop, .term { animation: none; }
   .palette-backdrop { backdrop-filter: none; }
-  .notes { right: 24px; bottom: 24px; max-height: calc(100vh - 48px); }
 }
