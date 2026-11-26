@@ -551,23 +551,6 @@ def test_agents_page_shows_tokens_chart(monkeypatch):
     assert 'class="flow-lane flow-in_progress"' in page and page.count('<a class="flow-node') == 3 and '<tr data-agent="2" data-ticket-card' in page
 
 
-def test_agent_page_opens_when_claude_code_counted_no_token(monkeypatch):
-    """Agent arrêté avant son premier tour (clé refusée, quota atteint) : Claude Code annonce 0 token partout. Sa page et son
-    journal s'ouvrent quand même, barres vides."""
-    import deploy_hub.main as main
-    from deploy_hub.sources.claude_runner import AgentRun, read_tokens
-
-    run = AgentRun(1, "client-demo", "Client Démo", "retour R-01", "fix-r-01", "brief", datetime(2026, 11, 17, 9), "échec",
-                   ended_at=datetime(2026, 11, 17, 9, 1))
-    read_tokens(run, {"usage": {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}})
-    assert run.tokens == 0
-    monkeypatch.setattr(main.claude, "runs", [run])
-    c = TestClient(main.app, raise_server_exceptions=False)
-    for path in ("/agents/1", "/agents/1/journal"):
-        page = c.get(path)
-        assert page.status_code == 200 and "<strong>0</strong> tokens au total" in page.text and 'style="width: 0%"' in page.text
-
-
 
 def test_context_is_read_from_the_journal_even_while_the_agent_runs():
     import json

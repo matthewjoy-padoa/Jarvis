@@ -572,3 +572,22 @@ def test_an_agent_can_be_renamed_and_pinned_and_a_pinned_agent_is_never_tidied_a
     assert [r.id for r in runner.runs] == [1]  # épinglé : reste ; l'autre, fini depuis plus de 30 jours, est archivé
     assert runner.rename(2, "Archivé renommé").title == "Archivé renommé" and runner.archived()[0].name == "Archivé renommé"
     assert ClaudeRunner(tmp_path, tmp_path / "agents").get(1).pinned  # gardé au redémarrage
+
+
+def test_agent_page_opens_when_claude_code_counted_no_token(monkeypatch):
+    """Agent arrêté avant son premier tour (clé refusée, quota atteint) : Claude Code annonce 0 token partout. Sa page et son
+    journal s'ouvrent quand même, barres vides."""
+    from fastapi.testclient import TestClient
+
+    import deploy_hub.main as main
+    from deploy_hub.sources.claude_runner import read_tokens
+
+    run = AgentRun(1, "client-demo", "Client Démo", "retour R-01", "fix-r-01", "brief", datetime(2026, 11, 17, 9), "échec",
+                   ended_at=datetime(2026, 11, 17, 9, 1))
+    read_tokens(run, {"usage": {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}})
+    assert run.tokens == 0
+    monkeypatch.setattr(main.claude, "runs", [run])
+    c = TestClient(main.app, raise_server_exceptions=False)
+    for path in ("/agents/1", "/agents/1/journal"):
+        page = c.get(path)
+        assert page.status_code == 200 and "<strong>0</strong> tokens au total" in page.text and 'style="width: 0%"' in page.text
