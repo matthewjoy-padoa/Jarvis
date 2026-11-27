@@ -128,12 +128,6 @@ html:root[data-style="sobre"] {
   .stat-todo strong { color: var(--st-todo); }
   a.stat-link:hover { background: var(--bg); }
   .segbar { height: 22px; border-radius: 4px; }
-  /* Agents en attente de réponse (page Agents) */
-  .agent-asking { border-left: 3px solid var(--st-todo); scroll-margin-top: calc(var(--topbar-h, 61px) + 64px); }
-  .agent-asking li { display: flex; align-items: center; gap: 6px 16px; }
-  .asking-what { flex: 1; min-width: 0; }
-  .asking-q { margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  @media (max-width: 640px) { .agent-asking li { flex-wrap: wrap; } .asking-what { flex-basis: 100%; } .asking-q { white-space: normal; } }
   .seg:first-child { border-radius: 4px 0 0 4px; } .seg:last-child { border-radius: 0 4px 4px 0; } .seg:only-child { border-radius: 4px; }
   .seg[data-filter-set]:hover { filter: none; opacity: .85; }
   .seg-n { font-size: 12px; font-weight: 600; }

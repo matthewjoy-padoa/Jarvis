@@ -38,8 +38,10 @@
   <a href="#dags" data-pane="pane-dags">DAG <span class="count" title="Runs de DAG en cours">{{ cards | selectattr("running") | list | length }}</span></a>
 </nav>
 <div id="pane-agents" data-tab-pane>
+{# Compteurs et tableau, sans armures : dans la vue classique (`plain`), et dans toute vue dès que les animations sont coupées (`still`). #}
+{% set counters = plain or still %}
 <p class="muted">Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.
-  {% if not plain %}Attrape un agent : il s'envole. Pose-le ailleurs dans sa colonne pour changer sa place, ou sur « Archiver » pour le ranger. {% endif %}<a href="/agents/archives">Archivés ({{ archived_count }})</a></p>
+  {% if not counters %}Attrape un agent : il s'envole. Pose-le ailleurs dans sa colonne pour changer sa place, ou sur « Archiver » pour le ranger. {% endif %}<a href="/agents/archives">Archivés ({{ archived_count }})</a></p>
 {% if runs %}
 {% set lanes = [
   ("in_progress", "En cours", "L'agent travaille dans son worktree · ? : attend ta réponse", runs | selectattr("group", "in", ["in_progress", "todo"]) | list),
@@ -47,9 +49,8 @@
   ("pr", "PR ouverte", "À relire sur GitHub", runs | selectattr("pr_url") | list),
   ("ko", "Arrêtés ou en échec", "Échec, arrêt, délai dépassé", runs | selectattr("group", "equalto", "ko") | rejectattr("pr_url") | list),
 ] %}
-{% if plain %}
-{# Vue classique (`plain`, base.html) : les quatre étapes en compteurs, puis le tableau ; ni armures ni glisser-déposer
-   (un agent s'archive depuis sa page). #}
+{% if counters %}
+{# Les quatre étapes en compteurs, puis le tableau ; ni armures ni glisser-déposer (un agent s'archive depuis sa page). #}
 {% if asking %}
 {# Ceux qui attendent une réponse d'abord (les armures « ? » de la vue originale) : la question posée, et un lien qui
    arrive sur le formulaire de réponse de l'agent. Une réponse déjà partie : lien vers l'agent qui la traite. #}

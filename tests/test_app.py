@@ -767,6 +767,11 @@ def test_animations_are_switched_off_per_browser_in_both_views():
     assert "data-motion" not in browser.get("/").text.split("<head>")[0]
     browser.post("/affichage", data={"animations": "off"})
     assert '<html lang="fr" data-motion="off">' in browser.get("/").text
+    claude.runs.clear()
+    client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief"})
+    agents = browser.get("/agents").text  # sans animations, la page Agents est en compteurs et tableau, même dans la vue originale
+    assert '<div class="stats">' in agents and 'class="bot"' not in agents and "data-archive-zone" not in agents
+    assert 'class="bot"' in TestClient(app).get("/agents").text
     browser.post("/affichage", data={"affichage": "sobre"})  # changer de vue garde le réglage des animations
     assert '<html lang="fr" data-style="sobre" data-motion="off">' in browser.get("/").text
     assert '<span class="badge">vue classique · sans animation</span>' in browser.get("/reglages").text
