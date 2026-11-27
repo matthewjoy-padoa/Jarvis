@@ -82,6 +82,15 @@ L'onglet Injections propose les DAGs de l'orchestrator qui traitent chaque resso
 
 Le bouton **Flow Digger ↗** de la barre ouvre [integration-flow-digger](https://github.com/padoa/integration-flow-digger) dans sa propre fenêtre, et le démarre d'abord sur la VM s'il ne tourne pas (`uv run main.py --start --no-browser`). À chaque clic, Jarvis regarde si sa branche a des commits que le dossier n'a pas (`git fetch`) : arrêté, il ne le met à jour (avance rapide, jamais de fusion) que s'il y en a ; déjà lancé, il propose « Mettre à jour et relancer » (seulement un Flow Digger qu'il a lui-même lancé) ou « Ouvrir la version actuelle ». Son installation (outils, 1Password, Google Drive, configs client) se fait une fois, selon son README.
 
+## InteCG
+
+InteCG est le jeu de cartes à collectionner de l'équipe, dans son propre dépôt (`intecg`). Quand ce dépôt est cloné sur la machine de Jarvis (par exemple `~/Dev/Apps/intecg` sur la VM) :
+- **Lien « InteCG ↗ » en pied de page** : ouvre le jeu dans sa propre fenêtre. S'il ne tourne pas, Jarvis met d'abord son dépôt à jour (avance rapide seulement), installe les paquets npm s'ils manquent ou ont changé, puis le démarre (`npm run dev`). Déjà lancé, il y emmène sans toucher au dépôt. Prérequis : Node, npm et `gh` connecté, comme le demande le README du jeu.
+- **Une chance de booster à chaque lancement** : un DAG ou un agent lancé dans Jarvis demande un booster bonus au jeu (`POST /api/credits/jarvis`). C'est InteCG qui décide : il tire au sort (chance faible, réglée dans le jeu), ne compte un lancement qu'une fois et fixe le maximum du jour ; il doit tourner à ce moment-là.
+- **Booster gagné** : un sachet tombe au milieu de l'écran, avec un bouton pour ouvrir le jeu, et une notification reste dans la cloche.
+
+Sans dépôt du jeu ni adresse réglée, il n'y a ni lien ni booster. Code : [`sources/intecg.py`](src/deploy_hub/sources/intecg.py), [`static/booster.js`](src/deploy_hub/static/booster.js).
+
 ## Lancer des agents Claude
 
 Sur un retour de recette, « Lancer un agent » envoie le brief à Claude Code (`claude -p`) :
@@ -140,6 +149,7 @@ Tous facultatifs. La page **Réglages** (accessible seulement en local, par exem
 | `ORCHESTRATOR_DIR` | Clone local de l'orchestrator : DAGs proposés, agents Claude, PR (vide : `~/integration-orchestrator`) |
 | `CLAUDE_BIN`, `JARVIS_AGENT_*` | Agents Claude |
 | `FLOW_DIGGER_DIR`, `FLOW_DIGGER_PORT`, `FLOW_DIGGER_URL` | Bouton Flow Digger (dossier, port 4004, adresse si le transfert de port en change) |
+| `INTECG_DIR`, `INTECG_URL` | InteCG, le jeu de cartes de l'équipe : dossier de son dépôt (vide : cherché aux emplacements habituels, dont `~/Dev/Apps/intecg`) et son adresse (vide : `http://localhost:5173` si le dépôt est sur la machine, sinon pas de lien). Voir [InteCG](#intecg) |
 | `PADOA_ENV_URL` | Bouton Environnements du dock (snap, snap-recette, integration) : modèle d'adresse avec `[stack]` et `[client]`, vide : `https://[stack]-[client].aodap-staging.fr/support` ; `[client]` = nom du client dans Jarvis (son slug) |
 
 **Secrets** (`NOTION_TOKEN`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD`) : en clair, ou une référence 1Password `op://<coffre>/<élément>/<champ>` (« Copy Secret Reference »), lue par `op read` à la première demande et gardée en mémoire seulement. Pour une référence, 1Password doit être connecté : **Réglages → 1Password** (ton mot de passe sert une fois à `op signin` et n'est ni gardé ni écrit ; la page relit aussitôt les références), l'app 1Password, ou `eval $(op signin)` dans le terminal qui lance Jarvis. Sur une machine sans session 1Password (VM), **Sources** affiche « référence 1Password illisible ». `.env` est ramené à `600`, et Jarvis refuse de démarrer si ses données ou sa configuration sont dans un dépôt git sans y être ignorées.

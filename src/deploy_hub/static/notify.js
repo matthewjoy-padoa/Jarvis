@@ -93,11 +93,13 @@
     set(Math.max(...items.map((n) => n.id)));
     if (last === null) return; // premier passage : on mémorise sans notifier
     htmx.trigger(document.body, "notifs-changed");
+    document.dispatchEvent(new CustomEvent("jarvis:notifs", { detail: items })); // booster.js : booster InteCG gagné
     if (pushActive || !("Notification" in window) || Notification.permission !== "granted") return;
     items.slice(-5).forEach((n) => {
       const note = new Notification(n.title, { body: n.detail, tag: n.key, requireInteraction: n.level === "urgent" });
       note.onclick = () => { window.focus(); if (n.link) location.href = n.link; note.close(); };
     });
   }
+  document.addEventListener("jarvis:poll-notifs", poll); // relevé demandé sans attendre la minute (booster.js)
   document.addEventListener("DOMContentLoaded", () => { showState(document); subscribePush().then(() => showState(document)); poll(); setInterval(poll, 60000); });
 })();

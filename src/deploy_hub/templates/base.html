@@ -32,13 +32,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=183">
+  <link rel="stylesheet" href="/static/style.css?v=184">
   {% if plain %}<link rel="stylesheet" href="/static/sobre.css?v=4">{% endif %}
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=11" defer></script>
   <script src="/static/dag.js?v=3" defer></script>
   <script src="/static/limit.js?v=1" defer></script>
-  <script src="/static/notify.js?v=4" defer></script>
+  <script src="/static/notify.js?v=5" defer></script>
+  {% set intecg = intecg_url() %}{# une seule lecture par page : script du booster ici, lien en pied de page #}
+  {% if intecg and not plain %}<script src="/static/booster.js?v=2" defer></script>{% endif %}{# sobre : pas de sachet qui tombe, la notification reste dans la cloche #}
   <script src="/static/drawer.js?v=6" defer></script>
   <script src="/static/palette.js?v=7" defer></script>
   <script src="/static/console.js?v=4" defer></script>
@@ -307,7 +309,7 @@
       </form>
     </div>
   </section>
-  <footer class="footer muted">{% if plain %}Jarvis · outil de l'équipe Integration{% else %}Jarvis · <em>Just A Rather Very Intelligent System</em>, au service de l'équipe Integration{% endif %} · <a href="/sources">État des systèmes</a>
+  <footer class="footer muted">{% if plain %}Jarvis · outil de l'équipe Integration{% else %}Jarvis · <em>Just A Rather Very Intelligent System</em>, au service de l'équipe Integration{% endif %} · <a href="/sources">État des systèmes</a>{% if intecg %}{# InteCG (jeu de cartes de l'équipe, dépôt intecg) : mis à jour et démarré au besoin, ouvert dans sa propre fenêtre. #} · <form method="post" action="/outils/intecg" target="intecg" class="footer-tool" data-own-window><button type="submit" title="Ouvrir InteCG, le jeu de cartes de l'équipe, dans une autre fenêtre (le met à jour et le démarre s'il ne tourne pas)">InteCG ↗</button></form>{% endif %}
     · <form method="post" action="/affichage" class="footer-style"><input type="hidden" name="vers" value="{{ request.url.path }}{{ '?' ~ request.url.query if request.url.query }}">
       <button type="submit" name="affichage" value="{{ 'jarvis' if plain else 'sobre' }}" class="link-button" title="Pour ce navigateur ; aussi dans Réglages">{{ "Affichage animé" if plain else "Affichage sobre" }}</button></form>{% if jarvis_version %} · <a href="https://github.com/matthewjoy-padoa/Jarvis/blob/main/CHANGELOG.md" title="Historique des versions{% if jarvis_commit %} · commit {{ jarvis_commit }}{% endif %}">v{{ jarvis_version }}</a>{% endif %}</footer>
   {# Raccourcis du client en cours : dock de boutons ronds au bord droit, nom du lien en bulle au survol.

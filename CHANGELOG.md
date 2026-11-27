@@ -11,9 +11,12 @@ Pour une PR qui monte le numéro :
 
 La version affichée en bas de chaque page change donc avec chaque fonctionnalité ; après une simple correction, le bandeau « Jarvis est à relancer » compare les commits. Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
-## [0.8.3] · 2026-11-25
+## [0.8.4] · 2026-11-27
 
 - Affichage sobre, pour qui préfère un outil de travail plus neutre : à choisir dans Réglages → Affichage ou par le lien en pied de page, pour ce navigateur seulement ; l'affichage animé reste celui par défaut. Même menu en haut, même dock des liens et mêmes boutons Notes et Console, mais tout est plus carré : gris neutres et un seul bleu, en clair comme en nuit ; angles peu arrondis, traits fins, pas d'ombre, rien qui bouge (logo fixe, environnements Padoa en liste et non en éventail, libellés Notes et Console toujours écrits) ; onglets soulignés, compteurs en bande, tableaux plus denses. Accueil en « Tableau de bord », sans salutation. Page Agents en compteurs et tableau, sans schéma ni armures (un agent s'archive depuis sa page) ; les agents qui attendent une réponse sont listés en tête, avec leur question et un bouton « Répondre » qui arrive sur le formulaire. Pas de thème Noël, ni au bouton de thème, ni imposé en décembre. Les informations et les fonctions sont les mêmes.
+## [0.8.3] · 2026-11-27
+
+- InteCG, le jeu de cartes de l'équipe (dépôt `intecg`, à part), relié à Jarvis dès que son dépôt est sur la machine (`~/Dev/Apps/intecg`, ou `INTECG_DIR`). Lien « InteCG ↗ » en pied de page : met le dépôt du jeu à jour, installe ses paquets au besoin, le démarre s'il ne tourne pas et l'ouvre dans sa propre fenêtre. Un DAG ou un agent lancé dans Jarvis demande un booster bonus au jeu (`POST /api/credits/jarvis`), en tâche de fond : c'est InteCG qui décide, par tirage au sort à chaque lancement (chance faible, réglée dans le jeu), sans compter un lancement deux fois et avec un maximum par jour. Booster gagné : un sachet tombe au milieu de l'écran avec un bouton « Ouvrir InteCG », et une notification reste dans la cloche. Jeu arrêté ou injoignable : le lancement se fait quand même, sans booster. Réglages `INTECG_DIR` et `INTECG_URL` (**Réglages → Dossiers et liens**).
 
 ## [0.8.2] · 2026-11-24
 
