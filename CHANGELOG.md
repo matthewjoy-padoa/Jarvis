@@ -13,7 +13,7 @@ La version affichée en bas de chaque page change donc avec chaque fonctionnalit
 
 ## [0.8.6] · 2026-11-27
 
-- Plus besoin de régler les dossiers de l'orchestrator, de Flow Digger et d'InteCG : au premier lancement, chaque dossier resté vide (`ORCHESTRATOR_DIR`, `FLOW_DIGGER_DIR`, `INTECG_DIR`) est cherché sur la machine, d'abord aux emplacements habituels (Flow Digger, InteCG), sinon parmi les dépôts git du dossier personnel (trois niveaux) dont l'origine nomme ce dépôt, le plus récemment mis à jour s'il y en a plusieurs. Le dossier trouvé est noté dans `.env` : Réglages → Dossiers l'affiche déjà rempli, et le choix, fait une fois, ne change plus tout seul. Un dossier déjà renseigné (dans `.env` ou hors `.env`, comme `vm.conf`) n'est jamais remplacé ; un dossier introuvable reste vide.
+- Plus besoin de régler les dossiers de l'orchestrator, de Flow Digger et d'InteCG : au premier lancement, chaque dossier resté vide (`ORCHESTRATOR_DIR`, `FLOW_DIGGER_DIR`, `INTECG_DIR`) est cherché sur la machine, parmi les dépôts git du dossier personnel (cinq niveaux) dont l'origine nomme ce dépôt, le plus récemment mis à jour s'il y en a plusieurs. Il n'y a plus d'emplacement « habituel » pour Flow Digger et InteCG : chacun range ses dépôts où il veut. Le dossier trouvé est noté dans `.env` : Réglages → Dossiers l'affiche déjà rempli, et le choix, fait une fois, ne change plus tout seul. Un dossier déjà renseigné (dans `.env` ou hors `.env`, comme `vm.conf`) n'est jamais remplacé ; un dossier introuvable reste vide.
 
 ## [0.8.5] · 2026-11-27
 

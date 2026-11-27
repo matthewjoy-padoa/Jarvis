@@ -246,18 +246,14 @@ def test_settings_are_split_into_parts_with_a_summary(env):
 
 
 def test_first_launch_notes_the_folders_found_on_the_machine_once(env, monkeypatch, tmp_path):
-    """Premier lancement : chaque dossier pas encore réglé est cherché (emplacements habituels, sinon clone git le plus
-    récent) et noté dans .env, où Réglages l'affiche déjà rempli ; un dossier réglé n'est ni cherché ni remplacé, un dossier
+    """Premier lancement : chaque dossier pas encore réglé est cherché parmi les clones git de la machine (le plus récent
+    d'abord) et noté dans .env, où Réglages l'affiche déjà rempli ; un dossier réglé n'est ni cherché ni remplacé, un dossier
     introuvable reste vide. Ensuite tout est réglé : plus aucune recherche."""
     from deploy_hub import first_launch
-    orchestrator, old, game = tmp_path / "Dev" / "integration-orchestrator", tmp_path / "integration-orchestrator", tmp_path / "jeu"
-    game.mkdir()
-    (game / "package.json").write_text("{}")
-    monkeypatch.setattr(first_launch.intecg, "CANDIDATES", (str(game),))  # emplacement habituel : pris avant tout clone
-    monkeypatch.setattr(first_launch.flow_digger, "CANDIDATES", ())
+    orchestrator, old, game = tmp_path / "Dev" / "integration-orchestrator", tmp_path / "integration-orchestrator", tmp_path / "ailleurs" / "jeu"
     searched = []
     monkeypatch.setattr(first_launch, "git_clones", lambda repos: searched.append(repos) or {
-        "integration-orchestrator": [orchestrator, old], "flow-digger": [], "intecg": [tmp_path / "autre-jeu"]})
+        "integration-orchestrator": [orchestrator, old], "flow-digger": [], "intecg": [game]})
     assert first_launch.note_folders() == ["ORCHESTRATOR_DIR", "INTECG_DIR"]
     lines = env.read_text().splitlines()
     assert f"ORCHESTRATOR_DIR={orchestrator}" in lines and f"INTECG_DIR={game}" in lines and "CLAUDE_BIN=claude  # garde-moi" in lines

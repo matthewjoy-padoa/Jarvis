@@ -183,7 +183,7 @@ def ensure_private_dirs(root: Path = PROJECT_ROOT) -> None:
 
 
 ORCHESTRATOR_REPO = "integration-orchestrator"
-SEARCH_DEPTH = 3  # ~/Dev/Apps/<clone> au plus : assez pour les emplacements habituels, et le parcours reste sous la seconde
+SEARCH_DEPTH = 5  # niveaux sous le dossier personnel : chacun range ses dépôts où il veut ; mesuré bien sous la seconde
 SKIPPED_DIRS = {"node_modules", "Library", "logs"}  # lourds ou sans clone ; les dossiers cachés sont sautés aussi
 
 

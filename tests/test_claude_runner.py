@@ -264,7 +264,7 @@ def test_git_clones_are_found_under_the_home_folder_most_recently_fetched_first(
     old = make_clone(tmp_path / "integration-orchestrator", url, fetched=1_000)
     recent = make_clone(tmp_path / "Dev" / "integration-orchestrator", url, fetched=2_000)
     other = make_clone(tmp_path / "Dev" / "autre", "git@github.com:exemple/autre.git")
-    make_clone(tmp_path / "a" / "b" / "c" / "d" / "integration-orchestrator", url)  # trop profond
+    make_clone(tmp_path / "a" / "b" / "c" / "d" / "e" / "integration-orchestrator", url)  # trop profond (six niveaux)
     make_clone(tmp_path / "node_modules" / "integration-orchestrator", url)
     (tmp_path / "Dev" / "worktree").mkdir()
     (tmp_path / "Dev" / "worktree" / ".git").write_text("gitdir: ailleurs")  # worktree : .git est un fichier

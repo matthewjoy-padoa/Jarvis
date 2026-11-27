@@ -19,8 +19,6 @@ from pathlib import Path
 from deploy_hub.config import child_environment, data_dir
 from deploy_hub.safe_write import write_text
 
-CANDIDATES = ("~/Dev/Apps/integration-flow-digger", "~/Dev/Apps/flow-digger", "~/flow-digger", "~/Dev/integration-flow-digger",
-              "~/integration-flow-digger", "~/Dev/flow-digger")
 PULL_TIMEOUT = 30  # s, pour chaque commande git (fetch, mise à jour)
 CHECK_TIMEOUT = 8  # s : fetch quand Flow Digger tourne déjà ; trop lent (réseau), on ouvre la version en service
 PID_FILE = "flow-digger.pid"  # data/flow-digger.pid : processus lancé par Jarvis, pour pouvoir le relancer
@@ -38,9 +36,10 @@ class Launch:
 
 
 def folder() -> Path | None:
-    """Dossier du dépôt : FLOW_DIGGER_DIR, sinon le premier emplacement habituel qui contient main.py."""
-    paths = [os.environ["FLOW_DIGGER_DIR"]] if os.getenv("FLOW_DIGGER_DIR") else CANDIDATES
-    return next((p for p in (Path(c).expanduser() for c in paths) if (p / "main.py").is_file()), None)
+    """Dossier du dépôt : FLOW_DIGGER_DIR, s'il contient main.py. Il n'y a pas d'emplacement convenu : au premier lancement,
+    Jarvis cherche le clone sur la machine et note ce réglage (first_launch)."""
+    chosen = os.getenv("FLOW_DIGGER_DIR")  # vide : rien, surtout pas le dossier courant
+    return Path(chosen).expanduser() if chosen and (Path(chosen).expanduser() / "main.py").is_file() else None
 
 
 def port() -> int:
@@ -182,8 +181,8 @@ def _start(wait: float, force: bool = False, restart: bool = False) -> Launch:
             return Launch(error="Flow Digger n'a pas pu être arrêté pour la mise à jour : il a sans doute été lancé hors de "
                                 "Jarvis (alias digg). Arrête-le (Ctrl+C dans son terminal), puis reclique sur Flow Digger.")
     if not repo:
-        return Launch(error="Flow Digger introuvable : clone padoa/integration-flow-digger sur la VM "
-                            f"(par exemple dans ~/flow-digger) ou indique son dossier dans FLOW_DIGGER_DIR (Réglages).")
+        return Launch(error="Flow Digger introuvable : clone padoa/integration-flow-digger sur la machine de Jarvis, puis "
+                            "redémarre Jarvis (il le cherche au démarrage) ou indique son dossier dans FLOW_DIGGER_DIR (Réglages).")
     updated = ""
     if not force:
         ok, detail = update(repo)
