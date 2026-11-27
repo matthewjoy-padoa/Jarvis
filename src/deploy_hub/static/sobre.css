@@ -1,13 +1,13 @@
-/* Affichage sobre de Jarvis (2026-11-25) : chargée après style.css, seulement quand l'affichage sobre est choisi
+/* Vue neutre de Jarvis (2026-11-25) : chargée après style.css, seulement quand cette vue est choisie
    (Réglages → Affichage, ou lien en pied de page ; cookie lu par le serveur, data-style="sobre" sur <html>).
-   Un outil de travail neutre : même squelette que l'affichage animé (barre du haut, dock des liens, boutons Notes et
-   Console), mais gris neutres et un seul bleu, traits fins, angles peu arrondis, pas d'ombre, rien qui bouge. Les statuts
-   gardent leurs quatre couleurs, en plus sourd.
+   Un outil de travail neutre : même squelette que la vue Jarvis (barre du haut, dock des liens, boutons Notes et
+   Console), mais gris neutres et un seul bleu, traits fins, angles peu arrondis, pas d'ombre. Les statuts gardent leurs
+   quatre couleurs, en plus sourd. Les animations ne se règlent pas ici : elles se coupent à part, dans les deux vues
+   (data-motion="off", fin de style.css).
    Tout est imbriqué sous html:root[data-style="sobre"] : chaque règle passe devant celle de style.css qu'elle remplace,
    thèmes compris (:root[data-theme="dark"]). Couleurs en light-dark() : le clair et la nuit suivent le thème (Auto, Nuit,
    Clair) déjà posé par style.css (color-scheme). Demande un navigateur qui connaît l'imbrication CSS et light-dark().
-   Ce qui ne change pas ici : les animations utiles (attente, avancement d'une synchro, « Enregistré » qui s'efface) et les
-   barres d'avancement, qui gardent leurs bouts ronds. */
+   Ce qui ne change pas ici : les barres d'avancement, qui gardent leurs bouts ronds. */
 html:root[data-style="sobre"] {
   --bg: light-dark(#f4f5f7, #20242b); --surface: light-dark(#ffffff, #292e36); --text: light-dark(#1a202c, #e2e5ea);
   --muted: light-dark(#5c6675, #a4adba); --border: light-dark(#dfe3e8, #3d444f);
@@ -29,40 +29,36 @@ html:root[data-style="sobre"] {
   .page-head h1 .muted { font-size: 13.5px; font-weight: 400; }
   .client-emoji:not(.client-icon) { display: none; }  /* le logo du client (image) reste, pas son emoji */
 
-  /* ---- Barre du haut : celle de l'affichage animé, en plus carré (arrondis : listes de la section suivante) ------- */
+  /* ---- Barre du haut : celle de la vue Jarvis, en plus carré (arrondis : listes de la section suivante) ---------- */
   .topbar { border-bottom-width: 1px; }
-  /* Logo fixe, nom en texte plein, pas de point « en ligne » qui bat */
-  .brand-mark { transform: none; transition: none; }
-  .brand-mark .ring-outer, .brand-mark .ring-inner, .brand-mark .core, .brand-name, .client-menu, .bell-count { animation: none; }
+  /* Nom en texte plein, pas de point « en ligne » */
   .brand-name { background: none; color: var(--text); font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
   .brand-dot { display: none; }
-  .client-chip { border-width: 1px; border-color: var(--border); background: var(--surface); box-shadow: none; font-weight: 600; transform: none; transition: none; }
+  .client-chip { border-width: 1px; border-color: var(--border); background: var(--surface); box-shadow: none; font-weight: 600; }
   .client-chip:hover { border-color: var(--muted); }
-  .nav-item { transition: none; }
   .client-menu a.client-menu-all { border-radius: 0 0 4px 4px; }
   .notif-panel { border-width: 1px; box-shadow: var(--shadow-lift); }
 
-  /* ---- Dock des liens du client : boutons carrés, fixes ---------------------------------------------------------- */
+  /* ---- Dock des liens du client : boutons carrés ----------------------------------------------------------------- */
   .dock, .dock-envs { padding: 6px; border-radius: 8px; background: var(--surface); backdrop-filter: none; }
-  .dock-btn { width: 36px; height: 36px; transform: none; transition: none; }
+  .dock-btn { width: 36px; height: 36px; }
   .dock-btn:hover, .dock-btn:focus-visible { border-color: var(--muted); color: var(--text); }
-  .dock-btn::after { transition: none; }
   /* Environnements Padoa : une liste à gauche du bouton, plus d'éventail. Elle garde elle-même le survol entre le bouton et
      ses lignes (marge intérieure, souris captée une fois ouverte) : la zone de survol de l'éventail (style.css) ne sert plus. */
   .dock-envs::before { content: none; }
   .dock-pop { right: 100%; width: auto; height: auto; padding-right: 12px; transform: translateY(-50%); display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
   .dock-envs:hover .dock-pop, .dock-envs:focus-within .dock-pop { pointer-events: auto; }
-  .dock-pop > * { position: static; transform: none; transition: none; font-weight: 500; }
+  .dock-pop > * { position: static; transform: none; font-weight: 500; }
   .dock-pop > a:hover, .dock-pop > a:focus-visible { background: var(--bg); border-color: var(--muted); color: var(--text); }
 
   /* ---- Boutons Notes et Console : carrés, rien ne s'allonge au survol --------------------------------------------- */
   /* Notes se pose au-dessus de Console, le bloc-notes au-dessus de Notes : tout se déduit de ces trois mesures.
      Le survol n'est repris que pour l'ombre, que la règle générale des boutons (plus bas) retire au survol. */
   --fab-h: 36px; --fab-bottom: 24px; --fab-gap: 8px;
-  button.console-fab { bottom: var(--fab-bottom); gap: 8px; height: var(--fab-h); min-width: 0; padding: 0 12px; transform: none; }
+  button.console-fab { bottom: var(--fab-bottom); gap: 8px; height: var(--fab-h); min-width: 0; padding: 0 12px; }
   button.console-fab, button.console-fab:hover:not(:disabled) { box-shadow: var(--shadow-lift); }
   button.console-fab .ic { width: 16px; height: 16px; }
-  .console-fab-label, button.console-fab kbd { max-width: none; opacity: 1; transition: none; }
+  .console-fab-label, button.console-fab kbd { max-width: none; opacity: 1; }
   .console-fab-label { font-family: inherit; font-size: 13px; font-weight: 500; }
   button.console-fab kbd { padding: 1px 6px; }
   button.notes-fab { bottom: calc(var(--fab-bottom) + var(--fab-h) + var(--fab-gap)); background: var(--surface); color: var(--text); }
@@ -80,9 +76,9 @@ html:root[data-style="sobre"] {
 
   /* ---- Boutons, champs, étiquettes -------------------------------------------------------------------------------- */
   /* Forme seulement : les tailles propres à chaque bouton (ligne de tableau, filtre, croix) restent celles de style.css */
-  button, .btn-primary, .btn-link { border-radius: 6px; font-weight: 500; box-shadow: none; transition: none; }
+  button, .btn-primary, .btn-link { border-radius: 6px; font-weight: 500; box-shadow: none; }
   .term-dot { border-radius: 50%; }
-  button:hover:not(:disabled), .btn-primary:hover, .btn-link:hover { transform: none; box-shadow: none; filter: none; }
+  button:hover:not(:disabled), .btn-primary:hover, .btn-link:hover { box-shadow: none; filter: none; }
   button.secondary:hover:not(:disabled), .btn-link:hover { background: var(--bg); border-color: var(--muted); }
   input:not([type=checkbox], [type=radio]), select, textarea { border-radius: 6px; }
   .toolbar input[type=search], .toolbar select, .dag-form select, .agent-form textarea { border-width: 1px; border-radius: 6px; }
@@ -101,8 +97,8 @@ html:root[data-style="sobre"] {
   .segmented { padding: 2px; border-radius: 6px; }
   .segmented a, .segmented button { min-height: 0; padding: 3px 11px; border-radius: 4px; box-shadow: none; }
   .segmented a.active, .segmented button.active, .nav-item.active { box-shadow: 0 0 0 1px var(--border); }
-  .retour details.agent > summary, .ticket details.agent > summary, .ticket-agent-btn { border-radius: 6px; background: var(--accent); box-shadow: none; transition: none; }
-  .retour details.agent > summary:hover, .ticket details.agent > summary:hover { transform: none; filter: none; box-shadow: none; }
+  .retour details.agent > summary, .ticket details.agent > summary, .ticket-agent-btn { border-radius: 6px; background: var(--accent); box-shadow: none; }
+  .retour details.agent > summary:hover, .ticket details.agent > summary:hover { filter: none; box-shadow: none; }
   /* Ouvert, ou replié dans une ligne de la liste (bouton discret, texte sombre) : fond clair, pas le bleu plein */
   .retour details.agent[open] > summary, .ticket details.agent[open] > summary, .retour-more details.agent:not([open]) > summary { background: var(--surface); }
   .retour details.agent[open], .ticket details.agent[open] { border-radius: 6px; }
@@ -118,8 +114,7 @@ html:root[data-style="sobre"] {
 
   /* ---- Cartes, tableaux, compteurs -------------------------------------------------------------------------------- */
   .card, .kpi, .stat, .chart, .panel, .retour, .run-card, table { border-width: 1px; border-radius: var(--radius); box-shadow: none; }
-  .card-linked, a.kpi-link, .kb-card, .wn-item, a.stat-link, a.tl-mark { transition: none; }
-  .card-linked:hover, a.kpi-link:hover, .kb-card:hover, .wn-item:hover, a.stat-link:hover, a.tl-mark:hover { transform: none; box-shadow: none; border-color: var(--muted); }
+  .card-linked:hover, a.kpi-link:hover, .kb-card:hover, .wn-item:hover, a.stat-link:hover, a.tl-mark:hover { box-shadow: none; border-color: var(--muted); }
   .panel { padding: 4px 16px 10px; }
   .panel h2 { font-size: 14px; }
   th { padding: 7px 10px; background: var(--bg); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
@@ -144,7 +139,6 @@ html:root[data-style="sobre"] {
   .seg-n { font-size: 12px; font-weight: 600; }
 
   /* ---- Fenêtres : recherche, ticket, notes ------------------------------------------------------------------------ */
-  .palette-panel, .drawer.modal .drawer-panel, .notes, .tabs-pick { border-radius: 8px; box-shadow: var(--shadow-lift); animation: none; }
-  .drawer-panel, .drawer-backdrop, .palette-backdrop, .term { animation: none; }
+  .palette-panel, .drawer.modal .drawer-panel, .notes, .tabs-pick { border-radius: 8px; box-shadow: var(--shadow-lift); }
   .palette-backdrop { backdrop-filter: none; }
 }

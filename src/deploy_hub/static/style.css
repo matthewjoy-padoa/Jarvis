@@ -1885,3 +1885,14 @@ details.filter.multi { position: relative; font-size: 13px; }
 .footer-style .link-button { box-shadow: none; text-decoration: none; vertical-align: baseline; }
 .footer-style .link-button:hover { text-decoration: underline; transform: none; }
 .style-choice { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+
+/* Animations coupées (Réglages → Affichage → Animations ; cookie lu par le serveur, data-motion="off" sur <html>), dans les
+   deux vues : ni animation ni transition, rien ne se déplace au survol. Restent les animations utiles : attente (.spinner),
+   avancement d'une synchro (.sync-btn), « Enregistré » qui s'efface (.save-status). Le JavaScript qui anime lit le même attribut (jarvisCalm, base.html). */
+:root[data-motion="off"] :not(.spinner, .save-status), :root[data-motion="off"] :not(.sync-btn)::before, :root[data-motion="off"] ::after {
+  animation: none !important; transition: none !important; }
+:root[data-motion="off"] .flow-in_progress .flow-bot { position: relative; bottom: auto; }  /* l'armure en vol se pose dans sa colonne : même règle que sous prefers-reduced-motion (armures), à garder accordées */
+:root[data-motion="off"] :is(.brand:hover .brand-mark, .client-chip:hover, .dock-btn:hover, .dock-btn:focus-visible, button:hover:not(:disabled),
+  .btn-primary:hover, .btn-link:hover, .retour details.agent > summary:hover, .ticket details.agent > summary:hover, .card-linked:hover,
+  a.kpi-link:hover, .kb-card:hover, .wn-item:hover, a.stat-link:hover, a.tl-mark:hover),
+:root[data-motion="off"] :is(.retour, .ticket) details.agent > summary:hover::after { transform: none; }  /* tout survol qui déplace : à compléter avec lui */

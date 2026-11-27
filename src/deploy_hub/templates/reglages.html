@@ -52,11 +52,19 @@
 </section>
 
 <section class="panel settings-part" id="affichage">
-  <div class="panel-head"><h2>{{ ic.icon("gear") }} Affichage</h2><span class="badge">{{ "sobre" if plain else "animé" }}</span></div>
-  <p class="muted">Sobre : un outil plus neutre. Le même menu en haut ; gris neutres et un seul bleu, formes plus carrées, rien qui bouge ; accueil en tableau de bord ; page Agents en compteurs et tableau, sans armures ; pas de thème Noël. Les informations et les fonctions sont les mêmes. Le choix vaut pour ce navigateur ; rien n'est écrit dans <code>.env</code>.</p>
+  <div class="panel-head"><h2>{{ ic.icon("gear") }} Affichage</h2><span class="badge">vue {{ style_names.sobre | lower if plain else style_names.jarvis }}{{ " · sans animation" if still }}</span></div>
+  <p class="muted">Deux réglages indépendants, pour ce navigateur seulement ; rien n'est écrit dans <code>.env</code>. Les informations et les fonctions sont les mêmes partout.</p>
+  <h3>Vue</h3>
+  <p class="muted">{{ style_names.jarvis }} : l'habillage d'origine, coloré et arrondi, avec les armures de la page Agents et le thème Noël. {{ style_names.sobre }} : le même menu en haut, mais gris neutres et un seul bleu, formes plus carrées, accueil en tableau de bord, page Agents en compteurs et tableau, pas de thème Noël.</p>
   <form method="post" action="/affichage" class="style-choice">
-    <button type="submit" name="affichage" value="jarvis" class="secondary" aria-pressed="{{ 'false' if plain else 'true' }}">Animé</button>
-    <button type="submit" name="affichage" value="sobre" class="secondary" aria-pressed="{{ 'true' if plain else 'false' }}">Sobre</button>
+    <button type="submit" name="affichage" value="jarvis" class="secondary" aria-pressed="{{ 'false' if plain else 'true' }}">{{ style_names.jarvis }}</button>
+    <button type="submit" name="affichage" value="sobre" class="secondary" aria-pressed="{{ 'true' if plain else 'false' }}">{{ style_names.sobre }}</button>
+  </form>
+  <h3>Animations</h3>
+  <p class="muted">Dans les deux vues. Désactivées : plus rien ne bouge ni ne glisse (logo, survols, ouvertures, armures, booster InteCG) ; restent l'indicateur d'attente et l'avancement d'une synchro. Le réglage « réduire les animations » du système les coupe aussi, sans passer par ici.</p>
+  <form method="post" action="/affichage" class="style-choice">
+    <button type="submit" name="animations" value="on" class="secondary" aria-pressed="{{ 'false' if still else 'true' }}">Activées</button>
+    <button type="submit" name="animations" value="off" class="secondary" aria-pressed="{{ 'true' if still else 'false' }}">Désactivées</button>
   </form>
 </section>
 

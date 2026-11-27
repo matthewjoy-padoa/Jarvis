@@ -201,7 +201,7 @@ def test_filters_script_searches_without_accents_and_offers_hidden_matches():
     js = client.get("/static/filters.js").text
     assert 'normalize("NFD")' in js and "data-out" in js and "more-out" in js
     assert "filters-toggle" in js and "data-fold-filters" in js  # menus déroulants derrière « Filtres » sur la fiche
-    assert "filters.js?v=11" in client.get("/actions").text
+    assert "filters.js?v=12" in client.get("/actions").text
 
 
 def test_filters_are_remembered_per_page_in_the_browser():
@@ -741,23 +741,40 @@ def test_sober_display_is_chosen_per_browser_and_has_no_christmas():
     sobre.css, n'offre plus Noël au bouton de thème et ne l'impose pas en décembre. Sans le cookie, rien ne change."""
     browser = TestClient(app)
     plain = browser.get("/")
-    assert "<html lang=\"fr\">" in plain.text and 'value="sobre"' in plain.text and "Affichage sobre" in plain.text
+    assert "<html lang=\"fr\">" in plain.text and 'value="sobre"' in plain.text and ">Vue neutre</button>" in plain.text
     assert "sobre.css" not in plain.text and '<header class="topbar">' in plain.text
     chosen = browser.post("/affichage", data={"affichage": "sobre", "vers": "/agents"}, follow_redirects=False)
     assert chosen.status_code == 303 and chosen.headers["location"] == "/agents"
     html = browser.get("/").text
-    assert '<html lang="fr" data-style="sobre">' in html and "Affichage animé" in html and "/static/sobre.css?v=" in html
+    assert '<html lang="fr" data-style="sobre">' in html and ">Vue Jarvis</button>" in html and "/static/sobre.css?v=" in html
     assert "Just A Rather Very Intelligent System</em>" not in html and "outil de l'équipe Integration" in html
     head = html.split("</head>")[0]
     assert '!sober && new Date() >= new Date("2026-12-01T00:00")' in head  # Noël jamais imposé en sobre
     assert '{ noel: "dark", "noel-clair": "light" }' in head  # un thème Noël retenu s'affiche en Nuit ou en Clair
     assert 'root.dataset.style === "sobre" ? ["", "dark", "light"]' in html  # bouton de thème sans Noël
     settings = browser.get("/reglages").text
-    assert 'id="affichage"' in settings and '<span class="badge">sobre</span>' in settings
+    assert 'id="affichage"' in settings and '<span class="badge">vue neutre</span>' in settings
     back = browser.post("/affichage", data={"affichage": "jarvis"}, follow_redirects=False)
     assert back.headers["location"] == "/reglages#affichage"
     assert "<html lang=\"fr\">" in browser.get("/").text
     assert ':root[data-style="sobre"] {' in client.get("/static/sobre.css").text
+
+
+def test_animations_are_switched_off_per_browser_in_both_views():
+    """Animations : réglage à part de la vue, gardé dans un cookie ; le serveur marque <html> (data-motion="off"), dans la vue
+    Jarvis comme dans la vue neutre. Choisir l'un ne change pas l'autre ; aucune vue ne coupe les animations d'elle-même."""
+    browser = TestClient(app)
+    assert "data-motion" not in browser.get("/").text.split("<head>")[0]
+    browser.post("/affichage", data={"animations": "off"})
+    assert '<html lang="fr" data-motion="off">' in browser.get("/").text
+    browser.post("/affichage", data={"affichage": "sobre"})  # changer de vue garde le réglage des animations
+    assert '<html lang="fr" data-style="sobre" data-motion="off">' in browser.get("/").text
+    assert '<span class="badge">vue neutre · sans animation</span>' in browser.get("/reglages").text
+    browser.post("/affichage", data={"animations": "on"})  # et l'inverse : la vue reste
+    assert '<html lang="fr" data-style="sobre">' in browser.get("/").text
+    assert ':root[data-motion="off"] :not(.spinner, .save-status)' in client.get("/static/style.css").text
+    sober = client.get("/static/sobre.css").text
+    assert "animation: none" not in sober and "transition: none" not in sober
 
 
 def test_display_choice_only_returns_to_a_page_of_jarvis():

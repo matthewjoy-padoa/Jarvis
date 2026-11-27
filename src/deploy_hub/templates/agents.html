@@ -48,10 +48,10 @@
   ("ko", "Arrêtés ou en échec", "Échec, arrêt, délai dépassé", runs | selectattr("group", "equalto", "ko") | rejectattr("pr_url") | list),
 ] %}
 {% if plain %}
-{# Affichage sobre (`plain`, base.html) : les quatre étapes en compteurs, puis le tableau ; ni armures ni glisser-déposer
+{# Vue neutre (`plain`, base.html) : les quatre étapes en compteurs, puis le tableau ; ni armures ni glisser-déposer
    (un agent s'archive depuis sa page). #}
 {% if asking %}
-{# Ceux qui attendent une réponse d'abord (les armures « ? » de l'affichage animé) : la question posée, et un lien qui
+{# Ceux qui attendent une réponse d'abord (les armures « ? » de la vue Jarvis) : la question posée, et un lien qui
    arrive sur le formulaire de réponse de l'agent. Une réponse déjà partie : lien vers l'agent qui la traite. #}
 <section class="panel agent-asking" id="en-attente" aria-labelledby="en-attente-titre">
   <div class="panel-head"><h2 id="en-attente-titre">En attente de ta réponse</h2><span class="badge g-todo">{{ asking | length }}</span></div>
@@ -103,7 +103,7 @@
   // « Archiver », il plonge dedans ; refusé ou lâché ailleurs, il rentre à sa place. Un simple clic ouvre toujours l'agent.
   (() => {
     const zone = document.querySelector("[data-archive-zone]"), out = zone.querySelector("[data-archive-out]");
-    const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const calm = window.jarvisCalm;  // animations coupées (base.html)
     const ease = "cubic-bezier(.2, .8, .2, 1)";
     const post = (url, body) => fetch(url, {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded"}, body});
     const JETS = '<g class="im-jets"><path class="im-fire" d="M17 44.5h5.4l-2.7 8zM25.6 44.5h5.4l-2.7 8z"/><path class="im-spark" d="M18.5 44.5h2.4l-1.2 4.4zM27.1 44.5h2.4l-1.2 4.4z"/></g>';

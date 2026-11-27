@@ -8,7 +8,7 @@
 {% set hour = now.hour %}
 <div class="page-head">
   <div>
-    {# `plain` (base.html) : affichage sobre, titre et phrases factuels, sans salutation #}
+    {# `plain` (base.html) : vue neutre, titre et phrases factuels, sans salutation #}
     <h1>{% if plain %}Tableau de bord{% else %}{{ "Bonsoir" if hour >= 18 or hour < 5 else "Bonjour" }}.{% endif %} <span class="muted">{{ days[today.weekday()] | capitalize }} {{ today.day }} {{ months[today.month - 1] }}</span></h1>
     <p class="jarvis-line">
       {% if not deployments and bau_board.synced %}Aucun client suivi : l'équipe a <a class="count-link" href="/bau"><strong>{{ bau_board.open | length }}</strong> demande(s) BAU ouverte(s)</a>.
