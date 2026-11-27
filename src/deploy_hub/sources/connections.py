@@ -20,10 +20,8 @@ from deploy_hub.sources.notion_api import API as NOTION_API, VERSION as NOTION_V
 TIMEOUT = 5
 
 
-def airflow_status(airflow: AirflowSource, problem: str = "") -> tuple[bool, str]:
+def airflow_status(airflow: AirflowSource) -> tuple[bool, str]:
     if not airflow.live:
-        if problem:
-            return False, f"non configuré : référence 1Password illisible ({problem}) : connecte 1Password dans Réglages"
         return False, "non configuré : AIRFLOW_BASE_URL, AIRFLOW_USER ou AIRFLOW_PASSWORD à renseigner dans Réglages"
     try:
         r = airflow.http.get("/dags", params={"limit": 1}, timeout=TIMEOUT)
@@ -36,10 +34,8 @@ def airflow_status(airflow: AirflowSource, problem: str = "") -> tuple[bool, str
     return True, f"connecté à {airflow.base_url}"
 
 
-def notion_status(token: str | None, problem: str = "", transport: httpx.BaseTransport | None = None) -> tuple[bool, str]:
+def notion_status(token: str | None, transport: httpx.BaseTransport | None = None) -> tuple[bool, str]:
     if not token:
-        if problem:
-            return False, f"jeton illisible : référence 1Password ({problem})"
         return False, "pas de NOTION_TOKEN : bouton « Rafraîchir depuis Notion » inactif (la routine de synchro reste possible)"
     try:
         with httpx.Client(timeout=TIMEOUT, transport=transport) as http:

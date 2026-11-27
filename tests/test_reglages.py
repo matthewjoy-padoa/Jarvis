@@ -1,4 +1,4 @@
-"""Page Réglages : .env écrit sans réafficher les secrets, rechargement à chaud, connexion à 1Password, garde-fous."""
+"""Page Réglages : .env écrit sans réafficher les secrets, rechargement à chaud, garde-fous."""
 
 import os
 import stat
@@ -6,7 +6,7 @@ import stat
 import pytest
 from fastapi.testclient import TestClient
 
-from deploy_hub import config, env_file, onepassword, shell
+from deploy_hub import config, env_file, shell
 from deploy_hub import main
 
 SAME = {"origin": "http://testserver"}
@@ -26,50 +26,36 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "airflow", main.airflow)  # remis en place après le test
     monkeypatch.setattr(main.dag_watch, "airflow_env", main.dag_watch.airflow_env)
     yield file
-    config.forget_secrets()
     for key, value in before.items():  # la page a pu écrire dans os.environ : rien ne doit déborder sur les autres tests
         if value is None:
             os.environ.pop(key, None)
             config.ENV_FILE_KEYS.discard(key)
 
 
-@pytest.fixture
-def fake_op(tmp_path, monkeypatch):
-    """Faux op : signin accepte « bon-mdp » (session sur stdout), read répond seulement avec la session, whoami de même."""
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    (bin_dir / "op").write_text("""#!/bin/sh
-case "$1" in
-  signin) read pw; [ "$pw" = "bon-mdp" ] && echo 'export OP_SESSION_padoa="jeton-de-session"' && exit 0
-          echo "[ERROR] 2026/11/13 10:00:00 Authentication: (401) Unauthorized" >&2; exit 1;;
-  whoami) [ -n "$OP_SESSION_padoa" ] && echo '{"url":"padoa.1password.com","email":"moi@padoa.fr"}' && exit 0
-          echo "[ERROR] 2026/11/13 10:00:00 account is not signed in" >&2; exit 1;;
-  account) echo '[{"url":"padoa.1password.com","email":"moi@padoa.fr"}]';;
-  read) [ -n "$OP_SESSION_padoa" ] || { echo "[ERROR] 2026/11/13 10:00:00 account is not signed in" >&2; exit 1; }
-        case "$3" in *user) printf jarvis;; *password) printf mdp;; *) printf ntn_x;; esac;;
-  signout) exit 0;;
-esac
-""")
-    (bin_dir / "op").chmod(0o755)
-    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
-    monkeypatch.setattr(onepassword, "_session", {})
-    config.forget_secrets()
-    return bin_dir
-
-
-def test_a_clear_secret_is_never_sent_back_to_the_page(env):
+def test_a_stored_secret_is_never_sent_back_to_the_page(env):
     page = TestClient(main.app).get("/reglages").text
-    assert "mdp-en-clair" not in page and "en clair" in page and "laisse vide pour le garder" in page
+    assert "mdp-en-clair" not in page and ">enregistré</span>" in page and "laisse vide pour le garder" in page
+
+
+def test_an_old_reference_left_in_the_env_file_counts_as_unset_and_is_flagged(env, monkeypatch):
+    """Un secret resté sous la forme « op://… » n'est plus lu : il vaut « non renseigné » (jamais envoyé tel quel à Airflow
+    ni à Notion, la synchro repasse par la routine) et Réglages le marque à remplacer, sans l'afficher."""
+    env.write_text("AIRFLOW_PASSWORD=op://Coffre/Airflow/password\n")
+    monkeypatch.setenv("AIRFLOW_PASSWORD", "op://Coffre/Airflow/password")
+    monkeypatch.setenv("NOTION_TOKEN", "op://Coffre/Notion/jeton")
+    assert config.secret("AIRFLOW_PASSWORD") == "" and main.notion_api.load_token() is None
+    page = TestClient(main.app).get("/reglages").text
+    assert ">à remplacer</span>" in page and "Coffre/Airflow" not in page
 
 
 def test_saving_keeps_other_lines_and_untyped_secrets_and_restricts_the_file(env):
-    form = {"AIRFLOW_BASE_URL": "http://localhost:8888", "AIRFLOW_USER": "op://Coffre/Airflow/username", "AIRFLOW_PASSWORD": ""}
+    form = {"AIRFLOW_BASE_URL": "http://localhost:8888", "AIRFLOW_USER": "utilisateur-airflow", "AIRFLOW_PASSWORD": ""}
     r = TestClient(main.app).post("/reglages", data=form, headers=SAME)
     assert r.status_code == 200 and "Enregistré dans .env : AIRFLOW_BASE_URL, AIRFLOW_USER" in r.text
     text = env.read_text()
     assert "# réglages" in text and "CLAUDE_BIN=claude  # garde-moi" in text  # le reste du fichier est intact
     assert "AIRFLOW_PASSWORD=mdp-en-clair" in text  # secret laissé vide : inchangé
-    assert "AIRFLOW_USER=op://Coffre/Airflow/username" in text
+    assert "AIRFLOW_USER=utilisateur-airflow" in text
     assert stat.S_IMODE(env.stat().st_mode) == 0o600
     assert os.environ["AIRFLOW_BASE_URL"] == "http://localhost:8888"
 
@@ -81,7 +67,6 @@ def test_a_secret_can_be_erased(env):
 
 @pytest.mark.parametrize(("key", "value", "why"), [
     ("AIRFLOW_BASE_URL", "localhost:8888", "http://"),
-    ("AIRFLOW_USER", "op:Coffre/x", "op://"),
     ("NOTION_TOKEN", "ntn_x\nAIRFLOW_USER=pirate", "une seule ligne"),
 ])
 def test_invalid_values_write_nothing(env, key, value, why):
@@ -97,34 +82,18 @@ def test_saving_reloads_airflow_without_restart(env):
     assert main.dag_watch.airflow_env["AIRFLOW_USER"] == "jarvis"
 
 
-def test_1password_signin_from_the_page_unlocks_the_references(env, fake_op):
-    form = {"AIRFLOW_BASE_URL": "http://localhost:8888", "AIRFLOW_USER": "op://Coffre/Airflow/user", "AIRFLOW_PASSWORD": "op://Coffre/Airflow/password"}
-    client = TestClient(main.app)
-    client.post("/reglages", data=form, headers=SAME)
-    assert not main.airflow.live  # pas encore connecté à 1Password
-    bad = client.post("/reglages/1password/connexion", data={"password": "faux"}, headers=SAME)
-    assert "Unauthorized" in bad.text and "faux" not in bad.text
-    ok = client.post("/reglages/1password/connexion", data={"password": "bon-mdp"}, headers=SAME)
-    assert "Connecté à 1Password" in ok.text and "moi@padoa.fr" in ok.text and "bon-mdp" not in ok.text
-    assert main.airflow.live and (main.airflow.user, main.airflow.password) == ("jarvis", "mdp")
-    assert "OP_SESSION_padoa" not in os.environ  # session gardée dans Jarvis seulement…
-    assert not any(k.startswith("OP_SESSION_") for k in config.child_environment())  # … jamais donnée aux agents ni au shell
-    client.post("/reglages/1password/deconnexion", headers=SAME)
-    assert onepassword._session == {}
-
-
 def test_the_test_button_reports_both_connections(env, monkeypatch):
     from deploy_hub.sources import connections
-    monkeypatch.setattr(connections, "notion_status", lambda token, problem="": (False, "pas de NOTION_TOKEN"))
+    monkeypatch.setattr(connections, "notion_status", lambda token: (False, "pas de NOTION_TOKEN"))
     r = TestClient(main.app).post("/reglages/tester", headers=SAME)
     assert "Airflow" in r.text and "Notion" in r.text and 'pas de <a href="/reglages#reglage-NOTION_TOKEN">NOTION_TOKEN</a>' in r.text
 
 
-@pytest.mark.parametrize("path", ["/reglages", "/reglages/tester", "/reglages/1password/connexion", "/reglages/1password/deconnexion"])
-def test_another_site_cannot_change_settings_or_sign_in(env, path):
+@pytest.mark.parametrize("path", ["/reglages", "/reglages/tester"])
+def test_another_site_cannot_change_settings(env, path):
     before = env.read_text()
     client = TestClient(main.app)
-    assert client.post(path, data={"AIRFLOW_USER": "pirate", "password": "x"}).status_code == 403
+    assert client.post(path, data={"AIRFLOW_USER": "pirate"}).status_code == 403
     assert client.post(path, data={"AIRFLOW_USER": "pirate"}, headers={"origin": "https://site-hostile.example"}).status_code == 403
     assert env.read_text() == before
 
@@ -233,7 +202,7 @@ def test_settings_are_split_into_parts_with_a_summary(env):
     assert {f.section for f in env_file.FIELDS} == set(env_file.SECTIONS)  # aucun réglage hors d'une partie affichée
     for name, part in env_file.SECTIONS.items():  # chaque partie : un lien dans le sommaire et sa carte
         assert f'href="#{part.anchor}"' in page and f'id="{part.anchor}"' in page and name in page
-    assert 'href="#1password"' in page and 'href="#notifications"' in page
+    assert 'href="#notifications"' in page
     for f in env_file.FIELDS:  # chaque réglage une seule fois, dans la carte de sa partie
         assert page.count(f'name="{f.key}"') == 1
         start = page.index(f'id="{env_file.SECTIONS[f.section].anchor}"')

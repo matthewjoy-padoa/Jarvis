@@ -40,15 +40,14 @@ def test_jarvis_env_keeps_variables_already_set(monkeypatch, tmp_path):
     assert air_jarvis.jarvis_env() == {}  # rien de configuré dans Jarvis, rien d'écrasé
 
 
-def test_jarvis_env_resolves_credentials_from_process(monkeypatch, tmp_path):
+def test_jarvis_env_takes_credentials_from_process(monkeypatch, tmp_path):
     monkeypatch.setenv("JARVIS_ENV_FILE", str(tmp_path / "absent.env"))
     monkeypatch.setenv("AIRFLOW_USER", "u-proc")
-    monkeypatch.setenv("AIRFLOW_PASSWORD", "op://coffre/airflow/password")
-    monkeypatch.setattr(config, "resolve", lambda v: "p-resolu" if v.startswith("op://") else v)
+    monkeypatch.setenv("AIRFLOW_PASSWORD", " p-proc ")
 
     env = air_jarvis.jarvis_env()
 
-    assert env["AIRFLOW_USER"] == "u-proc" and env["AIRFLOW_PASSWORD"] == "p-resolu"  # jamais la référence brute
+    assert env["AIRFLOW_USER"] == "u-proc" and env["AIRFLOW_PASSWORD"] == "p-proc"
 
 
 def test_entry_point_runs_air_with_jarvis_state_dir(tmp_path):

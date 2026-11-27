@@ -7,9 +7,8 @@ from deploy_hub.sources.pulls import PullRequests
 
 
 def test_settings_named_in_a_message_become_links_to_their_field():
-    html = main.settings_links("Clone introuvable : renseigne ORCHESTRATOR_DIR dans Réglages ; connecte 1Password.")
+    html = main.settings_links("Clone introuvable : renseigne ORCHESTRATOR_DIR dans Réglages.")
     assert '<a href="/reglages#reglage-ORCHESTRATOR_DIR">ORCHESTRATOR_DIR</a>' in html
-    assert '<a href="/reglages#1password">1Password</a>' in html
 
 
 def test_the_longest_setting_name_wins_and_text_stays_escaped():

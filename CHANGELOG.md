@@ -11,6 +11,10 @@ Pour une PR qui monte le numéro :
 
 La version affichée en bas de chaque page change donc avec chaque fonctionnalité ; après une simple correction, le bandeau « Jarvis est à relancer » compare les commits. Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
+## [0.8.6] · 2026-11-27
+
+- 1Password retiré de Jarvis, pour l'instant : plus de partie « 1Password » dans Réglages (connexion, déconnexion), plus de lecture des références `op://`. Les identifiants Airflow et le jeton Notion s'enregistrent tels quels dans `.env` (droits 600, hors git) ; la page Réglages ne les réaffiche jamais et les marque « enregistré ». **À faire en mettant à jour** : un secret encore enregistré sous la forme `op://…` n'est plus lu. Il vaut « non renseigné » (rien n'est envoyé à sa place, et la synchro Notion repasse par la routine), et Réglages le marque « à remplacer » : saisis-y la valeur elle-même. Les processus lancés par Jarvis (agents, shell, Flow Digger) ne reçoivent toujours pas une session de gestionnaire de mots de passe héritée du terminal.
+
 ## [0.8.5] · 2026-11-27
 
 - README allégé : ce qu'est Jarvis, installer, premiers pas, mises à jour, où lire la suite. Le détail de chaque fonction passe dans [`docs/guide.md`](docs/guide.md), les réglages et les secrets dans [`docs/reglages.md`](docs/reglages.md), sans rien retirer.

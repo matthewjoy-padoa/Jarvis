@@ -1113,12 +1113,9 @@ img.client-icon { width: 1em; height: 1em; object-fit: contain; vertical-align: 
 .tool-error { display: flex; gap: 8px; align-items: flex-start; color: var(--st-ko); }
 .tool-error .ic { flex: none; width: 18px; height: 18px; margin-top: 2px; }
 
-/* Page Réglages : .env, connexions, 1Password */
-.settings-form .field, .settings-signin .field { margin-bottom: 12px; }
+/* Page Réglages : .env, connexions */
+.settings-form .field { margin-bottom: 12px; flex-direction: column; }
 .settings-form .field .badge { align-self: flex-start; margin-left: 4px; font-weight: 500; }
-.settings-form .field { flex-direction: column; }
-.settings-signin { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
-.settings-signin .field { flex: 1 1 260px; margin-bottom: 0; }
 .settings-clear { display: inline-flex; gap: 4px; align-items: center; margin-left: 4px; }
 .settings-clear input { width: auto; margin: 0; }
 .settings-tests .refresh-wait { display: none; }

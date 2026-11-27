@@ -65,7 +65,7 @@ def command(repo: Path) -> list[str]:
 
 
 def _environment() -> dict[str, str]:
-    """Environnement de Jarvis sans ses secrets ni ses réglages (.env) : Flow Digger a les siens (1Password, Google)."""
+    """Environnement de Jarvis sans ses secrets ni ses réglages (.env) : Flow Digger a les siens."""
     return child_environment()
 
 
