@@ -5,6 +5,12 @@
 // contour encre, soudures crantées, formes pop, logo InteCG en autocollant. Le garder accordé au jeu s'il y change.
 (function () {
   const SHOWN_MS = 9000;
+  // Où mène « Ouvrir InteCG » : le lanceur de Jarvis si le jeu est sur sa machine (data-launch), sinon l'adresse du
+  // jeu dans ce navigateur (data-game : le jeu qui tourne sur le poste de la personne).
+  const HERE = document.currentScript ? document.currentScript.dataset : {};
+  const OPEN = HERE.launch
+    ? '<form method="post" action="/outils/intecg" target="intecg"><button type="submit">Ouvrir InteCG</button></form>'
+    : '<a class="booster-won-open" target="intecg" rel="noopener"></a>';
   const INK = "#14121c", CREAM = "#fffbe9", FONT = "system-ui, -apple-system, 'Segoe UI', sans-serif";
   // Dents de la soudure du sachet, en haut (direction -1) et en bas (1).
   const crimp = (y, direction) => "M5 " + y + " " + Array.from({ length: 21 }, (_, i) => `L${11 + i * 12} ${y + direction * 7} L${17 + i * 12} ${y}`).join(" ");
@@ -47,11 +53,13 @@
     box.innerHTML = '<div class="booster-won-card" role="status">' +
       '<div class="booster-pack-wrap"><span class="booster-burst" aria-hidden="true"></span>' + PACK + "</div>" +
       '<p class="booster-won-title"></p><p class="booster-won-detail muted"></p>' +
-      '<form method="post" action="/outils/intecg" target="intecg"><button type="submit">Ouvrir InteCG</button></form>' +
+      OPEN +
       '<button type="button" class="booster-won-close secondary" aria-label="Fermer">✕</button></div>';
     box.querySelector(".booster-won-title").textContent = note.title || "InteCG · booster gagné";
     box.querySelector(".booster-won-detail").textContent = note.detail || "";
-    box.addEventListener("click", (e) => { if (!e.target.closest(".booster-won-card") || e.target.closest(".booster-won-close, form")) setTimeout(close, 0); });
+    const link = box.querySelector(".booster-won-open");
+    if (link) { link.href = HERE.game || note.link || "#"; link.textContent = "Ouvrir InteCG"; }
+    box.addEventListener("click", (e) => { if (!e.target.closest(".booster-won-card") || e.target.closest(".booster-won-close, form, .booster-won-open")) setTimeout(close, 0); });
     document.body.append(box);
     timer = setTimeout(close, SHOWN_MS);
   }

@@ -11,6 +11,10 @@ Pour une PR qui monte le numéro :
 
 La version affichée en bas de chaque page change donc avec chaque fonctionnalité ; après une simple correction, le bandeau « Jarvis est à relancer » compare les commits. Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
+## [0.8.6] · 2026-11-27
+
+- InteCG : les boosters n'ont plus besoin que le jeu tourne sur la machine de Jarvis, ni d'aucun réglage. Jarvis écrit lui-même le booster gagné dans la base du jeu (tables CSV de son dépôt git), au nom du compte GitHub de sa machine, depuis un clone qu'il tient pour lui (`data/intecg/depot`) ; le booster apparaît dans le jeu du joueur, où qu'il tourne, à sa synchro suivante. Les règles restent celles du jeu, lues dans son dépôt (chance par lancement, maximum du jour, un lancement tiré une seule fois) ; seul un joueur déjà inscrit est crédité. L'animation s'affiche même sans jeu sur la machine, et son bouton ouvre alors le jeu du poste (`http://localhost:5173`, ou `INTECG_URL`). Prérequis : `gh` connecté avec accès au dépôt du jeu. Réglage `INTECG_REPO` (`aucun` : pas de booster). L'appel au serveur du jeu (`POST /api/credits/jarvis`) n'est plus utilisé.
+
 ## [0.8.5] · 2026-11-27
 
 - README allégé : ce qu'est Jarvis, installer, premiers pas, mises à jour, où lire la suite. Le détail de chaque fonction passe dans [`docs/guide.md`](docs/guide.md), les réglages et les secrets dans [`docs/reglages.md`](docs/reglages.md), sans rien retirer.

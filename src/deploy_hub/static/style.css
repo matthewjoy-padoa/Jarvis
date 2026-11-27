@@ -1090,6 +1090,7 @@ img.client-icon { width: 1em; height: 1em; object-fit: contain; vertical-align: 
 .booster-won-title { margin: 14px 0 2px; font-size: 16px; font-weight: 700; }
 .booster-won-detail { margin: 0 0 14px; min-height: 1em; }
 .booster-won-card form { margin: 0; }
+.booster-won-open { display: inline-block; padding: 6px 14px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 13px; font-weight: 600; }
 .booster-won-close { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; padding: 0; border-width: 1px; }
 .booster-pack-wrap { position: relative; width: 132px; margin: 0 auto; filter: drop-shadow(0 14px 20px rgb(0 0 0 / .4)); }
 .booster-pack { display: block; width: 100%; height: auto; overflow: visible; }

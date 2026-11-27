@@ -21,6 +21,7 @@ os.environ["ORCHESTRATOR_DIR"] = tempfile.mkdtemp()
 os.environ["CLAUDE_BIN"] = os.path.join(tempfile.mkdtemp(), "claude-absent")
 # Jamais le vrai InteCG : un agent ou un DAG lancé par un test ne doit créditer de booster à personne.
 os.environ["INTECG_URL"] = ""
+os.environ["INTECG_REPO"] = "aucun"  # jamais la vraie base du jeu : aucun booster n'y est écrit par un test
 os.environ["INTECG_DIR"] = tempfile.mkdtemp()  # dossier vide : pas le dépôt du jeu du développeur
 
 import json

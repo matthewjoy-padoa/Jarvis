@@ -119,12 +119,13 @@ Le bouton **Flow Digger ↗** de la barre ouvre [integration-flow-digger](https:
 
 ## InteCG
 
-InteCG est le jeu de cartes à collectionner de l'équipe, dans son propre dépôt (`intecg`). Quand ce dépôt est cloné sur la machine de Jarvis (par exemple `~/Dev/Apps/intecg` sur la VM) :
-- **Lien « InteCG ↗ » en pied de page** : ouvre le jeu dans sa propre fenêtre. S'il ne tourne pas, Jarvis met d'abord son dépôt à jour (avance rapide seulement), installe les paquets npm s'ils manquent ou ont changé, puis le démarre (`npm run dev`). Déjà lancé, il y emmène sans toucher au dépôt. Prérequis : Node, npm et `gh` connecté, comme le demande le README du jeu.
-- **Une chance de booster à chaque lancement** : un DAG ou un agent lancé dans Jarvis demande un booster bonus au jeu (`POST /api/credits/jarvis`). C'est InteCG qui décide : il tire au sort (chance faible, réglée dans le jeu), ne compte un lancement qu'une fois et fixe le maximum du jour ; il doit tourner à ce moment-là.
-- **Booster gagné** : un sachet tombe au milieu de l'écran, avec un bouton pour ouvrir le jeu, et une notification reste dans la cloche.
+InteCG est le jeu de cartes à collectionner de l'équipe, dans son propre dépôt (`intecg`). Jarvis s'y relie sans rien à installer : il suffit de jouer à InteCG, où que le jeu tourne (ton Mac, la VM).
+- **Une chance de booster à chaque lancement** : un DAG ou un agent lancé dans Jarvis a une chance de rapporter un booster bonus. Jarvis l'écrit lui-même dans la base du jeu (des tables CSV versionnées dans son dépôt, où chaque joueur pousse ses lignes), au nom du compte GitHub de sa machine : le jeu n'a pas à tourner, et le booster y apparaît à sa synchro suivante. Il garde pour ça son propre clone du jeu (`data/intecg/depot`, cloné au premier lancement).
+- **Les règles sont celles du jeu** : la chance et le maximum du jour sont lus dans le dépôt du jeu (`JARVIS_DROP_CHANCE`, `JARVIS_DAILY_MAX`) ; un lancement n'est tiré qu'une fois, toujours avec le même résultat. Seul un joueur déjà inscrit dans le jeu est crédité.
+- **Booster gagné** : le sachet du jeu tombe au milieu de l'écran, avec un bouton pour ouvrir le jeu, et une notification reste dans la cloche.
+- **Lien « InteCG ↗ » en pied de page**, seulement si le dépôt du jeu est aussi sur la machine de Jarvis (par exemple `~/Dev/Apps/intecg`) : il ouvre le jeu dans sa propre fenêtre. S'il ne tourne pas, Jarvis met d'abord ce dépôt à jour (avance rapide seulement), installe les paquets npm s'ils manquent ou ont changé, puis le démarre (`npm run dev`).
 
-Sans dépôt du jeu ni adresse réglée, il n'y a ni lien ni booster. Code : [`sources/intecg.py`](../src/deploy_hub/sources/intecg.py), [`static/booster.js`](../src/deploy_hub/static/booster.js).
+Prérequis : `gh` connecté sur la machine de Jarvis, avec un accès en écriture au dépôt du jeu (celui qu'il faut déjà pour y jouer). Dépôt injoignable : le lancement se fait quand même, sans booster, et Jarvis réessaie au plus tôt une heure après. `INTECG_REPO=aucun` coupe les boosters. Code : [`sources/intecg.py`](../src/deploy_hub/sources/intecg.py), [`static/booster.js`](../src/deploy_hub/static/booster.js).
 
 
 ## Mises à jour

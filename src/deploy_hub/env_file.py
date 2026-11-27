@@ -66,11 +66,15 @@ FIELDS = (
     Field("FLOW_DIGGER_DIR", "Dossier de Flow Digger", "path", "Vide : cherché aux emplacements habituels", section=FOLDERS),
     Field("JARVIS_TZ", "Fuseau horaire", "text", "Vide : Europe/Paris, quelle que soit l'heure du serveur (la VM est en UTC). "
           "Nom IANA, ex. Europe/Paris", live=False, section=FOLDERS),
-    Field("INTECG_DIR", "Dossier d'InteCG (jeu de cartes)", "path",
-          "Dépôt intecg : le lien InteCG du pied de page le met à jour et le démarre, et un DAG ou un agent lancé ici y rapporte un booster. "
-          "Vide : cherché aux emplacements habituels (~/Dev/Apps/intecg…)", section=FOLDERS),
+    Field("INTECG_REPO", "Dépôt d'InteCG (jeu de cartes)", "text",
+          "Un DAG ou un agent lancé ici a une chance de rapporter un booster dans InteCG : Jarvis l'écrit dans la base du jeu, "
+          "au nom du compte GitHub de cette machine (gh), sans que le jeu ait à tourner. Vide : ThanhHuyPadoa/intecg ; "
+          "« aucun » : pas de booster", section=FOLDERS),
+    Field("INTECG_DIR", "Dossier d'InteCG, s'il est sur cette machine", "path",
+          "Le lien InteCG du pied de page met ce dépôt à jour et démarre le jeu. Vide : cherché aux emplacements habituels "
+          "(~/Dev/Apps/intecg…) ; introuvable : pas de lien", section=FOLDERS),
     Field("INTECG_URL", "Adresse d'InteCG", "url",
-          "Vide : http://localhost:5173 si le dépôt du jeu est sur cette machine, sinon pas de lien avec InteCG", section=FOLDERS),
+          "Où le jeu s'ouvre depuis ton navigateur. Vide : http://localhost:5173", section=FOLDERS),
     Field("PADOA_ENV_URL", "Adresse des environnements Padoa", "text",
           "Bouton Environnements du dock. Modèle avec [stack] et [client] ; vide : https://[stack]-[client].aodap-staging.fr/support",
           section=FOLDERS),
