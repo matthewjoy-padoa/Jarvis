@@ -86,7 +86,7 @@ Le bouton **Flow Digger ↗** de la barre ouvre [integration-flow-digger](https:
 
 InteCG est le jeu de cartes à collectionner de l'équipe, dans son propre dépôt (`intecg`). Quand ce dépôt est cloné sur la machine de Jarvis (par exemple `~/Dev/Apps/intecg` sur la VM) :
 - **Lien « InteCG ↗ » en pied de page** : ouvre le jeu dans sa propre fenêtre. S'il ne tourne pas, Jarvis met d'abord son dépôt à jour (avance rapide seulement), installe les paquets npm s'ils manquent ou ont changé, puis le démarre (`npm run dev`). Déjà lancé, il y emmène sans toucher au dépôt. Prérequis : Node, npm et `gh` connecté, comme le demande le README du jeu.
-- **Une chance de booster à chaque lancement** : un DAG ou un agent lancé dans Jarvis demande un booster bonus au jeu (`POST /api/credits/jarvis`). C'est InteCG qui décide : il tire au sort (une chance sur cinq à ce jour), ne compte un lancement qu'une fois et fixe le maximum du jour ; il doit tourner à ce moment-là.
+- **Une chance de booster à chaque lancement** : un DAG ou un agent lancé dans Jarvis demande un booster bonus au jeu (`POST /api/credits/jarvis`). C'est InteCG qui décide : il tire au sort (chance faible, réglée dans le jeu), ne compte un lancement qu'une fois et fixe le maximum du jour ; il doit tourner à ce moment-là.
 - **Booster gagné** : un sachet tombe au milieu de l'écran, avec un bouton pour ouvrir le jeu, et une notification reste dans la cloche.
 
 Sans dépôt du jeu ni adresse réglée, il n'y a ni lien ni booster. Code : [`sources/intecg.py`](src/deploy_hub/sources/intecg.py), [`static/booster.js`](src/deploy_hub/static/booster.js).
