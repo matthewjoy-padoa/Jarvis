@@ -95,7 +95,6 @@
                {% if fd.kind == "secret" and f.stored_clear %}placeholder="•••••• enregistré, laisse vide pour le garder"{% elif fd.kind == "secret" %}placeholder="op://…"{% endif %}>
         {% endif %}
         <small class="muted">{{ fd.help }}{% if fd.kind == "secret" and not f.empty %} · <span class="settings-clear"><input type="checkbox" name="effacer_{{ fd.key }}" aria-label="Effacer {{ fd.label }}"> effacer</span>{% endif %}</small>
-        {% if notes.get(fd.key) %}<small>{{ notes[fd.key] }}</small>{% endif %}
       </label>
       {% endfor %}
     </div>

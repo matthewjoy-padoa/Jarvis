@@ -24,7 +24,7 @@ from deploy_hub import client_config
 from deploy_hub.config import PROCESS_KEYS, PROJECT_ROOT, clients_dir, data_dir, ensure_private_dirs, forget_secrets, load_settings, secret_problem
 from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, KO, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
                                group_counts, kanban_columns, notion_link, status_group)
-from deploy_hub import bau, brief, console, env_file, onepassword, shell, sync_notion
+from deploy_hub import bau, brief, console, env_file, first_launch, onepassword, shell, sync_notion
 from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
@@ -55,7 +55,7 @@ from deploy_hub.sources.web_push import WebPush
 HERE = Path(__file__).parent
 
 ensure_private_dirs()  # données et configuration des clients jamais dans un dossier que git pourrait pousser
-orchestrator_note = env_file.find_orchestrator_once()  # premier lancement : clone cherché et noté dans .env ; dit sous son champ des Réglages
+first_launch.note_folders()  # dossiers trouvés sur la machine (orchestrator, Flow Digger, InteCG) : notés dans .env, une fois
 settings = load_settings()
 fiches = FicheSource(settings.deployments_dir, clients_dir())
 airflow = AirflowSource.from_env()
@@ -1244,7 +1244,6 @@ def _guard_settings(request: Request) -> None:
 def _settings_page(request: Request, message: str = "", error: str = "", op_error: str = "") -> HTMLResponse:
     op = onepassword.status()
     return _render(request, "reglages.html", "/reglages", fields=env_file.view(), sections=env_file.SECTIONS, env_path=env_file.path(), op=op,
-                   notes={"ORCHESTRATOR_DIR": orchestrator_note},
                    message=message, error=error, op_error=op_error or op.get("error", ""))
 
 

@@ -247,10 +247,10 @@ def test_an_empty_orchestrator_setting_falls_back_to_the_default(monkeypatch):
     assert str(load_settings().orchestrator_dir).endswith("integration-orchestrator")
 
 
-def test_orchestrator_clones_are_found_under_the_home_folder_most_recently_fetched_first(tmp_path):
+def test_git_clones_are_found_under_the_home_folder_most_recently_fetched_first(tmp_path):
     """Les dépôts git dont l'origine est integration-orchestrator, le plus récemment mis à jour d'abord. Ni un autre dépôt,
     ni un worktree, ni un clone trop profond, ni node_modules ; un dossier personnel lui-même versionné ne bloque pas."""
-    from deploy_hub.config import orchestrator_clones
+    from deploy_hub.config import git_clones
 
     def make_clone(path, origin, fetched=None):
         path.mkdir(parents=True)
@@ -263,14 +263,15 @@ def test_orchestrator_clones_are_found_under_the_home_folder_most_recently_fetch
     url = "git@github.com:exemple/integration-orchestrator.git"
     old = make_clone(tmp_path / "integration-orchestrator", url, fetched=1_000)
     recent = make_clone(tmp_path / "Dev" / "integration-orchestrator", url, fetched=2_000)
-    make_clone(tmp_path / "Dev" / "autre", "git@github.com:exemple/autre.git")
+    other = make_clone(tmp_path / "Dev" / "autre", "git@github.com:exemple/autre.git")
     make_clone(tmp_path / "a" / "b" / "c" / "d" / "integration-orchestrator", url)  # trop profond
     make_clone(tmp_path / "node_modules" / "integration-orchestrator", url)
     (tmp_path / "Dev" / "worktree").mkdir()
     (tmp_path / "Dev" / "worktree" / ".git").write_text("gitdir: ailleurs")  # worktree : .git est un fichier
-    assert orchestrator_clones(tmp_path) == [recent, old]
+    wanted = {"integration-orchestrator": [recent, old], "autre": [other], "absent": []}  # un seul parcours pour tous les noms
+    assert git_clones(tuple(wanted), tmp_path) == wanted
     _git(tmp_path, "init", "-q")  # dossier personnel lui-même versionné (dotfiles) : on cherche quand même
-    assert orchestrator_clones(tmp_path) == [recent, old]
+    assert git_clones(tuple(wanted), tmp_path) == wanted
 
 
 def test_log_events_whose_message_is_text_do_not_break_the_agent_page(tmp_path):

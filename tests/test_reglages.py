@@ -245,15 +245,26 @@ def test_settings_are_split_into_parts_with_a_summary(env):
     assert agents.index("Limites") < agents.index('name="JARVIS_AGENT_MAX_TURNS"') < agents.index("Permissions et dossiers")
 
 
-def test_the_orchestrator_clone_is_searched_once_and_written_to_the_env_file(env, monkeypatch, tmp_path):
-    """Premier lancement sans ORCHESTRATOR_DIR : le clone trouvé est noté dans .env (le plus récent d'abord), les autres sont
-    cités ; ensuite le réglage existe et plus rien n'est cherché. Aucun clone : rien n'est écrit, la note le dit."""
-    kept, other = tmp_path / "Dev" / "integration-orchestrator", tmp_path / "integration-orchestrator"
-    monkeypatch.setattr(env_file, "orchestrator_clones", lambda: [])
-    assert "Aucun clone trouvé" in env_file.find_orchestrator_once() and "ORCHESTRATOR_DIR" not in env.read_text()
-    monkeypatch.setattr(env_file, "orchestrator_clones", lambda: [kept, other])
-    note = env_file.find_orchestrator_once()
-    assert f"ORCHESTRATOR_DIR={kept}" in env.read_text().splitlines() and os.environ["ORCHESTRATOR_DIR"] == str(kept)
-    assert "noté ici" in note and str(other) in note and "CLAUDE_BIN=claude  # garde-moi" in env.read_text()
-    monkeypatch.setattr(env_file, "orchestrator_clones", lambda: pytest.fail("déjà réglé : pas de nouvelle recherche"))
-    assert env_file.find_orchestrator_once() == ""
+def test_first_launch_notes_the_folders_found_on_the_machine_once(env, monkeypatch, tmp_path):
+    """Premier lancement : chaque dossier pas encore réglé est cherché (emplacements habituels, sinon clone git le plus
+    récent) et noté dans .env, où Réglages l'affiche déjà rempli ; un dossier réglé n'est ni cherché ni remplacé, un dossier
+    introuvable reste vide. Ensuite tout est réglé : plus aucune recherche."""
+    from deploy_hub import first_launch
+    orchestrator, old, game = tmp_path / "Dev" / "integration-orchestrator", tmp_path / "integration-orchestrator", tmp_path / "jeu"
+    game.mkdir()
+    (game / "package.json").write_text("{}")
+    monkeypatch.setattr(first_launch.intecg, "CANDIDATES", (str(game),))  # emplacement habituel : pris avant tout clone
+    monkeypatch.setattr(first_launch.flow_digger, "CANDIDATES", ())
+    searched = []
+    monkeypatch.setattr(first_launch, "git_clones", lambda repos: searched.append(repos) or {
+        "integration-orchestrator": [orchestrator, old], "flow-digger": [], "intecg": [tmp_path / "autre-jeu"]})
+    assert first_launch.note_folders() == ["ORCHESTRATOR_DIR", "INTECG_DIR"]
+    lines = env.read_text().splitlines()
+    assert f"ORCHESTRATOR_DIR={orchestrator}" in lines and f"INTECG_DIR={game}" in lines and "CLAUDE_BIN=claude  # garde-moi" in lines
+    assert not any(line.startswith("FLOW_DIGGER_DIR") for line in lines) and os.environ["ORCHESTRATOR_DIR"] == str(orchestrator)
+    page = TestClient(main.app).get("/reglages").text
+    assert f'name="ORCHESTRATOR_DIR" value="{orchestrator}"' in page and f'name="INTECG_DIR" value="{game}"' in page
+    assert first_launch.note_folders() == [] and searched == [("integration-orchestrator", "flow-digger", "intecg"), ("flow-digger",)]
+    monkeypatch.setenv("FLOW_DIGGER_DIR", str(tmp_path))  # tout est réglé : plus de recherche
+    monkeypatch.setattr(first_launch, "git_clones", lambda repos: pytest.fail("tout est réglé : pas de recherche"))
+    assert first_launch.note_folders() == []

@@ -196,16 +196,18 @@ def git_origin(folder: Path, timeout: float = 10) -> str:
         return ""
 
 
-def orchestrator_clones(home: Path | None = None) -> list[Path]:
-    """Clones de integration-orchestrator sous le dossier personnel : les dépôts git (pas leurs worktrees) dont l'origine
-    nomme ce dépôt, le plus récemment mis à jour (dernier fetch) d'abord. Ne lit que des noms de dossiers et l'adresse
-    d'origine de chaque dépôt rencontré ; ne descend pas dans un dépôt."""
-    found, pending = [], [(home or Path.home(), 0)]
+def git_clones(repos: tuple[str, ...], home: Path | None = None) -> dict[str, list[Path]]:
+    """Pour chaque nom de dépôt, ses clones sous le dossier personnel : les dépôts git (pas leurs worktrees) dont l'origine
+    nomme ce dépôt, le plus récemment mis à jour (dernier fetch) d'abord. Un seul parcours pour tous les noms ; il ne lit que
+    des noms de dossiers et l'adresse d'origine de chaque dépôt rencontré, et ne descend pas dans un dépôt."""
+    found, pending = {repo: [] for repo in repos}, [(home or Path.home(), 0)]
     while pending:
         folder, depth = pending.pop()
         if depth and (folder / ".git").is_dir():  # pas le dossier personnel lui-même, parfois versionné (dotfiles)
-            if ORCHESTRATOR_REPO in git_origin(folder, timeout=2):  # délai court : un dépôt bloqué ne retient pas le démarrage
-                found.append(folder)
+            origin = git_origin(folder, timeout=2)  # délai court : un dépôt bloqué ne retient pas le démarrage
+            for repo in repos:
+                if repo in origin:
+                    found[repo].append(folder)
             continue
         if depth == SEARCH_DEPTH:
             continue
@@ -218,7 +220,7 @@ def orchestrator_clones(home: Path | None = None) -> list[Path]:
     def updated(clone: Path) -> float:
         fetched = clone / ".git" / "FETCH_HEAD"
         return (fetched if fetched.exists() else clone / ".git" / "HEAD").stat().st_mtime
-    return sorted(found, key=updated, reverse=True)
+    return {repo: sorted(clones, key=updated, reverse=True) for repo, clones in found.items()}
 
 
 def load_settings() -> Settings:
@@ -226,7 +228,7 @@ def load_settings() -> Settings:
         deployments_dir=deployments_dir(),
         airflow_base_url=os.getenv("AIRFLOW_BASE_URL", "http://localhost:8080"),
         # « ORCHESTRATOR_DIR= » (vide, comme dans .env.example) et aucun clone trouvé au premier lancement
-        # (env_file.find_orchestrator_once) : valeur par défaut, pas « . » (le dossier de Jarvis, vu sur la VM)
+        # (first_launch.note_folders) : valeur par défaut, pas « . » (le dossier de Jarvis, vu sur la VM)
         orchestrator_dir=Path(os.getenv("ORCHESTRATOR_DIR") or f"~/{ORCHESTRATOR_REPO}").expanduser(),
     )
 

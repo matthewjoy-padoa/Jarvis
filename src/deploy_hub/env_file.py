@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from deploy_hub.safe_write import write_text
-from deploy_hub.config import ENV_FILE_KEYS, OP_PREFIX, PROCESS_KEYS, PROJECT_ROOT, SEARCH_DEPTH, orchestrator_clones, parse_env_line
+from deploy_hub.config import ENV_FILE_KEYS, OP_PREFIX, PROCESS_KEYS, PROJECT_ROOT, parse_env_line
 
 
 @dataclass(frozen=True)
@@ -63,12 +63,12 @@ FIELDS = (
           "Vues Notion lues telles quelles pour le sélecteur de squad de la page BAU, « nom | lien de la vue » séparées par « ; ». "
           "Vide : SPSTA et Plateform, les vues « Action squad » de la page BAU de l'équipe intégration", section=NOTION),
     Field("ORCHESTRATOR_DIR", "Dossier de integration-orchestrator", "path", "Clone local de integration-orchestrator : DAGs proposés, onglet PR, agents Claude. Vide au premier lancement : cherché sur la machine, puis noté ici", live=False, section=FOLDERS),
-    Field("FLOW_DIGGER_DIR", "Dossier de Flow Digger", "path", "Vide : cherché aux emplacements habituels", section=FOLDERS),
+    Field("FLOW_DIGGER_DIR", "Dossier de Flow Digger", "path", "Vide au premier lancement : cherché sur la machine, puis noté ici", section=FOLDERS),
     Field("JARVIS_TZ", "Fuseau horaire", "text", "Vide : Europe/Paris, quelle que soit l'heure du serveur (la VM est en UTC). "
           "Nom IANA, ex. Europe/Paris", live=False, section=FOLDERS),
     Field("INTECG_DIR", "Dossier d'InteCG (jeu de cartes)", "path",
           "Dépôt intecg : le lien InteCG du pied de page le met à jour et le démarre, et un DAG ou un agent lancé ici y rapporte un booster. "
-          "Vide : cherché aux emplacements habituels (~/Dev/Apps/intecg…)", section=FOLDERS),
+          "Vide au premier lancement : cherché sur la machine, puis noté ici", section=FOLDERS),
     Field("INTECG_URL", "Adresse d'InteCG", "url",
           "Vide : http://localhost:5173 si le dépôt du jeu est sur cette machine, sinon pas de lien avec InteCG", section=FOLDERS),
     Field("PADOA_ENV_URL", "Adresse des environnements Padoa", "text",
@@ -213,21 +213,3 @@ def update(form: dict[str, str], clear: set[str] = frozenset(), file: Path | Non
         else:
             os.environ.pop(key, None)
     return list(wanted)
-
-
-def find_orchestrator_once() -> str:
-    """Premier lancement sans ORCHESTRATOR_DIR : cherche le clone de integration-orchestrator sur la machine et le note dans
-    .env, une fois. Le clone ne change donc plus tout seul d'un démarrage à l'autre : les worktrees des agents y vivent.
-    Renvoie ce qu'il faut en dire sous le champ des Réglages ("" : le réglage était déjà fait)."""
-    if os.getenv("ORCHESTRATOR_DIR"):
-        return ""
-    clones = orchestrator_clones()
-    if not clones:
-        return f"Aucun clone trouvé sous ton dossier personnel ({SEARCH_DEPTH} niveaux) : indique son dossier ici."
-    others = f" Autres clones, non retenus : {', '.join(map(str, clones[1:]))}." if clones[1:] else ""
-    try:
-        update({"ORCHESTRATOR_DIR": str(clones[0])})
-    except (EnvError, OSError) as e:  # .env non modifiable, chemin refusé : ce démarrage s'en sert quand même
-        os.environ["ORCHESTRATOR_DIR"] = str(clones[0])
-        return f"Trouvé au démarrage, mais non noté dans .env ({e}) : cherché de nouveau au prochain démarrage.{others}"
-    return f"Trouvé au premier démarrage et noté ici.{others}"
