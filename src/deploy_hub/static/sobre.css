@@ -103,7 +103,8 @@ html:root[data-style="sobre"] {
   .segmented a.active, .segmented button.active, .nav-item.active { box-shadow: 0 0 0 1px var(--border); }
   .retour details.agent > summary, .ticket details.agent > summary, .ticket-agent-btn { border-radius: 6px; background: var(--accent); box-shadow: none; transition: none; }
   .retour details.agent > summary:hover, .ticket details.agent > summary:hover { transform: none; filter: none; box-shadow: none; }
-  .retour details.agent[open] > summary, .ticket details.agent[open] > summary { background: var(--surface); }
+  /* Ouvert, ou replié dans une ligne de la liste (bouton discret, texte sombre) : fond clair, pas le bleu plein */
+  .retour details.agent[open] > summary, .ticket details.agent[open] > summary, .retour-more details.agent:not([open]) > summary { background: var(--surface); }
   .retour details.agent[open], .ticket details.agent[open] { border-radius: 6px; }
 
   /* ---- Onglets : soulignés, plus de pastilles ------------------------------------------------------------------- */
