@@ -142,6 +142,20 @@ def test_adresse_par_defaut_seulement_si_le_jeu_est_sur_la_machine(tmp_path, mon
     assert intecg.url() == "http://vm:5174" and intecg._address() == ("vm", 5174)
 
 
+@pytest.mark.parametrize("address", ["http://localhost:abc", "http://localhost:99999", "http://[::1"])
+def test_adresse_illisible_pas_de_lien_ni_d_erreur(monkeypatch, address):
+    """Port ou hôte mal saisi dans Réglages (qui ne vérifie que « http:// ») : comme sans adresse, ni lien ni booster,
+    au lieu d'une erreur 500 au clic sur le lien InteCG."""
+    def refused(*a, **k):
+        raise ConnectionRefusedError  # aucun jeu à l'écoute, quoi qui tourne sur la machine du développeur
+    monkeypatch.setenv("INTECG_URL", address)
+    monkeypatch.setattr(intecg.socket, "create_connection", refused)
+    assert intecg.url() == "" and intecg.running() is False
+    client = TestClient(main.app)
+    assert "/outils/intecg" not in client.get("/").text
+    assert client.post("/outils/intecg", headers={"origin": "http://testserver"}).status_code == 200  # page « introuvable », pas 500
+
+
 def test_jeu_deja_lance_on_y_emmene_sans_rien_lancer(repo):
     with socket.socket() as listening:
         listening.bind(("127.0.0.1", repo.port))

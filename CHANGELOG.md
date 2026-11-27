@@ -13,6 +13,7 @@ La version affichée en bas de chaque page change donc avec chaque fonctionnalit
 
 ## [0.8.3] · 2026-11-27
 
+- Correction : une adresse d'InteCG mal saisie dans Réglages (`INTECG_URL` avec un port illisible, par exemple `http://localhost:abc`) ne met plus le lien « InteCG ↗ » en erreur 500. Elle est traitée comme une adresse absente : ni lien ni booster, comme pour une adresse sans `http://`.
 - InteCG, le jeu de cartes de l'équipe (dépôt `intecg`, à part), relié à Jarvis dès que son dépôt est sur la machine (`~/Dev/Apps/intecg`, ou `INTECG_DIR`). Lien « InteCG ↗ » en pied de page : met le dépôt du jeu à jour, installe ses paquets au besoin, le démarre s'il ne tourne pas et l'ouvre dans sa propre fenêtre. Un DAG ou un agent lancé dans Jarvis demande un booster bonus au jeu (`POST /api/credits/jarvis`), en tâche de fond : c'est InteCG qui décide, par tirage au sort à chaque lancement (chance faible, réglée dans le jeu), sans compter un lancement deux fois et avec un maximum par jour. Booster gagné : un sachet tombe au milieu de l'écran avec un bouton « Ouvrir InteCG », et une notification reste dans la cloche. Jeu arrêté ou injoignable : le lancement se fait quand même, sans booster. Réglages `INTECG_DIR` et `INTECG_URL` (**Réglages → Dossiers et liens**).
 
 ## [0.8.2] · 2026-11-24

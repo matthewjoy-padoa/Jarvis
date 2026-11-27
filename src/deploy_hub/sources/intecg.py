@@ -47,8 +47,17 @@ def url() -> str:
     « npm run dev » si le dépôt du jeu est sur la machine. Vide : pas de lien avec InteCG."""
     value = os.getenv("INTECG_URL", "").strip().rstrip("/")
     if value:
-        return value if value.startswith(("http://", "https://")) else ""
+        return value if value.startswith(("http://", "https://")) and _readable(value) else ""
     return DEFAULT_URL if folder() else ""
+
+
+def _readable(address: str) -> bool:
+    """Hôte et port lisibles : « http://localhost:abc » passe le contrôle de Réglages, mais pas urlsplit (ValueError)."""
+    try:
+        urlsplit(address).port
+    except ValueError:
+        return False
+    return True
 
 
 def _address() -> tuple[str, int]:
