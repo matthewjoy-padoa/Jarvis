@@ -50,8 +50,28 @@
 {% if plain %}
 {# Affichage sobre (`plain`, base.html) : les quatre étapes en compteurs, puis le tableau ; ni armures ni glisser-déposer
    (un agent s'archive depuis sa page). #}
-{{ charts.stats([("En cours", lanes[0][3] | rejectattr("group", "equalto", "todo") | list | length, ""),
-                 ("En attente de ta réponse", lanes[0][3] | selectattr("group", "equalto", "todo") | list | length, "todo"),
+{% if asking %}
+{# Ceux qui attendent une réponse d'abord (les armures « ? » de l'affichage animé) : la question posée, et un lien qui
+   arrive sur le formulaire de réponse de l'agent. Une réponse déjà partie : lien vers l'agent qui la traite. #}
+<section class="panel agent-asking" id="en-attente" aria-labelledby="en-attente-titre">
+  <div class="panel-head"><h2 id="en-attente-titre">En attente de ta réponse</h2><span class="badge g-todo">{{ asking | length }}</span></div>
+  <ul class="plain">
+    {% for r, questions, reply in asking %}
+    <li>
+      <div class="asking-what">
+        <a href="/agents/{{ r.id }}#repondre"><strong>#{{ r.id }}</strong> {{ r.name }}</a>
+        <span class="muted">· {{ r.client }}{% if r.ended_at %} · question posée {{ r.ended_at | quand }}{% endif %}</span>
+        {% if questions %}<p class="asking-q">{{ questions[0].text | md_inline }}{% if questions | length > 1 %} <span class="muted">(+ {{ questions | length - 1 }})</span>{% endif %}</p>{% endif %}
+      </div>
+      {% if reply %}<a class="btn-link" href="/agents/{{ reply.id }}">Réponse en cours · #{{ reply.id }}</a>
+      {% else %}<a class="btn-primary" href="/agents/{{ r.id }}#repondre">Répondre</a>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{{ charts.stats([("En cours", lanes[0][3] | length - asking | length, ""),
+                 ("En attente de ta réponse", asking | length, "todo", {"href": "#en-attente"} if asking else None),
                  ("Terminés, sans PR", lanes[1][3] | length, ""), ("PR ouvertes, à relire", lanes[2][3] | length, ""),
                  ("Arrêtés ou en échec", lanes[3][3] | length, "ko")]) }}
 {% else %}

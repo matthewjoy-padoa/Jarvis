@@ -1649,7 +1649,7 @@ p.last-sync { margin: 4px 0 6px; }
 .dag-source-error { color: var(--danger); }
 
 /* Agent qui attend une réponse : ses questions, puis « Répondre et relancer » */
-.agent-waiting { border-color: var(--warn); }
+.agent-waiting { border-color: var(--warn); scroll-margin-top: calc(var(--topbar-h, 61px) + 16px); }  /* arrivée par l'ancre #repondre */
 .agent-reply { display: grid; gap: 8px; margin-top: 12px; }
 .agent-reply textarea { width: 100%; font: inherit; }
 .agent-reply button { justify-self: start; }

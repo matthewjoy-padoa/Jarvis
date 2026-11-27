@@ -938,7 +938,10 @@ def agents(request: Request):
         claude.refresh_context(run)  # agents en cours : où en est leur contexte
     runs = [r for _, r in sorted(enumerate(claude.runs), key=lambda p: (not p[1].pinned, p[1].rank is None, p[1].rank or 0, p[0]))]  # épinglés, ordre choisi, récents
     archived = claude.archived()
-    return _render(request, "agents.html", "/agents", runs=runs, archived_count=len(archived),
+    # Agents qui attendent une réponse : (agent, ses questions, la suite qui traite déjà la réponse ou None s'il reste à répondre)
+    asking = [(r, agent_questions(r.summary)[1], None if claude.can_reply(r, reply) else reply)
+              for r in runs if r.status == WAITING for reply in [claude.follow_up(r.id)]]
+    return _render(request, "agents.html", "/agents", runs=runs, archived_count=len(archived), asking=asking,
                    cards=board(dag_watch, dag_chains.chains, airflow.runs), usage=usage(claude.runs + archived))
 
 

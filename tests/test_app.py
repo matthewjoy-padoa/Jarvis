@@ -803,3 +803,22 @@ def test_sober_agents_page_is_counters_and_a_table_without_suits():
     assert f'hx-post="/agents/{run.id}/archiver"' in sober.get(f"/agents/{run.id}").text
     animated = TestClient(app).get("/agents").text
     assert 'class="bot"' in animated and "data-archive-zone" in animated and 'class="panel agent-flow"' in animated
+
+
+def test_sober_agents_page_lists_waiting_agents_first_with_a_link_to_the_reply_form():
+    """En sobre, les agents qui attendent une réponse sont listés en tête de page Agents : la question posée et un lien
+    qui arrive sur le formulaire de réponse. Sans agent en attente, le bloc n'existe pas."""
+    from deploy_hub.sources.claude_runner import WAITING
+    claude.runs.clear()
+    client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief"})
+    run = claude.runs[0]
+    run.status = "terminé"
+    sober = TestClient(app, cookies=SOBER)
+    assert 'id="en-attente"' not in sober.get("/agents").text
+    run.status, run.summary = WAITING, "Rien modifié.\nQuestions :\n1. Client ou logiciel ?\n2. Avec un test ?\n"
+    page = sober.get("/agents").text
+    assert f'href="/agents/{run.id}#repondre">Répondre</a>' in page and "Client ou logiciel ?" in page and "(+ 1)" in page
+    assert page.index('id="en-attente"') < page.index('<div class="stats">') < page.index("<table data-filterable>")
+    assert 'class="stat stat-todo stat-link" href="#en-attente"' in page  # le compteur y mène
+    assert '<section class="panel agent-waiting" id="repondre">' in sober.get(f"/agents/{run.id}").text
+    assert 'id="en-attente"' not in TestClient(app).get("/agents").text  # l'affichage animé garde ses armures « ? »
