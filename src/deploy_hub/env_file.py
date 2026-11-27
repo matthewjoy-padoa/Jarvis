@@ -67,7 +67,7 @@ FIELDS = (
     Field("JARVIS_TZ", "Fuseau horaire", "text", "Vide : Europe/Paris, quelle que soit l'heure du serveur (la VM est en UTC). "
           "Nom IANA, ex. Europe/Paris", live=False, section=FOLDERS),
     Field("INTECG_DIR", "Dossier d'InteCG (jeu de cartes)", "path",
-          "Dépôt intecg : le bouton InteCG le met à jour et le démarre, et un DAG ou un agent lancé ici y rapporte un booster. "
+          "Dépôt intecg : le lien InteCG du pied de page le met à jour et le démarre, et un DAG ou un agent lancé ici y rapporte un booster. "
           "Vide : cherché aux emplacements habituels (~/Dev/Apps/intecg…)", section=FOLDERS),
     Field("INTECG_URL", "Adresse d'InteCG", "url",
           "Vide : http://localhost:5173 si le dépôt du jeu est sur cette machine, sinon pas de lien avec InteCG", section=FOLDERS),

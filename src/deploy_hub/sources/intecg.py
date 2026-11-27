@@ -5,11 +5,11 @@ Jarvis ne fait que prévenir le serveur du jeu (POST <adresse>/api/credits/jarvi
 crédite, qui ne compte une clé qu'une fois et qui plafonne les boosters du jour. L'appel part en tâche de fond et
 n'échoue jamais : un jeu arrêté ne doit ni ralentir ni empêcher un lancement.
 
-Le bouton InteCG de la barre démarre le jeu s'il ne tourne pas (start) : dépôt mis à jour en avance rapide, paquets
+Le lien InteCG du pied de page démarre le jeu s'il ne tourne pas (start) : dépôt mis à jour en avance rapide, paquets
 npm installés s'ils manquent ou ont changé, puis « npm run dev », détaché, comme le fait Flow Digger. Jeu déjà lancé :
 Jarvis y emmène sans toucher à son dépôt (le jeu commite et pousse sa base lui-même, et se met à jour au passage).
 
-Sans dépôt du jeu sur la machine ni INTECG_URL (Réglages), il n'y a ni bouton ni booster.
+Sans dépôt du jeu sur la machine ni INTECG_URL (Réglages), il n'y a ni lien ni booster.
 """
 
 import logging

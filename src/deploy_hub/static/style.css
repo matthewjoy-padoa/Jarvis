@@ -371,6 +371,10 @@ code.res, code.req { border-radius: 6px; border-width: 1px; }
 .result.ok { color: var(--text); } .result.ok::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--st-done); margin-right: 6px; vertical-align: 1px; }
 .toolbar input[type=search], .toolbar select, .dag-form select, .agent-form textarea { border: 2px solid var(--border); border-radius: 10px; background: var(--surface); }
 .footer { color: var(--muted); }
+/* Outil lancé depuis le pied de page (InteCG) : un bouton qui a l'air d'un lien du pied de page. */
+.footer-tool { display: inline; margin: 0; }
+.footer .footer-tool button { display: inline; min-height: 0; height: auto; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--accent); font: inherit; font-weight: inherit; cursor: pointer; }
+.footer .footer-tool button:hover { text-decoration: underline; background: none; }
 
 /* Notifications */
 .bell-wrap { position: relative; flex: none; }
