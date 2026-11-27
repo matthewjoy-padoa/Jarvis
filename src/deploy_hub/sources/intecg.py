@@ -29,7 +29,6 @@ from deploy_hub.sources import flow_digger
 from deploy_hub.sources.flow_digger import Launch
 
 TIMEOUT_S = 60  # le jeu commite et pousse sa base (git) avant de répondre
-CANDIDATES = ("~/Dev/Apps/intecg", "~/Dev/intecg", "~/intecg")
 DEFAULT_URL = "http://localhost:5173"  # port par défaut de « npm run dev » (Vite)
 INSTALL_TIMEOUT = 300  # s, « npm install »
 log = logging.getLogger("uvicorn.error")
@@ -37,9 +36,10 @@ _starting = threading.Lock()  # deux clics rapprochés : le second attend le pre
 
 
 def folder() -> Path | None:
-    """Dossier du dépôt du jeu : INTECG_DIR, sinon le premier emplacement habituel qui contient package.json."""
-    paths = [os.environ["INTECG_DIR"]] if os.getenv("INTECG_DIR") else CANDIDATES
-    return next((p for p in (Path(c).expanduser() for c in paths) if (p / "package.json").is_file()), None)
+    """Dossier du dépôt du jeu : INTECG_DIR, s'il contient package.json. Il n'y a pas d'emplacement convenu : au premier
+    lancement, Jarvis cherche le clone sur la machine et note ce réglage (first_launch)."""
+    chosen = os.getenv("INTECG_DIR")  # vide : rien, surtout pas le dossier courant
+    return Path(chosen).expanduser() if chosen and (Path(chosen).expanduser() / "package.json").is_file() else None
 
 
 def url() -> str:
@@ -85,8 +85,8 @@ def _start(wait: float, force: bool) -> Launch:
         return Launch(url=url())  # lancé pendant qu'on attendait le verrou
     repo = folder()
     if not repo:
-        return Launch(error="InteCG introuvable : clone le dépôt intecg sur la machine de Jarvis (par exemple dans "
-                            "~/Dev/Apps/intecg) ou indique son dossier dans INTECG_DIR (Réglages).")
+        return Launch(error="InteCG introuvable : clone le dépôt intecg sur la machine de Jarvis, puis redémarre Jarvis "
+                            "(il le cherche au démarrage) ou indique son dossier dans INTECG_DIR (Réglages).")
     updated = ""
     if not force:
         ok, updated = flow_digger.update(repo)

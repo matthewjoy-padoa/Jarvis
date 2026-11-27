@@ -22,6 +22,8 @@ os.environ["CLAUDE_BIN"] = os.path.join(tempfile.mkdtemp(), "claude-absent")
 # Jamais le vrai InteCG : un agent ou un DAG lancé par un test ne doit créditer de booster à personne.
 os.environ["INTECG_URL"] = ""
 os.environ["INTECG_DIR"] = tempfile.mkdtemp()  # dossier vide : pas le dépôt du jeu du développeur
+# Dossiers tous réglés : le premier lancement (first_launch) ne cherche rien sur la machine du développeur et n'écrit aucun .env.
+os.environ["FLOW_DIGGER_DIR"] = tempfile.mkdtemp()
 
 import json
 import threading
