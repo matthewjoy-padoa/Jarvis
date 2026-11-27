@@ -731,3 +731,94 @@ def test_the_whole_agent_card_opens_the_agent():
     assert f'<a href="/agents/{run.id}" data-row-link>' in client.get("/agents/archives").text
     css = (__import__("pathlib").Path(__file__).parents[1] / "src" / "deploy_hub" / "static" / "style.css").read_text()
     assert ".flow-tip::before" in css  # la bulle du schéma reste ouverte quand la souris la rejoint
+
+
+SOBER = {"jarvis_affichage": "sobre"}  # cookie posé par POST /affichage
+
+
+def test_sober_display_is_chosen_per_browser_and_has_no_christmas():
+    """Affichage sobre : choisi dans Réglages ou en pied de page, gardé dans un cookie ; le serveur marque alors <html>, charge
+    sobre.css, n'offre plus Noël au bouton de thème et ne l'impose pas en décembre. Sans le cookie, rien ne change."""
+    browser = TestClient(app)
+    plain = browser.get("/")
+    assert "<html lang=\"fr\">" in plain.text and 'value="sobre"' in plain.text and "Affichage sobre" in plain.text
+    assert "sobre.css" not in plain.text and '<header class="topbar">' in plain.text
+    chosen = browser.post("/affichage", data={"affichage": "sobre", "vers": "/agents"}, follow_redirects=False)
+    assert chosen.status_code == 303 and chosen.headers["location"] == "/agents"
+    html = browser.get("/").text
+    assert '<html lang="fr" data-style="sobre">' in html and "Affichage animé" in html and "/static/sobre.css?v=" in html
+    assert "Just A Rather Very Intelligent System</em>" not in html and "outil de l'équipe Integration" in html
+    head = html.split("</head>")[0]
+    assert '!sober && new Date() >= new Date("2026-12-01T00:00")' in head  # Noël jamais imposé en sobre
+    assert '{ noel: "dark", "noel-clair": "light" }' in head  # un thème Noël retenu s'affiche en Nuit ou en Clair
+    assert 'root.dataset.style === "sobre" ? ["", "dark", "light"]' in html  # bouton de thème sans Noël
+    settings = browser.get("/reglages").text
+    assert 'id="affichage"' in settings and '<span class="badge">sobre</span>' in settings
+    back = browser.post("/affichage", data={"affichage": "jarvis"}, follow_redirects=False)
+    assert back.headers["location"] == "/reglages#affichage"
+    assert "<html lang=\"fr\">" in browser.get("/").text
+    assert ':root[data-style="sobre"] {' in client.get("/static/sobre.css").text
+
+
+def test_display_choice_only_returns_to_a_page_of_jarvis():
+    for outside in ("https://example.com/", "//example.com/x"):
+        r = TestClient(app).post("/affichage", data={"affichage": "sobre", "vers": outside}, follow_redirects=False)
+        assert r.headers["location"] == "/reglages#affichage"
+
+
+def test_sober_display_keeps_the_top_menu_dock_and_floating_buttons():
+    """En sobre, le squelette est celui de l'affichage animé, au caractère près : barre du haut, dock des liens du client,
+    boutons Notes et Console. Seule sobre.css en change l'aspect."""
+    def skeleton(cookies):
+        html = TestClient(app, cookies=cookies).get("/deploiements/client-demo/synthese").text
+        parts = (('<header class="topbar"', "</header>"), ('<div class="dock-wrap"', "</body>"), ("data-console-open", 'id="notes"'))
+        return [html[html.index(start):html.index(end, html.index(start))] for start, end in parts]
+    bar, dock, buttons = sober = skeleton(SOBER)
+    assert sober == skeleton({})
+    assert "data-client-switch" in bar and 'id="theme-toggle"' in bar and "/clients/client-demo/liens" in dock and "data-notes-open" in buttons
+
+
+def test_sober_home_is_a_dashboard_without_greeting():
+    sober = TestClient(app, cookies=SOBER).get("/").text
+    assert "<h1>Tableau de bord " in sober and "Brief du jour" in sober
+    for chatty in ("Bonjour.", "Bonsoir.", "Par quoi commence-t-on", "Jarvis a relevé", "Brief du matin"):
+        assert chatty not in sober, chatty
+    animated = TestClient(app).get("/").text
+    assert ("Bonjour." in animated or "Bonsoir." in animated) and "Brief du matin" in animated and "Tableau de bord" not in animated
+
+
+def test_sober_agents_page_is_counters_and_a_table_without_suits():
+    """En sobre, la page Agents donne les étapes en compteurs puis le tableau : ni schéma, ni armure, ni photo, ni
+    glisser-déposer (l'agent s'archive depuis sa page). L'affichage animé garde son schéma et ses armures."""
+    claude.runs.clear()
+    client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief"})
+    run = claude.runs[0]
+    run.status = "terminé"
+    sober = TestClient(app, cookies=SOBER)
+    page = sober.get("/agents").text
+    assert "<strong>1</strong><span>Terminés, sans PR</span>" in page and "<span>En attente de ta réponse</span>" in page
+    assert f'<tr data-agent="{run.id}"' in page and 'href="/agents/archives">Archivés (' in page
+    for decor in ('class="bot"', "agent-face", "data-fly", "data-archive-zone", "il s'envole", "takeOff", "agent-flow"):
+        assert decor not in page, decor
+    assert f'hx-post="/agents/{run.id}/archiver"' in sober.get(f"/agents/{run.id}").text
+    animated = TestClient(app).get("/agents").text
+    assert 'class="bot"' in animated and "data-archive-zone" in animated and 'class="panel agent-flow"' in animated
+
+
+def test_sober_agents_page_lists_waiting_agents_first_with_a_link_to_the_reply_form():
+    """En sobre, les agents qui attendent une réponse sont listés en tête de page Agents : la question posée et un lien
+    qui arrive sur le formulaire de réponse. Sans agent en attente, le bloc n'existe pas."""
+    from deploy_hub.sources.claude_runner import WAITING
+    claude.runs.clear()
+    client.post("/actions/agent-retour/client-demo/R-03", data={"prompt": "Brief"})
+    run = claude.runs[0]
+    run.status = "terminé"
+    sober = TestClient(app, cookies=SOBER)
+    assert 'id="en-attente"' not in sober.get("/agents").text
+    run.status, run.summary = WAITING, "Rien modifié.\nQuestions :\n1. Client ou logiciel ?\n2. Avec un test ?\n"
+    page = sober.get("/agents").text
+    assert f'href="/agents/{run.id}#repondre">Répondre</a>' in page and "Client ou logiciel ?" in page and "(+ 1)" in page
+    assert page.index('id="en-attente"') < page.index('<div class="stats">') < page.index("<table data-filterable>")
+    assert 'class="stat stat-todo stat-link" href="#en-attente"' in page  # le compteur y mène
+    assert '<section class="panel agent-waiting" id="repondre">' in sober.get(f"/agents/{run.id}").text
+    assert 'id="en-attente"' not in TestClient(app).get("/agents").text  # l'affichage animé garde ses armures « ? »

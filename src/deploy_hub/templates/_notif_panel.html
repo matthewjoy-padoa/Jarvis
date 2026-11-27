@@ -1,7 +1,7 @@
 {% import "_icons.html" as ic %}
 {# Panneau des notifications (cloche de la barre du haut). Attend : notes, unread, urgent. #}
 <div class="notif-head">
-  <strong>Jarvis vous signale</strong>
+  <strong>{{ "Notifications" if plain else "Jarvis vous signale" }}</strong>
   {% if unread %}<button type="button" class="secondary" hx-post="/notifications/lu" hx-target="#notif-panel">Tout marquer comme lu</button>{% endif %}
 </div>
 <ul class="notif-list">

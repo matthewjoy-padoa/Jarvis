@@ -325,7 +325,10 @@ async def _push_loop() -> None:
 
 app = FastAPI(title="Jarvis", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
-templates = Jinja2Templates(directory=HERE / "templates")
+# `plain` : affichage sobre choisi dans ce navigateur (cookie STYLE_COOKIE), connu de tous les gabarits, fragments htmx compris.
+# Un gabarit relu sur le disque avant la relance, par un processus qui ne le fournit pas encore, le voit faux : affichage animé.
+templates = Jinja2Templates(directory=HERE / "templates",
+                            context_processors=[lambda request: {"plain": request.cookies.get(STYLE_COOKIE) == "sobre"}])
 def when_text(moment: datetime | None) -> str:
     """« aujourd'hui à 14:04 », « hier à 16:00 », « le 12/11 à 09:03 » (« le 12/11/2025 à … » une autre année)."""
     if not moment:
@@ -420,6 +423,10 @@ NAV_PAGES = [p for p in PAGES if p[0] != "/clients"]  # « BAU » toujours : la 
 
 
 CLIENT_COOKIE = "jarvis_client"  # client en cours : celui de la dernière fiche ouverte
+# Affichage sobre, choisi dans Réglages ou en pied de page : même squelette, couleurs neutres, formes plus carrées, ni armures,
+# ni Noël, ni effets (sobre.css, branches `plain` des gabarits).
+# Gardé dans un cookie, pas dans le navigateur seul : le serveur rend la page sobre dès le premier affichage (`plain`, plus haut).
+STYLE_COOKIE = "jarvis_affichage"
 # Vues tous clients, proposées sur la page Clients (et toujours joignables par leur URL).
 CROSS_PAGES = [
     ("/injections", "Injections"),
@@ -503,6 +510,16 @@ def _fiche_url(request: Request, slug: str) -> str:
 def _keep(response, cookie: str, value: str):
     """Préférence gardée un an dans ce navigateur (client en cours, vue des fiches)."""
     response.set_cookie(cookie, value, max_age=365 * 24 * 3600, samesite="lax")
+    return response
+
+
+@app.post("/affichage")
+def display_style(affichage: str = Form(""), vers: str = Form("")):
+    """Affichage sobre ou animé (« jarvis »), pour ce navigateur ; retour à la page d'où vient le choix."""
+    response = RedirectResponse(_local_path(vers, "/reglages#affichage"), status_code=303)
+    if affichage == "sobre":
+        return _keep(response, STYLE_COOKIE, "sobre")
+    response.delete_cookie(STYLE_COOKIE)
     return response
 
 
@@ -926,7 +943,10 @@ def agents(request: Request):
         claude.refresh_context(run)  # agents en cours : où en est leur contexte
     runs = [r for _, r in sorted(enumerate(claude.runs), key=lambda p: (not p[1].pinned, p[1].rank is None, p[1].rank or 0, p[0]))]  # épinglés, ordre choisi, récents
     archived = claude.archived()
-    return _render(request, "agents.html", "/agents", runs=runs, archived_count=len(archived),
+    # Agents qui attendent une réponse : (agent, ses questions, la suite qui traite déjà la réponse ou None s'il reste à répondre)
+    asking = [(r, agent_questions(r.summary)[1], None if claude.can_reply(r, reply) else reply)
+              for r in runs if r.status == WAITING for reply in [claude.follow_up(r.id)]]
+    return _render(request, "agents.html", "/agents", runs=runs, archived_count=len(archived), asking=asking,
                    cards=board(dag_watch, dag_chains.chains, airflow.runs), usage=usage(claude.runs + archived))
 
 

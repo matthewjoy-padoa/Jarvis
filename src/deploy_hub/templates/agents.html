@@ -39,7 +39,7 @@
 </nav>
 <div id="pane-agents" data-tab-pane>
 <p class="muted">Chaque agent travaille dans son propre worktree de l'orchestrator, créé depuis origin/main.
-  Attrape un agent : il s'envole. Pose-le ailleurs dans sa colonne pour changer sa place, ou sur « Archiver » pour le ranger. <a href="/agents/archives">Archivés ({{ archived_count }})</a></p>
+  {% if not plain %}Attrape un agent : il s'envole. Pose-le ailleurs dans sa colonne pour changer sa place, ou sur « Archiver » pour le ranger. {% endif %}<a href="/agents/archives">Archivés ({{ archived_count }})</a></p>
 {% if runs %}
 {% set lanes = [
   ("in_progress", "En cours", "L'agent travaille dans son worktree · ? : attend ta réponse", runs | selectattr("group", "in", ["in_progress", "todo"]) | list),
@@ -47,6 +47,34 @@
   ("pr", "PR ouverte", "À relire sur GitHub", runs | selectattr("pr_url") | list),
   ("ko", "Arrêtés ou en échec", "Échec, arrêt, délai dépassé", runs | selectattr("group", "equalto", "ko") | rejectattr("pr_url") | list),
 ] %}
+{% if plain %}
+{# Affichage sobre (`plain`, base.html) : les quatre étapes en compteurs, puis le tableau ; ni armures ni glisser-déposer
+   (un agent s'archive depuis sa page). #}
+{% if asking %}
+{# Ceux qui attendent une réponse d'abord (les armures « ? » de l'affichage animé) : la question posée, et un lien qui
+   arrive sur le formulaire de réponse de l'agent. Une réponse déjà partie : lien vers l'agent qui la traite. #}
+<section class="panel agent-asking" id="en-attente" aria-labelledby="en-attente-titre">
+  <div class="panel-head"><h2 id="en-attente-titre">En attente de ta réponse</h2><span class="badge g-todo">{{ asking | length }}</span></div>
+  <ul class="plain">
+    {% for r, questions, reply in asking %}
+    <li>
+      <div class="asking-what">
+        <a href="/agents/{{ r.id }}#repondre"><strong>#{{ r.id }}</strong> {{ r.name }}</a>
+        <span class="muted">· {{ r.client }}{% if r.ended_at %} · question posée {{ r.ended_at | quand }}{% endif %}</span>
+        {% if questions %}<p class="asking-q">{{ questions[0].text | md_inline }}{% if questions | length > 1 %} <span class="muted">(+ {{ questions | length - 1 }})</span>{% endif %}</p>{% endif %}
+      </div>
+      {% if reply %}<a class="btn-link" href="/agents/{{ reply.id }}">Réponse en cours · #{{ reply.id }}</a>
+      {% else %}<a class="btn-primary" href="/agents/{{ r.id }}#repondre">Répondre</a>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{{ charts.stats([("En cours", lanes[0][3] | length - asking | length, ""),
+                 ("En attente de ta réponse", asking | length, "todo", {"href": "#en-attente"} if asking else None),
+                 ("Terminés, sans PR", lanes[1][3] | length, ""), ("PR ouvertes, à relire", lanes[2][3] | length, ""),
+                 ("Arrêtés ou en échec", lanes[3][3] | length, "ko")]) }}
+{% else %}
 <section class="panel agent-flow" id="schema" aria-label="Où en sont les agents">
   {% for key, title, hint, found in lanes %}
   <div class="flow-lane flow-{{ key }}{{ ' is-empty' if not found }}">
@@ -236,6 +264,7 @@
     el.addEventListener("focusout", () => mark(false));
   });
 </script>
+{% endif %}
 {% endif %}
 <table data-filterable>
   <thead><tr><th>#</th><th>Lancé à</th><th data-filter>Client</th><th>Sujet</th><th>Branche</th><th data-filter>État</th><th>Durée</th><th>Tokens</th><th>PR</th></tr></thead>

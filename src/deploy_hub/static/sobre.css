@@ -1,0 +1,150 @@
+/* Affichage sobre de Jarvis (2026-11-25) : chargée après style.css, seulement quand l'affichage sobre est choisi
+   (Réglages → Affichage, ou lien en pied de page ; cookie lu par le serveur, data-style="sobre" sur <html>).
+   Un outil de travail neutre : même squelette que l'affichage animé (barre du haut, dock des liens, boutons Notes et
+   Console), mais gris neutres et un seul bleu, traits fins, angles peu arrondis, pas d'ombre, rien qui bouge. Les statuts
+   gardent leurs quatre couleurs, en plus sourd.
+   Tout est imbriqué sous html:root[data-style="sobre"] : chaque règle passe devant celle de style.css qu'elle remplace,
+   thèmes compris (:root[data-theme="dark"]). Couleurs en light-dark() : le clair et la nuit suivent le thème (Auto, Nuit,
+   Clair) déjà posé par style.css (color-scheme). Demande un navigateur qui connaît l'imbrication CSS et light-dark().
+   Ce qui ne change pas ici : les animations utiles (attente, avancement d'une synchro, « Enregistré » qui s'efface) et les
+   barres d'avancement, qui gardent leurs bouts ronds. */
+html:root[data-style="sobre"] {
+  --bg: light-dark(#f4f5f7, #20242b); --surface: light-dark(#ffffff, #292e36); --text: light-dark(#1a202c, #e2e5ea);
+  --muted: light-dark(#5c6675, #a4adba); --border: light-dark(#dfe3e8, #3d444f);
+  --accent: light-dark(#23468c, #8fb0ea); --accent-soft: light-dark(#e7edf7, #2e3b55); --on-accent: light-dark(#ffffff, #10141b);
+  --cyan: light-dark(#2c6a8d, #86b8d4); --on-status: light-dark(#ffffff, #131519);
+  --st-todo: light-dark(#a06600, #d2a550); --st-progress: light-dark(#2b5cab, #8fb0ea);
+  --st-ko: light-dark(#b3261e, #e58b82); --st-done: light-dark(#1d7044, #77c093);
+  --pa-todo: light-dark(#faefd2, rgba(210, 165, 80, .18)); --pa-progress: light-dark(#e3ebf8, rgba(143, 176, 234, .18));
+  --pa-ko: light-dark(#fae3e0, rgba(229, 139, 130, .18)); --pa-done: light-dark(#dbefe2, rgba(119, 192, 147, .18));
+  --radius: 6px; --line: 1px; --shadow: none; --shadow-card: none;
+  --shadow-lift: 0 6px 16px -8px light-dark(rgba(16, 24, 40, .25), rgba(0, 0, 0, .5));
+  --ring: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
+
+  body { font-size: 13.5px; }
+  .footer { font-size: 12.5px; }
+  h1 { font-size: 21px; letter-spacing: -.01em; }
+  h2 { font-size: 15px; }
+  .page-head { margin-bottom: 10px; }
+  .page-head h1 .muted { font-size: 13.5px; font-weight: 400; }
+  .client-emoji:not(.client-icon) { display: none; }  /* le logo du client (image) reste, pas son emoji */
+
+  /* ---- Barre du haut : celle de l'affichage animé, en plus carré (arrondis : listes de la section suivante) ------- */
+  .topbar { border-bottom-width: 1px; }
+  /* Logo fixe, nom en texte plein, pas de point « en ligne » qui bat */
+  .brand-mark { transform: none; transition: none; }
+  .brand-mark .ring-outer, .brand-mark .ring-inner, .brand-mark .core, .brand-name, .client-menu, .bell-count { animation: none; }
+  .brand-name { background: none; color: var(--text); font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+  .brand-dot { display: none; }
+  .client-chip { border-width: 1px; border-color: var(--border); background: var(--surface); box-shadow: none; font-weight: 600; transform: none; transition: none; }
+  .client-chip:hover { border-color: var(--muted); }
+  .nav-item { transition: none; }
+  .client-menu a.client-menu-all { border-radius: 0 0 4px 4px; }
+  .notif-panel { border-width: 1px; box-shadow: var(--shadow-lift); }
+
+  /* ---- Dock des liens du client : boutons carrés, fixes ---------------------------------------------------------- */
+  .dock, .dock-envs { padding: 6px; border-radius: 8px; background: var(--surface); backdrop-filter: none; }
+  .dock-btn { width: 36px; height: 36px; transform: none; transition: none; }
+  .dock-btn:hover, .dock-btn:focus-visible { border-color: var(--muted); color: var(--text); }
+  .dock-btn::after { transition: none; }
+  /* Environnements Padoa : une liste à gauche du bouton, plus d'éventail. Elle garde elle-même le survol entre le bouton et
+     ses lignes (marge intérieure, souris captée une fois ouverte) : la zone de survol de l'éventail (style.css) ne sert plus. */
+  .dock-envs::before { content: none; }
+  .dock-pop { right: 100%; width: auto; height: auto; padding-right: 12px; transform: translateY(-50%); display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
+  .dock-envs:hover .dock-pop, .dock-envs:focus-within .dock-pop { pointer-events: auto; }
+  .dock-pop > * { position: static; transform: none; transition: none; font-weight: 500; }
+  .dock-pop > a:hover, .dock-pop > a:focus-visible { background: var(--bg); border-color: var(--muted); color: var(--text); }
+
+  /* ---- Boutons Notes et Console : carrés, rien ne s'allonge au survol --------------------------------------------- */
+  /* Notes se pose au-dessus de Console, le bloc-notes au-dessus de Notes : tout se déduit de ces trois mesures.
+     Le survol n'est repris que pour l'ombre, que la règle générale des boutons (plus bas) retire au survol. */
+  --fab-h: 36px; --fab-bottom: 24px; --fab-gap: 8px;
+  button.console-fab { bottom: var(--fab-bottom); gap: 8px; height: var(--fab-h); min-width: 0; padding: 0 12px; transform: none; }
+  button.console-fab, button.console-fab:hover:not(:disabled) { box-shadow: var(--shadow-lift); }
+  button.console-fab .ic { width: 16px; height: 16px; }
+  .console-fab-label, button.console-fab kbd { max-width: none; opacity: 1; transition: none; }
+  .console-fab-label { font-family: inherit; font-size: 13px; font-weight: 500; }
+  button.console-fab kbd { padding: 1px 6px; }
+  button.notes-fab { bottom: calc(var(--fab-bottom) + var(--fab-h) + var(--fab-gap)); background: var(--surface); color: var(--text); }
+  button.notes-fab, button.notes-fab:hover:not(:disabled) { box-shadow: 0 0 0 1px var(--border), var(--shadow-lift); }
+  button.notes-fab kbd { border-color: var(--border); background: var(--bg); color: var(--muted); }
+  &.notes-open button.notes-fab { background: var(--accent); color: var(--on-accent); }
+  &.notes-open button.notes-fab kbd { border-color: transparent; background: none; color: inherit; }
+  .notes { --notes-bottom: calc(var(--fab-bottom) + 2 * (var(--fab-h) + var(--fab-gap))); bottom: var(--notes-bottom); max-height: calc(100vh - var(--notes-bottom) - 32px); }
+  /* Libellé écrit seulement quand il tient à droite du contenu (main : 1100 px, plus deux marges d'environ 150 px) */
+  @media (max-width: 1400px) {
+    .console-fab-label, button.console-fab kbd { display: none; }
+    button.console-fab { width: var(--fab-h); padding: 0; justify-content: center; }
+  }
+  @media (max-width: 640px) { --fab-bottom: 16px; }
+
+  /* ---- Boutons, champs, étiquettes -------------------------------------------------------------------------------- */
+  /* Forme seulement : les tailles propres à chaque bouton (ligne de tableau, filtre, croix) restent celles de style.css */
+  button, .btn-primary, .btn-link { border-radius: 6px; font-weight: 500; box-shadow: none; transition: none; }
+  .term-dot { border-radius: 50%; }
+  button:hover:not(:disabled), .btn-primary:hover, .btn-link:hover { transform: none; box-shadow: none; filter: none; }
+  button.secondary:hover:not(:disabled), .btn-link:hover { background: var(--bg); border-color: var(--muted); }
+  input:not([type=checkbox], [type=radio]), select, textarea { border-radius: 6px; }
+  .toolbar input[type=search], .toolbar select, .dag-form select, .agent-form textarea { border-width: 1px; border-radius: 6px; }
+  .badge { padding: 1px 7px; border-radius: 4px; font-size: 11.5px; font-weight: 500; }
+  .count { border-radius: 4px; }
+  code.res, code.req { border-radius: 4px; }
+  kbd { border-radius: 4px; }
+  /* Plus de pastilles ni de grands arrondis : 4 px pour une étiquette, 6 px pour un champ ou un encart */
+  .filters a, .stacks a, .team, .req, .wn-kind, .wn-pill, .pal-chip, button.pal-hint, .blocking-kind, .settings-nav a, .gauge-gap,
+  .deadline-client-pick, .jx, .nav-item, .client-menu a, .bell-count, .dock-btn::after { border-radius: 4px; }
+  .notif-icon, .field input, .field textarea, .kb-card, .kb-col, a.blocking-row, .settings-form select, .brief-text, .my-notes textarea, .notes-field textarea,
+  a.gauge-link, .multi > summary, .multi-list, .client-pick select, .refresh .refresh-out .result, .refresh .request-error, .wn-item, .pal-item, .pal-card,
+  .client-chip, .nav-group, .bar-icon, .client-menu, .dock-btn, .dock-pop > * { border-radius: 6px; }
+  .health { flex: none; width: 9px; height: 9px; box-shadow: none; }
+  .health.lg { width: 11px; height: 11px; vertical-align: 2px; }
+  .segmented { padding: 2px; border-radius: 6px; }
+  .segmented a, .segmented button { min-height: 0; padding: 3px 11px; border-radius: 4px; box-shadow: none; }
+  .segmented a.active, .segmented button.active, .nav-item.active { box-shadow: 0 0 0 1px var(--border); }
+  .retour details.agent > summary, .ticket details.agent > summary, .ticket-agent-btn { border-radius: 6px; background: var(--accent); box-shadow: none; transition: none; }
+  .retour details.agent > summary:hover, .ticket details.agent > summary:hover { transform: none; filter: none; box-shadow: none; }
+  /* Ouvert, ou replié dans une ligne de la liste (bouton discret, texte sombre) : fond clair, pas le bleu plein */
+  .retour details.agent[open] > summary, .ticket details.agent[open] > summary, .retour-more details.agent:not([open]) > summary { background: var(--surface); }
+  .retour details.agent[open], .ticket details.agent[open] { border-radius: 6px; }
+
+  /* ---- Onglets : soulignés, plus de pastilles ------------------------------------------------------------------- */
+  .tabs { gap: 22px; margin: 10px 0 16px; padding-top: 0; border-bottom: 1px solid var(--border); }
+  .tabs a { margin-bottom: -1px; padding: 9px 1px 8px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); font-weight: 500; }
+  .tabs a:hover { color: var(--text); }
+  .tabs a.active { background: none; color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+  .tabs.is-stuck { box-shadow: 0 0 0 100vmax var(--bg); clip-path: inset(0 -100vmax 0); border-bottom-color: var(--border); }
+  .tabs-view { margin-bottom: 4px; }
+  .tabs-view button, .auto-sync { min-height: 26px; }
+
+  /* ---- Cartes, tableaux, compteurs -------------------------------------------------------------------------------- */
+  .card, .kpi, .stat, .chart, .panel, .retour, .run-card, table { border-width: 1px; border-radius: var(--radius); box-shadow: none; }
+  .card-linked, a.kpi-link, .kb-card, .wn-item, a.stat-link, a.tl-mark { transition: none; }
+  .card-linked:hover, a.kpi-link:hover, .kb-card:hover, .wn-item:hover, a.stat-link:hover, a.tl-mark:hover { transform: none; box-shadow: none; border-color: var(--muted); }
+  .panel { padding: 4px 16px 10px; }
+  .panel h2 { font-size: 14px; }
+  th { padding: 7px 10px; background: var(--bg); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+  td { padding: 7px 10px; }
+  /* Compteurs : une seule bande à cases, le chiffre en couleur quand il alerte */
+  .stats { gap: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+  .stat { padding: 10px 16px; border: 0; border-right: 1px solid var(--border); border-radius: 0; background: none; }
+  .stat::before { display: none; }
+  .stat strong, .kpi strong { font-size: 21px; font-weight: 600; letter-spacing: 0; }
+  .stat-ko strong { color: var(--st-ko); }
+  .stat-todo strong { color: var(--st-todo); }
+  a.stat-link:hover { background: var(--bg); }
+  .segbar { height: 22px; border-radius: 4px; }
+  /* Agents en attente de réponse (page Agents) */
+  .agent-asking { border-left: 3px solid var(--st-todo); scroll-margin-top: calc(var(--topbar-h, 61px) + 64px); }
+  .agent-asking li { display: flex; align-items: center; gap: 6px 16px; }
+  .asking-what { flex: 1; min-width: 0; }
+  .asking-q { margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 640px) { .agent-asking li { flex-wrap: wrap; } .asking-what { flex-basis: 100%; } .asking-q { white-space: normal; } }
+  .seg:first-child { border-radius: 4px 0 0 4px; } .seg:last-child { border-radius: 0 4px 4px 0; } .seg:only-child { border-radius: 4px; }
+  .seg[data-filter-set]:hover { filter: none; opacity: .85; }
+  .seg-n { font-size: 12px; font-weight: 600; }
+
+  /* ---- Fenêtres : recherche, ticket, notes ------------------------------------------------------------------------ */
+  .palette-panel, .drawer.modal .drawer-panel, .notes, .tabs-pick { border-radius: 8px; box-shadow: var(--shadow-lift); animation: none; }
+  .drawer-panel, .drawer-backdrop, .palette-backdrop, .term { animation: none; }
+  .palette-backdrop { backdrop-filter: none; }
+}

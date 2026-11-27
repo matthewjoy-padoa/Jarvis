@@ -1,5 +1,7 @@
 <!doctype html>
-<html lang="fr">
+{# `plain` : affichage sobre choisi dans ce navigateur (fourni à tous les gabarits par main.py). Même squelette que l'affichage
+   animé (barre du haut, dock, boutons flottants) ; sobre.css en change les couleurs et les formes. #}
+<html lang="fr"{% if plain %} data-style="sobre"{% endif %}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,31 +12,35 @@
     // Thème retenu dans le navigateur ("" ou rien : Auto, suit le Mac). À partir du 1er décembre 2026 (heure du navigateur), Noël
     // s'impose une fois à chaque navigateur, quel que soit le thème retenu : nuit si on était en Nuit (ou en Auto sur un Mac en mode
     // nuit), clair sinon. « theme-noel-2026 » retient que c'est fait : ensuite le bouton de thème décide, et Noël ne revient pas.
+    // Affichage sobre (data-style, rendu par le serveur) : jamais Noël ; un thème Noël retenu s'affiche en Nuit ou en Clair.
     (function () {
+      const sober = document.documentElement.dataset.style === "sobre";
       let t = null;
       try {
         t = localStorage.getItem("theme");
-        if (new Date() >= new Date("2026-12-01T00:00") && !localStorage.getItem("theme-noel-2026")) {
+        if (!sober && new Date() >= new Date("2026-12-01T00:00") && !localStorage.getItem("theme-noel-2026")) {
           const night = t === "dark" || (t !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
           if (!/^noel/.test(t)) t = night ? "noel" : "noel-clair";
           localStorage.setItem("theme", t);
           localStorage.setItem("theme-noel-2026", "1");
         }
       } catch (e) {}
+      if (sober && t) t = { noel: "dark", "noel-clair": "light" }[t] || t;
       if (t) document.documentElement.dataset.theme = t;
     })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=181">
+  <link rel="stylesheet" href="/static/style.css?v=184">
+  {% if plain %}<link rel="stylesheet" href="/static/sobre.css?v=4">{% endif %}
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=11" defer></script>
   <script src="/static/dag.js?v=3" defer></script>
   <script src="/static/limit.js?v=1" defer></script>
   <script src="/static/notify.js?v=5" defer></script>
   {% set intecg = intecg_url() %}{# une seule lecture par page : script du booster ici, lien en pied de page #}
-  {% if intecg %}<script src="/static/booster.js?v=2" defer></script>{% endif %}
+  {% if intecg and not plain %}<script src="/static/booster.js?v=2" defer></script>{% endif %}{# sobre : pas de sachet qui tombe, la notification reste dans la cloche #}
   <script src="/static/drawer.js?v=6" defer></script>
   <script src="/static/palette.js?v=7" defer></script>
   <script src="/static/console.js?v=4" defer></script>
@@ -115,9 +121,10 @@
   <script>
     // Thème : Auto (suit le Mac) → Nuit → Clair → Noël nuit → Noël clair → Auto. Tout choix est retenu dans le navigateur, Auto compris
     // ("") : Noël, imposé une fois le 1er décembre (script du <head>), ne revient pas une fois qu'on a choisi autre chose.
+    // Affichage sobre : Auto → Nuit → Clair, sans Noël.
     (function () {
       const root = document.documentElement, button = document.getElementById("theme-toggle");
-      const order = ["", "dark", "light", "noel", "noel-clair"], labels = { "": "Auto", dark: "Nuit", light: "Clair", noel: "Noël nuit", "noel-clair": "Noël clair" };
+      const order = root.dataset.style === "sobre" ? ["", "dark", "light"] : ["", "dark", "light", "noel", "noel-clair"], labels = { "": "Auto", dark: "Nuit", light: "Clair", noel: "Noël nuit", "noel-clair": "Noël clair" };
       const svg = (paths) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
       const tree = (fill) => `<path d="M12 3 8 8.5h2L6.5 13.5h2.5L5 19h14l-4-5.5h2.5L14 8.5h2z" ${fill}/><path d="M12 19v2.5"/>`;
       const icons = {
@@ -302,7 +309,9 @@
       </form>
     </div>
   </section>
-  <footer class="footer muted">Jarvis · <em>Just A Rather Very Intelligent System</em>, au service de l'équipe Integration · <a href="/sources">État des systèmes</a>{% if intecg %}{# InteCG (jeu de cartes de l'équipe, dépôt intecg) : mis à jour et démarré au besoin, ouvert dans sa propre fenêtre. #} · <form method="post" action="/outils/intecg" target="intecg" class="footer-tool" data-own-window><button type="submit" title="Ouvrir InteCG, le jeu de cartes de l'équipe, dans une autre fenêtre (le met à jour et le démarre s'il ne tourne pas)">InteCG ↗</button></form>{% endif %}{% if jarvis_version %} · <a href="https://github.com/matthewjoy-padoa/Jarvis/blob/main/CHANGELOG.md" title="Historique des versions{% if jarvis_commit %} · commit {{ jarvis_commit }}{% endif %}">v{{ jarvis_version }}</a>{% endif %}</footer>
+  <footer class="footer muted">{% if plain %}Jarvis · outil de l'équipe Integration{% else %}Jarvis · <em>Just A Rather Very Intelligent System</em>, au service de l'équipe Integration{% endif %} · <a href="/sources">État des systèmes</a>{% if intecg %}{# InteCG (jeu de cartes de l'équipe, dépôt intecg) : mis à jour et démarré au besoin, ouvert dans sa propre fenêtre. #} · <form method="post" action="/outils/intecg" target="intecg" class="footer-tool" data-own-window><button type="submit" title="Ouvrir InteCG, le jeu de cartes de l'équipe, dans une autre fenêtre (le met à jour et le démarre s'il ne tourne pas)">InteCG ↗</button></form>{% endif %}
+    · <form method="post" action="/affichage" class="footer-style"><input type="hidden" name="vers" value="{{ request.url.path }}{{ '?' ~ request.url.query if request.url.query }}">
+      <button type="submit" name="affichage" value="{{ 'jarvis' if plain else 'sobre' }}" class="link-button" title="Pour ce navigateur ; aussi dans Réglages">{{ "Affichage animé" if plain else "Affichage sobre" }}</button></form>{% if jarvis_version %} · <a href="https://github.com/matthewjoy-padoa/Jarvis/blob/main/CHANGELOG.md" title="Historique des versions{% if jarvis_commit %} · commit {{ jarvis_commit }}{% endif %}">v{{ jarvis_version }}</a>{% endif %}</footer>
   {# Raccourcis du client en cours : dock de boutons ronds au bord droit, nom du lien en bulle au survol.
      Liens ouverts dans le navigateur : Jarvis ne lit jamais leur contenu. #}
   {% if current or bau_dock is not none %}

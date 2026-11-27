@@ -8,6 +8,7 @@
 <nav class="settings-nav" aria-label="Parties des réglages">
   <a href="#1password">{{ ic.icon("lock") }} 1Password</a>
   <a href="#notifications">{{ ic.icon("bell") }} Notifications</a>
+  <a href="#affichage">{{ ic.icon("gear") }} Affichage</a>
   <span class="settings-nav-sep" aria-hidden="true"></span>
   {% for name, part in sections.items() %}<a href="#{{ part.anchor }}">{{ ic.icon(part.icon) }} {{ name }}</a>
   {% endfor %}
@@ -48,6 +49,15 @@
   <p class="muted">Agent terminé, DAG en échec, échéances, rappels : Jarvis les affiche sur le Mac, même onglet fermé (le navigateur doit rester lancé). Le choix vaut pour ce navigateur ; rien n'est écrit dans <code>.env</code>.</p>
   <button type="button" data-enable-browser-notifs hidden>Activer les notifications du Mac</button>
   <p class="muted" data-notifs-help hidden></p>
+</section>
+
+<section class="panel settings-part" id="affichage">
+  <div class="panel-head"><h2>{{ ic.icon("gear") }} Affichage</h2><span class="badge">{{ "sobre" if plain else "animé" }}</span></div>
+  <p class="muted">Sobre : un outil plus neutre. Le même menu en haut ; gris neutres et un seul bleu, formes plus carrées, rien qui bouge ; accueil en tableau de bord ; page Agents en compteurs et tableau, sans armures ; pas de thème Noël. Les informations et les fonctions sont les mêmes. Le choix vaut pour ce navigateur ; rien n'est écrit dans <code>.env</code>.</p>
+  <form method="post" action="/affichage" class="style-choice">
+    <button type="submit" name="affichage" value="jarvis" class="secondary" aria-pressed="{{ 'false' if plain else 'true' }}">Animé</button>
+    <button type="submit" name="affichage" value="sobre" class="secondary" aria-pressed="{{ 'true' if plain else 'false' }}">Sobre</button>
+  </form>
 </section>
 
 <div class="settings-chapter">

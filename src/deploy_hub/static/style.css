@@ -474,7 +474,7 @@ button .ic { margin-right: 2px; }
    popover (couche du dessus) : la barre d'onglets défile et rogne ce qui en dépasse. */
 .tabs-view { display: flex; flex: none; align-items: center; gap: 4px; margin: 0 0 6px auto; padding-left: 12px; }
 .tabs-view button, .auto-sync { min-height: 28px; padding: 3px 12px; font-size: 12.5px; white-space: nowrap; box-shadow: none; }
-.tabs-view .view-toggle[aria-pressed="true"], .auto-sync[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.tabs-view .view-toggle[aria-pressed="true"], .auto-sync[aria-pressed="true"], .style-choice button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
 .tabs-view .view-toggle[aria-pressed="true"]::before { content: "✓"; }
 .tabs-view .view-pick { padding: 3px 7px; anchor-name: --tabs-pick; }
 .tabs-view .view-pick .ic { margin: 0; }
@@ -1679,7 +1679,7 @@ p.last-sync { margin: 4px 0 6px; }
 .dag-source-error { color: var(--danger); }
 
 /* Agent qui attend une réponse : ses questions, puis « Répondre et relancer » */
-.agent-waiting { border-color: var(--warn); }
+.agent-waiting { border-color: var(--warn); scroll-margin-top: calc(var(--topbar-h, 61px) + 16px); }  /* arrivée par l'ancre #repondre */
 .agent-reply { display: grid; gap: 8px; margin-top: 12px; }
 .agent-reply textarea { width: 100%; font: inherit; }
 .agent-reply button { justify-self: start; }
@@ -1878,3 +1878,10 @@ details.filter.multi { position: relative; font-size: 13px; }
 .agent-rename input { min-width: min(420px, 100%); }
 .bot-pin { position: absolute; top: -4px; right: -2px; color: var(--accent); line-height: 0; }
 .bot-pin svg, .ic-pin { width: 14px; height: 14px; color: var(--accent); }
+
+/* Choix de l'affichage (animé ou sobre) : lien du pied de page et boutons de Réglages. L'affichage sobre lui-même est dans
+   sobre.css, chargée seulement quand il est choisi. */
+.footer-style { display: inline; margin: 0; }
+.footer-style .link-button { box-shadow: none; text-decoration: none; vertical-align: baseline; }
+.footer-style .link-button:hover { text-decoration: underline; transform: none; }
+.style-choice { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }

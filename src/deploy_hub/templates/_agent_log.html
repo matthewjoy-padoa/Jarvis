@@ -44,7 +44,7 @@
   </form>
   {% elif relaunch %}<p class="muted">Relancé dans <a href="/agents/{{ relaunch.id }}">l'agent #{{ relaunch.id }}</a>.</p>{% endif %}
   {% if waiting %}
-  <section class="panel agent-waiting">
+  <section class="panel agent-waiting" id="repondre">
     <h2>{{ "L'agent a une question" if questions | length == 1 else "L'agent a %d questions" % questions | length }}</h2>
     {% if intro %}<div class="md agent-context"><h3>Ce que l'agent a constaté</h3>{{ intro | md }}</div>{% endif %}
     <form class="agent-reply" hx-post="/agents/{{ run.id }}/repondre" hx-target="#reply-out-{{ run.id }}" hx-disabled-elt="find button">
