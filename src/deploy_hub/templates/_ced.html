@@ -30,7 +30,7 @@
     {% endfor %}
     </tbody>
   </table>
-  <p class="muted">Requêtes en gras : propres au client (<code>src/extract/customers/…</code>) ; les autres viennent du logiciel. Catalogue généré depuis l'orchestrator, voir le README.</p>
+  <p class="muted">Requêtes en gras : propres au client (<code>src/extract/customers/…</code>) ; les autres viennent du logiciel. Catalogue généré depuis l'orchestrator, voir docs/guide.md (Lancer des DAGs).</p>
 </section>
 {% else %}
 <p class="muted">Aucun DAG CED pour {{ d.client }}{% if not d.orchestrator %} : le client n'est pas encore dans l'orchestrator{% else %} : CED désactivé ou sans requête dans <code>dags/config_deployment.py</code>{% endif %}.</p>
