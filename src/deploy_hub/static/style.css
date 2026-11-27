@@ -1079,6 +1079,35 @@ img.client-icon { width: 1em; height: 1em; object-fit: contain; vertical-align: 
 .tool-launch .ic { width: 16px; height: 16px; margin: 0; }
 .tool-launch-ext { margin-left: -4px; font-size: 12px; line-height: 1; }
 @media (max-width: 1440px) { .tool-launch-label { display: none; } }
+/* Booster gagné dans InteCG (static/booster.js) : un sachet tombe au milieu de l'écran, tremble et scintille. Le sachet
+   garde ses couleurs (marine et anneaux du logo) dans tous les thèmes. */
+.booster-won { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--bg) 55%, transparent); }
+.booster-won-card { position: relative; width: min(320px, 100%); padding: 26px 24px 20px; text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 18px 50px rgba(0, 18, 53, .22); }
+.booster-won-title { margin: 14px 0 2px; font-size: 16px; font-weight: 700; }
+.booster-won-detail { margin: 0 0 14px; min-height: 1em; }
+.booster-won-card form { margin: 0; }
+.booster-won-close { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; padding: 0; border-width: 1px; }
+.booster-pack { position: relative; width: 96px; height: 132px; margin: 0 auto; border-radius: 8px; display: grid; place-items: center;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, .22) 50%, transparent 62%) 0 0 / 260% 100%, radial-gradient(120% 80% at 50% 0%, #2a55a8 0%, #0d1d45 60%, #081430 100%);
+  box-shadow: 0 0 0 1px #5ce1ff66, 0 10px 26px rgba(0, 18, 53, .35), 0 0 34px #5ce1ff55; }
+.booster-pack::before, .booster-pack::after { content: ""; position: absolute; left: 0; right: 0; height: 11px; background: repeating-linear-gradient(90deg, #5ce1ff 0 3px, #2a8fb5 3px 6px); opacity: .85; }
+.booster-pack::before { top: 0; border-radius: 8px 8px 0 0; } .booster-pack::after { bottom: 0; border-radius: 0 0 8px 8px; }
+.booster-rings { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #5ce1ff; box-shadow: 0 0 0 5px #0d1d45, 0 0 0 7px #5ce1ffaa, 0 0 0 12px #0d1d45, 0 0 0 14px #5ce1ff55; }
+.booster-pack i { position: absolute; top: 50%; left: 50%; width: 7px; height: 7px; margin: -3.5px; border-radius: 50%; background: #ffd97a; opacity: 0; --a: calc(var(--n) * 45deg); }
+.booster-pack i:nth-child(2) { --n: 0; } .booster-pack i:nth-child(3) { --n: 1; } .booster-pack i:nth-child(4) { --n: 2; } .booster-pack i:nth-child(5) { --n: 3; }
+.booster-pack i:nth-child(6) { --n: 4; } .booster-pack i:nth-child(7) { --n: 5; } .booster-pack i:nth-child(8) { --n: 6; } .booster-pack i:nth-child(9) { --n: 7; }
+@media (prefers-reduced-motion: no-preference) {
+  .booster-won { animation: booster-fade .25s ease-out both; }
+  .booster-won-card { animation: booster-card .35s var(--ease) both; }
+  .booster-pack { animation: booster-drop .7s cubic-bezier(.3, 1.5, .5, 1) both, booster-shake .5s ease-in-out .8s 2, booster-sheen 2.4s ease-in-out 1s infinite; }
+  .booster-pack i { animation: booster-burst 1s ease-out .75s both; }
+  @keyframes booster-fade { from { opacity: 0; } }
+  @keyframes booster-card { from { opacity: 0; transform: scale(.92); } }
+  @keyframes booster-drop { from { opacity: 0; transform: translateY(-140px) rotate(-14deg); } }
+  @keyframes booster-shake { 0%, 100% { rotate: 0deg; } 25% { rotate: -6deg; } 75% { rotate: 6deg; } }
+  @keyframes booster-sheen { from { background-position: 100% 0, 0 0; } to { background-position: -60% 0, 0 0; } }
+  @keyframes booster-burst { 0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(.4); } 100% { opacity: 0; transform: rotate(var(--a)) translateY(-92px) scale(1.2); } }
+}
 .tool-choice { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }  /* Flow Digger : mettre à jour et relancer, ou ouvrir */
 .tool-error { display: flex; gap: 8px; align-items: flex-start; color: var(--st-ko); }
 .tool-error .ic { flex: none; width: 18px; height: 18px; margin-top: 2px; }

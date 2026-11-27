@@ -27,12 +27,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=178">
+  <link rel="stylesheet" href="/static/style.css?v=179">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=11" defer></script>
   <script src="/static/dag.js?v=3" defer></script>
   <script src="/static/limit.js?v=1" defer></script>
-  <script src="/static/notify.js?v=4" defer></script>
+  <script src="/static/notify.js?v=5" defer></script>
+  {% set intecg = intecg_url() %}{# une seule lecture par page : script du booster ici, bouton dans la barre #}
+  {% if intecg %}<script src="/static/booster.js?v=1" defer></script>{% endif %}
   <script src="/static/drawer.js?v=6" defer></script>
   <script src="/static/palette.js?v=7" defer></script>
   <script src="/static/console.js?v=4" defer></script>
@@ -100,6 +102,13 @@
     <form method="post" action="/outils/flow-digger" target="flow-digger" class="tool-launch" data-own-window>
       <button type="submit" class="secondary" title="Ouvrir Flow Digger dans une autre fenêtre (le démarre sur la VM s'il ne tourne pas)">{{ ic.icon("shovel") }}<span class="tool-launch-label">Flow Digger</span><span class="tool-launch-ext" aria-hidden="true">↗</span></button>
     </form>
+    {# InteCG (jeu de cartes de l'équipe, dépôt intecg) : mis à jour et démarré au besoin, ouvert dans sa propre fenêtre.
+       Seulement si le jeu est sur cette machine (ou son adresse réglée). #}
+    {% if intecg %}
+    <form method="post" action="/outils/intecg" target="intecg" class="tool-launch" data-own-window>
+      <button type="submit" class="secondary" title="Ouvrir InteCG, le jeu de cartes de l'équipe, dans une autre fenêtre (le met à jour et le démarre s'il ne tourne pas)">{{ ic.icon("cards") }}<span class="tool-launch-label">InteCG</span><span class="tool-launch-ext" aria-hidden="true">↗</span></button>
+    </form>
+    {% endif %}
     <span class="bar-sep" aria-hidden="true"></span>
     <div class="bell-wrap">
       <button type="button" class="bell secondary bar-icon" aria-label="Notifications" aria-haspopup="true" aria-expanded="false"

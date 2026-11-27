@@ -383,6 +383,7 @@ templates.env.globals["auto_sync_every"] = auto_sync_every  # bouton « Synchro 
 templates.env.globals["auto_sync_note"] = auto_sync_note
 templates.env.tests["drive"] = client_config.is_drive  # {% if l.url is drive %} : logo Google Drive dans le dock
 templates.env.tests["notion"] = client_config.is_notion  # {% if l.url is notion %} : logo Notion dans le dock
+templates.env.globals["intecg_url"] = intecg.url  # bouton InteCG de la barre et animation du booster gagné (base.html)
 templates.env.globals["jarvis_version"] = _version_started  # pied de page ; historique dans CHANGELOG.md
 templates.env.globals["jarvis_commit"] = _code_started[:7]
 templates.env.globals["update_for"] = update_for  # bandeau « à relancer » ou « nouvelle version » (base.html)
@@ -1170,6 +1171,24 @@ def open_flow_digger(request: Request, forcer: str = Form(""), relancer: str = F
     if launch.url and not launch.behind:
         return RedirectResponse(launch.url, status_code=303)
     return _render(request, "outil.html", "", tool="Flow Digger", launch=launch, action="/outils/flow-digger")
+
+
+@app.get("/outils/intecg")
+def intecg_reloaded():
+    """Onglet rechargé : rien n'est lancé par un GET, retour à l'accueil."""
+    return RedirectResponse("/", status_code=303)
+
+
+@app.post("/outils/intecg")
+def open_intecg(request: Request, forcer: str = Form("")):
+    """Démarre InteCG (le jeu de cartes de l'équipe) sur la machine de Jarvis s'il ne tourne pas, dépôt mis à jour
+    d'abord, puis y emmène. forcer=1 (page d'échec) : lance la version déjà présente, sans mise à jour."""
+    if not _from_jarvis(request):
+        raise HTTPException(403, "Lancement refusé : la demande ne vient pas de Jarvis.")
+    launch = intecg.start(force=forcer == "1")
+    if launch.url:
+        return RedirectResponse(launch.url, status_code=303)
+    return _render(request, "outil.html", "", tool="InteCG", launch=launch, action="/outils/intecg")
 
 
 # ---- Réglages : .env, connexions et 1Password depuis l'app -------------------------------------------------------

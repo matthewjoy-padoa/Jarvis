@@ -1,7 +1,11 @@
 """Lien avec InteCG (jeu de cartes de l'équipe) : un DAG ou un agent lancé demande un booster au serveur du jeu.
 Aucun appel réseau : le POST est remplacé par un faux."""
 
+import os
+import socket
+import time
 from datetime import datetime
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -105,3 +109,97 @@ def intecg_key(key: str) -> bool:
     """Forme acceptée par InteCG (server/dbPlugin.ts, JARVIS_KEY_RE)."""
     import re
     return bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9:._-]{0,59}", key))
+
+
+# ------------------------------------------------------------ Bouton InteCG : mise à jour, démarrage, ouverture
+@pytest.fixture
+def repo(tmp_path, monkeypatch):
+    """Faux dépôt du jeu (package.json, paquets installés), port libre où rien n'écoute, aucune commande lancée."""
+    folder = tmp_path / "intecg"
+    (folder / "node_modules").mkdir(parents=True)
+    (folder / "package.json").write_text("{}")
+    (folder / "node_modules" / ".package-lock.json").write_text("{}")
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    monkeypatch.setenv("INTECG_DIR", str(folder))
+    monkeypatch.setenv("INTECG_URL", f"http://127.0.0.1:{port}")
+    monkeypatch.setattr(intecg, "data_dir", lambda: tmp_path / "data")
+    monkeypatch.setattr(intecg.flow_digger, "update", lambda repo: (True, ""))
+    game = SimpleNamespace(path=folder, port=port, ran=[])
+    monkeypatch.setattr(intecg.subprocess, "run", lambda cmd, **k: game.ran.append(cmd) or SimpleNamespace(returncode=0))
+    monkeypatch.setattr(intecg.subprocess, "Popen", lambda cmd, **k: game.ran.append(cmd))
+    return game
+
+
+def test_adresse_par_defaut_seulement_si_le_jeu_est_sur_la_machine(tmp_path, monkeypatch):
+    monkeypatch.setenv("INTECG_URL", "")
+    monkeypatch.setenv("INTECG_DIR", str(tmp_path))
+    assert intecg.folder() is None and intecg.url() == ""
+    (tmp_path / "package.json").write_text("{}")
+    assert intecg.folder() == tmp_path and intecg.url() == intecg.DEFAULT_URL
+    monkeypatch.setenv("INTECG_URL", "http://vm:5174/")
+    assert intecg.url() == "http://vm:5174" and intecg._address() == ("vm", 5174)
+
+
+def test_jeu_deja_lance_on_y_emmene_sans_rien_lancer(repo):
+    with socket.socket() as listening:
+        listening.bind(("127.0.0.1", repo.port))
+        listening.listen()
+        assert intecg.start() == intecg.Launch(url=f"http://127.0.0.1:{repo.port}")
+    assert repo.ran == []
+
+
+def test_jeu_arrete_demarre_sur_son_port_apres_mise_a_jour(repo, monkeypatch):
+    seen = []
+    monkeypatch.setattr(intecg.flow_digger, "update", lambda folder: seen.append(folder) or (True, "a1b2c3d → e4f5a6b"))
+    launch = intecg.start(wait=0.1)
+    assert seen == [repo.path] and repo.ran == [["npm", "run", "dev", "--", "--port", str(repo.port), "--strictPort"]]
+    assert "ne répond pas" in launch.error  # rien n'écoute : le faux lancement ne démarre rien
+    assert "mis à jour a1b2c3d → e4f5a6b" in (repo.path.parent / "data" / "intecg.log").read_text()
+
+
+def test_paquets_installes_s_ils_manquent_ou_si_le_verrou_a_change(repo):
+    (repo.path / "node_modules" / ".package-lock.json").unlink()
+    intecg.start(wait=0)
+    assert [cmd[:2] for cmd in repo.ran] == [["npm", "install"], ["npm", "run"]]
+    repo.ran.clear()
+    (repo.path / "node_modules" / ".package-lock.json").write_text("{}")
+    (repo.path / "package-lock.json").write_text("{}")
+    os.utime(repo.path / "package-lock.json", (time.time() + 60,) * 2)
+    intecg.start(wait=0)
+    assert [cmd[:2] for cmd in repo.ran] == [["npm", "install"], ["npm", "run"]]
+
+
+def test_mise_a_jour_impossible_rien_n_est_lance_sauf_si_on_force(repo, monkeypatch):
+    monkeypatch.setattr(intecg.flow_digger, "update", lambda folder: (False, "git fetch a échoué : réseau"))
+    launch = intecg.start(wait=0)
+    assert launch.can_force and "git fetch a échoué" in launch.error and repo.ran == []
+    intecg.start(wait=0, force=True)
+    assert [cmd[:3] for cmd in repo.ran] == [["npm", "run", "dev"]]
+
+
+def test_installation_en_echec_ou_depot_absent_dit_quoi_faire(repo, monkeypatch):
+    (repo.path / "node_modules" / ".package-lock.json").unlink()
+    monkeypatch.setattr(intecg.subprocess, "run", lambda cmd, **k: SimpleNamespace(returncode=1))
+    assert "npm install" in intecg.start(wait=0).error and repo.ran == []
+    (repo.path / "package.json").unlink()
+    assert "INTECG_DIR" in intecg.start(wait=0).error
+
+
+def test_bouton_de_la_barre_et_route(repo):
+    client = TestClient(main.app)
+    page = client.get("/").text
+    assert 'action="/outils/intecg"' in page and "/static/booster.js" in page
+    assert client.post("/outils/intecg").status_code == 403  # pas depuis une page de Jarvis
+    with socket.socket() as listening:
+        listening.bind(("127.0.0.1", repo.port))
+        listening.listen()
+        r = client.post("/outils/intecg", headers={"origin": "http://testserver"}, follow_redirects=False)
+    assert (r.status_code, r.headers["location"]) == (303, f"http://127.0.0.1:{repo.port}")
+    assert client.get("/outils/intecg", follow_redirects=False).headers["location"] == "/"
+
+
+def test_sans_jeu_ni_adresse_pas_de_bouton(monkeypatch):
+    page = TestClient(main.app).get("/").text
+    assert "/outils/intecg" not in page and "booster.js" not in page
