@@ -17,6 +17,7 @@ La version affichée en bas de chaque page change donc avec chaque fonctionnalit
 
 ## [0.8.2] · 2026-11-24
 
+- Correction : la page d'un agent arrêté avant son premier tour (Claude Code annonce alors 0 token partout : clé refusée, quota atteint) s'ouvre de nouveau ; elle répondait par une erreur 500 (division par zéro dans les barres de tokens), et son journal aussi.
 - Mises à jour depuis l'app, plus de `git pull` à la main : toutes les dix minutes, Jarvis regarde sur GitHub (`git fetch`) si une nouvelle version est publiée ; bandeau « Nouvelle version de Jarvis disponible » sur toutes les pages, et notification. Le bouton **Mettre à jour et redémarrer** fait lui-même le `git pull` (avance rapide), `uv sync`, puis relance Jarvis (même terminal, même service) ; la page se recharge sur la nouvelle version. Refusé tant qu'un agent, une synchro Notion ou la lecture de l'annuaire tourne.
 - Pour passer à cette version-ci, une dernière fois à la main : `git pull`, puis relancer le serveur (le Jarvis d'avant n'a pas encore le bouton). Les versions suivantes passent par le bouton.
 
