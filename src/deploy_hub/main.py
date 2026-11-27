@@ -21,10 +21,10 @@ from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
 from deploy_hub import client_config
-from deploy_hub.config import PROCESS_KEYS, PROJECT_ROOT, clients_dir, data_dir, ensure_private_dirs, forget_secrets, load_settings, secret_problem
+from deploy_hub.config import PROCESS_KEYS, PROJECT_ROOT, clients_dir, data_dir, ensure_private_dirs, load_settings
 from deploy_hub.models import (ACTION_STATUSES, DONE, INJECTION_STATUSES, KO, MILESTONE_LABELS, RETOUR_STATUSES, Deployment,
                                group_counts, kanban_columns, notion_link, status_group)
-from deploy_hub import bau, brief, console, env_file, first_launch, onepassword, shell, sync_notion
+from deploy_hub import bau, brief, console, env_file, first_launch, shell, sync_notion
 from deploy_hub.search import Index
 from deploy_hub.sources import ActionResult
 from deploy_hub.sources import dags as dag_catalogue
@@ -84,17 +84,12 @@ _refresh_lock = threading.Lock()  # un seul rafraîchissement Notion à la fois
 log = logging.getLogger("uvicorn.error")  # mêmes lignes que celles de uvicorn
 
 
-def _airflow_problem() -> str:
-    """Raison pour laquelle les identifiants Airflow (op://) n'ont pas pu être lus ; "" sinon."""
-    return " ; ".join(f"{n} : {e}" for n in ("AIRFLOW_USER", "AIRFLOW_PASSWORD") if (e := secret_problem(n)))
-
-
 @asynccontextmanager
 async def lifespan(_app):
     # Au lancement : Airflow et Notion sont-ils vraiment joignables ? (une lecture chacun, dans le terminal de Jarvis)
     checks = await asyncio.gather(
-        asyncio.to_thread(connections.airflow_status, airflow, _airflow_problem()),
-        asyncio.to_thread(connections.notion_status, notion_api.load_token(), secret_problem("NOTION_TOKEN")),
+        asyncio.to_thread(connections.airflow_status, airflow),
+        asyncio.to_thread(connections.notion_status, notion_api.load_token()),
         asyncio.to_thread(_check_claude_login, True))  # écrit sa propre ligne : avertissement s'il faut se reconnecter
     for line in connections.lines(*checks[:2]):
         log.info(line)
@@ -343,15 +338,14 @@ def when_text(moment: datetime | None) -> str:
 
 templates.env.filters["quand"] = when_text
 # Réglages cités dans un message (« renseigne ORCHESTRATOR_DIR dans Réglages ») → lien vers leur champ de la page Réglages ;
-# « 1Password » → sa section de connexion. Le plus long d'abord : JARVIS_AGENT_MAX ne doit pas couper JARVIS_AGENT_MAX_TURNS.
-SETTING_MENTION = re.compile(r"\b(" + "|".join(sorted(map(re.escape, env_file.BY_KEY), key=len, reverse=True)) + r")\b|\b1Password\b")
+# Le plus long d'abord : JARVIS_AGENT_MAX ne doit pas couper JARVIS_AGENT_MAX_TURNS.
+SETTING_MENTION = re.compile(r"\b(" + "|".join(sorted(map(re.escape, env_file.BY_KEY), key=len, reverse=True)) + r")\b")
 
 
 def settings_links(text) -> Markup:
-    """Message en texte (échappé ici) → même texte, réglages et 1Password en liens vers la page Réglages."""
+    """Message en texte (échappé ici) → même texte, chaque réglage cité en lien vers son champ de la page Réglages."""
     def link(m: re.Match) -> str:
-        href = f"/reglages#reglage-{m.group(1)}" if m.group(1) else "/reglages#1password"
-        return f'<a href="{href}">{m.group(0)}</a>'
+        return f'<a href="/reglages#reglage-{m.group(1)}">{m.group(0)}</a>'
     return Markup(SETTING_MENTION.sub(link, str(escape(text or ""))))
 
 
@@ -1109,10 +1103,9 @@ def dag_watch_stop(watch_id: int):
 
 @app.get("/sources", response_class=HTMLResponse)
 def sources(request: Request):
-    return _render(request, "sources.html", "/sources", externals=external_statuses(notion_api.load_token() is not None,
-                                                                         secret_problem("NOTION_TOKEN")), settings=settings,
+    return _render(request, "sources.html", "/sources", externals=external_statuses(notion_api.load_token() is not None), settings=settings,
                    claude_login=_claude_login or connections.claude_status(sync_routine.claude_bin),  # dernier contrôle (une heure au plus)
-                   airflow_message="" if airflow.live else connections.airflow_status(airflow, _airflow_problem())[1])
+                   airflow_message="" if airflow.live else connections.airflow_status(airflow)[1])
 
 
 @app.get("/deploiements/{slug}")
@@ -1219,13 +1212,12 @@ def open_intecg(request: Request, forcer: str = Form("")):
     return _render(request, "outil.html", "", tool="InteCG", launch=launch, action="/outils/intecg")
 
 
-# ---- Réglages : .env, connexions et 1Password depuis l'app -------------------------------------------------------
+# ---- Réglages : .env et connexions depuis l'app ----------------------------------------------------------------------
 
 def _reload_connections() -> None:
-    """Après un changement de réglages ou une connexion à 1Password : secrets relus, Airflow reconstruit (historique gardé),
-    réglages des agents Claude appliqués aux prochains lancements."""
+    """Après un changement de réglages : Airflow reconstruit (historique gardé), réglages des agents Claude appliqués aux
+    prochains lancements."""
     global airflow
-    forget_secrets()
     claude.reconfigure()
     fresh = AirflowSource.from_env()
     fresh.runs = airflow.runs
@@ -1234,17 +1226,16 @@ def _reload_connections() -> None:
 
 
 def _guard_settings(request: Request) -> None:
-    """Réglages et mot de passe 1Password : seulement en local, et depuis une page de Jarvis."""
+    """Réglages : seulement en local, et depuis une page de Jarvis."""
     if not request.client or request.client.host not in shell.LOCAL_HOSTS:
         raise HTTPException(403, "Réglages : connexions locales seulement (transfert de port).")
     if not _from_jarvis(request):
         raise HTTPException(403, "Réglages : la demande ne vient pas de Jarvis.")
 
 
-def _settings_page(request: Request, message: str = "", error: str = "", op_error: str = "") -> HTMLResponse:
-    op = onepassword.status()
-    return _render(request, "reglages.html", "/reglages", fields=env_file.view(), sections=env_file.SECTIONS, env_path=env_file.path(), op=op,
-                   message=message, error=error, op_error=op_error or op.get("error", ""))
+def _settings_page(request: Request, message: str = "", error: str = "") -> HTMLResponse:
+    return _render(request, "reglages.html", "/reglages", fields=env_file.view(), sections=env_file.SECTIONS, env_path=env_file.path(),
+                   message=message, error=error)
 
 
 @app.get("/reglages", response_class=HTMLResponse)
@@ -1278,27 +1269,9 @@ async def settings_save(request: Request):
 async def settings_test(request: Request):
     _guard_settings(request)
     checks = await asyncio.gather(
-        asyncio.to_thread(connections.airflow_status, airflow, _airflow_problem()),
-        asyncio.to_thread(connections.notion_status, notion_api.load_token(), secret_problem("NOTION_TOKEN")))
+        asyncio.to_thread(connections.airflow_status, airflow),
+        asyncio.to_thread(connections.notion_status, notion_api.load_token()))
     return templates.TemplateResponse(request, "_reglages_tests.html", {"checks": zip(("Airflow", "Notion"), checks)})
-
-
-@app.post("/reglages/1password/connexion", response_class=HTMLResponse)
-async def settings_op_signin(request: Request, password: str = Form("")):
-    _guard_settings(request)
-    status = await asyncio.to_thread(onepassword.signin, password)
-    del password  # jamais gardé ni journalisé
-    if status.get("signed_in"):
-        await asyncio.to_thread(_reload_connections)
-        return _settings_page(request, message="Connecté à 1Password : les références op:// sont relues. Lance « Tester ».")
-    return _settings_page(request, op_error=status.get("error") or "Connexion refusée.")
-
-
-@app.post("/reglages/1password/deconnexion", response_class=HTMLResponse)
-async def settings_op_signout(request: Request):
-    _guard_settings(request)
-    await asyncio.to_thread(onepassword.signout)
-    return _settings_page(request, message="Déconnecté de 1Password. Les secrets déjà lus restent en mémoire jusqu'au prochain changement ou redémarrage.")
 
 
 # Pages globales qui restent ouvertes quand on change de client dans le menu : leur client par défaut est celui du menu.

@@ -51,7 +51,7 @@ Le bouton attend qu'aucun agent, aucune synchro ni aucune lecture de l'annuaire 
 | Sujet | Où lire |
 |---|---|
 | Tout ce que fait Jarvis, fonction par fonction | [docs/guide.md](docs/guide.md) |
-| Tous les réglages, et les secrets avec 1Password | [docs/reglages.md](docs/reglages.md) |
+| Tous les réglages, et les secrets | [docs/reglages.md](docs/reglages.md) |
 | Synchro Notion : routine, tâche planifiée, journal | [docs/routine-synchro.md](docs/routine-synchro.md) |
 | Faire tourner Jarvis sur une VM | [docs/vm.md](docs/vm.md) |
 

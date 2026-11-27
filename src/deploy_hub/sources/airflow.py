@@ -59,7 +59,7 @@ class AirflowSource:
 
     @classmethod
     def from_env(cls) -> "AirflowSource":
-        return cls(os.getenv("AIRFLOW_BASE_URL", ""), secret("AIRFLOW_USER"), secret("AIRFLOW_PASSWORD"))  # en clair ou op://…
+        return cls(os.getenv("AIRFLOW_BASE_URL", ""), secret("AIRFLOW_USER"), secret("AIRFLOW_PASSWORD"))
 
     def air_env(self) -> dict[str, str]:
         """Réglages Airflow donnés à air.py (lancement et suivi) ; vide sans Airflow configuré."""

@@ -10,11 +10,9 @@ class ExternalStatus:
     hint: str
 
 
-def external_statuses(notion_token: bool = False, notion_problem: str = "") -> list[ExternalStatus]:
+def external_statuses(notion_token: bool = False) -> list[ExternalStatus]:
     if notion_token:
         hint = "Jeton présent : bouton « Rafraîchir » actif"
-    elif notion_problem:  # référence 1Password illisible (session op expirée, op absent…)
-        hint = f"NOTION_TOKEN est une référence 1Password illisible : {notion_problem} (connecte 1Password dans Réglages)"
     else:
         hint = "Intégration interne à créer, jeton NOTION_TOKEN à renseigner dans Réglages"
     return [

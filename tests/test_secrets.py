@@ -1,81 +1,11 @@
-"""Secrets en référence 1Password (op://…), dossiers de données hors de git, .env limité à son propriétaire."""
+"""Secrets et données de Jarvis : dossiers hors de git, .env limité à son propriétaire, rien de secret donné aux processus lancés."""
 
-import os
 import stat
 import subprocess
 
 import pytest
 
 from deploy_hub import config
-from deploy_hub.sources import notion_api
-from deploy_hub.sources.airflow import AirflowSource
-
-REF = "op://Padoa-integration/Jarvis/notion"
-
-
-@pytest.fixture
-def fake_op(tmp_path, monkeypatch):
-    """Faux 1Password CLI : répond la valeur de la référence connue, « not signed in » sinon ; compte ses appels."""
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    calls = tmp_path / "appels"
-    op = bin_dir / "op"
-    op.write_text(f"""#!/bin/sh
-echo x >> {calls}
-[ "$1 $2 $3" = "read --no-newline {REF}" ] && printf 'ntn_secret' && exit 0
-[ "$3" = "op://Padoa-integration/Airflow/user" ] && printf 'jarvis' && exit 0
-[ "$3" = "op://Padoa-integration/Airflow/password" ] && printf 'mdp' && exit 0
-echo "[ERROR] 2026/11/13 account is not signed in" >&2
-exit 1
-""")
-    op.chmod(0o755)
-    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
-    monkeypatch.setattr(config, "_resolved", {})
-    monkeypatch.setattr(config, "SECRET_ERRORS", {})
-    monkeypatch.setattr(config, "_failed_at", {})
-    return lambda: len(calls.read_text().splitlines()) if calls.exists() else 0
-
-
-def test_a_plain_value_is_kept_as_is(fake_op):
-    assert config.resolve("ntn_en_clair") == "ntn_en_clair" and fake_op() == 0
-
-
-def test_a_1password_reference_is_read_once_and_kept_in_memory_only(fake_op, monkeypatch):
-    monkeypatch.setenv("NOTION_TOKEN", REF)
-    assert config.secret("NOTION_TOKEN") == "ntn_secret"
-    assert config.secret("NOTION_TOKEN") == "ntn_secret" and fake_op() == 1  # un seul op read
-    assert os.environ["NOTION_TOKEN"] == REF  # l'environnement (transmis aux agents, au shell) ne garde que la référence
-
-
-def test_an_unreadable_reference_gives_nothing_and_says_why(fake_op, monkeypatch):
-    monkeypatch.setenv("NOTION_TOKEN", "op://Padoa-integration/Inconnu/champ")
-    assert notion_api.load_token() is None
-    assert "not signed in" in config.SECRET_ERRORS["op://Padoa-integration/Inconnu/champ"]
-    assert config.secret("NOTION_TOKEN") == "" and fake_op() == 1  # pas de nouvel op read à chaque page…
-    monkeypatch.setattr(config, "RETRY_AFTER", 0)
-    assert config.secret("NOTION_TOKEN") == "" and fake_op() == 2  # … mais on retente après RETRY_AFTER
-
-
-def test_without_op_installed(monkeypatch, tmp_path):
-    monkeypatch.setenv("PATH", str(tmp_path))  # aucun op
-    monkeypatch.setattr(config, "_resolved", {})
-    monkeypatch.setattr(config, "SECRET_ERRORS", {})
-    monkeypatch.setattr(config, "_failed_at", {})
-    assert config.resolve(REF) == "" and config.SECRET_ERRORS[REF] == "1Password CLI (op) absent"
-
-
-def test_the_notion_token_can_be_a_reference_in_the_env_file(fake_op, monkeypatch, tmp_path):
-    monkeypatch.delenv("NOTION_TOKEN", raising=False)
-    (tmp_path / ".env").write_text(f"NOTION_TOKEN={REF}  # dans 1Password\n")
-    assert notion_api.load_token(tmp_path) == "ntn_secret"
-
-
-def test_airflow_credentials_can_be_references(fake_op, monkeypatch):
-    monkeypatch.setenv("AIRFLOW_BASE_URL", "http://localhost:8888")
-    monkeypatch.setenv("AIRFLOW_USER", "op://Padoa-integration/Airflow/user")
-    monkeypatch.setenv("AIRFLOW_PASSWORD", "op://Padoa-integration/Airflow/password")
-    airflow = AirflowSource.from_env()
-    assert airflow.live and (airflow.user, airflow.password) == ("jarvis", "mdp")
 
 
 def git_repo(path):
@@ -121,19 +51,8 @@ def test_an_env_file_readable_by_others_is_restricted(tmp_path, monkeypatch, cap
     monkeypatch.delenv("JARVIS_TEST_RESTRICT", raising=False)
 
 
-def test_the_sources_page_says_why_the_reference_is_unreadable(fake_op, monkeypatch):
-    from fastapi.testclient import TestClient
-    from deploy_hub.main import app
-    monkeypatch.setenv("NOTION_TOKEN", "op://Padoa-integration/Inconnu/champ")
-    page = TestClient(app).get("/sources").text
-    assert 'référence <a href="/reglages#1password">1Password</a> illisible' in page and "not signed in" in page
-
-
-def test_the_sources_page_says_why_airflow_credentials_are_unreadable(fake_op, monkeypatch):
-    from fastapi.testclient import TestClient
-    from deploy_hub import config as cfg
-    from deploy_hub.main import app
-    monkeypatch.setenv("AIRFLOW_USER", "op://Padoa-integration/Inconnu/user")
-    cfg.secret("AIRFLOW_USER")  # lu au démarrage par AirflowSource.from_env
-    page = TestClient(app).get("/sources").text
-    assert '<a href="/reglages#reglage-AIRFLOW_USER">AIRFLOW_USER</a> : ' in page and "not signed in" in page
+def test_processes_started_by_jarvis_get_neither_its_secrets_nor_a_password_manager_session(monkeypatch):
+    monkeypatch.setenv("AIRFLOW_PASSWORD", "mot-de-passe")
+    monkeypatch.setenv("OP_SESSION_exemple", "jeton-de-session")  # session héritée du terminal qui lance Jarvis
+    given = config.child_environment()
+    assert "AIRFLOW_PASSWORD" not in given and "OP_SESSION_exemple" not in given

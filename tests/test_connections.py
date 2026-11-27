@@ -44,8 +44,6 @@ def test_airflow_unreachable():
 
 def test_airflow_simulated_says_why():
     assert connections.airflow_status(AirflowSource("", "", ""))[1].startswith("non configuré : AIRFLOW_BASE_URL")
-    ok, message = connections.airflow_status(AirflowSource("http://localhost:8888", "", ""), "AIRFLOW_USER : does not have a field 'user'")
-    assert not ok and "référence 1Password illisible" in message and "does not have a field" in message
 
 
 def notion_answering(status: int, body=None):
@@ -59,7 +57,6 @@ def test_notion_connected_names_the_integration():
 def test_notion_refused_or_missing():
     assert connections.notion_status("ntn_x", transport=notion_answering(401)) == (False, "jeton refusé par Notion (401) : vérifie NOTION_TOKEN")
     assert "pas de NOTION_TOKEN" in connections.notion_status(None)[1]
-    assert "jeton illisible" in connections.notion_status(None, "not signed in")[1]
 
 
 def test_lines_are_short_and_marked():
@@ -69,7 +66,7 @@ def test_lines_are_short_and_marked():
 
 def test_the_lines_are_printed_when_jarvis_starts(caplog, monkeypatch):
     from deploy_hub import main
-    monkeypatch.setattr(connections, "notion_status", lambda token, problem="": (False, "pas de NOTION_TOKEN"))
+    monkeypatch.setattr(connections, "notion_status", lambda token: (False, "pas de NOTION_TOKEN"))
     with caplog.at_level(logging.INFO, logger="uvicorn.error"):
         with TestClient(main.app):  # démarrage (lifespan) puis arrêt
             pass

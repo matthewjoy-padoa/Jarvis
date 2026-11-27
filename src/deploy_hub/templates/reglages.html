@@ -6,7 +6,6 @@
   <a href="/sources" class="btn-link">État des systèmes →</a>
 </div>
 <nav class="settings-nav" aria-label="Parties des réglages">
-  <a href="#1password">{{ ic.icon("lock") }} 1Password</a>
   <a href="#notifications">{{ ic.icon("bell") }} Notifications</a>
   <a href="#affichage">{{ ic.icon("gear") }} Affichage</a>
   <span class="settings-nav-sep" aria-hidden="true"></span>
@@ -20,29 +19,6 @@
   <h2>Accès et notifications</h2>
   <p class="muted">Pris en compte tout de suite, sur cette machine et ce navigateur. Rien n'est écrit dans <code>.env</code>.</p>
 </div>
-
-<section class="panel settings-part" id="1password">
-  <div class="panel-head"><h2>{{ ic.icon("lock") }} 1Password</h2>
-    {% if op.signed_in %}<span class="badge g-done">connecté{% if op.email %} · {{ op.email }}{% endif %}</span>
-    {% elif not op.installed %}<span class="badge">op absent</span>
-    {% else %}<span class="badge g-ko">non connecté</span>{% endif %}
-  </div>
-  {% if op.signed_in %}
-    <p class="muted">Les références op:// sont lisibles{% if op.url %} ({{ op.url }}){% endif %}. La session de 1Password s'arrête après 30 min sans activité : les secrets déjà lus restent en mémoire.</p>
-    <form method="post" action="/reglages/1password/deconnexion"><button type="submit" class="secondary">Se déconnecter</button></form>
-  {% elif op.installed and op.accounts %}
-    <form method="post" action="/reglages/1password/connexion" class="settings-signin">
-      <label class="field">Mot de passe 1Password{% if op.accounts[0].email %} de {{ op.accounts[0].email }}{% endif %}
-        <input type="password" name="password" autocomplete="current-password" required>
-        <small class="muted">Passé à <code>op signin</code> puis oublié : jamais écrit ni journalisé. La session reste dans Jarvis, sans aller aux agents ni au shell.</small></label>
-      <button type="submit">Se connecter</button>
-    </form>
-  {% endif %}
-  {% if op_error %}<p class="result ko">{{ op_error | reglages }}</p>{% endif %}
-  {% if op.installed and not op.accounts and not op.signed_in %}
-    <p class="muted">Une seule fois par machine, dans un terminal (ta Secret Key est demandée, Jarvis ne la voit pas) :<br><code>op account add --address &lt;adresse du site 1Password&gt; --email &lt;ton e-mail&gt;</code>, puis recharge cette page.</p>
-  {% endif %}
-</section>
 
 <section class="panel settings-part" id="notifications" data-browser-notifs>
   <div class="panel-head"><h2>{{ ic.icon("bell") }} Notifications du Mac</h2><span class="badge" data-notifs-state>…</span></div>
@@ -70,7 +46,7 @@
 
 <div class="settings-chapter">
   <h2>Configuration de Jarvis</h2>
-  <p class="muted settings-intro">Enregistrée dans <code>{{ env_path }}</code> (hors git, droits 600). Pour les secrets, mets plutôt une référence 1Password <code>op://&lt;coffre&gt;/&lt;élément&gt;/&lt;champ&gt;</code> (dans l'app 1Password, sur le champ : ⌄ → Copy Secret Reference) : Jarvis la lit en mémoire, rien n'est écrit en clair.</p>
+  <p class="muted settings-intro">Enregistrée dans <code>{{ env_path }}</code> (hors git, droits 600).</p>
 </div>
 
 <form class="settings-form" method="post" action="/reglages" autocomplete="off">
@@ -84,7 +60,8 @@
     <div class="settings-fields">
       {% for f in items if f.field.group == group %}{% set fd = f.field %}
       <label class="field" id="reglage-{{ fd.key }}"><span class="settings-label">{{ fd.label }} <code class="settings-key">{{ fd.key }}</code>
-        {% if fd.kind == "secret" and f.stored_clear %}<span class="badge g-ko" title="Valeur enregistrée en clair dans .env">en clair</span>{% elif f.reference %}<span class="badge g-done">1Password</span>{% endif %}
+        {% if f.to_replace %}<span class="badge g-ko" title="Ancienne référence op:// : Jarvis ne la lit plus, ce réglage vaut « non renseigné ». Saisis la valeur elle-même.">à remplacer</span>
+        {% elif f.stored %}<span class="badge" title="Valeur enregistrée dans .env ; elle n'est jamais réaffichée">enregistré</span>{% endif %}
         {% if f.overridden %}<span class="badge g-ko" title="Aussi définie dans l'environnement du processus (vm.conf…) : c'est cette valeur-là qui gagnera au prochain démarrage">définie hors .env</span>{% endif %}
         {% if not fd.live %}<span class="badge" title="Pris en compte au prochain démarrage de Jarvis">au redémarrage</span>{% endif %}
         {% if f.path_ok is sameas true %}<span class="badge g-done">trouvé</span>{% elif f.path_ok is sameas false %}<span class="badge g-ko">introuvable</span>{% endif %}</span>
@@ -92,9 +69,9 @@
         <select name="{{ fd.key }}">{% for c in fd.choices %}<option value="{{ c }}"{% if c == f.value %} selected{% endif %}>{{ c or "par défaut" }}</option>{% endfor %}</select>
         {% else %}
         <input name="{{ fd.key }}" value="{{ f.value }}" spellcheck="false"{% if fd.kind == "int" %} inputmode="numeric"{% endif %}
-               {% if fd.kind == "secret" and f.stored_clear %}placeholder="•••••• enregistré, laisse vide pour le garder"{% elif fd.kind == "secret" %}placeholder="op://…"{% endif %}>
+               {% if f.stored %}placeholder="•••••• enregistré, laisse vide pour le garder"{% endif %}>
         {% endif %}
-        <small class="muted">{{ fd.help }}{% if fd.kind == "secret" and not f.empty %} · <span class="settings-clear"><input type="checkbox" name="effacer_{{ fd.key }}" aria-label="Effacer {{ fd.label }}"> effacer</span>{% endif %}</small>
+        <small class="muted">{{ fd.help }}{% if f.stored %}{{ " · " if fd.help }}<span class="settings-clear"><input type="checkbox" name="effacer_{{ fd.key }}" aria-label="Effacer {{ fd.label }}"> effacer</span>{% endif %}</small>
       </label>
       {% endfor %}
     </div>

@@ -36,7 +36,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=186">
+  <link rel="stylesheet" href="/static/style.css?v=187">
   {% if plain %}<link rel="stylesheet" href="/static/sobre.css?v=6">{% endif %}
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/filters.js?v=12" defer></script>
@@ -119,7 +119,7 @@
       <div id="notif-panel" class="notif-panel" hidden></div>
     </div>
     <button type="button" class="theme-toggle bar-icon" id="theme-toggle" title="Changer de thème" aria-label="Thème">Auto</button>
-    <a href="/reglages" class="settings-link bar-icon {{ 'active' if active == '/reglages' }}" aria-label="Réglages" title="Réglages : Airflow, Notion, 1Password">{{ ic.icon("gear") }}</a>
+    <a href="/reglages" class="settings-link bar-icon {{ 'active' if active == '/reglages' }}" aria-label="Réglages" title="Réglages : Airflow, Notion, dossiers, affichage">{{ ic.icon("gear") }}</a>
     </div>
   </header>
   <script>

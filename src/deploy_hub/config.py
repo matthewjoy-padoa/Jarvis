@@ -84,74 +84,30 @@ def restrict(path: Path) -> bool:
     return False
 
 
-# Secrets : une valeur « op://coffre/élément/champ » est une référence 1Password, lue avec « op read » à la première
-# demande puis gardée en mémoire seulement (jamais écrite, jamais remise dans l'environnement transmis aux agents).
-OP_PREFIX = "op://"
-_resolved: dict[str, str] = {}
-SECRET_ERRORS: dict[str, str] = {}  # référence → raison du dernier échec, pour la page Sources
-_failed_at: dict[str, float] = {}
-RETRY_AFTER = 60  # s : un échec n'est retenté qu'ensuite (chaque page lit le jeton ; op peut attendre jusqu'au délai)
-
-
-def resolve(value: str) -> str:
-    """Valeur telle quelle, ou celle de la référence 1Password ; "" si 1Password ne la donne pas (raison dans SECRET_ERRORS)."""
-    value = (value or "").strip()
-    if not value.startswith(OP_PREFIX):
-        return value
-    if value in _resolved:
-        return _resolved[value]
-    if time.monotonic() - _failed_at.get(value, -RETRY_AFTER) < RETRY_AFTER:
-        return ""
-    value_ok = _read_op(value)
-    if not value_ok:
-        _failed_at[value] = time.monotonic()
-    return value_ok
-
-
-def _read_op(value: str) -> str:
-    from deploy_hub import onepassword
-    if not onepassword.installed():
-        SECRET_ERRORS[value] = "1Password CLI (op) absent"
-        return ""
-    try:
-        out = onepassword.run("read", "--no-newline", value)
-    except (OSError, subprocess.TimeoutExpired) as e:
-        SECRET_ERRORS[value] = f"op read a échoué ({type(e).__name__})"
-        return ""
-    if out.returncode or not out.stdout:
-        # Message de op (jamais la valeur : elle n'est pas lue) ; le plus souvent « not signed in ».
-        SECRET_ERRORS[value] = onepassword.message(out.stderr) or "op read n'a rien renvoyé (champ vide ?)"
-        return ""
-    SECRET_ERRORS.pop(value, None)
-    _resolved[value] = out.stdout
-    return out.stdout
-
-
-def forget_secrets() -> None:
-    """Oublie les valeurs lues et les échecs : après une connexion à 1Password ou un changement de réglages."""
-    _resolved.clear()
-    _failed_at.clear()
-    SECRET_ERRORS.clear()
-
-
 PRIVATE_KEYS = ("NOTION_TOKEN", "AIRFLOW_USER", "AIRFLOW_PASSWORD")
 
 
 def child_environment() -> dict[str, str]:
     """Environnement donné aux processus lancés par Jarvis (agents, shell, Flow Digger) : sans ses secrets, sans les
-    réglages de son .env et sans session 1Password (une session ouvrirait tous les coffres du compte)."""
+    réglages de son .env, et sans session de gestionnaire de mots de passe héritée du terminal (OP_SESSION_* : elle ouvrirait
+    tous les coffres du compte aux agents)."""
     return {k: v for k, v in os.environ.items()
             if k not in PRIVATE_KEYS and k not in ENV_FILE_KEYS and not k.startswith("OP_SESSION_")}
 
 
+OLD_REFERENCE = "op://"  # ancienne référence à un gestionnaire de mots de passe : Jarvis ne les lit plus (0.8.7)
+
+
+def plain(value: str) -> str:
+    """Valeur d'un secret, utilisable telle quelle ; "" pour une ancienne référence restée dans .env : elle vaut « non
+    renseigné » (rien n'est envoyé à sa place à Airflow ni à Notion) et Réglages la signale à remplacer."""
+    value = (value or "").strip()
+    return "" if value.startswith(OLD_REFERENCE) else value
+
+
 def secret(name: str) -> str:
-    """Secret de Jarvis (NOTION_TOKEN, AIRFLOW_USER, AIRFLOW_PASSWORD) : valeur en clair ou référence op://."""
-    return resolve(os.getenv(name, ""))
-
-
-def secret_problem(name: str) -> str:
-    """Pourquoi la référence 1Password du secret n'a pas pu être lue ; "" si elle l'a été ou n'en est pas une."""
-    return SECRET_ERRORS.get(os.getenv(name, "").strip(), "")
+    """Secret de Jarvis (NOTION_TOKEN, AIRFLOW_USER, AIRFLOW_PASSWORD), tel qu'enregistré dans les réglages."""
+    return plain(os.getenv(name, ""))
 
 
 def private_dir_problem(path: Path) -> str:

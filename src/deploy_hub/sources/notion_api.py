@@ -18,7 +18,7 @@ from pathlib import Path
 import httpx
 
 from deploy_hub.safe_write import write_json
-from deploy_hub.config import PROJECT_ROOT, data_dir, resolve
+from deploy_hub.config import PROJECT_ROOT, data_dir, plain
 from deploy_hub.queries import ConfigError, page_id_of
 from deploy_hub.sync_notion import (RECETTE_COLUMNS, RECETTE_CONTENT, SyncError, add_users, load_config, publish,
                                     summary, unknown_users, versions)
@@ -96,8 +96,8 @@ TYPE_MAX = 40
 
 
 def load_token(root: Path = PROJECT_ROOT) -> str | None:
-    """NOTION_TOKEN de l'environnement, sinon du fichier .env de l'app (ignoré par git) ; en clair ou référence 1Password
-    (op://…, lue par op read). Jamais affiché ni journalisé ; None si absent ou illisible."""
+    """NOTION_TOKEN de l'environnement, sinon du fichier .env de l'app (ignoré par git). Jamais affiché ni journalisé ;
+    None si absent."""
     raw = os.getenv("NOTION_TOKEN", "")
     env = root / ".env"
     if not raw and env.is_file():
@@ -105,7 +105,7 @@ def load_token(root: Path = PROJECT_ROOT) -> str | None:
             key, _, value = line.partition("=")
             if key.strip() == "NOTION_TOKEN" and value.strip():
                 raw = value.split(" #")[0].strip().strip('"').strip("'")
-    return resolve(raw) or None
+    return plain(raw) or None
 
 
 def _uuid(page_id: str) -> str:

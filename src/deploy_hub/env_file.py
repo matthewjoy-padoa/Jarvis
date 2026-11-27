@@ -1,8 +1,7 @@
 """Réglages de Jarvis modifiables depuis la page Réglages : lecture et écriture du .env, sans jamais réafficher un secret.
 
 - Seules les clés de FIELDS sont écrites ; les autres lignes du .env (commentaires compris) restent telles quelles.
-- Un secret enregistré en clair n'est jamais renvoyé à la page : le champ arrive vide, et vide veut dire « inchangé ».
-  Une référence 1Password (op://…) n'est pas un secret : elle s'affiche.
+- Un secret enregistré n'est jamais renvoyé à la page : le champ arrive vide, et vide veut dire « inchangé ».
 - Le fichier est réécrit d'un bloc (fichier temporaire puis remplacement), en 600.
 """
 
@@ -12,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from deploy_hub.safe_write import write_text
-from deploy_hub.config import ENV_FILE_KEYS, OP_PREFIX, PROCESS_KEYS, PROJECT_ROOT, parse_env_line
+from deploy_hub.config import ENV_FILE_KEYS, OLD_REFERENCE, PROCESS_KEYS, PROJECT_ROOT, parse_env_line
 
 
 @dataclass(frozen=True)
@@ -20,7 +19,7 @@ class Field:
     key: str
     label: str
     kind: str        # url, secret, path, bin (programme), int, choice ou text
-    help: str
+    help: str = ""
     live: bool = True  # False : pris en compte au prochain démarrage de Jarvis
     section: str = "Airflow"
     choices: tuple[str, ...] = ()  # kind « choice » : valeurs permises ("" = défaut)
@@ -49,9 +48,9 @@ ENGINE, LIMITS, RIGHTS = "Moteur", "Limites", "Permissions et dossiers"
 
 FIELDS = (
     Field("AIRFLOW_BASE_URL", "Adresse d'Airflow", "url", "Vue depuis la machine de Jarvis : sur la VM, http://localhost:8888"),
-    Field("AIRFLOW_USER", "Utilisateur Airflow", "secret", "Référence 1Password conseillée : op://<coffre>/<élément>/<champ>"),
-    Field("AIRFLOW_PASSWORD", "Mot de passe Airflow", "secret", "Référence 1Password conseillée : op://<coffre>/<élément>/<champ>"),
-    Field("NOTION_TOKEN", "Jeton Notion", "secret", "Facultatif. Référence 1Password conseillée : op://<coffre>/<élément>/<champ>",
+    Field("AIRFLOW_USER", "Utilisateur Airflow", "secret"),
+    Field("AIRFLOW_PASSWORD", "Mot de passe Airflow", "secret"),
+    Field("NOTION_TOKEN", "Jeton Notion", "secret", "Facultatif.",
           section=NOTION),
     Field("JARVIS_NOTION_DASHBOARDS", "Liste des dashboards clients", "text",
           "Id de la page Notion qui liste les dashboards des clients (annuaire de « Ajouter un client »). Vide : « Liste des dashboards "
@@ -136,19 +135,15 @@ def read(file: Path | None = None) -> dict[str, str]:
     return dict(p for line in file.read_text(encoding="utf-8").splitlines() if (p := parse_env_line(line)))
 
 
-def is_reference(value: str) -> bool:
-    return value.startswith(OP_PREFIX)
-
-
 def view(file: Path | None = None) -> list[dict]:
-    """Ce que la page affiche, champ par champ : la valeur (jamais celle d'un secret en clair) et son état."""
+    """Ce que la page affiche, champ par champ : la valeur (jamais celle d'un secret) et son état."""
     values = read(file)
     out = []
     for f in FIELDS:
         value = values.get(f.key, "")
-        clear_secret = f.kind == "secret" and value and not is_reference(value)
-        out.append({"field": f, "value": "" if clear_secret else value, "stored_clear": bool(clear_secret),
-                    "reference": is_reference(value), "empty": not value,
+        stored = bool(f.kind == "secret" and value)  # secret enregistré : jamais renvoyé à la page
+        out.append({"field": f, "value": "" if stored else value, "stored": stored,
+                    "to_replace": stored and value.startswith(OLD_REFERENCE),  # ancienne référence : plus lue (config.plain)
                     "overridden": f.key in PROCESS_KEYS,  # fixée hors .env (vm.conf…) : elle gagnera au redémarrage
                     "path_ok": _found(f, value)})
     return out
@@ -175,8 +170,6 @@ def _clean(field: Field, value: str) -> str:
         raise EnvError(f"{field.label} : un nombre entier, {field.minimum} au moins")
     if field.kind == "choice" and value not in field.choices + ("",):
         raise EnvError(f"{field.label} : {' ou '.join(c for c in field.choices if c)}")
-    if field.kind == "secret" and value.startswith("op:") and not is_reference(value):
-        raise EnvError(f"{field.label} : une référence 1Password commence par op://")
     return value
 
 
