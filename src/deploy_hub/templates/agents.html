@@ -48,10 +48,10 @@
   ("ko", "Arrêtés ou en échec", "Échec, arrêt, délai dépassé", runs | selectattr("group", "equalto", "ko") | rejectattr("pr_url") | list),
 ] %}
 {% if plain %}
-{# Vue neutre (`plain`, base.html) : les quatre étapes en compteurs, puis le tableau ; ni armures ni glisser-déposer
+{# Vue classique (`plain`, base.html) : les quatre étapes en compteurs, puis le tableau ; ni armures ni glisser-déposer
    (un agent s'archive depuis sa page). #}
 {% if asking %}
-{# Ceux qui attendent une réponse d'abord (les armures « ? » de la vue Jarvis) : la question posée, et un lien qui
+{# Ceux qui attendent une réponse d'abord (les armures « ? » de la vue originale) : la question posée, et un lien qui
    arrive sur le formulaire de réponse de l'agent. Une réponse déjà partie : lien vers l'agent qui la traite. #}
 <section class="panel agent-asking" id="en-attente" aria-labelledby="en-attente-titre">
   <div class="panel-head"><h2 id="en-attente-titre">En attente de ta réponse</h2><span class="badge g-todo">{{ asking | length }}</span></div>

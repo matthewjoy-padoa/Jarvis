@@ -325,9 +325,9 @@ async def _push_loop() -> None:
 
 app = FastAPI(title="Jarvis", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
-# Choix d'affichage de ce navigateur, connus de tous les gabarits, fragments htmx compris : `plain`, la vue neutre (cookie
+# Choix d'affichage de ce navigateur, connus de tous les gabarits, fragments htmx compris : `plain`, la vue classique (cookie
 # STYLE_COOKIE) ; `still`, animations coupées (MOTION_COOKIE). Un gabarit relu sur le disque avant la relance, par un processus
-# qui ne les fournit pas encore, les voit faux : vue Jarvis, animations actives.
+# qui ne les fournit pas encore, les voit faux : vue originale, animations actives.
 templates = Jinja2Templates(directory=HERE / "templates", context_processors=[lambda request: {
     "plain": request.cookies.get(STYLE_COOKIE) == "sobre", "still": request.cookies.get(MOTION_COOKIE) == "off"}])
 def when_text(moment: datetime | None) -> str:
@@ -428,9 +428,9 @@ CLIENT_COOKIE = "jarvis_client"  # client en cours : celui de la dernière fiche
 # armures, ni Noël (sobre.css, branches `plain` des gabarits). Les animations se règlent à part, dans les deux vues (MOTION_COOKIE,
 # `still`, data-motion="off" dans style.css). Gardés dans des cookies, pas dans le navigateur seul : le serveur rend la page
 # telle quelle dès le premier affichage. Les noms affichés des vues ne sont écrits qu'ici : « sobre » (cookie, data-style,
-# sobre.css) et `plain` (gabarits) désignent la vue « Neutre » de l'écran ; l'identifiant reste, pour les cookies déjà posés.
+# sobre.css) et `plain` (gabarits) désignent la vue « Classique » de l'écran ; l'identifiant reste, pour les cookies déjà posés.
 STYLE_COOKIE, MOTION_COOKIE = "jarvis_affichage", "jarvis_animations"
-templates.env.globals["style_names"] = {"jarvis": "Jarvis", "sobre": "Neutre"}  # pied de page, Réglages
+templates.env.globals["style_names"] = {"jarvis": "Originale", "sobre": "Classique"}  # pied de page, Réglages
 # Vues tous clients, proposées sur la page Clients (et toujours joignables par leur URL).
 CROSS_PAGES = [
     ("/injections", "Injections"),

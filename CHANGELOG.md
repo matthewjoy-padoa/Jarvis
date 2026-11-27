@@ -13,7 +13,7 @@ La version affichée en bas de chaque page change donc avec chaque fonctionnalit
 
 ## [0.8.5] · 2026-11-27
 
-- Animations réglables à part, dans les deux vues : Réglages → Affichage → Animations (« Activées » ou « Désactivées »), pour ce navigateur. Désactivées, plus rien ne bouge ni ne glisse (logo, survols, ouvertures, armures, booster InteCG) ; restent l'indicateur d'attente et l'avancement d'une synchro. La vue auparavant dite « sobre » ne coupe donc plus les animations d'elle-même : elle les retrouve, booster InteCG compris. Les deux vues changent de nom : « Jarvis » (ex-« animé ») et « Neutre » (ex-« sobre ») ; le lien du pied de page devient « Vue neutre » / « Vue Jarvis ».
+- Animations réglables à part, dans les deux vues : Réglages → Affichage → Animations (« Activées » ou « Désactivées »), pour ce navigateur. Désactivées, plus rien ne bouge ni ne glisse (logo, survols, ouvertures, armures, booster InteCG) ; restent l'indicateur d'attente et l'avancement d'une synchro. La vue auparavant dite « sobre » ne coupe donc plus les animations d'elle-même : elle les retrouve, booster InteCG compris. Les deux vues changent de nom : « Originale » (ex-« animé ») et « Classique » (ex-« sobre ») ; le lien du pied de page devient « Vue classique » / « Vue originale ».
 
 ## [0.8.4] · 2026-11-27
 

@@ -1,6 +1,6 @@
-/* Vue neutre de Jarvis (2026-11-25) : chargée après style.css, seulement quand cette vue est choisie
+/* Vue classique de Jarvis (2026-11-25) : chargée après style.css, seulement quand cette vue est choisie
    (Réglages → Affichage, ou lien en pied de page ; cookie lu par le serveur, data-style="sobre" sur <html>).
-   Un outil de travail neutre : même squelette que la vue Jarvis (barre du haut, dock des liens, boutons Notes et
+   Un outil de travail neutre : même squelette que la vue originale (barre du haut, dock des liens, boutons Notes et
    Console), mais gris neutres et un seul bleu, traits fins, angles peu arrondis, pas d'ombre. Les statuts gardent leurs
    quatre couleurs, en plus sourd. Les animations ne se règlent pas ici : elles se coupent à part, dans les deux vues
    (data-motion="off", fin de style.css).
@@ -29,7 +29,7 @@ html:root[data-style="sobre"] {
   .page-head h1 .muted { font-size: 13.5px; font-weight: 400; }
   .client-emoji:not(.client-icon) { display: none; }  /* le logo du client (image) reste, pas son emoji */
 
-  /* ---- Barre du haut : celle de la vue Jarvis, en plus carré (arrondis : listes de la section suivante) ---------- */
+  /* ---- Barre du haut : celle de la vue originale, en plus carré (arrondis : listes de la section suivante) ---------- */
   .topbar { border-bottom-width: 1px; }
   /* Nom en texte plein, pas de point « en ligne » */
   .brand-name { background: none; color: var(--text); font-size: 18px; font-weight: 700; letter-spacing: -.01em; }

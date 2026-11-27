@@ -52,7 +52,7 @@
 </section>
 
 <section class="panel settings-part" id="affichage">
-  <div class="panel-head"><h2>{{ ic.icon("gear") }} Affichage</h2><span class="badge">vue {{ style_names.sobre | lower if plain else style_names.jarvis }}{{ " · sans animation" if still }}</span></div>
+  <div class="panel-head"><h2>{{ ic.icon("gear") }} Affichage</h2><span class="badge">vue {{ (style_names.sobre if plain else style_names.jarvis) | lower }}{{ " · sans animation" if still }}</span></div>
   <p class="muted">Deux réglages indépendants, pour ce navigateur seulement ; rien n'est écrit dans <code>.env</code>. Les informations et les fonctions sont les mêmes partout.</p>
   <h3>Vue</h3>
   <p class="muted">{{ style_names.jarvis }} : l'habillage d'origine, coloré et arrondi, avec les armures de la page Agents et le thème Noël. {{ style_names.sobre }} : le même menu en haut, mais gris neutres et un seul bleu, formes plus carrées, accueil en tableau de bord, page Agents en compteurs et tableau, pas de thème Noël.</p>
