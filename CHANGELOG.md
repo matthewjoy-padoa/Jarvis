@@ -11,6 +11,10 @@ Pour une PR qui monte le numéro :
 
 La version affichée en bas de chaque page change donc avec chaque fonctionnalité ; après une simple correction, le bandeau « Jarvis est à relancer » compare les commits. Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
+## [0.8.3] · 2026-11-27
+
+- InteCG, le jeu de cartes de l'équipe (dépôt `intecg`, à part) : un DAG ou un agent lancé dans Jarvis rapporte un booster bonus dans le jeu. Jarvis prévient le serveur du jeu (`POST /api/credits/jarvis`) en tâche de fond ; c'est InteCG qui crédite, ne compte un lancement qu'une fois et plafonne les boosters du jour. Le booster gagné s'annonce dans les notifications. Réglage `INTECG_URL` (**Réglages → Dossiers et liens**, sur la VM `http://localhost:5173`) ; vide, rien n'est envoyé. Jeu arrêté ou injoignable : le lancement se fait quand même, sans booster.
+
 ## [0.8.2] · 2026-11-24
 
 - Mises à jour depuis l'app, plus de `git pull` à la main : toutes les dix minutes, Jarvis regarde sur GitHub (`git fetch`) si une nouvelle version est publiée ; bandeau « Nouvelle version de Jarvis disponible » sur toutes les pages, et notification. Le bouton **Mettre à jour et redémarrer** fait lui-même le `git pull` (avance rapide), `uv sync`, puis relance Jarvis (même terminal, même service) ; la page se recharge sur la nouvelle version. Refusé tant qu'un agent, une synchro Notion ou la lecture de l'annuaire tourne.

@@ -43,6 +43,7 @@ from deploy_hub.sources.sync_routine import SyncRoutine
 from deploy_hub.sources import connections, flow_digger, notion_api, running_code
 from deploy_hub.sources.external import external_statuses
 from deploy_hub.sources.journal import changes_since, group_changes
+from deploy_hub.sources import intecg
 from deploy_hub.sources import watchers
 from deploy_hub.sources.notifications import Notification, NotificationStore
 from deploy_hub.sources.personal import PersonalStore, remind_date
@@ -72,6 +73,9 @@ dag_source = DagSource(settings.orchestrator_dir, dag_catalogue.LOCAL)
 dag_chains = ChainRunner(data_dir() / "airflow" / "chaines.json",
                          lambda dag_id, padoa_env, slug, card: _launch_watched(dag_id, padoa_env, fiches.get_deployment(slug), card), notifications)
 dag_watch.on_end = dag_chains.watch_ended
+# InteCG (jeu de cartes de l'équipe, dépôt à part) : un DAG ou un agent lancé ici rapporte un booster dans le jeu.
+boosters = intecg.Boosters(notifications)
+claude.on_launch = lambda run: boosters.earned("agent", run.id, run.started_at, "Agent lancé", run.client)
 web_push = WebPush(data_dir() / "push")  # notifications du Mac même onglet fermé (voir sources/web_push.py)
 personal = PersonalStore(data_dir() / "perso.json")  # épingles, notes et rappels : à moi seul, jamais dans Notion
 _refresh_lock = threading.Lock()  # un seul rafraîchissement Notion à la fois
@@ -1349,6 +1353,7 @@ def _launch_watched(dag_id: str, padoa_env: str, d: Deployment | None = None, ca
             next((c["customer"] for c in dag_catalogue.ced_for(customers) if c["dag_id"] == dag_id), "")  # client du catalogue
         w = dag_watch.start(d.slug if d else "", d.client if d else "", customer, dag_id, result.run_id, padoa_env, card)
         result.message += f" · suivi #{w.id} lancé (relances automatiques, rapport à la fin) : Agents → DAG"
+        boosters.earned("dag", w.id, w.started_at, "DAG lancé", w.client)
     return result, w
 
 

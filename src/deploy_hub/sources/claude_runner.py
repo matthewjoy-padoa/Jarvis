@@ -8,6 +8,7 @@ Sans --bare, l'agent charge comme une session normale ~/.claude/CLAUDE.md, ses h
 
 import inspect
 import json
+import logging
 import os
 import re
 import signal
@@ -550,6 +551,7 @@ class ClaudeRunner:
                  max_turns: int = 0, max_budget_usd: int = 0, archive_days: int = ARCHIVE_DAYS, log_days: int = LOG_DAYS):
         self.orchestrator_dir = orchestrator_dir
         self.notifications = notifications  # NotificationStore : « agent terminé »
+        self.on_launch = None  # appelé avec l'agent qui vient d'être lancé (booster InteCG : sources/intecg.py)
         self.state_dir = state_dir
         self.state_file = state_dir / "agents.json"
         self.archive_file = state_dir / "agents-archive.json"  # lu seulement à la demande (page des archives, bilan)
@@ -814,6 +816,11 @@ class ClaudeRunner:
             self.runs.insert(0, run)
         self._save()
         self._start(run)
+        if self.on_launch:
+            try:
+                self.on_launch(run)
+            except Exception:  # noqa: BLE001 : l'agent est parti, la suite ne doit pas faire croire à un échec
+                logging.getLogger("uvicorn.error").exception("Suite du lancement d'un agent en échec")
         return ActionResult(True, f"Agent #{run.id} lancé sur {subject}, branche {branch}. Suivi dans Agents.", False, str(run.id))
 
     def _git(self, *args: str, check: bool = True) -> subprocess.CompletedProcess:

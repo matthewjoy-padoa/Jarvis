@@ -19,6 +19,8 @@ os.environ["ORCHESTRATOR_DIR"] = tempfile.mkdtemp()
 # Jamais le vrai Claude Code : la boucle de fond (relecture de l'annuaire des clients) tourne dès qu'un test démarre l'app.
 # Les tests qui lancent claude passent leur faux binaire explicitement.
 os.environ["CLAUDE_BIN"] = os.path.join(tempfile.mkdtemp(), "claude-absent")
+# Jamais le vrai InteCG : un agent ou un DAG lancé par un test ne doit créditer de booster à personne.
+os.environ["INTECG_URL"] = ""
 
 import json
 import threading
