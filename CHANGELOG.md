@@ -11,9 +11,13 @@ Pour une PR qui monte le numéro :
 
 La version affichée en bas de chaque page change donc avec chaque fonctionnalité ; après une simple correction, le bandeau « Jarvis est à relancer » compare les commits. Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
-## [0.8.6] · 2026-11-27
+## [0.8.7] · 2026-11-27
 
 - 1Password retiré de Jarvis, pour l'instant : plus de partie « 1Password » dans Réglages (connexion, déconnexion), plus de lecture des références `op://`. Les identifiants Airflow et le jeton Notion s'enregistrent tels quels dans `.env` (droits 600, hors git) ; la page Réglages ne les réaffiche jamais et les marque « enregistré ». **À faire en mettant à jour** : un secret encore enregistré sous la forme `op://…` n'est plus lu. Il vaut « non renseigné » (rien n'est envoyé à sa place, et la synchro Notion repasse par la routine), et Réglages le marque « à remplacer » : saisis-y la valeur elle-même. Les processus lancés par Jarvis (agents, shell, Flow Digger) ne reçoivent toujours pas une session de gestionnaire de mots de passe héritée du terminal.
+
+## [0.8.6] · 2026-11-27
+
+- Plus besoin de régler les dossiers de l'orchestrator, de Flow Digger et d'InteCG : au premier lancement, chaque dossier resté vide (`ORCHESTRATOR_DIR`, `FLOW_DIGGER_DIR`, `INTECG_DIR`) est cherché sur la machine, parmi les dépôts git du dossier personnel (cinq niveaux) dont l'origine nomme ce dépôt, le plus récemment mis à jour s'il y en a plusieurs. Il n'y a plus d'emplacement « habituel » pour Flow Digger et InteCG : chacun range ses dépôts où il veut. Le dossier trouvé est noté dans `.env` : Réglages → Dossiers l'affiche déjà rempli, et le choix, fait une fois, ne change plus tout seul. Un dossier déjà renseigné (dans `.env` ou hors `.env`, comme `vm.conf`) n'est jamais remplacé ; un dossier introuvable reste vide.
 
 ## [0.8.5] · 2026-11-27
 

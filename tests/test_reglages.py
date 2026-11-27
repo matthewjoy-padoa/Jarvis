@@ -212,3 +212,24 @@ def test_settings_are_split_into_parts_with_a_summary(env):
     assert [g for g in ("Moteur", "Limites", "Permissions et dossiers") if f'<h3 class="settings-group">{g}</h3>' in agents] \
         == ["Moteur", "Limites", "Permissions et dossiers"]
     assert agents.index("Limites") < agents.index('name="JARVIS_AGENT_MAX_TURNS"') < agents.index("Permissions et dossiers")
+
+
+def test_first_launch_notes_the_folders_found_on_the_machine_once(env, monkeypatch, tmp_path):
+    """Premier lancement : chaque dossier pas encore réglé est cherché parmi les clones git de la machine (le plus récent
+    d'abord) et noté dans .env, où Réglages l'affiche déjà rempli ; un dossier réglé n'est ni cherché ni remplacé, un dossier
+    introuvable reste vide. Ensuite tout est réglé : plus aucune recherche."""
+    from deploy_hub import first_launch
+    orchestrator, old, game = tmp_path / "Dev" / "integration-orchestrator", tmp_path / "integration-orchestrator", tmp_path / "ailleurs" / "jeu"
+    searched = []
+    monkeypatch.setattr(first_launch, "git_clones", lambda repos: searched.append(repos) or {
+        "integration-orchestrator": [orchestrator, old], "flow-digger": [], "intecg": [game]})
+    assert first_launch.note_folders() == ["ORCHESTRATOR_DIR", "INTECG_DIR"]
+    lines = env.read_text().splitlines()
+    assert f"ORCHESTRATOR_DIR={orchestrator}" in lines and f"INTECG_DIR={game}" in lines and "CLAUDE_BIN=claude  # garde-moi" in lines
+    assert not any(line.startswith("FLOW_DIGGER_DIR") for line in lines) and os.environ["ORCHESTRATOR_DIR"] == str(orchestrator)
+    page = TestClient(main.app).get("/reglages").text
+    assert f'name="ORCHESTRATOR_DIR" value="{orchestrator}"' in page and f'name="INTECG_DIR" value="{game}"' in page
+    assert first_launch.note_folders() == [] and searched == [("integration-orchestrator", "flow-digger", "intecg"), ("flow-digger",)]
+    monkeypatch.setenv("FLOW_DIGGER_DIR", str(tmp_path))  # tout est réglé : plus de recherche
+    monkeypatch.setattr(first_launch, "git_clones", lambda repos: pytest.fail("tout est réglé : pas de recherche"))
+    assert first_launch.note_folders() == []

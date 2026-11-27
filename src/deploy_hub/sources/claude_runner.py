@@ -25,7 +25,7 @@ from pathlib import Path
 
 from deploy_hub.bau import KEY as BAU_KEY, LABEL as BAU_LABEL, Demande
 from deploy_hub.safe_write import write_json
-from deploy_hub.config import child_environment
+from deploy_hub.config import ORCHESTRATOR_REPO, child_environment, git_origin
 from deploy_hub.models import DONE, IN_PROGRESS, KO, TODO, Deployment, RetourRecette, status_group
 from deploy_hub.sources import ActionResult
 
@@ -791,9 +791,9 @@ class ClaudeRunner:
             return f"Claude Code en ligne de commande introuvable ({self.claude_bin}) : installe-le ou renseigne CLAUDE_BIN dans Réglages."
         if not (self.orchestrator_dir / ".git").exists():
             return f"Clone de integration-orchestrator introuvable ({self.orchestrator_dir}) : renseigne ORCHESTRATOR_DIR dans Réglages."
-        origin = subprocess.run(["git", "-C", str(self.orchestrator_dir), "remote", "get-url", "origin"], capture_output=True, text=True).stdout
-        if "integration-orchestrator" not in origin:  # Jarvis lui-même (ORCHESTRATOR_DIR vide) ou un autre dépôt : vu sur la VM
-            return (f"{self.orchestrator_dir.resolve()} n'est pas un clone de integration-orchestrator (origin : {origin.strip() or 'aucun'}) : "
+        origin = git_origin(self.orchestrator_dir)
+        if ORCHESTRATOR_REPO not in origin:  # un autre dépôt (Jarvis lui-même, vu sur la VM)
+            return (f"{self.orchestrator_dir.resolve()} n'est pas un clone de integration-orchestrator (origin : {origin or 'aucun'}) : "
                     "renseigne ORCHESTRATOR_DIR dans Réglages, ex. /home/padoa/Dev/integration-orchestrator.")
         # Les worktrees vont dans <orchestrator>/.claude/worktrees/jarvis : un .claude à root (sudo, conteneur) les bloque.
         existing = next(p for p in (self.worktrees_dir, *self.worktrees_dir.parents) if p.exists())
