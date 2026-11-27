@@ -53,6 +53,7 @@ La version affichée en bas de chaque page change donc avec chaque fonctionnalit
 ## [0.5.7] · 2026-11-23
 
 - Thèmes « Noël » : deux choix de plus au bouton de thème (Auto → Nuit → Clair → Noël nuit → Noël clair) et dans la commande « Changer de thème » de la palette. Nuit de sapin à l'accent or, ou matin de neige à l'accent sapin ; statuts gardés lisibles dans les deux (KO en rouge). Neige derrière le contenu, guirlande qui scintille sous la barre, bonnet sur le logo, « Joyeuses fêtes » en pied de page. Décor sans animation si le Mac demande moins de mouvement. À partir du 1er décembre 2026, Noël s'impose une fois à chaque navigateur, quel que soit le thème choisi avant (nuit si on était en Nuit, clair si on était en Clair, selon le Mac en Auto) ; on peut ensuite l'enlever au bouton : tout choix est retenu, Auto compris, et Noël ne revient pas.
+- Jarvis s'installe comme application (Chrome : menu ⋮ → « Caster, enregistrer et partager » → « Installer la page en tant qu'application ») : ses notifications portent alors le logo Jarvis à la place de celui de Chrome. Manifeste `static/manifest.json` et logo en PNG (192 et 512 px).
 
 ## [0.5.6] · 2026-11-23
 

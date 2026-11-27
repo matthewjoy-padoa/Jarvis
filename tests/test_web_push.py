@@ -148,3 +148,15 @@ def test_routes(tmp_path, monkeypatch):
     assert client.post("/notifications/push/test").json() == {"envoyees": 1, "abonnes": 1}
     client.post("/notifications/push/desabonnement", json={"endpoint": SUB["endpoint"]})
     assert main.web_push.subscriptions() == []
+
+
+def test_jarvis_can_be_installed_as_an_app_with_its_logo():
+    """Installé comme application, Jarvis signe ses notifications de son logo (sinon macOS montre celui de Chrome)."""
+    client = TestClient(main.app)
+    assert '<link rel="manifest" href="/static/manifest.json">' in client.get("/notifications").text
+    manifest = client.get("/static/manifest.json").json()
+    assert manifest["name"] == "Jarvis" and manifest["display"] == "standalone" and manifest["start_url"] == "/"
+    assert {i["sizes"] for i in manifest["icons"]} == {"192x192", "512x512"}
+    for icon in manifest["icons"]:
+        png = client.get(icon["src"])
+        assert png.status_code == 200 and png.headers["content-type"] == "image/png" and png.content.startswith(b"\x89PNG")
