@@ -2,7 +2,7 @@
 rapporte un booster bonus au joueur de cette machine.
 
 Jarvis ne fait que prévenir le serveur du jeu (POST <adresse>/api/credits/jarvis, {cle, motif}) : c'est InteCG qui
-crédite, qui ne compte une clé qu'une fois et qui plafonne les boosters du jour. L'appel part en tâche de fond et
+décide (tirage au sort à chaque lancement), qui ne compte une clé qu'une fois et qui plafonne les boosters du jour. L'appel part en tâche de fond et
 n'échoue jamais : un jeu arrêté ne doit ni ralentir ni empêcher un lancement.
 
 Le lien InteCG du pied de page démarre le jeu s'il ne tourne pas (start) : dépôt mis à jour en avance rapide, paquets
