@@ -25,7 +25,7 @@
       less.hidden = shown <= step;
     }
     more.addEventListener("click", () => { shown += step; render(); });
-    less.addEventListener("click", () => { shown = step; render(); list.scrollIntoView({ block: "nearest", behavior: "smooth" }); });
+    less.addEventListener("click", () => { shown = step; render(); list.scrollIntoView({ block: "nearest", behavior: window.jarvisCalm ? "auto" : "smooth" }); });
     render();
   }
   const run = (root) => root.querySelectorAll("[data-limit]").forEach(setup);

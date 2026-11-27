@@ -332,7 +332,7 @@
     Object.entries(entry.keys).forEach(([k, s]) => { if (!(toggle && isClient(k) && !(k in wanted))) s.value = ""; });
     if (!(toggle && already)) Object.entries(wanted).forEach(([k, v]) => (entry.keys[k].value = v));
     entry.apply();
-    if (scroll) entry.bar.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (scroll) entry.bar.scrollIntoView({ behavior: window.jarvisCalm ? "auto" : "smooth", block: "start" });
     return true;
   }
 

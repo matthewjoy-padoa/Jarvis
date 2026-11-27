@@ -191,8 +191,8 @@ def test_bouton_de_la_barre_et_route(repo):
     client = TestClient(main.app)
     page = client.get("/").text
     assert 'action="/outils/intecg"' in page and "/static/booster.js" in page
-    sober = TestClient(main.app, cookies={"jarvis_affichage": "sobre"}).get("/").text  # sobre : le lien reste, pas le sachet qui tombe
-    assert 'action="/outils/intecg"' in sober and "booster.js" not in sober
+    sober = TestClient(main.app, cookies={"jarvis_affichage": "sobre"}).get("/").text  # vue classique : le lien et le booster aussi
+    assert 'action="/outils/intecg"' in sober and "/static/booster.js" in sober
     assert client.post("/outils/intecg").status_code == 403  # pas depuis une page de Jarvis
     with socket.socket() as listening:
         listening.bind(("127.0.0.1", repo.port))

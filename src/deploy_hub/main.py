@@ -325,10 +325,11 @@ async def _push_loop() -> None:
 
 app = FastAPI(title="Jarvis", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
-# `plain` : affichage sobre choisi dans ce navigateur (cookie STYLE_COOKIE), connu de tous les gabarits, fragments htmx compris.
-# Un gabarit relu sur le disque avant la relance, par un processus qui ne le fournit pas encore, le voit faux : affichage animé.
-templates = Jinja2Templates(directory=HERE / "templates",
-                            context_processors=[lambda request: {"plain": request.cookies.get(STYLE_COOKIE) == "sobre"}])
+# Choix d'affichage de ce navigateur, connus de tous les gabarits, fragments htmx compris : `plain`, la vue classique (cookie
+# STYLE_COOKIE) ; `still`, animations coupées (MOTION_COOKIE). Un gabarit relu sur le disque avant la relance, par un processus
+# qui ne les fournit pas encore, les voit faux : vue originale, animations actives.
+templates = Jinja2Templates(directory=HERE / "templates", context_processors=[lambda request: {
+    "plain": request.cookies.get(STYLE_COOKIE) == "sobre", "still": request.cookies.get(MOTION_COOKIE) == "off"}])
 def when_text(moment: datetime | None) -> str:
     """« aujourd'hui à 14:04 », « hier à 16:00 », « le 12/11 à 09:03 » (« le 12/11/2025 à … » une autre année)."""
     if not moment:
@@ -423,10 +424,13 @@ NAV_PAGES = [p for p in PAGES if p[0] != "/clients"]  # « BAU » toujours : la 
 
 
 CLIENT_COOKIE = "jarvis_client"  # client en cours : celui de la dernière fiche ouverte
-# Affichage sobre, choisi dans Réglages ou en pied de page : même squelette, couleurs neutres, formes plus carrées, ni armures,
-# ni Noël, ni effets (sobre.css, branches `plain` des gabarits).
-# Gardé dans un cookie, pas dans le navigateur seul : le serveur rend la page sobre dès le premier affichage (`plain`, plus haut).
-STYLE_COOKIE = "jarvis_affichage"
+# Deux vues, choisies dans Réglages ou en pied de page. « sobre » : même squelette, couleurs neutres, formes plus carrées, ni
+# armures, ni Noël (sobre.css, branches `plain` des gabarits). Les animations se règlent à part, dans les deux vues (MOTION_COOKIE,
+# `still`, data-motion="off" dans style.css). Gardés dans des cookies, pas dans le navigateur seul : le serveur rend la page
+# telle quelle dès le premier affichage. Les noms affichés des vues ne sont écrits qu'ici : « sobre » (cookie, data-style,
+# sobre.css) et `plain` (gabarits) désignent la vue « Classique » de l'écran ; l'identifiant reste, pour les cookies déjà posés.
+STYLE_COOKIE, MOTION_COOKIE = "jarvis_affichage", "jarvis_animations"
+templates.env.globals["style_names"] = {"jarvis": "Originale", "sobre": "Classique"}  # pied de page, Réglages
 # Vues tous clients, proposées sur la page Clients (et toujours joignables par leur URL).
 CROSS_PAGES = [
     ("/injections", "Injections"),
@@ -514,12 +518,15 @@ def _keep(response, cookie: str, value: str):
 
 
 @app.post("/affichage")
-def display_style(affichage: str = Form(""), vers: str = Form("")):
-    """Affichage sobre ou animé (« jarvis »), pour ce navigateur ; retour à la page d'où vient le choix."""
+def display_style(affichage: str = Form(""), animations: str = Form(""), vers: str = Form("")):
+    """Vue (« jarvis » ou « sobre ») et animations (« on » ou « off »), pour ce navigateur ; un choix absent du formulaire
+    ne change pas. Retour à la page d'où vient le choix."""
     response = RedirectResponse(_local_path(vers, "/reglages#affichage"), status_code=303)
-    if affichage == "sobre":
-        return _keep(response, STYLE_COOKIE, "sobre")
-    response.delete_cookie(STYLE_COOKIE)
+    for choice, cookie, kept in ((affichage, STYLE_COOKIE, "sobre"), (animations, MOTION_COOKIE, "off")):
+        if choice == kept:
+            _keep(response, cookie, kept)
+        elif choice:  # le choix par défaut ne laisse pas de cookie
+            response.delete_cookie(cookie)
     return response
 
 

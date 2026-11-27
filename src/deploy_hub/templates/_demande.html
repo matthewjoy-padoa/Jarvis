@@ -10,7 +10,7 @@
       {% if x.priority %}<span class="badge" title="Priorité">{{ x.priority }}</span>{% endif %}
     </div>
     <div class="ticket-actions">
-      {% if x.is_open %}<button type="button" class="ticket-agent-btn" onclick="const a = this.closest('.ticket').querySelector('details.agent'); a.open = true; a.scrollIntoView({behavior: 'smooth', block: 'start'})">{{ ic.icon("bot") }} Lancer un agent</button>{% endif %}
+      {% if x.is_open %}<button type="button" class="ticket-agent-btn" onclick="const a = this.closest('.ticket').querySelector('details.agent'); a.open = true; a.scrollIntoView({behavior: window.jarvisCalm ? 'auto' : 'smooth', block: 'start'})">{{ ic.icon("bot") }} Lancer un agent</button>{% endif %}
       {% include "_pin_button.html" %}
       {% if x.notion_url %}<a class="btn-link" href="{{ x.notion_url }}" target="_blank" rel="noopener">Ouvrir dans Notion ↗</a>{% endif %}
       <a class="btn-link" href="/bau/demande/{{ x.ref }}" target="_blank" rel="noopener" title="Ouvrir cette demande dans un nouvel onglet">Nouvel onglet ↗</a>

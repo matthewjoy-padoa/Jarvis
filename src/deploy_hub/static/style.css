@@ -1680,6 +1680,12 @@ p.last-sync { margin: 4px 0 6px; }
 
 /* Agent qui attend une réponse : ses questions, puis « Répondre et relancer » */
 .agent-waiting { border-color: var(--warn); scroll-margin-top: calc(var(--topbar-h, 61px) + 16px); }  /* arrivée par l'ancre #repondre */
+/* Agents en attente de réponse, en tête de la page Agents quand elle est en compteurs (vue classique, ou animations coupées) */
+.agent-asking { border-left: 3px solid var(--st-todo); scroll-margin-top: calc(var(--topbar-h, 61px) + 64px); }
+.agent-asking li { display: flex; align-items: center; gap: 6px 16px; }
+.asking-what { flex: 1; min-width: 0; }
+.asking-q { margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 640px) { .agent-asking li { flex-wrap: wrap; } .asking-what { flex-basis: 100%; } .asking-q { white-space: normal; } }
 .agent-reply { display: grid; gap: 8px; margin-top: 12px; }
 .agent-reply textarea { width: 100%; font: inherit; }
 .agent-reply button { justify-self: start; }
@@ -1885,3 +1891,14 @@ details.filter.multi { position: relative; font-size: 13px; }
 .footer-style .link-button { box-shadow: none; text-decoration: none; vertical-align: baseline; }
 .footer-style .link-button:hover { text-decoration: underline; transform: none; }
 .style-choice { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+
+/* Animations coupées (Réglages → Affichage → Animations ; cookie lu par le serveur, data-motion="off" sur <html>), dans les
+   deux vues : ni animation ni transition, rien ne se déplace au survol, et la page Agents passe en compteurs et tableau, sans
+   armures (agents.html, `still`). Restent les animations utiles : attente (.spinner),
+   avancement d'une synchro (.sync-btn), « Enregistré » qui s'efface (.save-status). Le JavaScript qui anime lit le même attribut (jarvisCalm, base.html). */
+:root[data-motion="off"] :not(.spinner, .save-status), :root[data-motion="off"] :not(.sync-btn)::before, :root[data-motion="off"] ::after {
+  animation: none !important; transition: none !important; }
+:root[data-motion="off"] :is(.brand:hover .brand-mark, .client-chip:hover, .dock-btn:hover, .dock-btn:focus-visible, button:hover:not(:disabled),
+  .btn-primary:hover, .btn-link:hover, .retour details.agent > summary:hover, .ticket details.agent > summary:hover, .card-linked:hover,
+  a.kpi-link:hover, .kb-card:hover, .wn-item:hover, a.stat-link:hover, a.tl-mark:hover),
+:root[data-motion="off"] :is(.retour, .ticket) details.agent > summary:hover::after { transform: none; }  /* tout survol qui déplace : à compléter avec lui */
