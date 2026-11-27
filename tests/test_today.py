@@ -33,6 +33,15 @@ def test_unchanged_or_equivalent_values_are_not_events():
     assert diff_caches({R: row}, {R: {**row, "vigilance": False, "deadline": ""}}, "actions", "x") == []
 
 
+def test_a_checked_box_is_the_same_from_the_routine_and_from_the_api():
+    """Case cochée : « __YES__ » par la routine (SQL), True par l'API. Passer de l'une à l'autre n'est pas un changement."""
+    row = {"url": R, "statut": "À faire", "vigilance": "__YES__"}
+    assert diff_caches({R: row}, {R: {**row, "vigilance": True}}, "actions", "x") == []
+    assert diff_caches({R: {**row, "vigilance": True}}, {R: row}, "actions", "x") == []
+    ticked = diff_caches({R: {**row, "vigilance": "__NO__"}}, {R: row}, "actions", "x")
+    assert [(e["champ"], e["avant"], e["apres"]) for e in ticked] == [("vigilance", None, True)]  # cochée pour de bon : toujours vu
+
+
 def test_journal_keeps_60_days(tmp_path):
     old = (datetime.now() - timedelta(days=61)).isoformat(timespec="seconds")
     (tmp_path / "journal.json").write_text(json.dumps([{"quand": old, "base": "actions", "url": C, "type": "nouveau"}]))

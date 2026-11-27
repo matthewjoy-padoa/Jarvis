@@ -245,6 +245,21 @@ def test_routine_after_a_direct_refresh_reads_only_what_changed(root):
     assert ("actions", "actions", []) not in p["requetes"]  # colonnes et date de relecture notées par le rafraîchissement
 
 
+def test_a_direct_refresh_after_the_routine_raises_no_false_vigilance_alert(root):
+    """Cache laissé par la routine (case cochée : « __YES__ »), puis rafraîchissement par l'API (True) : la carte n'a
+    pas changé, donc ni changement compté ni notification urgente « point de vigilance levé »."""
+    refresh("acme", client_for(FakeNotion(3)), root)
+    cache_file = root / "data" / "notion" / "acme" / "cache-actions.json"
+    cache = json.loads(cache_file.read_text())
+    for row in cache.values():  # mêmes cartes, telles que la routine SQL les range
+        row["vigilance"], row["evenement"] = ("__YES__" if row["vigilance"] else "__NO__"), "__NO__"
+    cache_file.write_text(json.dumps(cache))
+    notes = root / "data" / "notifications.json"
+    notes.unlink(missing_ok=True)
+    assert refresh("acme", client_for(FakeNotion(3)), root)["changements"] == 0
+    assert not notes.is_file() or "vigilance" not in notes.read_text()
+
+
 def test_missing_property_or_access_stops_before_writing(root):
     def no_access(request):
         return httpx.Response(404, json={}) if "/query" in request.url.path else FakeNotion()(request)

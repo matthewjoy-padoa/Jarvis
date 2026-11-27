@@ -943,6 +943,10 @@ JOURNAL_DAYS = 60  # au-delà, les événements sont oubliés
 
 
 def _norm(value):
+    """Valeur comparable d'un passage à l'autre : une case à cocher vaut « __YES__ » / « __NO__ » par la routine (SQL),
+    True / False par l'API ; vide et décoché reviennent au même."""
+    if value in ("__YES__", True):
+        return True
     return None if value in (None, "", "__NO__", False, 0) else value
 
 
