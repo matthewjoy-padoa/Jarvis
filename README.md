@@ -5,17 +5,6 @@ Ce qui est éparpillé entre Notion, Airflow et l'orchestrator, réuni au même 
 
 Chacun installe son Jarvis et suit **ses propres clients** : configuration et données restent sur sa machine.
 
-## Ce qu'on y trouve
-
-| | |
-|---|---|
-| **Accueil** | Retards, échéances, injections KO, prochains jalons, ce qui a changé depuis ta dernière visite. |
-| **Fiche client** | Synthèse, jalons, injections par ressource, actions par équipe, retours de recette, règles de reprise, CED, PR. |
-| **BAU** | Les demandes de l'équipe, en liste ou en kanban, par squad. |
-| **DAGs** | Lancer un DAG depuis la fiche, puis le suivre : relances automatiques et rapport. |
-| **Agents Claude** | Sur un retour de recette ou une demande BAU, un agent prépare le correctif et ouvre la PR. |
-| **Pour toi** | Brief du matin, épingles, notes, rappels, notifications sur le Mac. |
-
 ## Installer
 
 Il te faut [uv](https://docs.astral.sh/uv/), un accès au Notion Padoa et, pour en profiter vraiment, [Claude Code](https://claude.com/claude-code) connecté à Notion.
@@ -27,6 +16,17 @@ uv run uvicorn deploy_hub.main:app --port 8765
 ```
 
 Ouvre http://localhost:8765. Aucun réglage n'est nécessaire pour démarrer : Jarvis crée tout seul son dossier `data/`.
+
+## Ce qu'on y trouve
+
+| | |
+|---|---|
+| **Accueil** | Retards, échéances, injections KO, prochains jalons, ce qui a changé depuis ta dernière visite. |
+| **Fiche client** | Synthèse, jalons, injections par ressource, actions par équipe, retours de recette, règles de reprise, CED, PR. |
+| **BAU** | Les demandes de l'équipe, en liste ou en kanban, par squad. |
+| **DAGs** | Lancer un DAG depuis la fiche, puis le suivre : relances automatiques et rapport. |
+| **Agents Claude** | Sur un retour de recette ou une demande BAU, un agent prépare le correctif et ouvre la PR. |
+| **Pour toi** | Brief du matin, épingles, notes, rappels, notifications sur le Mac. |
 
 ## Premiers pas
 
