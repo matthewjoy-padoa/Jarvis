@@ -9,16 +9,16 @@
    Ce qui ne change pas ici : les animations utiles (attente, avancement d'une synchro, « Enregistré » qui s'efface) et les
    barres d'avancement, qui gardent leurs bouts ronds. */
 html:root[data-style="sobre"] {
-  --bg: light-dark(#f4f5f7, #131519); --surface: light-dark(#ffffff, #1a1d23); --text: light-dark(#1a202c, #e2e5ea);
-  --muted: light-dark(#5c6675, #96a0ad); --border: light-dark(#dfe3e8, #2a2f38);
-  --accent: light-dark(#23468c, #8fb0ea); --accent-soft: light-dark(#e7edf7, #222c3f); --on-accent: light-dark(#ffffff, #10141b);
+  --bg: light-dark(#f4f5f7, #20242b); --surface: light-dark(#ffffff, #292e36); --text: light-dark(#1a202c, #e2e5ea);
+  --muted: light-dark(#5c6675, #a4adba); --border: light-dark(#dfe3e8, #3d444f);
+  --accent: light-dark(#23468c, #8fb0ea); --accent-soft: light-dark(#e7edf7, #2e3b55); --on-accent: light-dark(#ffffff, #10141b);
   --cyan: light-dark(#2c6a8d, #86b8d4); --on-status: light-dark(#ffffff, #131519);
   --st-todo: light-dark(#a06600, #d2a550); --st-progress: light-dark(#2b5cab, #8fb0ea);
   --st-ko: light-dark(#b3261e, #e58b82); --st-done: light-dark(#1d7044, #77c093);
   --pa-todo: light-dark(#faefd2, rgba(210, 165, 80, .18)); --pa-progress: light-dark(#e3ebf8, rgba(143, 176, 234, .18));
   --pa-ko: light-dark(#fae3e0, rgba(229, 139, 130, .18)); --pa-done: light-dark(#dbefe2, rgba(119, 192, 147, .18));
   --radius: 6px; --line: 1px; --shadow: none; --shadow-card: none;
-  --shadow-lift: 0 6px 16px -8px light-dark(rgba(16, 24, 40, .25), rgba(0, 0, 0, .7));
+  --shadow-lift: 0 6px 16px -8px light-dark(rgba(16, 24, 40, .25), rgba(0, 0, 0, .5));
   --ring: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
 
   body { font-size: 13.5px; }
