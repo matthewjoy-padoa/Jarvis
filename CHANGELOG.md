@@ -11,6 +11,10 @@ Pour une PR qui monte le numéro :
 
 La version affichée en bas de chaque page change donc avec chaque fonctionnalité ; après une simple correction, le bandeau « Jarvis est à relancer » compare les commits. Deux PR ouvertes en même temps : la seconde fusionnée prend le numéro suivant (conflit à résoudre dans ces trois fichiers). Un test vérifie que les trois numéros concordent et que le premier chiffre reste 0 (`tests/test_versions.py`). Le tag `v0.x.y` sur `main` reste facultatif.
 
+## [0.8.6] · 2026-11-27
+
+- Plus besoin de régler le dossier de l'orchestrator : au premier lancement, quand `ORCHESTRATOR_DIR` est vide, Jarvis cherche sous le dossier personnel (trois niveaux) le dépôt git dont l'origine est `integration-orchestrator`, prend le plus récemment mis à jour s'il y en a plusieurs, et le note dans `.env` : le choix est fait une fois et ne change plus tout seul. Réglages → Dossiers dit ce qui a été trouvé, et quels clones ne sont pas retenus. Un dossier déjà renseigné (dans `.env` ou hors `.env`, comme `vm.conf`) n'est jamais remplacé.
+
 ## [0.8.5] · 2026-11-27
 
 - README allégé : ce qu'est Jarvis, installer, premiers pas, mises à jour, où lire la suite. Le détail de chaque fonction passe dans [`docs/guide.md`](docs/guide.md), les réglages et les secrets dans [`docs/reglages.md`](docs/reglages.md), sans rien retirer.

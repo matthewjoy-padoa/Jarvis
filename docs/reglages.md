@@ -15,7 +15,7 @@ Tous facultatifs. La page **Réglages** (accessible seulement en local, par exem
 | `JARVIS_NOTION_BAU` | Lien (ou id) de la page projet ou BAU dont Jarvis suit les demandes, page **BAU** (vide : « BAU équipe intégration - TECHNIQUE ») |
 | `AIRFLOW_BASE_URL`, `AIRFLOW_USER`, `AIRFLOW_PASSWORD` | Lancement réel des DAGs |
 | `JARVIS_DAG_MAX_CLEARS`, `JARVIS_DAG_INTERVAL_S` | Suivi des runs : relances automatiques au plus (0 : aucune), secondes entre deux vérifications |
-| `ORCHESTRATOR_DIR` | Clone local de l'orchestrator : DAGs proposés, agents Claude, PR (vide : `~/integration-orchestrator`) |
+| `ORCHESTRATOR_DIR` | Clone local de l'orchestrator : DAGs proposés, agents Claude, PR (vide au premier lancement : cherché sous le dossier personnel, puis noté dans `.env`) |
 | `CLAUDE_BIN`, `JARVIS_AGENT_*` | Agents Claude |
 | `FLOW_DIGGER_DIR`, `FLOW_DIGGER_PORT`, `FLOW_DIGGER_URL` | Bouton Flow Digger (dossier, port 4004, adresse si le transfert de port en change) |
 | `INTECG_DIR`, `INTECG_URL` | InteCG, le jeu de cartes de l'équipe : dossier de son dépôt (vide : cherché aux emplacements habituels, dont `~/Dev/Apps/intecg`) et son adresse (vide : `http://localhost:5173` si le dépôt est sur la machine, sinon pas de lien). Voir [InteCG](guide.md#intecg) |

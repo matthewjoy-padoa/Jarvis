@@ -243,3 +243,17 @@ def test_settings_are_split_into_parts_with_a_summary(env):
     assert [g for g in ("Moteur", "Limites", "Permissions et dossiers") if f'<h3 class="settings-group">{g}</h3>' in agents] \
         == ["Moteur", "Limites", "Permissions et dossiers"]
     assert agents.index("Limites") < agents.index('name="JARVIS_AGENT_MAX_TURNS"') < agents.index("Permissions et dossiers")
+
+
+def test_the_orchestrator_clone_is_searched_once_and_written_to_the_env_file(env, monkeypatch, tmp_path):
+    """Premier lancement sans ORCHESTRATOR_DIR : le clone trouvé est noté dans .env (le plus récent d'abord), les autres sont
+    cités ; ensuite le réglage existe et plus rien n'est cherché. Aucun clone : rien n'est écrit, la note le dit."""
+    kept, other = tmp_path / "Dev" / "integration-orchestrator", tmp_path / "integration-orchestrator"
+    monkeypatch.setattr(env_file, "orchestrator_clones", lambda: [])
+    assert "Aucun clone trouvé" in env_file.find_orchestrator_once() and "ORCHESTRATOR_DIR" not in env.read_text()
+    monkeypatch.setattr(env_file, "orchestrator_clones", lambda: [kept, other])
+    note = env_file.find_orchestrator_once()
+    assert f"ORCHESTRATOR_DIR={kept}" in env.read_text().splitlines() and os.environ["ORCHESTRATOR_DIR"] == str(kept)
+    assert "noté ici" in note and str(other) in note and "CLAUDE_BIN=claude  # garde-moi" in env.read_text()
+    monkeypatch.setattr(env_file, "orchestrator_clones", lambda: pytest.fail("déjà réglé : pas de nouvelle recherche"))
+    assert env_file.find_orchestrator_once() == ""

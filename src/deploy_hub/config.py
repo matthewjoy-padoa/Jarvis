@@ -182,12 +182,52 @@ def ensure_private_dirs(root: Path = PROJECT_ROOT) -> None:
         raise SystemExit("Jarvis ne démarre pas : " + " ".join(problems))
 
 
+ORCHESTRATOR_REPO = "integration-orchestrator"
+SEARCH_DEPTH = 3  # ~/Dev/Apps/<clone> au plus : assez pour les emplacements habituels, et le parcours reste sous la seconde
+SKIPPED_DIRS = {"node_modules", "Library", "logs"}  # lourds ou sans clone ; les dossiers cachés sont sautés aussi
+
+
+def git_origin(folder: Path, timeout: float = 10) -> str:
+    """Adresse d'origine du dépôt git de ce dossier ; "" sans dépôt, sans origine, ou si git est absent ou bloqué."""
+    try:
+        return subprocess.run(["git", "-C", str(folder), "remote", "get-url", "origin"],
+                              capture_output=True, text=True, timeout=timeout).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def orchestrator_clones(home: Path | None = None) -> list[Path]:
+    """Clones de integration-orchestrator sous le dossier personnel : les dépôts git (pas leurs worktrees) dont l'origine
+    nomme ce dépôt, le plus récemment mis à jour (dernier fetch) d'abord. Ne lit que des noms de dossiers et l'adresse
+    d'origine de chaque dépôt rencontré ; ne descend pas dans un dépôt."""
+    found, pending = [], [(home or Path.home(), 0)]
+    while pending:
+        folder, depth = pending.pop()
+        if depth and (folder / ".git").is_dir():  # pas le dossier personnel lui-même, parfois versionné (dotfiles)
+            if ORCHESTRATOR_REPO in git_origin(folder, timeout=2):  # délai court : un dépôt bloqué ne retient pas le démarrage
+                found.append(folder)
+            continue
+        if depth == SEARCH_DEPTH:
+            continue
+        try:
+            pending += [(Path(entry.path), depth + 1) for entry in os.scandir(folder)
+                        if entry.is_dir(follow_symlinks=False) and not entry.name.startswith(".") and entry.name not in SKIPPED_DIRS]
+        except OSError:
+            pass  # dossier illisible : on passe
+
+    def updated(clone: Path) -> float:
+        fetched = clone / ".git" / "FETCH_HEAD"
+        return (fetched if fetched.exists() else clone / ".git" / "HEAD").stat().st_mtime
+    return sorted(found, key=updated, reverse=True)
+
+
 def load_settings() -> Settings:
     return Settings(
         deployments_dir=deployments_dir(),
         airflow_base_url=os.getenv("AIRFLOW_BASE_URL", "http://localhost:8080"),
-        # « ORCHESTRATOR_DIR= » (vide, comme dans .env.example) : valeur par défaut, pas « . » (le dossier de Jarvis, vu sur la VM)
-        orchestrator_dir=Path(os.getenv("ORCHESTRATOR_DIR") or "~/integration-orchestrator").expanduser(),
+        # « ORCHESTRATOR_DIR= » (vide, comme dans .env.example) et aucun clone trouvé au premier lancement
+        # (env_file.find_orchestrator_once) : valeur par défaut, pas « . » (le dossier de Jarvis, vu sur la VM)
+        orchestrator_dir=Path(os.getenv("ORCHESTRATOR_DIR") or f"~/{ORCHESTRATOR_REPO}").expanduser(),
     )
 
 
