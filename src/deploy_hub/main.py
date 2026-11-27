@@ -43,6 +43,7 @@ from deploy_hub.sources.sync_routine import SyncRoutine
 from deploy_hub.sources import connections, flow_digger, notion_api, running_code
 from deploy_hub.sources.external import external_statuses
 from deploy_hub.sources.journal import changes_since, group_changes
+from deploy_hub.sources import intecg
 from deploy_hub.sources import watchers
 from deploy_hub.sources.notifications import Notification, NotificationStore
 from deploy_hub.sources.personal import PersonalStore, remind_date
@@ -72,6 +73,9 @@ dag_source = DagSource(settings.orchestrator_dir, dag_catalogue.LOCAL)
 dag_chains = ChainRunner(data_dir() / "airflow" / "chaines.json",
                          lambda dag_id, padoa_env, slug, card: _launch_watched(dag_id, padoa_env, fiches.get_deployment(slug), card), notifications)
 dag_watch.on_end = dag_chains.watch_ended
+# InteCG (jeu de cartes de l'équipe, dépôt à part) : un DAG ou un agent lancé ici rapporte un booster dans le jeu.
+boosters = intecg.Boosters(notifications)
+claude.on_launch = lambda run: boosters.earned("agent", run.id, run.started_at, "Agent lancé", run.client)
 web_push = WebPush(data_dir() / "push")  # notifications du Mac même onglet fermé (voir sources/web_push.py)
 personal = PersonalStore(data_dir() / "perso.json")  # épingles, notes et rappels : à moi seul, jamais dans Notion
 _refresh_lock = threading.Lock()  # un seul rafraîchissement Notion à la fois
@@ -379,6 +383,7 @@ templates.env.globals["auto_sync_every"] = auto_sync_every  # bouton « Synchro 
 templates.env.globals["auto_sync_note"] = auto_sync_note
 templates.env.tests["drive"] = client_config.is_drive  # {% if l.url is drive %} : logo Google Drive dans le dock
 templates.env.tests["notion"] = client_config.is_notion  # {% if l.url is notion %} : logo Notion dans le dock
+templates.env.globals["intecg_url"] = intecg.url  # lien InteCG du pied de page et animation du booster gagné (base.html)
 templates.env.globals["jarvis_version"] = _version_started  # pied de page ; historique dans CHANGELOG.md
 templates.env.globals["jarvis_commit"] = _code_started[:7]
 templates.env.globals["update_for"] = update_for  # bandeau « à relancer » ou « nouvelle version » (base.html)
@@ -1168,6 +1173,24 @@ def open_flow_digger(request: Request, forcer: str = Form(""), relancer: str = F
     return _render(request, "outil.html", "", tool="Flow Digger", launch=launch, action="/outils/flow-digger")
 
 
+@app.get("/outils/intecg")
+def intecg_reloaded():
+    """Onglet rechargé : rien n'est lancé par un GET, retour à l'accueil."""
+    return RedirectResponse("/", status_code=303)
+
+
+@app.post("/outils/intecg")
+def open_intecg(request: Request, forcer: str = Form("")):
+    """Démarre InteCG (le jeu de cartes de l'équipe) sur la machine de Jarvis s'il ne tourne pas, dépôt mis à jour
+    d'abord, puis y emmène. forcer=1 (page d'échec) : lance la version déjà présente, sans mise à jour."""
+    if not _from_jarvis(request):
+        raise HTTPException(403, "Lancement refusé : la demande ne vient pas de Jarvis.")
+    launch = intecg.start(force=forcer == "1")
+    if launch.url:
+        return RedirectResponse(launch.url, status_code=303)
+    return _render(request, "outil.html", "", tool="InteCG", launch=launch, action="/outils/intecg")
+
+
 # ---- Réglages : .env, connexions et 1Password depuis l'app -------------------------------------------------------
 
 def _reload_connections() -> None:
@@ -1349,6 +1372,7 @@ def _launch_watched(dag_id: str, padoa_env: str, d: Deployment | None = None, ca
             next((c["customer"] for c in dag_catalogue.ced_for(customers) if c["dag_id"] == dag_id), "")  # client du catalogue
         w = dag_watch.start(d.slug if d else "", d.client if d else "", customer, dag_id, result.run_id, padoa_env, card)
         result.message += f" · suivi #{w.id} lancé (relances automatiques, rapport à la fin) : Agents → DAG"
+        boosters.earned("dag", w.id, w.started_at, "DAG lancé", w.client)
     return result, w
 
 
